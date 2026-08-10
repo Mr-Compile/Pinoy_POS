@@ -202,8 +202,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                     keyboardType: TextInputType.number,
                     textInputAction: TextInputAction.next,
                     validator: (value) => Validators.compose([
-                      Validators.required(value, 'Price'),
-                      Validators.positiveNumber(value, 'Price'),
+                      (v) => Validators.required(v, 'Price'),
+                      (v) => Validators.positiveNumber(v, 'Price'),
                     ], value),
                     onChanged: (value) {
                       if (!hasChanges) {
@@ -224,8 +224,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                     keyboardType: TextInputType.number,
                     textInputAction: TextInputAction.next,
                     validator: (value) => Validators.compose([
-                      Validators.required(value, 'Stock'),
-                      Validators.nonNegativeNumber(value, 'Stock'),
+                      (v) => Validators.required(v, 'Stock'),
+                      (v) => Validators.nonNegativeNumber(v, 'Stock'),
                     ], value),
                     onChanged: (value) {
                       if (!hasChanges) {
@@ -310,6 +310,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                 selectedCategoryId,
                 product,
                 setState,
+                (value) => setState(() => isSaving = value),
               ),
               label: 'Save',
             ),
@@ -328,6 +329,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     int? selectedCategoryId,
     Product? product,
     StateSetter setState,
+    ValueChanged<bool> setSaving,
   ) async {
     if (!formKey.currentState!.validate()) {
       return;
@@ -347,9 +349,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
       return;
     }
 
-    setState(() {
-      isSaving = true;
-    });
+    setSaving(true);
 
     try {
       final productData = Product(
@@ -390,11 +390,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
         showErrorSnackbar(context, 'Failed to save product');
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          isSaving = false;
-        });
-      }
+      setSaving(false);
     }
   }
 }
