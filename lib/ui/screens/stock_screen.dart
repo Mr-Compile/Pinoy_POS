@@ -7,7 +7,9 @@ import 'package:pinoy_pos/services/stock_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
-import 'package:pinoy_pos/ui/widgets/confirm_dialog.dart';
+import 'package:pinoy_pos/ui/widgets/enhanced_dialogs.dart';
+import 'package:pinoy_pos/ui/widgets/success_snackbar.dart';
+import 'package:pinoy_pos/ui/widgets/error_snackbar.dart';
 
 class StockScreen extends ConsumerStatefulWidget {
   const StockScreen({super.key});
@@ -21,6 +23,7 @@ class _StockScreenState extends ConsumerState<StockScreen> {
   final StockService _stockService = StockService();
   List<Product> _products = [];
   bool _isLoading = true;
+  bool _isProcessing = false;
 
   @override
   void initState() {
@@ -44,24 +47,61 @@ class _StockScreenState extends ConsumerState<StockScreen> {
   }
 
   Future<void> _adjustStock(Product product, int adjustment) async {
-    final confirmed = await showConfirmDialog(
+    final authNotifier = ref.read(authStateProvider.notifier);
+    if (!authNotifier.hasPermission('add_stock')) {
+      EnhancedDialogs.showAccessDeniedDialog(context: context);
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
       context: context,
-      title: 'Adjust Stock',
-      message: adjustment > 0
-          ? 'Add $adjustment to ${product.name}?'
-          : 'Remove ${-adjustment} from ${product.name}?',
+      builder: (context) => AlertDialog(
+        title: const Text('Adjust Stock'),
+        content: Text(adjustment > 0
+            ? 'Add $adjustment to ${product.name}?'
+            : 'Remove ${-adjustment} from ${product.name}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
     );
 
-    if (confirmed == true) {
-      await _stockService.adjustStock(product.id!, adjustment, 'Manual adjustment');
-      _loadProducts();
+    if (confirmed == true && mounted) {
+      setState(() {
+        _isProcessing = true;
+      });
+
+      try {
+        await _stockService.adjustStock(product.id!, adjustment, 'Manual adjustment');
+        if (mounted) {
+          showSuccessSnackbar(context, 'Stock adjusted successfully');
+          _loadProducts();
+        }
+      } catch (e) {
+        if (mounted) {
+          showErrorSnackbar(context, 'Failed to adjust stock');
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isProcessing = false;
+          });
+        }
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final authNotifier = ref.read(authStateProvider.notifier);
-    final canAdjust = authNotifier.hasPermission('adjust_stock');
+    final canAdjust = authNotifier.hasPermission('add_stock');
 
     if (_isLoading) {
       return Scaffold(
@@ -102,11 +142,11 @@ class _StockScreenState extends ConsumerState<StockScreen> {
                               children: [
                                 IconButton(
                                   icon: const Icon(Icons.add),
-                                  onPressed: () => _adjustStock(product, 10),
+                                  onPressed: _isProcessing ? null : () => _adjustStock(product, 10),
                                 ),
                                 IconButton(
                                   icon: const Icon(Icons.remove),
-                                  onPressed: () => _adjustStock(product, -10),
+                                  onPressed: _isProcessing ? null : () => _adjustStock(product, -10),
                                 ),
                               ],
                             )
@@ -138,11 +178,11 @@ class _StockScreenState extends ConsumerState<StockScreen> {
                                     children: [
                                       IconButton(
                                         icon: const Icon(Icons.add),
-                                        onPressed: () => _adjustStock(product, 10),
+                                        onPressed: _isProcessing ? null : () => _adjustStock(product, 10),
                                       ),
                                       IconButton(
                                         icon: const Icon(Icons.remove),
-                                        onPressed: () => _adjustStock(product, -10),
+                                        onPressed: _isProcessing ? null : () => _adjustStock(product, -10),
                                       ),
                                     ],
                                   )

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 void showSuccessSnackbar(BuildContext context, String message) {
+  ScaffoldMessenger.of(context).clearSnackBars();
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
       content: Row(
@@ -12,6 +13,7 @@ void showSuccessSnackbar(BuildContext context, String message) {
       ),
       backgroundColor: Colors.green,
       behavior: SnackBarBehavior.floating,
+      duration: const Duration(seconds: 3),
     ),
   );
 }

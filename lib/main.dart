@@ -6,7 +6,7 @@ import 'package:pinoy_pos/core/database_seeder.dart';
 import 'package:pinoy_pos/providers/theme_provider.dart';
 import 'package:pinoy_pos/ui/app_shell.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   // Initialize database

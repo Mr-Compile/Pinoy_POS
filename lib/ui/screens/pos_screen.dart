@@ -6,6 +6,10 @@ import 'package:pinoy_pos/services/product_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
+import 'package:pinoy_pos/ui/widgets/loading_button.dart';
+import 'package:pinoy_pos/ui/widgets/success_snackbar.dart';
+import 'package:pinoy_pos/ui/widgets/error_snackbar.dart';
+import 'package:pinoy_pos/ui/widgets/enhanced_dialogs.dart';
 
 class POSScreen extends ConsumerStatefulWidget {
   const POSScreen({super.key});
@@ -19,6 +23,7 @@ class _POSScreenState extends ConsumerState<POSScreen> {
   List<Product> _products = [];
   final Map<int, int> _cart = {};
   bool _isLoading = true;
+  bool _isProcessing = false;
 
   @override
   void initState() {
@@ -44,15 +49,35 @@ class _POSScreenState extends ConsumerState<POSScreen> {
   double get _total {
     double total = 0;
     _cart.forEach((productId, quantity) {
-      final product = _products.firstWhere((p) => p.id == productId);
-      total += product.price * quantity;
+      try {
+        final product = _products.firstWhere((p) => p.id == productId);
+        total += product.price * quantity;
+      } catch (e) {
+        // Product not found, skip this cart item
+      }
     });
     return total;
   }
 
   void _addToCart(Product product) {
+    if (product.id == null) {
+      showErrorSnackbar(context, 'Invalid product');
+      return;
+    }
+
+    if (product.stock <= 0) {
+      showErrorSnackbar(context, 'Product is out of stock');
+      return;
+    }
+    
+    final currentQuantity = _cart[product.id!] ?? 0;
+    if (currentQuantity >= product.stock) {
+      showErrorSnackbar(context, 'Not enough stock available');
+      return;
+    }
+    
     setState(() {
-      _cart[product.id!] = (_cart[product.id!] ?? 0) + 1;
+      _cart[product.id!] = currentQuantity + 1;
     });
   }
 
@@ -70,6 +95,13 @@ class _POSScreenState extends ConsumerState<POSScreen> {
 
   Future<void> _checkout() async {
     if (_cart.isEmpty) {
+      showErrorSnackbar(context, 'Cart is empty');
+      return;
+    }
+
+    final authNotifier = ref.read(authStateProvider.notifier);
+    if (!authNotifier.hasPermission('create_sales')) {
+      EnhancedDialogs.showAccessDeniedDialog(context: context);
       return;
     }
 
@@ -77,7 +109,15 @@ class _POSScreenState extends ConsumerState<POSScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Confirm Sale'),
-        content: Text('Total: ₱${_total.toStringAsFixed(2)}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Total: ₱${_total.toStringAsFixed(2)}'),
+            const SizedBox(height: 8),
+            Text('Items: ${_cart.length}'),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -91,11 +131,30 @@ class _POSScreenState extends ConsumerState<POSScreen> {
       ),
     );
 
-    if (confirmed == true) {
-      // Will implement actual sale in next step
+    if (confirmed == true && mounted) {
       setState(() {
-        _cart.clear();
+        _isProcessing = true;
       });
+
+      try {
+        // Will implement actual sale in next step
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        if (mounted) {
+          setState(() {
+            _cart.clear();
+            _isProcessing = false;
+          });
+          showSuccessSnackbar(context, 'Sale completed successfully');
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _isProcessing = false;
+          });
+          showErrorSnackbar(context, 'Failed to complete sale');
+        }
+      }
     }
   }
 
@@ -179,7 +238,7 @@ class _POSScreenState extends ConsumerState<POSScreen> {
                       children: [
                         IconButton(
                           icon: const Icon(Icons.remove),
-                          onPressed: quantity > 0
+                          onPressed: quantity > 0 && product.id != null
                               ? () => _removeFromCart(product.id!)
                               : null,
                         ),
@@ -192,7 +251,7 @@ class _POSScreenState extends ConsumerState<POSScreen> {
                         ),
                         IconButton(
                           icon: const Icon(Icons.add),
-                          onPressed: product.stock > 0
+                          onPressed: product.stock > 0 && product.id != null
                               ? () => _addToCart(product)
                               : null,
                         ),
@@ -239,9 +298,10 @@ class _POSScreenState extends ConsumerState<POSScreen> {
                   const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
-                    child: FilledButton(
+                    child: LoadingButton(
+                      isLoading: _isProcessing,
                       onPressed: canSell ? _checkout : null,
-                      child: const Text('Checkout'),
+                      label: 'Checkout',
                     ),
                   ),
                 ],
@@ -301,7 +361,7 @@ class _POSScreenState extends ConsumerState<POSScreen> {
                       children: [
                         IconButton(
                           icon: const Icon(Icons.remove),
-                          onPressed: quantity > 0
+                          onPressed: quantity > 0 && product.id != null
                               ? () => _removeFromCart(product.id!)
                               : null,
                         ),
@@ -314,7 +374,7 @@ class _POSScreenState extends ConsumerState<POSScreen> {
                         ),
                         IconButton(
                           icon: const Icon(Icons.add),
-                          onPressed: product.stock > 0
+                          onPressed: product.stock > 0 && product.id != null
                               ? () => _addToCart(product)
                               : null,
                         ),
@@ -393,9 +453,10 @@ class _POSScreenState extends ConsumerState<POSScreen> {
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
-                  child: FilledButton(
+                  child: LoadingButton(
+                    isLoading: _isProcessing,
                     onPressed: canSell ? _checkout : null,
-                    child: const Text('Checkout'),
+                    label: 'Checkout',
                   ),
                 ),
               ],

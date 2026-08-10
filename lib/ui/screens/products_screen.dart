@@ -8,7 +8,11 @@ import 'package:pinoy_pos/services/category_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
-import 'package:pinoy_pos/ui/widgets/confirm_dialog.dart';
+import 'package:pinoy_pos/ui/widgets/enhanced_dialogs.dart';
+import 'package:pinoy_pos/ui/widgets/success_snackbar.dart';
+import 'package:pinoy_pos/ui/widgets/error_snackbar.dart';
+import 'package:pinoy_pos/ui/widgets/validators.dart';
+import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 
 class ProductsScreen extends ConsumerStatefulWidget {
   const ProductsScreen({super.key});
@@ -48,15 +52,29 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
   }
 
   Future<void> _deleteProduct(Product product) async {
-    final confirmed = await showConfirmDialog(
+    final authNotifier = ref.read(authStateProvider.notifier);
+    if (!authNotifier.hasPermission('delete_products')) {
+      EnhancedDialogs.showAccessDeniedDialog(context: context);
+      return;
+    }
+
+    final confirmed = await EnhancedDialogs.showDeleteDialog(
       context: context,
-      title: 'Delete Product',
-      message: 'Are you sure you want to delete ${product.name}?',
+      itemName: product.name,
     );
 
-    if (confirmed == true) {
-      await _productService.deleteProduct(product.id!);
-      _loadData();
+    if (confirmed == true && mounted) {
+      try {
+        await _productService.deleteProduct(product.id!);
+        if (mounted) {
+          showSuccessSnackbar(context, 'Product deleted successfully');
+          _loadData();
+        }
+      } catch (e) {
+        if (mounted) {
+          showErrorSnackbar(context, 'Failed to delete product');
+        }
+      }
     }
   }
 
@@ -142,6 +160,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     final stockController = TextEditingController(text: product?.stock.toString() ?? '');
     final barcodeController = TextEditingController(text: product?.barcode ?? '');
     int? selectedCategoryId = product?.categoryId;
+    bool hasChanges = false;
+    bool isSaving = false;
 
     showDialog(
       context: context,
@@ -160,12 +180,17 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                       labelText: 'Product Name',
                       border: OutlineInputBorder(),
                     ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Product name is required';
+                    autofocus: true,
+                    textInputAction: TextInputAction.next,
+                    validator: (value) => Validators.required(value, 'Product name'),
+                    onChanged: (value) {
+                      if (!hasChanges) {
+                        setState(() {
+                          hasChanges = true;
+                        });
                       }
-                      return null;
                     },
+                    onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
@@ -175,16 +200,19 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                       border: OutlineInputBorder(),
                     ),
                     keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Price is required';
+                    textInputAction: TextInputAction.next,
+                    validator: (value) => Validators.compose([
+                      Validators.required(value, 'Price'),
+                      Validators.positiveNumber(value, 'Price'),
+                    ], value),
+                    onChanged: (value) {
+                      if (!hasChanges) {
+                        setState(() {
+                          hasChanges = true;
+                        });
                       }
-                      final price = double.tryParse(value);
-                      if (price == null || price <= 0) {
-                        return 'Price must be greater than 0';
-                      }
-                      return null;
                     },
+                    onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
@@ -194,16 +222,19 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                       border: OutlineInputBorder(),
                     ),
                     keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Stock is required';
+                    textInputAction: TextInputAction.next,
+                    validator: (value) => Validators.compose([
+                      Validators.required(value, 'Stock'),
+                      Validators.nonNegativeNumber(value, 'Stock'),
+                    ], value),
+                    onChanged: (value) {
+                      if (!hasChanges) {
+                        setState(() {
+                          hasChanges = true;
+                        });
                       }
-                      final stock = int.tryParse(value);
-                      if (stock == null || stock < 0) {
-                        return 'Stock must be 0 or greater';
-                      }
-                      return null;
                     },
+                    onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
@@ -212,6 +243,15 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                       labelText: 'Barcode',
                       border: OutlineInputBorder(),
                     ),
+                    textInputAction: TextInputAction.next,
+                    onChanged: (value) {
+                      if (!hasChanges) {
+                        setState(() {
+                          hasChanges = true;
+                        });
+                      }
+                    },
+                    onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<int>(
@@ -229,7 +269,14 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                     onChanged: (value) {
                       setState(() {
                         selectedCategoryId = value;
+                        hasChanges = true;
                       });
+                    },
+                    validator: (value) {
+                      if (value == null) {
+                        return 'Category is required';
+                      }
+                      return null;
                     },
                   ),
                 ],
@@ -238,48 +285,116 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
               onPressed: () async {
-                if (!formKey.currentState!.validate()) {
-                  return;
-                }
-
-                final productData = Product(
-                  name: nameController.text,
-                  price: double.parse(priceController.text),
-                  stock: int.parse(stockController.text),
-                  barcode: barcodeController.text,
-                  categoryId: selectedCategoryId,
-                  createdAt: DateTime.now(),
-                );
-
-                if (product == null) {
-                  await _productService.createProduct(productData);
-                } else {
-                  await _productService.updateProduct(
-                    product.copyWith(
-                      name: productData.name,
-                      price: productData.price,
-                      stock: productData.stock,
-                      barcode: productData.barcode,
-                      categoryId: productData.categoryId,
-                    ),
+                if (hasChanges) {
+                  final discard = await EnhancedDialogs.showUnsavedChangesDialog(
+                    context: context,
                   );
-                }
-
-                if (context.mounted) {
+                  if (discard == true && context.mounted) {
+                    Navigator.pop(context);
+                  }
+                } else {
                   Navigator.pop(context);
-                  _loadData();
                 }
               },
-              child: const Text('Save'),
+              child: const Text('Cancel'),
+            ),
+            LoadingButton(
+              isLoading: isSaving,
+              onPressed: () => _saveProduct(
+                formKey,
+                nameController,
+                priceController,
+                stockController,
+                barcodeController,
+                selectedCategoryId,
+                product,
+                setState,
+              ),
+              label: 'Save',
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _saveProduct(
+    GlobalKey<FormState> formKey,
+    TextEditingController nameController,
+    TextEditingController priceController,
+    TextEditingController stockController,
+    TextEditingController barcodeController,
+    int? selectedCategoryId,
+    Product? product,
+    StateSetter setState,
+  ) async {
+    if (!formKey.currentState!.validate()) {
+      return;
+    }
+
+    final name = nameController.text.trim();
+    
+    // Check for duplicate product name within same category
+    final isDuplicate = _products.any((p) => 
+      p.name.toLowerCase() == name.toLowerCase() && 
+      p.categoryId == selectedCategoryId &&
+      (product == null || p.id != product.id)
+    );
+    
+    if (isDuplicate) {
+      showErrorSnackbar(context, 'Product name already exists in this category');
+      return;
+    }
+
+    setState(() {
+      isSaving = true;
+    });
+
+    try {
+      final productData = Product(
+        name: name,
+        price: double.parse(priceController.text),
+        stock: int.parse(stockController.text),
+        barcode: barcodeController.text.trim(),
+        categoryId: selectedCategoryId,
+        createdAt: DateTime.now(),
+      );
+
+      if (product == null) {
+        await _productService.createProduct(productData);
+        if (mounted) {
+          showSuccessSnackbar(context, 'Product created successfully');
+        }
+      } else {
+        await _productService.updateProduct(
+          product.copyWith(
+            name: productData.name,
+            price: productData.price,
+            stock: productData.stock,
+            barcode: productData.barcode,
+            categoryId: productData.categoryId,
+          ),
+        );
+        if (mounted) {
+          showSuccessSnackbar(context, 'Product updated successfully');
+        }
+      }
+
+      if (mounted) {
+        Navigator.pop(context);
+        _loadData();
+      }
+    } catch (e) {
+      if (mounted) {
+        showErrorSnackbar(context, 'Failed to save product');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          isSaving = false;
+        });
+      }
+    }
   }
 }

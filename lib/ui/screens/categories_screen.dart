@@ -6,7 +6,11 @@ import 'package:pinoy_pos/services/category_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
-import 'package:pinoy_pos/ui/widgets/confirm_dialog.dart';
+import 'package:pinoy_pos/ui/widgets/enhanced_dialogs.dart';
+import 'package:pinoy_pos/ui/widgets/success_snackbar.dart';
+import 'package:pinoy_pos/ui/widgets/error_snackbar.dart';
+import 'package:pinoy_pos/ui/widgets/validators.dart';
+import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 
 class CategoriesScreen extends ConsumerStatefulWidget {
   const CategoriesScreen({super.key});
@@ -42,15 +46,29 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
   }
 
   Future<void> _deleteCategory(Category category) async {
-    final confirmed = await showConfirmDialog(
+    final authNotifier = ref.read(authStateProvider.notifier);
+    if (!authNotifier.hasPermission('delete_categories')) {
+      EnhancedDialogs.showAccessDeniedDialog(context: context);
+      return;
+    }
+
+    final confirmed = await EnhancedDialogs.showDeleteDialog(
       context: context,
-      title: 'Delete Category',
-      message: 'Are you sure you want to delete ${category.name}?',
+      itemName: category.name,
     );
 
-    if (confirmed == true) {
-      await _categoryService.deleteCategory(category.id!);
-      _loadCategories();
+    if (confirmed == true && mounted) {
+      try {
+        await _categoryService.deleteCategory(category.id!);
+        if (mounted) {
+          showSuccessSnackbar(context, 'Category deleted successfully');
+          _loadCategories();
+        }
+      } catch (e) {
+        if (mounted) {
+          showErrorSnackbar(context, 'Failed to delete category');
+        }
+      }
     }
   }
 
@@ -120,62 +138,138 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
   void _showCategoryDialog({Category? category}) {
     final formKey = GlobalKey<FormState>();
     final nameController = TextEditingController(text: category?.name ?? '');
+    bool hasChanges = false;
+    bool isSaving = false;
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(category == null ? 'Add Category' : 'Edit Category'),
-        content: Form(
-          key: formKey,
-          child: TextFormField(
-            controller: nameController,
-            decoration: const InputDecoration(
-              labelText: 'Category Name',
-              border: OutlineInputBorder(),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Text(category == null ? 'Add Category' : 'Edit Category'),
+          content: Form(
+            key: formKey,
+            child: TextFormField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'Category Name',
+                border: OutlineInputBorder(),
+              ),
+              autofocus: true,
+              textInputAction: TextInputAction.done,
+              validator: (value) => Validators.required(value, 'Category name'),
+              onChanged: (value) {
+                if (!hasChanges) {
+                  setState(() {
+                    hasChanges = true;
+                  });
+                }
+              },
+              onFieldSubmitted: (_) => _saveCategory(
+                formKey,
+                nameController,
+                category,
+                setState,
+                isSaving,
+              ),
             ),
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Category name is required';
-              }
-              return null;
-            },
           ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                if (hasChanges) {
+                  final discard = await EnhancedDialogs.showUnsavedChangesDialog(
+                    context: context,
+                  );
+                  if (discard == true && context.mounted) {
+                    Navigator.pop(context);
+                  }
+                } else {
+                  Navigator.pop(context);
+                }
+              },
+              child: const Text('Cancel'),
+            ),
+            LoadingButton(
+              isLoading: isSaving,
+              onPressed: () => _saveCategory(
+                formKey,
+                nameController,
+                category,
+                setState,
+                isSaving,
+              ),
+              label: 'Save',
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              if (!formKey.currentState!.validate()) {
-                return;
-              }
-
-              final categoryData = Category(
-                name: nameController.text,
-                createdAt: DateTime.now(),
-              );
-
-              if (category == null) {
-                await _categoryService.createCategory(categoryData);
-              } else {
-                await _categoryService.updateCategory(
-                  category.copyWith(
-                    name: categoryData.name,
-                  ),
-                );
-              }
-
-              if (context.mounted) {
-                Navigator.pop(context);
-                _loadCategories();
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
       ),
     );
+  }
+
+  Future<void> _saveCategory(
+    GlobalKey<FormState> formKey,
+    TextEditingController nameController,
+    Category? category,
+    StateSetter setState,
+    bool isSaving,
+  ) async {
+    if (!formKey.currentState!.validate()) {
+      return;
+    }
+
+    final name = nameController.text.trim();
+    
+    // Check for duplicate name
+    final isDuplicate = _categories.any((c) => 
+      c.name.toLowerCase() == name.toLowerCase() && 
+      (category == null || c.id != category.id)
+    );
+    
+    if (isDuplicate) {
+      showErrorSnackbar(context, 'Category name already exists');
+      return;
+    }
+
+    setState(() {
+      isSaving = true;
+    });
+
+    try {
+      final categoryData = Category(
+        name: name,
+        createdAt: DateTime.now(),
+      );
+
+      if (category == null) {
+        await _categoryService.createCategory(categoryData);
+        if (mounted) {
+          showSuccessSnackbar(context, 'Category created successfully');
+        }
+      } else {
+        await _categoryService.updateCategory(
+          category.copyWith(
+            name: categoryData.name,
+          ),
+        );
+        if (mounted) {
+          showSuccessSnackbar(context, 'Category updated successfully');
+        }
+      }
+
+      if (mounted) {
+        Navigator.pop(context);
+        _loadCategories();
+      }
+    } catch (e) {
+      if (mounted) {
+        showErrorSnackbar(context, 'Failed to save category');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          isSaving = false;
+        });
+      }
+    }
   }
 }

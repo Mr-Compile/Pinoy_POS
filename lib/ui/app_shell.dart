@@ -11,6 +11,7 @@ import 'package:pinoy_pos/ui/screens/users_screen.dart';
 import 'package:pinoy_pos/ui/screens/settings_screen.dart';
 import 'package:pinoy_pos/ui/screens/more_screen.dart';
 import 'package:pinoy_pos/ui/screens/login_screen.dart';
+import 'package:pinoy_pos/ui/screens/categories_screen.dart';
 
 class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key});
@@ -130,6 +131,16 @@ class _AppShellState extends ConsumerState<AppShell> {
             label: 'Dashboard',
             icon: Icons.dashboard,
             screen: const DashboardScreen(),
+          ),
+          AppTab(
+            label: 'Categories',
+            icon: Icons.category,
+            screen: const CategoriesScreen(),
+          ),
+          AppTab(
+            label: 'Products',
+            icon: Icons.inventory_2,
+            screen: const ProductsScreen(),
           ),
           AppTab(
             label: 'Users',

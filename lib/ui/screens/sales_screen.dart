@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
+import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/services/sales_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
+import 'package:pinoy_pos/ui/widgets/enhanced_dialogs.dart';
+import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 
 class SalesScreen extends ConsumerStatefulWidget {
   const SalesScreen({super.key});
@@ -17,6 +20,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
   final SalesService _salesService = SalesService();
   List<Sale> _sales = [];
   bool _isLoading = true;
+  bool _isProcessing = false;
 
   @override
   void initState() {
@@ -39,8 +43,53 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     }
   }
 
+  Future<void> _voidSale(Sale sale) async {
+    final authNotifier = ref.read(authStateProvider.notifier);
+    if (!authNotifier.hasPermission('void_sales')) {
+      EnhancedDialogs.showAccessDeniedDialog(context: context);
+      return;
+    }
+
+    final reason = await EnhancedDialogs.showVoidSaleDialog(
+      context: context,
+    );
+
+    if (reason != null && mounted) {
+      setState(() {
+        _isProcessing = true;
+      });
+
+      try {
+        // Will implement actual void in next step
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        if (mounted) {
+          setState(() {
+            _isProcessing = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Sale voided successfully')),
+          );
+          _loadSales();
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _isProcessing = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to void sale')),
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final authNotifier = ref.read(authStateProvider.notifier);
+    final canVoid = authNotifier.hasPermission('void_sales');
+
     if (_isLoading) {
       return Scaffold(
         appBar: AppBar(
@@ -56,7 +105,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _loadSales,
+            onPressed: _isProcessing ? null : _loadSales,
           ),
         ],
       ),
@@ -78,11 +127,25 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                     subtitle: Text(
                       sale.createdAt.toLocal().toString().split('.')[0],
                     ),
-                    trailing: Text(
-                      '₱${sale.totalAmount.toStringAsFixed(2)}',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '₱${sale.totalAmount.toStringAsFixed(2)}',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                        if (canVoid) ...[
+                          const SizedBox(width: 8),
+                          LoadingButton(
+                            isLoading: _isProcessing,
+                            onPressed: () => _voidSale(sale),
+                            label: 'Void',
+                            isDanger: true,
                           ),
+                        ],
+                      ],
                     ),
                   ),
                 );

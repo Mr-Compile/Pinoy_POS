@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/services/report_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
@@ -151,8 +150,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Widget _buildQuickActions() {
-    final user = ref.read(authStateProvider).user;
-    final role = user?.role;
+    final authNotifier = ref.read(authStateProvider.notifier);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -166,21 +164,23 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           spacing: 12,
           runSpacing: 12,
           children: [
-            _buildActionButton(
-              'New Sale',
-              Icons.point_of_sale,
-              () {
-                // Navigate to POS - would need to access parent navigation
-              },
-            ),
-            _buildActionButton(
-              'Add Product',
-              Icons.add,
-              () {
-                // Navigate to Products - would need to access parent navigation
-              },
-            ),
-            if (role == UserRole.owner || role == UserRole.admin)
+            if (authNotifier.hasPermission('create_sales'))
+              _buildActionButton(
+                'New Sale',
+                Icons.point_of_sale,
+                () {
+                  // Navigate to POS - would need to access parent navigation
+                },
+              ),
+            if (authNotifier.hasPermission('edit_products'))
+              _buildActionButton(
+                'Add Product',
+                Icons.add,
+                () {
+                  // Navigate to Products - would need to access parent navigation
+                },
+              ),
+            if (authNotifier.hasPermission('manage_users'))
               _buildActionButton(
                 'Add User',
                 Icons.person_add,
@@ -188,13 +188,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   // Navigate to Users - would need to access parent navigation
                 },
               ),
-            _buildActionButton(
-              'Reports',
-              Icons.bar_chart,
-              () {
-                // Navigate to Reports - would need to access parent navigation
-              },
-            ),
+            if (authNotifier.hasPermission('view_reports'))
+              _buildActionButton(
+                'Reports',
+                Icons.bar_chart,
+                () {
+                  // Navigate to Reports - would need to access parent navigation
+                },
+              ),
           ],
         ),
       ],

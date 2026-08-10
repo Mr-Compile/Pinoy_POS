@@ -105,6 +105,11 @@ class AuthService {
       'manage_users',
       'view_settings',
       'view_more',
+      'edit_categories',
+      'edit_products',
+      'delete_categories',
+      'delete_products',
+      'view_trash',
     ];
   }
 
@@ -116,6 +121,8 @@ class AuthService {
       'view_reports',
       'view_more',
       'add_stock',
+      'create_sales',
+      'void_sales',
     ];
   }
 

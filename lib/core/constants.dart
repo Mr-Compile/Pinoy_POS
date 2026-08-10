@@ -17,7 +17,7 @@ class AppConstants {
   static const int maxDailyAIQueries = 10;
 
   // Security
-  static const int minPasswordLength = 6;
+  static const int minPasswordLength = 8;
   static const int pinLength = 4;
 
   // Stock
