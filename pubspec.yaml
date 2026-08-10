@@ -59,9 +59,6 @@ dependencies:
   # PDF/CSV Export
   pdf: ^3.11.1
   csv: ^6.0.0
-  
-  # File Handling
-  file_picker: ^5.5.0
 
 dev_dependencies:
   flutter_test:
