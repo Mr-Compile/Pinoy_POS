@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/database.dart';
 import 'package:pinoy_pos/core/constants.dart';
-import 'package:pinoy_pos/ui/screens/login_screen.dart';
+import 'package:pinoy_pos/core/database_seeder.dart';
+import 'package:pinoy_pos/providers/theme_provider.dart';
+import 'package:pinoy_pos/ui/app_shell.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -10,6 +12,10 @@ void main() async {
   // Initialize database
   final dbHelper = DatabaseHelper();
   await dbHelper.database;
+  
+  // Seed initial data
+  final seeder = DatabaseSeeder();
+  await seeder.seed();
   
   runApp(const ProviderScope(child: MyApp()));
 }
@@ -19,25 +25,13 @@ class MyApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final themeNotifier = ref.read(themeProvider.notifier);
+
     return MaterialApp(
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.green,
-          brightness: Brightness.light,
-        ),
-      ),
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.green,
-          brightness: Brightness.dark,
-        ),
-      ),
-      themeMode: ThemeMode.system,
-      home: const LoginScreen(),
+      theme: themeNotifier.getTheme(context),
+      home: const AppShell(),
     );
   }
 }

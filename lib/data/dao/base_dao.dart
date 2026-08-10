@@ -11,7 +11,7 @@ abstract class BaseDao<T> {
 
   Future<int> insert(T item) async {
     final database = await db;
-    return await database.insert(tableName, (item as dynamic).toMap());
+    return await database.insert(tableName, (item as dynamic).toMap() as Map<String, dynamic>);
   }
 
   Future<int> update(T item) async {
@@ -19,7 +19,7 @@ abstract class BaseDao<T> {
     final id = (item as dynamic).id;
     return await database.update(
       tableName,
-      item.toMap(),
+      (item as dynamic).toMap() as Map<String, dynamic>,
       where: 'id = ?',
       whereArgs: [id],
     );

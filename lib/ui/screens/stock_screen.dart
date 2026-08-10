@@ -1,0 +1,158 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/data/models/product.dart';
+import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/services/product_service.dart';
+import 'package:pinoy_pos/services/stock_service.dart';
+import 'package:pinoy_pos/ui/widgets/app_card.dart';
+import 'package:pinoy_pos/ui/widgets/empty_state.dart';
+import 'package:pinoy_pos/ui/widgets/loading_state.dart';
+import 'package:pinoy_pos/ui/widgets/confirm_dialog.dart';
+
+class StockScreen extends ConsumerStatefulWidget {
+  const StockScreen({super.key});
+
+  @override
+  ConsumerState<StockScreen> createState() => _StockScreenState();
+}
+
+class _StockScreenState extends ConsumerState<StockScreen> {
+  final ProductService _productService = ProductService();
+  final StockService _stockService = StockService();
+  List<Product> _products = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProducts();
+  }
+
+  Future<void> _loadProducts() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    final products = await _productService.getActiveProducts();
+
+    if (mounted) {
+      setState(() {
+        _products = products;
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _adjustStock(Product product, int adjustment) async {
+    final confirmed = await showConfirmDialog(
+      context: context,
+      title: 'Adjust Stock',
+      message: adjustment > 0
+          ? 'Add $adjustment to ${product.name}?'
+          : 'Remove ${-adjustment} from ${product.name}?',
+    );
+
+    if (confirmed == true) {
+      await _stockService.adjustStock(product.id!, adjustment, 'Manual adjustment');
+      _loadProducts();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final authNotifier = ref.read(authStateProvider.notifier);
+    final canAdjust = authNotifier.hasPermission('adjust_stock');
+
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Stock Management'),
+        ),
+        body: const LoadingState(),
+      );
+    }
+
+    final lowStockProducts = _products.where((p) => p.isLowStock).toList();
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Stock Management'),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (lowStockProducts.isNotEmpty) ...[
+              Text(
+                'Low Stock Alert',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: Colors.orange,
+                    ),
+              ),
+              const SizedBox(height: 12),
+              ...lowStockProducts.map((product) => AppCard(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: ListTile(
+                      title: Text(product.name),
+                      subtitle: Text('Stock: ${product.stock} (Min: ${product.minStock})'),
+                      trailing: canAdjust
+                          ? Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.add),
+                                  onPressed: () => _adjustStock(product, 10),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.remove),
+                                  onPressed: () => _adjustStock(product, -10),
+                                ),
+                              ],
+                            )
+                          : null,
+                    ),
+                  )),
+              const SizedBox(height: 24),
+            ],
+            Text(
+              'All Products',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 12),
+            _products.isEmpty
+                ? const EmptyState(
+                    icon: Icons.inventory_2,
+                    title: 'No Products',
+                    message: 'Add products to manage stock',
+                  )
+                : Column(
+                    children: _products.map((product) => AppCard(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: ListTile(
+                            title: Text(product.name),
+                            subtitle: Text('Stock: ${product.stock}'),
+                            trailing: canAdjust
+                                ? Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.add),
+                                        onPressed: () => _adjustStock(product, 10),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.remove),
+                                        onPressed: () => _adjustStock(product, -10),
+                                      ),
+                                    ],
+                                  )
+                                : null,
+                          ),
+                        )).toList(),
+                  ),
+          ],
+        ),
+      ),
+    );
+  }
+}

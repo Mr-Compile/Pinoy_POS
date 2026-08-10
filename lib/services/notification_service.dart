@@ -1,5 +1,5 @@
 import 'package:pinoy_pos/data/models/notification.dart';
-import 'package:pinoy_pos/data/repositories\notification_repository.dart';
+import 'package:pinoy_pos/data/repositories/notification_repository.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
 
 class NotificationService {
