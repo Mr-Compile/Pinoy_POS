@@ -19,4 +19,6 @@ class SaleRepository {
   Future<double> getTotalSalesForDate(DateTime date) => _saleDao.getTotalSalesForDate(date);
   Future<double> getTotalSalesForMonth(int year, int month) => _saleDao.getTotalSalesForMonth(year, month);
   Future<double> getTotalSalesForUser(int userId) => _saleDao.getTotalSalesForUser(userId);
+  Future<double> getTotalSalesForDateForUser(DateTime date, int userId) => _saleDao.getTotalSalesForDateForUser(date, userId);
+  Future<double> getTotalSalesForMonthForUser(int year, int month, int userId) => _saleDao.getTotalSalesForMonthForUser(year, month, userId);
 }

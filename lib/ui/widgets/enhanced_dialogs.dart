@@ -208,8 +208,9 @@ class EnhancedDialogs {
     required BuildContext context,
     String? message,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
-      color: Colors.black.withValues(alpha: 0.5),
+      color: colorScheme.scrim.withValues(alpha: 0.5),
       child: Center(
         child: Card(
           child: Padding(

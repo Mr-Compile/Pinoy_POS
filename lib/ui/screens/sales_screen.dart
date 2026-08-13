@@ -3,11 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/services/sales_service.dart';
+import 'package:pinoy_pos/ui/screens/sale_detail_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/enhanced_dialogs.dart';
 import 'package:pinoy_pos/ui/widgets/loading_button.dart';
+import 'package:pinoy_pos/ui/widgets/success_snackbar.dart';
+import 'package:pinoy_pos/ui/widgets/error_snackbar.dart';
 
 class SalesScreen extends ConsumerStatefulWidget {
   const SalesScreen({super.key});
@@ -60,26 +63,24 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
       });
 
       try {
-        // Will implement actual void in next step
-        await Future.delayed(const Duration(milliseconds: 500));
-        
+        final success = await _salesService.voidSale(sale.id!);
         if (mounted) {
           setState(() {
             _isProcessing = false;
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Sale voided successfully')),
-          );
-          _loadSales();
+          if (success) {
+            showSuccessSnackbar(context, 'Sale voided successfully');
+            _loadSales();
+          } else {
+            showErrorSnackbar(context, 'Failed to void sale');
+          }
         }
       } catch (e) {
         if (mounted) {
           setState(() {
             _isProcessing = false;
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to void sale')),
-          );
+          showErrorSnackbar(context, 'Failed to void sale');
         }
       }
     }
@@ -127,6 +128,14 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                     subtitle: Text(
                       sale.createdAt.toLocal().toString().split('.')[0],
                     ),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => SaleDetailScreen(sale: sale),
+                        ),
+                      );
+                    },
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [

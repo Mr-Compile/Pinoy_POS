@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/data/models/product.dart';
+import 'package:pinoy_pos/data/models/sale_item.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/services/product_service.dart';
+import 'package:pinoy_pos/services/sales_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
@@ -20,6 +22,7 @@ class POSScreen extends ConsumerStatefulWidget {
 
 class _POSScreenState extends ConsumerState<POSScreen> {
   final ProductService _productService = ProductService();
+  final SalesService _salesService = SalesService();
   List<Product> _products = [];
   final Map<int, int> _cart = {};
   bool _isLoading = true;
@@ -105,55 +108,63 @@ class _POSScreenState extends ConsumerState<POSScreen> {
       return;
     }
 
-    final confirmed = await showDialog<bool>(
+    final total = _total;
+    final result = await showDialog<_PaymentResult>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirm Sale'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Total: ₱${_total.toStringAsFixed(2)}'),
-            const SizedBox(height: 8),
-            Text('Items: ${_cart.length}'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Confirm'),
-          ),
-        ],
-      ),
+      builder: (context) => _PaymentDialog(total: total),
     );
 
-    if (confirmed == true && mounted) {
-      setState(() {
-        _isProcessing = true;
+    if (result == null || !mounted) return;
+
+    setState(() {
+      _isProcessing = true;
+    });
+
+    try {
+      final saleItems = <SaleItem>[];
+      _cart.forEach((productId, quantity) {
+        try {
+          final product = _products.firstWhere((p) => p.id == productId);
+          saleItems.add(SaleItem(
+            saleId: 0,
+            productId: productId,
+            quantity: quantity,
+            unitPrice: product.price,
+            totalPrice: product.price * quantity,
+          ));
+        } catch (e) {
+          // skip missing product
+        }
       });
 
-      try {
-        // Will implement actual sale in next step
-        await Future.delayed(const Duration(milliseconds: 500));
-        
-        if (mounted) {
+      final success = await _salesService.createSale(
+        items: saleItems,
+        totalAmount: total,
+        cashReceived: result.cashReceived,
+        notes: result.notes,
+      );
+
+      if (mounted) {
+        if (success) {
           setState(() {
             _cart.clear();
             _isProcessing = false;
           });
           showSuccessSnackbar(context, 'Sale completed successfully');
-        }
-      } catch (e) {
-        if (mounted) {
+          _loadProducts();
+        } else {
           setState(() {
             _isProcessing = false;
           });
           showErrorSnackbar(context, 'Failed to complete sale');
         }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+        });
+        showErrorSnackbar(context, 'Failed to complete sale: $e');
       }
     }
   }
@@ -270,7 +281,7 @@ class _POSScreenState extends ConsumerState<POSScreen> {
               color: Theme.of(context).colorScheme.surface,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
+                  color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.1),
                   blurRadius: 4,
                   offset: const Offset(0, -2),
                 ),
@@ -464,5 +475,121 @@ class _POSScreenState extends ConsumerState<POSScreen> {
           ),
       ],
     );
+  }
+}
+
+class _PaymentResult {
+  final double cashReceived;
+  final String? notes;
+
+  _PaymentResult({required this.cashReceived, this.notes});
+}
+
+class _PaymentDialog extends StatefulWidget {
+  final double total;
+
+  const _PaymentDialog({required this.total});
+
+  @override
+  State<_PaymentDialog> createState() => _PaymentDialogState();
+}
+
+class _PaymentDialogState extends State<_PaymentDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _cashController = TextEditingController();
+  final _notesController = TextEditingController();
+
+  @override
+  void dispose() {
+    _cashController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final change = _parseCash() - widget.total;
+
+    return AlertDialog(
+      title: const Text('Payment'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Total: ₱${widget.total.toStringAsFixed(2)}',
+                  style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _cashController,
+                decoration: const InputDecoration(
+                  labelText: 'Cash Received',
+                  prefixText: '₱',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+                autofocus: true,
+                validator: (value) {
+                  final cash = double.tryParse(value?.trim() ?? '');
+                  if (cash == null) {
+                    return 'Enter a valid amount';
+                  }
+                  if (cash < widget.total) {
+                    return 'Insufficient cash received';
+                  }
+                  return null;
+                },
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 12),
+              if (_parseCash() >= widget.total)
+                Text(
+                  'Change: ₱${change.toStringAsFixed(2)}',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _notesController,
+                decoration: const InputDecoration(
+                  labelText: 'Notes (optional)',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 2,
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        LoadingButton(
+          isLoading: false,
+          onPressed: () {
+            if (!_formKey.currentState!.validate()) return;
+            Navigator.pop(
+              context,
+              _PaymentResult(
+                cashReceived: _parseCash(),
+                notes: _notesController.text.trim().isEmpty
+                    ? null
+                    : _notesController.text.trim(),
+              ),
+            );
+          },
+          label: 'Complete Sale',
+        ),
+      ],
+    );
+  }
+
+  double _parseCash() {
+    return double.tryParse(_cashController.text.trim()) ?? 0.0;
   }
 }

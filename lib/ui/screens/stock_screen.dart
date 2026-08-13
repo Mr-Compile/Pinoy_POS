@@ -53,13 +53,19 @@ class _StockScreenState extends ConsumerState<StockScreen> {
       return;
     }
 
+    final newStock = product.stock + adjustment;
+    if (newStock < 0) {
+      showErrorSnackbar(context, 'Insufficient stock to remove');
+      return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Adjust Stock'),
         content: Text(adjustment > 0
-            ? 'Add $adjustment to ${product.name}?'
-            : 'Remove ${-adjustment} from ${product.name}?'),
+            ? 'Add $adjustment to ${product.name}? (New stock: $newStock)'
+            : 'Remove ${-adjustment} from ${product.name}? (New stock: $newStock)'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -79,7 +85,7 @@ class _StockScreenState extends ConsumerState<StockScreen> {
       });
 
       try {
-        await _stockService.adjustStock(product.id!, adjustment, 'Manual adjustment');
+        await _stockService.adjustStock(product.id!, newStock, 'Manual adjustment');
         if (mounted) {
           showSuccessSnackbar(context, 'Stock adjusted successfully');
           _loadProducts();
@@ -101,7 +107,9 @@ class _StockScreenState extends ConsumerState<StockScreen> {
   @override
   Widget build(BuildContext context) {
     final authNotifier = ref.read(authStateProvider.notifier);
-    final canAdjust = authNotifier.hasPermission('add_stock');
+    final canAddStock = authNotifier.hasPermission('add_stock');
+    final canAdjustStock = authNotifier.hasPermission('adjust_stock');
+    final colorScheme = Theme.of(context).colorScheme;
 
     if (_isLoading) {
       return Scaffold(
@@ -113,6 +121,28 @@ class _StockScreenState extends ConsumerState<StockScreen> {
     }
 
     final lowStockProducts = _products.where((p) => p.isLowStock).toList();
+
+    // Build the trailing stock action buttons based on permissions.
+    // Staff: add-only (+10). Owner: add and remove (+10 / -10).
+    Widget? buildStockActions(Product product) {
+      if (!canAddStock) return null;
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.add),
+            tooltip: 'Add stock',
+            onPressed: _isProcessing ? null : () => _adjustStock(product, 10),
+          ),
+          if (canAdjustStock)
+            IconButton(
+              icon: const Icon(Icons.remove),
+              tooltip: 'Remove stock',
+              onPressed: _isProcessing ? null : () => _adjustStock(product, -10),
+            ),
+        ],
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -127,7 +157,7 @@ class _StockScreenState extends ConsumerState<StockScreen> {
               Text(
                 'Low Stock Alert',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: Colors.orange,
+                      color: colorScheme.error,
                     ),
               ),
               const SizedBox(height: 12),
@@ -136,21 +166,7 @@ class _StockScreenState extends ConsumerState<StockScreen> {
                     child: ListTile(
                       title: Text(product.name),
                       subtitle: Text('Stock: ${product.stock} (Min: ${product.minStock})'),
-                      trailing: canAdjust
-                          ? Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.add),
-                                  onPressed: _isProcessing ? null : () => _adjustStock(product, 10),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.remove),
-                                  onPressed: _isProcessing ? null : () => _adjustStock(product, -10),
-                                ),
-                              ],
-                            )
-                          : null,
+                      trailing: buildStockActions(product),
                     ),
                   )),
               const SizedBox(height: 24),
@@ -172,21 +188,7 @@ class _StockScreenState extends ConsumerState<StockScreen> {
                           child: ListTile(
                             title: Text(product.name),
                             subtitle: Text('Stock: ${product.stock}'),
-                            trailing: canAdjust
-                                ? Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.add),
-                                        onPressed: _isProcessing ? null : () => _adjustStock(product, 10),
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.remove),
-                                        onPressed: _isProcessing ? null : () => _adjustStock(product, -10),
-                                      ),
-                                    ],
-                                  )
-                                : null,
+                            trailing: buildStockActions(product),
                           ),
                         )).toList(),
                   ),

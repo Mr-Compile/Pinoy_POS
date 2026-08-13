@@ -1,12 +1,15 @@
+import 'package:pinoy_pos/core/authorization_exception.dart';
 import 'package:pinoy_pos/data/models/product.dart';
 import 'package:pinoy_pos/data/repositories/product_repository.dart';
 import 'package:pinoy_pos/data/repositories/category_repository.dart';
+import 'package:pinoy_pos/services/activity_log_service.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
 
 class ProductService {
   final ProductRepository _productRepository = ProductRepository();
   final CategoryRepository _categoryRepository = CategoryRepository();
   final AuthService _authService = AuthService();
+  final ActivityLogService _activityLogService = ActivityLogService();
 
   Future<List<Product>> getActiveProducts() async {
     if (!_authService.hasPermission('view_products')) {
@@ -37,8 +40,8 @@ class ProductService {
   }
 
   Future<bool> createProduct(Product product) async {
-    if (!_authService.hasPermission('manage_products')) {
-      return false;
+    if (!_authService.hasPermission('edit_products')) {
+      throw AuthorizationException('edit_products');
     }
 
     if (product.name.isEmpty) {
@@ -65,12 +68,17 @@ class ProductService {
     }
 
     await _productRepository.insert(product);
+    await _activityLogService.logActivity(
+      action: 'create_product',
+      entity: 'product',
+      details: 'Created product: ${product.name}',
+    );
     return true;
   }
 
   Future<bool> updateProduct(Product product) async {
-    if (!_authService.hasPermission('manage_products')) {
-      return false;
+    if (!_authService.hasPermission('edit_products')) {
+      throw AuthorizationException('edit_products');
     }
 
     if (product.name.isEmpty) {
@@ -97,24 +105,42 @@ class ProductService {
     }
 
     await _productRepository.update(product);
+    await _activityLogService.logActivity(
+      action: 'update_product',
+      entity: 'product',
+      entityId: product.id,
+      details: 'Updated product: ${product.name}',
+    );
     return true;
   }
 
   Future<bool> deleteProduct(int id) async {
-    if (!_authService.hasPermission('manage_products')) {
-      return false;
+    if (!_authService.hasPermission('delete_products')) {
+      throw AuthorizationException('delete_products');
     }
 
     await _productRepository.softDelete(id);
+    await _activityLogService.logActivity(
+      action: 'delete_product',
+      entity: 'product',
+      entityId: id,
+      details: 'Soft-deleted product',
+    );
     return true;
   }
 
   Future<bool> restoreProduct(int id) async {
-    if (!_authService.hasPermission('manage_products')) {
-      return false;
+    if (!_authService.hasPermission('delete_products')) {
+      throw AuthorizationException('delete_products');
     }
 
     await _productRepository.restore(id);
+    await _activityLogService.logActivity(
+      action: 'restore_product',
+      entity: 'product',
+      entityId: id,
+      details: 'Restored product from trash',
+    );
     return true;
   }
 }

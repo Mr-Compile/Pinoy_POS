@@ -20,10 +20,12 @@ class LoadingButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final effectiveStyle = style ??
         (isDanger
             ? FilledButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.error,
+                backgroundColor: colorScheme.error,
+                foregroundColor: colorScheme.onError,
               )
             : null);
 
@@ -31,19 +33,15 @@ class LoadingButton extends StatelessWidget {
       onPressed: isLoading ? null : onPressed,
       style: effectiveStyle,
       child: isLoading
-          ? const SizedBox(
+          ? SizedBox(
               height: 20,
               width: 20,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
-                color: Colors.white,
+                color: colorScheme.onPrimary,
               ),
             )
-          : child ??
-              Text(
-                label,
-                style: const TextStyle(color: Colors.white),
-              ),
+          : child ?? Text(label),
     );
   }
 }

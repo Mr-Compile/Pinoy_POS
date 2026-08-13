@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/route_guard.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/ui/screens/activity_logs_screen.dart';
 import 'package:pinoy_pos/ui/screens/ai_advisor_screen.dart';
+import 'package:pinoy_pos/ui/screens/announcements_screen.dart';
 import 'package:pinoy_pos/ui/screens/categories_screen.dart';
+import 'package:pinoy_pos/ui/screens/notifications_screen.dart';
+import 'package:pinoy_pos/ui/screens/profile_screen.dart';
 import 'package:pinoy_pos/ui/screens/settings_screen.dart';
 import 'package:pinoy_pos/ui/screens/users_screen.dart';
 import 'package:pinoy_pos/ui/screens/stock_screen.dart';
 import 'package:pinoy_pos/ui/screens/trash_screen.dart';
-import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/enhanced_dialogs.dart';
 
 class MoreScreen extends ConsumerWidget {
@@ -16,6 +20,114 @@ class MoreScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authNotifier = ref.read(authStateProvider.notifier);
+    final colorScheme = Theme.of(context).colorScheme;
+
+    final entries = <_MoreEntry>[];
+
+    // --- Business modules (Owner / Staff) ---
+    if (authNotifier.hasPermission('edit_categories')) {
+      entries.add(_MoreEntry(
+        icon: Icons.category,
+        title: 'Categories',
+        permission: 'edit_categories',
+        routeName: 'categories',
+        screen: const CategoriesScreen(),
+      ));
+    }
+    if (authNotifier.hasPermission('add_stock')) {
+      entries.add(_MoreEntry(
+        icon: Icons.warehouse,
+        title: 'Stock',
+        permission: 'add_stock',
+        routeName: 'stock',
+        screen: const StockScreen(),
+      ));
+    }
+    if (authNotifier.hasPermission('view_announcements')) {
+      entries.add(_MoreEntry(
+        icon: Icons.campaign,
+        title: 'Announcements',
+        permission: 'view_announcements',
+        routeName: 'announcements',
+        screen: const AnnouncementsScreen(),
+      ));
+    }
+    if (authNotifier.hasPermission('view_ai_advisor')) {
+      entries.add(_MoreEntry(
+        icon: Icons.smart_toy,
+        title: 'AI Advisor',
+        permission: 'view_ai_advisor',
+        routeName: 'ai_advisor',
+        screen: const AIAdvisorScreen(),
+      ));
+    }
+
+    // --- System modules (System Admin) ---
+    if (authNotifier.hasPermission('manage_users')) {
+      entries.add(_MoreEntry(
+        icon: Icons.people,
+        title: 'Users',
+        permission: 'manage_users',
+        routeName: 'users',
+        screen: const UsersScreen(),
+      ));
+    }
+    if (authNotifier.hasPermission('backup_restore')) {
+      entries.add(_MoreEntry(
+        icon: Icons.backup,
+        title: 'Backup & Restore',
+        permission: 'backup_restore',
+        routeName: 'backup_restore',
+        screen: const SettingsScreen(),
+      ));
+    }
+
+    // --- Shared modules ---
+    if (authNotifier.hasPermission('view_settings')) {
+      entries.add(_MoreEntry(
+        icon: Icons.settings,
+        title: 'Settings',
+        permission: 'view_settings',
+        routeName: 'settings',
+        screen: const SettingsScreen(),
+      ));
+    }
+    if (authNotifier.hasPermission('view_trash')) {
+      entries.add(_MoreEntry(
+        icon: Icons.delete_outline,
+        title: 'Trash Bin',
+        permission: 'view_trash',
+        routeName: 'trash',
+        screen: const TrashScreen(),
+      ));
+    }
+    if (authNotifier.hasPermission('view_activity_logs')) {
+      entries.add(_MoreEntry(
+        icon: Icons.history,
+        title: 'Activity Logs',
+        permission: 'view_activity_logs',
+        routeName: 'activity_logs',
+        screen: const ActivityLogsScreen(),
+      ));
+    }
+    if (authNotifier.hasPermission('view_notifications')) {
+      entries.add(_MoreEntry(
+        icon: Icons.notifications,
+        title: 'Notifications',
+        permission: 'view_notifications',
+        routeName: 'notifications',
+        screen: const NotificationsScreen(),
+      ));
+    }
+
+    // Profile (all roles)
+    entries.add(_MoreEntry(
+      icon: Icons.person,
+      title: 'Profile',
+      permission: null,
+      routeName: 'profile',
+      screen: const ProfileScreen(),
+    ));
 
     return Scaffold(
       appBar: AppBar(
@@ -24,118 +136,28 @@ class MoreScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          if (authNotifier.hasPermission('edit_categories'))
-            AppCard(
-              child: ListTile(
-                leading: const Icon(Icons.category),
-                title: const Text('Categories'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const CategoriesScreen(),
-                    ),
-                  );
-                },
-              ),
-            ),
-          if (authNotifier.hasPermission('edit_categories'))
-            const SizedBox(height: 12),
-          if (authNotifier.hasPermission('add_stock'))
-            AppCard(
-              child: ListTile(
-                leading: const Icon(Icons.inventory),
-                title: const Text('Stock'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const StockScreen(),
-                    ),
-                  );
-                },
-              ),
-            ),
-          if (authNotifier.hasPermission('add_stock'))
-            const SizedBox(height: 12),
-          if (authNotifier.hasPermission('manage_users'))
-            AppCard(
-              child: ListTile(
-                leading: const Icon(Icons.people),
-                title: const Text('Users'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const UsersScreen(),
-                    ),
-                  );
-                },
-              ),
-            ),
-          if (authNotifier.hasPermission('manage_users'))
-            const SizedBox(height: 12),
-          if (authNotifier.hasPermission('view_settings'))
-            AppCard(
-              child: ListTile(
-                leading: const Icon(Icons.settings),
-                title: const Text('Settings'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const SettingsScreen(),
-                    ),
-                  );
-                },
-              ),
-            ),
-          if (authNotifier.hasPermission('view_settings'))
-            const SizedBox(height: 12),
-          if (authNotifier.hasPermission('view_ai_advisor'))
-            AppCard(
-              child: ListTile(
-                leading: const Icon(Icons.psychology),
-                title: const Text('AI Advisor'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const AIAdvisorScreen(),
-                    ),
-                  );
-                },
-              ),
-            ),
-          if (authNotifier.hasPermission('view_ai_advisor'))
-            const SizedBox(height: 12),
-          if (authNotifier.hasPermission('view_trash'))
-            AppCard(
-              child: ListTile(
-                leading: const Icon(Icons.delete_outline),
-                title: const Text('Trash Bin'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const TrashScreen(),
-                    ),
-                  );
-                },
-              ),
-            ),
-          if (authNotifier.hasPermission('view_trash'))
-            const SizedBox(height: 12),
-          AppCard(
+          // Grid of navigation entries
+          GridView.count(
+            crossAxisCount: MediaQuery.of(context).size.width >= 600 ? 4 : 3,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 1.0,
+            children: entries.map((entry) {
+              return _buildEntryCard(context, ref, entry);
+            }).toList(),
+          ),
+          const SizedBox(height: 24),
+          // Logout button
+          Card(
             child: ListTile(
-              leading: const Icon(Icons.logout, color: Colors.red),
-              title: const Text('Logout', style: TextStyle(color: Colors.red)),
+              leading: Icon(Icons.logout, color: colorScheme.error),
+              title: Text(
+                'Logout',
+                style: TextStyle(color: colorScheme.error),
+              ),
+              trailing: Icon(Icons.chevron_right, color: colorScheme.error),
               onTap: () async {
                 final confirmed = await EnhancedDialogs.showLogoutDialog(
                   context: context,
@@ -150,4 +172,65 @@ class MoreScreen extends ConsumerWidget {
       ),
     );
   }
+
+  Widget _buildEntryCard(BuildContext context, WidgetRef ref, _MoreEntry entry) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () {
+          if (entry.permission == null) {
+            // No permission required (e.g. Profile)
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => entry.screen),
+            );
+          } else {
+            RouteGuard.pushIfAuthorized(
+              context,
+              ref,
+              screen: entry.screen,
+              permission: entry.permission!,
+              routeName: entry.routeName,
+            );
+          }
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(entry.icon, size: 32, color: colorScheme.primary),
+              const SizedBox(height: 8),
+              Text(
+                entry.title,
+                style: Theme.of(context).textTheme.bodySmall,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MoreEntry {
+  final IconData icon;
+  final String title;
+  final String? permission;
+  final String routeName;
+  final Widget screen;
+
+  _MoreEntry({
+    required this.icon,
+    required this.title,
+    this.permission,
+    required this.routeName,
+    required this.screen,
+  });
 }

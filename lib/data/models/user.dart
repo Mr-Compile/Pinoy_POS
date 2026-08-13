@@ -1,7 +1,14 @@
 enum UserRole {
   owner,
   admin,
-  staff,
+  staff;
+
+  /// Human-readable display name for the role.
+  String get displayName => switch (this) {
+        UserRole.owner => 'Owner',
+        UserRole.admin => 'System Admin',
+        UserRole.staff => 'Staff',
+      };
 }
 
 class User {

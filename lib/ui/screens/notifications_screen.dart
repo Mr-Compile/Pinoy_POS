@@ -83,7 +83,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                     subtitle: Text(notification.message),
                     trailing: notification.isRead
                         ? null
-                        : const Icon(Icons.circle, color: Colors.blue, size: 8),
+                        : Icon(Icons.circle,
+                            color: Theme.of(context).colorScheme.primary, size: 8),
                     onTap: () => _markAsRead(notification),
                   ),
                 );

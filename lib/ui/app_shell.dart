@@ -11,7 +11,6 @@ import 'package:pinoy_pos/ui/screens/users_screen.dart';
 import 'package:pinoy_pos/ui/screens/settings_screen.dart';
 import 'package:pinoy_pos/ui/screens/more_screen.dart';
 import 'package:pinoy_pos/ui/screens/login_screen.dart';
-import 'package:pinoy_pos/ui/screens/categories_screen.dart';
 
 class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key});
@@ -40,13 +39,27 @@ class _AppShellState extends ConsumerState<AppShell> {
       _selectedIndex = 0;
     }
 
+    if (isTablet) {
+      return Scaffold(
+        body: Row(
+          children: [
+            _buildNavigationRail(tabs),
+            const VerticalDivider(thickness: 1, width: 1),
+            Expanded(
+              child: _getScreen(tabs[_selectedIndex].screen),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Scaffold(
       body: _getScreen(tabs[_selectedIndex].screen),
-      bottomNavigationBar: isTablet ? null : _buildBottomNavigationBar(tabs),
+      bottomNavigationBar: _buildBottomNavigationBar(tabs),
     );
   }
 
-  Widget _buildBottomNavigationBar(List<AppTab> tabs) {
+  NavigationBar _buildBottomNavigationBar(List<AppTab> tabs) {
     return NavigationBar(
       selectedIndex: _selectedIndex,
       onDestinationSelected: (index) {
@@ -57,7 +70,29 @@ class _AppShellState extends ConsumerState<AppShell> {
       destinations: tabs
           .map((tab) => NavigationDestination(
                 icon: Icon(tab.icon),
+                selectedIcon: Icon(tab.selectedIcon ?? tab.icon),
                 label: tab.label,
+                tooltip: tab.label,
+              ))
+          .toList(),
+    );
+  }
+
+  NavigationRail _buildNavigationRail(List<AppTab> tabs) {
+    return NavigationRail(
+      selectedIndex: _selectedIndex,
+      onDestinationSelected: (index) {
+        setState(() {
+          _selectedIndex = index;
+        });
+      },
+      extended: MediaQuery.of(context).size.width >= 900,
+      minExtendedWidth: 200,
+      destinations: tabs
+          .map((tab) => NavigationRailDestination(
+                icon: Icon(tab.icon),
+                selectedIcon: Icon(tab.selectedIcon ?? tab.icon),
+                label: Text(tab.label),
               ))
           .toList(),
     );
@@ -73,22 +108,26 @@ class _AppShellState extends ConsumerState<AppShell> {
         return [
           AppTab(
             label: 'Dashboard',
-            icon: Icons.dashboard,
+            icon: Icons.dashboard_outlined,
+            selectedIcon: Icons.dashboard,
             screen: const DashboardScreen(),
           ),
           AppTab(
             label: 'POS',
-            icon: Icons.point_of_sale,
+            icon: Icons.shopping_cart_outlined,
+            selectedIcon: Icons.shopping_cart,
             screen: const POSScreen(),
           ),
           AppTab(
             label: 'Products',
-            icon: Icons.inventory_2,
+            icon: Icons.inventory_2_outlined,
+            selectedIcon: Icons.inventory_2,
             screen: const ProductsScreen(),
           ),
           AppTab(
             label: 'Reports',
-            icon: Icons.bar_chart,
+            icon: Icons.analytics_outlined,
+            selectedIcon: Icons.analytics,
             screen: const ReportsScreen(),
           ),
           AppTab(
@@ -101,22 +140,26 @@ class _AppShellState extends ConsumerState<AppShell> {
         return [
           AppTab(
             label: 'Dashboard',
-            icon: Icons.dashboard,
+            icon: Icons.dashboard_outlined,
+            selectedIcon: Icons.dashboard,
             screen: const DashboardScreen(),
           ),
           AppTab(
             label: 'POS',
-            icon: Icons.point_of_sale,
+            icon: Icons.shopping_cart_outlined,
+            selectedIcon: Icons.shopping_cart,
             screen: const POSScreen(),
           ),
           AppTab(
             label: 'Sales',
-            icon: Icons.receipt_long,
+            icon: Icons.receipt_long_outlined,
+            selectedIcon: Icons.receipt_long,
             screen: const SalesScreen(),
           ),
           AppTab(
             label: 'Reports',
-            icon: Icons.bar_chart,
+            icon: Icons.analytics_outlined,
+            selectedIcon: Icons.analytics,
             screen: const ReportsScreen(),
           ),
           AppTab(
@@ -129,27 +172,20 @@ class _AppShellState extends ConsumerState<AppShell> {
         return [
           AppTab(
             label: 'Dashboard',
-            icon: Icons.dashboard,
+            icon: Icons.dashboard_outlined,
+            selectedIcon: Icons.dashboard,
             screen: const DashboardScreen(),
           ),
           AppTab(
-            label: 'Categories',
-            icon: Icons.category,
-            screen: const CategoriesScreen(),
-          ),
-          AppTab(
-            label: 'Products',
-            icon: Icons.inventory_2,
-            screen: const ProductsScreen(),
-          ),
-          AppTab(
             label: 'Users',
-            icon: Icons.people,
+            icon: Icons.people_outline,
+            selectedIcon: Icons.people,
             screen: const UsersScreen(),
           ),
           AppTab(
             label: 'Settings',
-            icon: Icons.settings,
+            icon: Icons.settings_outlined,
+            selectedIcon: Icons.settings,
             screen: const SettingsScreen(),
           ),
           AppTab(
@@ -165,11 +201,13 @@ class _AppShellState extends ConsumerState<AppShell> {
 class AppTab {
   final String label;
   final IconData icon;
+  final IconData? selectedIcon;
   final Widget screen;
 
   AppTab({
     required this.label,
     required this.icon,
+    this.selectedIcon,
     required this.screen,
   });
 }

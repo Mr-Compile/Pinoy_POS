@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/data/repositories/user_repository.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/services/auth_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
@@ -21,6 +22,7 @@ class UsersScreen extends ConsumerStatefulWidget {
 
 class _UsersScreenState extends ConsumerState<UsersScreen> {
   final UserRepository _userRepository = UserRepository();
+  final AuthService _authService = AuthService();
   List<User> _users = [];
   bool _isLoading = true;
 
@@ -47,7 +49,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
 
   Future<void> _deleteUser(User user) async {
     final authNotifier = ref.read(authStateProvider.notifier);
-    if (!authNotifier.hasPermission('manage_users')) {
+    if (!authNotifier.hasPermission('delete_users')) {
       EnhancedDialogs.showAccessDeniedDialog(context: context);
       return;
     }
@@ -79,10 +81,228 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     }
   }
 
+  Future<void> _toggleUserActive(User user) async {
+    final authNotifier = ref.read(authStateProvider.notifier);
+    if (!authNotifier.hasPermission('toggle_user_active')) {
+      EnhancedDialogs.showAccessDeniedDialog(context: context);
+      return;
+    }
+
+    final currentUser = ref.read(authStateProvider).user;
+    if (currentUser?.id == user.id) {
+      showErrorSnackbar(context, 'You cannot deactivate your own account');
+      return;
+    }
+
+    try {
+      final success = await _authService.toggleUserActive(user.id!, !user.isActive);
+      if (mounted) {
+        if (success) {
+          showSuccessSnackbar(
+              context, user.isActive ? 'User deactivated' : 'User activated');
+          _loadUsers();
+        } else {
+          showErrorSnackbar(context, 'Failed to update user status');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        showErrorSnackbar(context, 'Failed to update user status');
+      }
+    }
+  }
+
+  Future<void> _resetPassword(User user) async {
+    final authNotifier = ref.read(authStateProvider.notifier);
+    if (!authNotifier.hasPermission('reset_password')) {
+      EnhancedDialogs.showAccessDeniedDialog(context: context);
+      return;
+    }
+
+    final formKey = GlobalKey<FormState>();
+    final passwordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+    bool isSaving = false;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Text('Reset Password for ${user.username}'),
+          content: SingleChildScrollView(
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: passwordController,
+                    decoration: const InputDecoration(
+                      labelText: 'New Password',
+                      border: OutlineInputBorder(),
+                    ),
+                    obscureText: true,
+                    autofocus: true,
+                    validator: (value) => Validators.password(value),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: confirmPasswordController,
+                    decoration: const InputDecoration(
+                      labelText: 'Confirm Password',
+                      border: OutlineInputBorder(),
+                    ),
+                    obscureText: true,
+                    validator: (value) =>
+                        Validators.confirmPassword(value, passwordController.text),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            LoadingButton(
+              isLoading: isSaving,
+              onPressed: () async {
+                if (!formKey.currentState!.validate()) return;
+                setState(() => isSaving = true);
+                try {
+                  final success = await _authService.resetPassword(
+                    user.id!,
+                    passwordController.text,
+                  );
+                  if (context.mounted) {
+                    Navigator.pop(context, success);
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    Navigator.pop(context, false);
+                  }
+                }
+              },
+              label: 'Reset',
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result == true && mounted) {
+      showSuccessSnackbar(context, 'Password reset successfully');
+    } else if (result == false && mounted) {
+      showErrorSnackbar(context, 'Failed to reset password');
+    }
+  }
+
+  Future<void> _editUser(User user) async {
+    final authNotifier = ref.read(authStateProvider.notifier);
+    if (!authNotifier.hasPermission('edit_users')) {
+      EnhancedDialogs.showAccessDeniedDialog(context: context);
+      return;
+    }
+
+    final formKey = GlobalKey<FormState>();
+    final fullNameController = TextEditingController(text: user.fullName);
+    UserRole selectedRole = user.role;
+    bool isSaving = false;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Text('Edit User: ${user.username}'),
+          content: SingleChildScrollView(
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: fullNameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Full Name',
+                      border: OutlineInputBorder(),
+                    ),
+                    autofocus: true,
+                    validator: (value) => Validators.required(value, 'Full Name'),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<UserRole>(
+                    decoration: const InputDecoration(
+                      labelText: 'Role',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                          value: UserRole.owner, child: Text('Owner')),
+                      DropdownMenuItem(
+                          value: UserRole.admin, child: Text('System Admin')),
+                      DropdownMenuItem(
+                          value: UserRole.staff, child: Text('Staff')),
+                    ],
+                    initialValue: selectedRole,
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() => selectedRole = value);
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            LoadingButton(
+              isLoading: isSaving,
+              onPressed: () async {
+                if (!formKey.currentState!.validate()) return;
+                setState(() => isSaving = true);
+                try {
+                  final success = await _authService.updateUser(
+                    userId: user.id!,
+                    fullName: fullNameController.text.trim(),
+                    role: selectedRole,
+                  );
+                  if (context.mounted) {
+                    Navigator.pop(context, success);
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    Navigator.pop(context, false);
+                  }
+                }
+              },
+              label: 'Save',
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result == true && mounted) {
+      showSuccessSnackbar(context, 'User updated successfully');
+      _loadUsers();
+    } else if (result == false && mounted) {
+      showErrorSnackbar(context, 'Failed to update user');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authNotifier = ref.read(authStateProvider.notifier);
     final canManage = authNotifier.hasPermission('manage_users');
+    final canEdit = authNotifier.hasPermission('edit_users');
+    final canDelete = authNotifier.hasPermission('delete_users');
+    final canResetPassword = authNotifier.hasPermission('reset_password');
+    final canToggleActive = authNotifier.hasPermission('toggle_user_active');
 
     if (_isLoading) {
       return Scaffold(
@@ -100,6 +320,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
           if (canManage)
             IconButton(
               icon: const Icon(Icons.add),
+              tooltip: 'Add User',
               onPressed: () => _showUserDialog(),
             ),
         ],
@@ -117,18 +338,88 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                 final user = _users[index];
                 final currentUser = ref.read(authStateProvider).user;
                 final isSelf = currentUser?.id == user.id;
-                
+
                 return AppCard(
                   margin: const EdgeInsets.only(bottom: 12),
-                  child: ListTile(
-                    title: Text(user.fullName),
-                    subtitle: Text('${user.username} • ${user.role.name}'),
-                    trailing: canManage && !isSelf
-                        ? IconButton(
-                            icon: const Icon(Icons.delete),
-                            onPressed: () => _deleteUser(user),
-                          )
-                        : null,
+                  child: Column(
+                    children: [
+                      ListTile(
+                        leading: CircleAvatar(
+                          child: Text(
+                            user.fullName.isNotEmpty
+                                ? user.fullName[0].toUpperCase()
+                                : '?',
+                          ),
+                        ),
+                        title: Text(user.fullName),
+                        subtitle: Text(
+                          '${user.username} • ${user.role.displayName}${user.isActive ? '' : ' (Inactive)'}',
+                        ),
+                        trailing: (canEdit || canDelete) && !isSelf
+                            ? PopupMenuButton<String>(
+                                tooltip: 'Actions',
+                                onSelected: (action) {
+                                  switch (action) {
+                                    case 'edit':
+                                      _editUser(user);
+                                      break;
+                                    case 'reset_password':
+                                      _resetPassword(user);
+                                      break;
+                                    case 'toggle_active':
+                                      _toggleUserActive(user);
+                                      break;
+                                    case 'delete':
+                                      _deleteUser(user);
+                                      break;
+                                  }
+                                },
+                                itemBuilder: (context) => [
+                                  if (canEdit)
+                                    const PopupMenuItem(
+                                      value: 'edit',
+                                      child: ListTile(
+                                        leading: Icon(Icons.edit),
+                                        title: Text('Edit'),
+                                        contentPadding: EdgeInsets.zero,
+                                      ),
+                                    ),
+                                  if (canResetPassword)
+                                    const PopupMenuItem(
+                                      value: 'reset_password',
+                                      child: ListTile(
+                                        leading: Icon(Icons.lock_reset),
+                                        title: Text('Reset Password'),
+                                        contentPadding: EdgeInsets.zero,
+                                      ),
+                                    ),
+                                  if (canToggleActive && !isSelf)
+                                    PopupMenuItem(
+                                      value: 'toggle_active',
+                                      child: ListTile(
+                                        leading: Icon(user.isActive
+                                            ? Icons.person_off
+                                            : Icons.person),
+                                        title: Text(user.isActive
+                                            ? 'Deactivate'
+                                            : 'Activate'),
+                                        contentPadding: EdgeInsets.zero,
+                                      ),
+                                    ),
+                                  if (canDelete)
+                                    const PopupMenuItem(
+                                      value: 'delete',
+                                      child: ListTile(
+                                        leading: Icon(Icons.delete),
+                                        title: Text('Delete'),
+                                        contentPadding: EdgeInsets.zero,
+                                      ),
+                                    ),
+                                ],
+                              )
+                            : null,
+                      ),
+                    ],
                   ),
                 );
               },
@@ -221,7 +512,8 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                     ),
                     obscureText: true,
                     textInputAction: TextInputAction.next,
-                    validator: (value) => Validators.confirmPassword(value, passwordController.text),
+                    validator: (value) => Validators.confirmPassword(
+                        value, passwordController.text),
                     onChanged: (value) {
                       if (!hasChanges) {
                         setState(() {
@@ -238,9 +530,12 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                       border: OutlineInputBorder(),
                     ),
                     items: const [
-                      DropdownMenuItem(value: UserRole.owner, child: Text('Owner')),
-                      DropdownMenuItem(value: UserRole.admin, child: Text('Admin')),
-                      DropdownMenuItem(value: UserRole.staff, child: Text('Staff')),
+                      DropdownMenuItem(
+                          value: UserRole.owner, child: Text('Owner')),
+                      DropdownMenuItem(
+                          value: UserRole.admin, child: Text('System Admin')),
+                      DropdownMenuItem(
+                          value: UserRole.staff, child: Text('Staff')),
                     ],
                     initialValue: selectedRole,
                     onChanged: (value) {
@@ -311,9 +606,10 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     }
 
     final username = usernameController.text.trim();
-    
+
     // Check for duplicate username
-    final existingUser = await _userRepository.getByUsernameWithDeleted(username);
+    final existingUser =
+        await _userRepository.getByUsernameWithDeleted(username);
     if (existingUser != null) {
       if (mounted) {
         showErrorSnackbar(context, 'Username already exists');
@@ -326,13 +622,22 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     });
 
     try {
-      // Will implement actual user creation in next step
-      await Future.delayed(const Duration(milliseconds: 500));
-      
+      final success = await _authService.createUser(
+        username: username,
+        password: passwordController.text,
+        fullName: fullNameController.text.trim(),
+        role: selectedRole ?? UserRole.staff,
+      );
+
       if (mounted) {
-        showSuccessSnackbar(context, 'User created successfully');
-        Navigator.pop(context);
-        _loadUsers();
+        if (success) {
+          showSuccessSnackbar(context, 'User created successfully');
+          Navigator.pop(context);
+          _loadUsers();
+        } else {
+          showErrorSnackbar(context,
+              'Failed to create user (username may already exist or password too short)');
+        }
       }
     } catch (e) {
       if (mounted) {

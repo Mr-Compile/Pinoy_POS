@@ -1,10 +1,13 @@
+import 'package:pinoy_pos/core/authorization_exception.dart';
 import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/data/repositories/category_repository.dart';
+import 'package:pinoy_pos/services/activity_log_service.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
 
 class CategoryService {
   final CategoryRepository _categoryRepository = CategoryRepository();
   final AuthService _authService = AuthService();
+  final ActivityLogService _activityLogService = ActivityLogService();
 
   Future<List<Category>> getActiveCategories() async {
     if (!_authService.hasPermission('view_categories')) {
@@ -21,8 +24,8 @@ class CategoryService {
   }
 
   Future<bool> createCategory(Category category) async {
-    if (!_authService.hasPermission('manage_categories')) {
-      return false;
+    if (!_authService.hasPermission('edit_categories')) {
+      throw AuthorizationException('edit_categories');
     }
 
     if (category.name.isEmpty) {
@@ -35,12 +38,17 @@ class CategoryService {
     }
 
     await _categoryRepository.insert(category);
+    await _activityLogService.logActivity(
+      action: 'create_category',
+      entity: 'category',
+      details: 'Created category: ${category.name}',
+    );
     return true;
   }
 
   Future<bool> updateCategory(Category category) async {
-    if (!_authService.hasPermission('manage_categories')) {
-      return false;
+    if (!_authService.hasPermission('edit_categories')) {
+      throw AuthorizationException('edit_categories');
     }
 
     if (category.name.isEmpty) {
@@ -53,24 +61,42 @@ class CategoryService {
     }
 
     await _categoryRepository.update(category);
+    await _activityLogService.logActivity(
+      action: 'update_category',
+      entity: 'category',
+      entityId: category.id,
+      details: 'Updated category: ${category.name}',
+    );
     return true;
   }
 
   Future<bool> deleteCategory(int id) async {
-    if (!_authService.hasPermission('manage_categories')) {
-      return false;
+    if (!_authService.hasPermission('delete_categories')) {
+      throw AuthorizationException('delete_categories');
     }
 
     await _categoryRepository.softDelete(id);
+    await _activityLogService.logActivity(
+      action: 'delete_category',
+      entity: 'category',
+      entityId: id,
+      details: 'Soft-deleted category',
+    );
     return true;
   }
 
   Future<bool> restoreCategory(int id) async {
-    if (!_authService.hasPermission('manage_categories')) {
-      return false;
+    if (!_authService.hasPermission('delete_categories')) {
+      throw AuthorizationException('delete_categories');
     }
 
     await _categoryRepository.restore(id);
+    await _activityLogService.logActivity(
+      action: 'restore_category',
+      entity: 'category',
+      entityId: id,
+      details: 'Restored category from trash',
+    );
     return true;
   }
 }

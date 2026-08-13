@@ -1,3 +1,4 @@
+import 'package:pinoy_pos/core/authorization_exception.dart';
 import 'package:pinoy_pos/core/database.dart';
 import 'package:pinoy_pos/core/security.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
@@ -5,14 +6,18 @@ import 'package:pinoy_pos/data/models/sale_item.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/data/repositories/sale_repository.dart';
 import 'package:pinoy_pos/data/repositories/sale_item_repository.dart';
-import 'package:pinoy_pos/services/stock_service.dart';
+import 'package:pinoy_pos/data/repositories/product_repository.dart';
+import 'package:pinoy_pos/services/activity_log_service.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
+import 'package:pinoy_pos/services/stock_service.dart';
 
 class SalesService {
   final SaleRepository _saleRepository = SaleRepository();
   final SaleItemRepository _saleItemRepository = SaleItemRepository();
   final StockService _stockService = StockService();
   final AuthService _authService = AuthService();
+  final ActivityLogService _activityLogService = ActivityLogService();
+  final ProductRepository _productRepository = ProductRepository();
   final DatabaseHelper _dbHelper = DatabaseHelper();
 
   Future<List<Sale>> getSales() async {
@@ -49,7 +54,7 @@ class SalesService {
     }
 
     final sale = await _saleRepository.getById(id);
-    
+
     if (sale == null) return null;
 
     if (_authService.currentUser?.role == UserRole.staff &&
@@ -68,14 +73,27 @@ class SalesService {
     return _saleItemRepository.getBySaleId(saleId);
   }
 
+  /// Create a sale within a single atomic transaction.
+  ///
+  /// Steps:
+  /// 1. Validate all items have sufficient stock (pre-check).
+  /// 2. Insert sale record.
+  /// 3. Insert sale_items.
+  /// 4. Deduct stock for each item.
+  /// 5. If any step fails, the transaction rolls back automatically.
   Future<bool> createSale({
     required List<SaleItem> items,
     required double totalAmount,
     required double cashReceived,
     String? notes,
   }) async {
-    if (!_authService.hasPermission('create_sale')) {
-      return false;
+    if (!_authService.hasPermission('create_sales')) {
+      await _activityLogService.logActivity(
+        action: 'unauthorized_create_sale',
+        entity: 'sale',
+        details: 'Attempted to create sale without permission',
+      );
+      throw AuthorizationException('create_sales');
     }
 
     if (items.isEmpty) {
@@ -84,6 +102,17 @@ class SalesService {
 
     if (cashReceived < totalAmount) {
       return false;
+    }
+
+    // Pre-check stock availability for all items
+    for (final item in items) {
+      final product = await _productRepository.getById(item.productId);
+      if (product == null) {
+        return false;
+      }
+      if (product.stock < item.quantity) {
+        return false;
+      }
     }
 
     return await _dbHelper.transaction((txn) async {
@@ -112,17 +141,34 @@ class SalesService {
         );
 
         if (!stockDeducted) {
-          throw Exception('Insufficient stock');
+          // Throwing inside a transaction causes automatic rollback
+          throw Exception('Insufficient stock for product ${item.productId}');
         }
       }
+
+      // Log activity
+      await _activityLogService.logActivity(
+        action: 'create_sale',
+        entity: 'sale',
+        entityId: saleId,
+        details: 'Sale $receiptNumber created for ₱${totalAmount.toStringAsFixed(2)}',
+      );
 
       return true;
     });
   }
 
+  /// Void a sale within a single atomic transaction.
+  /// Restores stock for all items, then soft-deletes the sale.
   Future<bool> voidSale(int saleId) async {
-    if (!_authService.hasPermission('void_sale')) {
-      return false;
+    if (!_authService.hasPermission('void_sales')) {
+      await _activityLogService.logActivity(
+        action: 'unauthorized_void_sale',
+        entity: 'sale',
+        entityId: saleId,
+        details: 'Attempted to void sale without permission',
+      );
+      throw AuthorizationException('void_sales');
     }
 
     return await _dbHelper.transaction((txn) async {
@@ -140,6 +186,15 @@ class SalesService {
       }
 
       await _saleRepository.softDelete(saleId);
+
+      // Log activity
+      await _activityLogService.logActivity(
+        action: 'void_sale',
+        entity: 'sale',
+        entityId: saleId,
+        details: 'Sale ${sale.receiptNumber} voided',
+      );
+
       return true;
     });
   }

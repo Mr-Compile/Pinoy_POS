@@ -80,7 +80,35 @@ class SaleDao extends BaseDao<Sale> {
       FROM sales
       WHERE user_id = ? AND deleted_at IS NULL
     ''', [userId]);
-    
+
+    return (result.first['total'] as num?)?.toDouble() ?? 0.0;
+  }
+
+  Future<double> getTotalSalesForDateForUser(DateTime date, int userId) async {
+    final database = await db;
+    final start = DateTime(date.year, date.month, date.day);
+    final end = start.add(const Duration(days: 1));
+
+    final result = await database.rawQuery('''
+      SELECT COALESCE(SUM(total_amount), 0) as total
+      FROM sales
+      WHERE created_at >= ? AND created_at < ? AND user_id = ? AND deleted_at IS NULL
+    ''', [start.toIso8601String(), end.toIso8601String(), userId]);
+
+    return (result.first['total'] as num?)?.toDouble() ?? 0.0;
+  }
+
+  Future<double> getTotalSalesForMonthForUser(int year, int month, int userId) async {
+    final database = await db;
+    final start = DateTime(year, month, 1);
+    final end = DateTime(year, month + 1, 1);
+
+    final result = await database.rawQuery('''
+      SELECT COALESCE(SUM(total_amount), 0) as total
+      FROM sales
+      WHERE created_at >= ? AND created_at < ? AND user_id = ? AND deleted_at IS NULL
+    ''', [start.toIso8601String(), end.toIso8601String(), userId]);
+
     return (result.first['total'] as num?)?.toDouble() ?? 0.0;
   }
 }

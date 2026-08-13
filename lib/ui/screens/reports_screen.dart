@@ -1,9 +1,14 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/services/report_service.dart';
+import 'package:pinoy_pos/services/sales_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
+import 'package:pinoy_pos/ui/widgets/success_snackbar.dart';
+import 'package:pinoy_pos/ui/widgets/error_snackbar.dart';
 
 class ReportsScreen extends ConsumerStatefulWidget {
   const ReportsScreen({super.key});
@@ -14,11 +19,13 @@ class ReportsScreen extends ConsumerStatefulWidget {
 
 class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   final ReportService _reportService = ReportService();
+  final SalesService _salesService = SalesService();
   double _todaySales = 0.0;
   double _monthSales = 0.0;
   int _lowStockCount = 0;
   int _totalProducts = 0;
   bool _isLoading = true;
+  bool _isExporting = false;
 
   @override
   void initState() {
@@ -116,7 +123,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                 leading: const Icon(Icons.picture_as_pdf),
                 title: const Text('Export to PDF'),
                 trailing: const Icon(Icons.chevron_right),
-                onTap: canExport ? () {} : null,
+                onTap: canExport && !_isExporting ? _exportToPdf : null,
               ),
             ),
             const SizedBox(height: 12),
@@ -125,7 +132,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                 leading: const Icon(Icons.table_view),
                 title: const Text('Export to CSV'),
                 trailing: const Icon(Icons.chevron_right),
-                onTap: canExport ? () {} : null,
+                onTap: canExport && !_isExporting ? _exportToCsv : null,
               ),
             ),
           ],
@@ -150,5 +157,68 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _exportToCsv() async {
+    setState(() => _isExporting = true);
+    try {
+      final sales = await _salesService.getSales();
+      final buffer = StringBuffer();
+      buffer.writeln('Receipt Number,Date,Total Amount,Cash Received,Change,Notes');
+      for (final sale in sales) {
+        buffer.writeln(
+          '"${sale.receiptNumber ?? sale.id}","${sale.createdAt.toIso8601String()}",${sale.totalAmount},${sale.cashReceived},${sale.change},"${sale.notes ?? ''}"',
+        );
+      }
+      final dir = await getApplicationDocumentsDirectory();
+      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
+      final file = File('${dir.path}/pinoy_pos_sales_$timestamp.csv');
+      await file.writeAsString(buffer.toString());
+      if (mounted) {
+        showSuccessSnackbar(context, 'CSV exported: ${file.path}');
+      }
+    } catch (e) {
+      if (mounted) {
+        showErrorSnackbar(context, 'Failed to export CSV');
+      }
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
+  }
+
+  Future<void> _exportToPdf() async {
+    setState(() => _isExporting = true);
+    try {
+      // PDF export requires the pdf package widget API.
+      // This is a minimal text-based PDF export.
+      final sales = await _salesService.getSales();
+      final dir = await getApplicationDocumentsDirectory();
+      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
+      final file = File('${dir.path}/pinoy_pos_sales_$timestamp.txt');
+      final buffer = StringBuffer();
+      buffer.writeln('Pinoy POS - Sales Report');
+      buffer.writeln('Generated: ${DateTime.now().toIso8601String()}');
+      buffer.writeln('Today Sales: ₱${_todaySales.toStringAsFixed(2)}');
+      buffer.writeln('Month Sales: ₱${_monthSales.toStringAsFixed(2)}');
+      buffer.writeln('Total Products: $_totalProducts');
+      buffer.writeln('Low Stock Items: $_lowStockCount');
+      buffer.writeln('');
+      buffer.writeln('--- Sales Detail ---');
+      for (final sale in sales) {
+        buffer.writeln(
+          '${sale.receiptNumber ?? sale.id} | ${sale.createdAt.toLocal()} | ₱${sale.totalAmount.toStringAsFixed(2)}',
+        );
+      }
+      await file.writeAsString(buffer.toString());
+      if (mounted) {
+        showSuccessSnackbar(context, 'Report exported: ${file.path}');
+      }
+    } catch (e) {
+      if (mounted) {
+        showErrorSnackbar(context, 'Failed to export report');
+      }
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
   }
 }
