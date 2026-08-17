@@ -1,16 +1,16 @@
 import 'package:pinoy_pos/core/authorization_exception.dart';
 import 'package:pinoy_pos/core/database.dart';
-import 'package:pinoy_pos/services/auth_service.dart';
+import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 
 class BackupService {
   final DatabaseHelper _dbHelper = DatabaseHelper();
-  final AuthService _authService = AuthService();
+  final SessionManager _sessionManager = SessionManager();
 
   Future<String> createBackup() async {
-    if (!_authService.hasPermission('backup_restore')) {
+    if (!_sessionManager.hasPermission('backup_restore')) {
       throw AuthorizationException('backup_restore');
     }
 
@@ -26,7 +26,7 @@ class BackupService {
   }
 
   Future<bool> restoreBackup(String backupPath) async {
-    if (!_authService.hasPermission('backup_restore')) {
+    if (!_sessionManager.hasPermission('backup_restore')) {
       throw AuthorizationException('backup_restore');
     }
 

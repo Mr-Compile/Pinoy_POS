@@ -1,17 +1,17 @@
 import 'package:pinoy_pos/core/constants.dart';
+import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/ai_usage.dart';
 import 'package:pinoy_pos/data/repositories/ai_usage_repository.dart';
-import 'package:pinoy_pos/services/auth_service.dart';
 
 class AIUsageService {
   final AIUsageRepository _aiUsageRepository = AIUsageRepository();
-  final AuthService _authService = AuthService();
+  final SessionManager _sessionManager = SessionManager();
 
   Future<int> getTodayUsageCount() async {
-    if (_authService.currentUser == null) {
+    if (_sessionManager.currentUser == null) {
       return 0;
     }
-    return _aiUsageRepository.getTodayCount(_authService.currentUser!.id!);
+    return _aiUsageRepository.getTodayCount(_sessionManager.currentUser!.id!);
   }
 
   Future<bool> canUseAI() async {
@@ -20,7 +20,7 @@ class AIUsageService {
   }
 
   Future<bool> recordQuery(String query, String? response) async {
-    if (_authService.currentUser == null) {
+    if (_sessionManager.currentUser == null) {
       return false;
     }
 
@@ -29,7 +29,7 @@ class AIUsageService {
     }
 
     final aiUsage = AIUsage(
-      userId: _authService.currentUser!.id!,
+      userId: _sessionManager.currentUser!.id!,
       query: query,
       response: response,
       createdAt: DateTime.now(),
@@ -40,9 +40,9 @@ class AIUsageService {
   }
 
   Future<List<AIUsage>> getQueryHistory() async {
-    if (_authService.currentUser == null) {
+    if (_sessionManager.currentUser == null) {
       return [];
     }
-    return _aiUsageRepository.getByUserId(_authService.currentUser!.id!);
+    return _aiUsageRepository.getByUserId(_sessionManager.currentUser!.id!);
   }
 }

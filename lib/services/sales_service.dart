@@ -1,6 +1,7 @@
 import 'package:pinoy_pos/core/authorization_exception.dart';
 import 'package:pinoy_pos/core/database.dart';
 import 'package:pinoy_pos/core/security.dart';
+import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/data/models/sale_item.dart';
 import 'package:pinoy_pos/data/models/user.dart';
@@ -8,40 +9,39 @@ import 'package:pinoy_pos/data/repositories/sale_repository.dart';
 import 'package:pinoy_pos/data/repositories/sale_item_repository.dart';
 import 'package:pinoy_pos/data/repositories/product_repository.dart';
 import 'package:pinoy_pos/services/activity_log_service.dart';
-import 'package:pinoy_pos/services/auth_service.dart';
 import 'package:pinoy_pos/services/stock_service.dart';
 
 class SalesService {
   final SaleRepository _saleRepository = SaleRepository();
   final SaleItemRepository _saleItemRepository = SaleItemRepository();
   final StockService _stockService = StockService();
-  final AuthService _authService = AuthService();
+  final SessionManager _sessionManager = SessionManager();
   final ActivityLogService _activityLogService = ActivityLogService();
   final ProductRepository _productRepository = ProductRepository();
   final DatabaseHelper _dbHelper = DatabaseHelper();
 
   Future<List<Sale>> getSales() async {
-    if (!_authService.hasPermission('view_sales')) {
+    if (!_sessionManager.hasPermission('view_sales')) {
       return [];
     }
 
-    if (_authService.currentUser?.role == UserRole.staff) {
-      return _saleRepository.getByUserId(_authService.currentUser!.id!);
+    if (_sessionManager.currentUser?.role == UserRole.staff) {
+      return _saleRepository.getByUserId(_sessionManager.currentUser!.id!);
     }
 
     return _saleRepository.getAllActive();
   }
 
   Future<List<Sale>> getSalesByDateRange(DateTime start, DateTime end) async {
-    if (!_authService.hasPermission('view_sales')) {
+    if (!_sessionManager.hasPermission('view_sales')) {
       return [];
     }
 
-    if (_authService.currentUser?.role == UserRole.staff) {
+    if (_sessionManager.currentUser?.role == UserRole.staff) {
       return _saleRepository.getByDateRangeAndUser(
         start,
         end,
-        _authService.currentUser!.id!,
+        _sessionManager.currentUser!.id!,
       );
     }
 
@@ -49,7 +49,7 @@ class SalesService {
   }
 
   Future<Sale?> getSaleById(int id) async {
-    if (!_authService.hasPermission('view_sales')) {
+    if (!_sessionManager.hasPermission('view_sales')) {
       return null;
     }
 
@@ -57,8 +57,8 @@ class SalesService {
 
     if (sale == null) return null;
 
-    if (_authService.currentUser?.role == UserRole.staff &&
-        sale.userId != _authService.currentUser!.id) {
+    if (_sessionManager.currentUser?.role == UserRole.staff &&
+        sale.userId != _sessionManager.currentUser!.id) {
       return null;
     }
 
@@ -66,7 +66,7 @@ class SalesService {
   }
 
   Future<List<SaleItem>> getSaleItems(int saleId) async {
-    if (!_authService.hasPermission('view_sales')) {
+    if (!_sessionManager.hasPermission('view_sales')) {
       return [];
     }
 
@@ -87,7 +87,7 @@ class SalesService {
     required double cashReceived,
     String? notes,
   }) async {
-    if (!_authService.hasPermission('create_sales')) {
+    if (!_sessionManager.hasPermission('create_sales')) {
       await _activityLogService.logActivity(
         action: 'unauthorized_create_sale',
         entity: 'sale',
@@ -123,7 +123,7 @@ class SalesService {
         totalAmount: totalAmount,
         cashReceived: cashReceived,
         change: change,
-        userId: _authService.currentUser!.id!,
+        userId: _sessionManager.currentUser!.id!,
         createdAt: DateTime.now(),
         receiptNumber: receiptNumber,
         notes: notes,
@@ -161,7 +161,7 @@ class SalesService {
   /// Void a sale within a single atomic transaction.
   /// Restores stock for all items, then soft-deletes the sale.
   Future<bool> voidSale(int saleId) async {
-    if (!_authService.hasPermission('void_sales')) {
+    if (!_sessionManager.hasPermission('void_sales')) {
       await _activityLogService.logActivity(
         action: 'unauthorized_void_sale',
         entity: 'sale',
@@ -200,7 +200,7 @@ class SalesService {
   }
 
   Future<double> getTodaySales() async {
-    if (!_authService.hasPermission('view_sales')) {
+    if (!_sessionManager.hasPermission('view_sales')) {
       return 0.0;
     }
 
@@ -209,7 +209,7 @@ class SalesService {
   }
 
   Future<double> getMonthSales() async {
-    if (!_authService.hasPermission('view_sales')) {
+    if (!_sessionManager.hasPermission('view_sales')) {
       return 0.0;
     }
 
@@ -218,7 +218,7 @@ class SalesService {
   }
 
   Future<double> getUserSales(int userId) async {
-    if (!_authService.hasPermission('view_sales')) {
+    if (!_sessionManager.hasPermission('view_sales')) {
       return 0.0;
     }
 

@@ -1,22 +1,22 @@
 import 'package:pinoy_pos/core/authorization_exception.dart';
 import 'package:pinoy_pos/core/database.dart';
+import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/stock_history.dart';
 import 'package:pinoy_pos/data/repositories/product_repository.dart';
 import 'package:pinoy_pos/data/repositories/stock_history_repository.dart';
 import 'package:pinoy_pos/services/activity_log_service.dart';
-import 'package:pinoy_pos/services/auth_service.dart';
 import 'package:pinoy_pos/services/notification_service.dart';
 
 class StockService {
   final ProductRepository _productRepository = ProductRepository();
   final StockHistoryRepository _stockHistoryRepository = StockHistoryRepository();
-  final AuthService _authService = AuthService();
+  final SessionManager _sessionManager = SessionManager();
   final ActivityLogService _activityLogService = ActivityLogService();
   final NotificationService _notificationService = NotificationService();
   final DatabaseHelper _dbHelper = DatabaseHelper();
 
   Future<List<StockHistory>> getStockHistory(int productId) async {
-    if (!_authService.hasPermission('view_stock')) {
+    if (!_sessionManager.hasPermission('view_stock')) {
       return [];
     }
     return _stockHistoryRepository.getByProductId(productId);
@@ -25,7 +25,7 @@ class StockService {
   /// Add stock to a product. Increases stock_quantity, inserts stock_history,
   /// logs activity, and generates a low-stock notification if needed.
   Future<bool> addStock(int productId, int quantity, String? reason) async {
-    if (!_authService.hasPermission('add_stock')) {
+    if (!_sessionManager.hasPermission('add_stock')) {
       await _activityLogService.logActivity(
         action: 'unauthorized_add_stock',
         entity: 'product',
@@ -55,7 +55,7 @@ class StockService {
         previousStock: previousStock,
         newStock: newStock,
         reason: reason,
-        userId: _authService.currentUser?.id,
+        userId: _sessionManager.currentUser?.id,
         createdAt: DateTime.now(),
       );
 
@@ -76,14 +76,14 @@ class StockService {
   /// Adjust stock to a new absolute value. Validates quantity, calculates
   /// previous and new stock, updates atomically, inserts history, and logs.
   Future<bool> adjustStock(int productId, int newStock, String reason) async {
-    if (!_authService.hasPermission('add_stock')) {
+    if (!_sessionManager.hasPermission('adjust_stock')) {
       await _activityLogService.logActivity(
         action: 'unauthorized_adjust_stock',
         entity: 'product',
         entityId: productId,
         details: 'Attempted to adjust stock without permission',
       );
-      throw AuthorizationException('add_stock');
+      throw AuthorizationException('adjust_stock');
     }
 
     if (newStock < 0) {
@@ -110,7 +110,7 @@ class StockService {
         previousStock: previousStock,
         newStock: newStock,
         reason: reason,
-        userId: _authService.currentUser?.id,
+        userId: _sessionManager.currentUser?.id,
         createdAt: DateTime.now(),
       );
 
@@ -159,7 +159,7 @@ class StockService {
         quantity: quantity,
         previousStock: previousStock,
         newStock: newStock,
-        userId: _authService.currentUser?.id,
+        userId: _sessionManager.currentUser?.id,
         createdAt: DateTime.now(),
       );
 

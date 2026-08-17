@@ -1,30 +1,30 @@
 import 'package:pinoy_pos/core/authorization_exception.dart';
+import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/data/repositories/category_repository.dart';
 import 'package:pinoy_pos/services/activity_log_service.dart';
-import 'package:pinoy_pos/services/auth_service.dart';
 
 class CategoryService {
   final CategoryRepository _categoryRepository = CategoryRepository();
-  final AuthService _authService = AuthService();
+  final SessionManager _sessionManager = SessionManager();
   final ActivityLogService _activityLogService = ActivityLogService();
 
   Future<List<Category>> getActiveCategories() async {
-    if (!_authService.hasPermission('view_categories')) {
+    if (!_sessionManager.hasPermission('view_categories')) {
       return [];
     }
     return _categoryRepository.getActiveCategories();
   }
 
   Future<Category?> getCategoryById(int id) async {
-    if (!_authService.hasPermission('view_categories')) {
+    if (!_sessionManager.hasPermission('view_categories')) {
       return null;
     }
     return _categoryRepository.getById(id);
   }
 
   Future<bool> createCategory(Category category) async {
-    if (!_authService.hasPermission('edit_categories')) {
+    if (!_sessionManager.hasPermission('edit_categories')) {
       throw AuthorizationException('edit_categories');
     }
 
@@ -47,7 +47,7 @@ class CategoryService {
   }
 
   Future<bool> updateCategory(Category category) async {
-    if (!_authService.hasPermission('edit_categories')) {
+    if (!_sessionManager.hasPermission('edit_categories')) {
       throw AuthorizationException('edit_categories');
     }
 
@@ -71,7 +71,7 @@ class CategoryService {
   }
 
   Future<bool> deleteCategory(int id) async {
-    if (!_authService.hasPermission('delete_categories')) {
+    if (!_sessionManager.hasPermission('delete_categories')) {
       throw AuthorizationException('delete_categories');
     }
 
@@ -86,7 +86,7 @@ class CategoryService {
   }
 
   Future<bool> restoreCategory(int id) async {
-    if (!_authService.hasPermission('delete_categories')) {
+    if (!_sessionManager.hasPermission('delete_categories')) {
       throw AuthorizationException('delete_categories');
     }
 

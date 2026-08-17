@@ -1,30 +1,30 @@
+import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/notification.dart';
 import 'package:pinoy_pos/data/repositories/notification_repository.dart';
-import 'package:pinoy_pos/services/auth_service.dart';
 
 class NotificationService {
   final NotificationRepository _notificationRepository = NotificationRepository();
-  final AuthService _authService = AuthService();
+  final SessionManager _sessionManager = SessionManager();
 
   Future<List<Notification>> getNotifications() async {
-    if (_authService.currentUser == null) {
+    if (_sessionManager.currentUser == null) {
       return [];
     }
-    return _notificationRepository.getByUserId(_authService.currentUser!.id!);
+    return _notificationRepository.getByUserId(_sessionManager.currentUser!.id!);
   }
 
   Future<List<Notification>> getUnreadNotifications() async {
-    if (_authService.currentUser == null) {
+    if (_sessionManager.currentUser == null) {
       return [];
     }
-    return _notificationRepository.getUnreadByUserId(_authService.currentUser!.id!);
+    return _notificationRepository.getUnreadByUserId(_sessionManager.currentUser!.id!);
   }
 
   Future<int> getUnreadCount() async {
-    if (_authService.currentUser == null) {
+    if (_sessionManager.currentUser == null) {
       return 0;
     }
-    return _notificationRepository.getUnreadCount(_authService.currentUser!.id!);
+    return _notificationRepository.getUnreadCount(_sessionManager.currentUser!.id!);
   }
 
   Future<void> createNotification({
@@ -37,7 +37,7 @@ class NotificationService {
       title: title,
       message: message,
       type: type,
-      userId: userId ?? _authService.currentUser?.id,
+      userId: userId ?? _sessionManager.currentUser?.id,
       createdAt: DateTime.now(),
     );
     await _notificationRepository.insert(notification);
@@ -48,9 +48,9 @@ class NotificationService {
   }
 
   Future<void> markAllAsRead() async {
-    if (_authService.currentUser == null) {
+    if (_sessionManager.currentUser == null) {
       return;
     }
-    await _notificationRepository.markAllAsRead(_authService.currentUser!.id!);
+    await _notificationRepository.markAllAsRead(_sessionManager.currentUser!.id!);
   }
 }

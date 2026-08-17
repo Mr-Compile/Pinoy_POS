@@ -1,46 +1,46 @@
 import 'package:pinoy_pos/core/authorization_exception.dart';
+import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/product.dart';
 import 'package:pinoy_pos/data/repositories/product_repository.dart';
 import 'package:pinoy_pos/data/repositories/category_repository.dart';
 import 'package:pinoy_pos/services/activity_log_service.dart';
-import 'package:pinoy_pos/services/auth_service.dart';
 
 class ProductService {
   final ProductRepository _productRepository = ProductRepository();
   final CategoryRepository _categoryRepository = CategoryRepository();
-  final AuthService _authService = AuthService();
+  final SessionManager _sessionManager = SessionManager();
   final ActivityLogService _activityLogService = ActivityLogService();
 
   Future<List<Product>> getActiveProducts() async {
-    if (!_authService.hasPermission('view_products')) {
+    if (!_sessionManager.hasPermission('view_products')) {
       return [];
     }
     return _productRepository.getActiveProducts();
   }
 
   Future<List<Product>> getLowStockProducts() async {
-    if (!_authService.hasPermission('view_products')) {
+    if (!_sessionManager.hasPermission('view_products')) {
       return [];
     }
     return _productRepository.getLowStockProducts();
   }
 
   Future<List<Product>> searchProducts(String query) async {
-    if (!_authService.hasPermission('view_products')) {
+    if (!_sessionManager.hasPermission('view_products')) {
       return [];
     }
     return _productRepository.searchProducts(query);
   }
 
   Future<Product?> getProductById(int id) async {
-    if (!_authService.hasPermission('view_products')) {
+    if (!_sessionManager.hasPermission('view_products')) {
       return null;
     }
     return _productRepository.getById(id);
   }
 
   Future<bool> createProduct(Product product) async {
-    if (!_authService.hasPermission('edit_products')) {
+    if (!_sessionManager.hasPermission('edit_products')) {
       throw AuthorizationException('edit_products');
     }
 
@@ -77,7 +77,7 @@ class ProductService {
   }
 
   Future<bool> updateProduct(Product product) async {
-    if (!_authService.hasPermission('edit_products')) {
+    if (!_sessionManager.hasPermission('edit_products')) {
       throw AuthorizationException('edit_products');
     }
 
@@ -115,7 +115,7 @@ class ProductService {
   }
 
   Future<bool> deleteProduct(int id) async {
-    if (!_authService.hasPermission('delete_products')) {
+    if (!_sessionManager.hasPermission('delete_products')) {
       throw AuthorizationException('delete_products');
     }
 
@@ -130,7 +130,7 @@ class ProductService {
   }
 
   Future<bool> restoreProduct(int id) async {
-    if (!_authService.hasPermission('delete_products')) {
+    if (!_sessionManager.hasPermission('delete_products')) {
       throw AuthorizationException('delete_products');
     }
 
