@@ -19,8 +19,10 @@ class User {
   final UserRole role;
   final String fullName;
   final bool isActive;
+  final String? colorPreference;
   final DateTime? lastLogin;
   final DateTime createdAt;
+  final DateTime? updatedAt;
   final DateTime? deletedAt;
 
   User({
@@ -31,8 +33,10 @@ class User {
     required this.role,
     required this.fullName,
     this.isActive = true,
+    this.colorPreference,
     this.lastLogin,
     required this.createdAt,
+    this.updatedAt,
     this.deletedAt,
   });
 
@@ -45,8 +49,10 @@ class User {
       'role': role.name,
       'full_name': fullName,
       'is_active': isActive ? 1 : 0,
+      'color_preference': colorPreference,
       'last_login': lastLogin?.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt?.toIso8601String(),
       'deleted_at': deletedAt?.toIso8601String(),
     };
   }
@@ -63,10 +69,14 @@ class User {
       ),
       fullName: map['full_name'] as String,
       isActive: (map['is_active'] as int) == 1,
+      colorPreference: map['color_preference'] as String?,
       lastLogin: map['last_login'] != null
           ? DateTime.parse(map['last_login'] as String)
           : null,
       createdAt: DateTime.parse(map['created_at'] as String),
+      updatedAt: map['updated_at'] != null
+          ? DateTime.parse(map['updated_at'] as String)
+          : null,
       deletedAt: map['deleted_at'] != null
           ? DateTime.parse(map['deleted_at'] as String)
           : null,
@@ -81,8 +91,10 @@ class User {
     UserRole? role,
     String? fullName,
     bool? isActive,
+    String? colorPreference,
     DateTime? lastLogin,
     DateTime? createdAt,
+    DateTime? updatedAt,
     DateTime? deletedAt,
   }) {
     return User(
@@ -93,8 +105,10 @@ class User {
       role: role ?? this.role,
       fullName: fullName ?? this.fullName,
       isActive: isActive ?? this.isActive,
+      colorPreference: colorPreference ?? this.colorPreference,
       lastLogin: lastLogin ?? this.lastLogin,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
     );
   }

@@ -26,8 +26,10 @@ class ActivityLogService {
     int? entityId,
     String? details,
   }) async {
+    final currentUser = _sessionManager.currentUser;
     final activityLog = ActivityLog(
-      userId: _sessionManager.currentUser?.id ?? 0,
+      userId: currentUser?.id ?? 0,
+      role: currentUser?.role.name,
       action: action,
       entity: entity,
       entityId: entityId,

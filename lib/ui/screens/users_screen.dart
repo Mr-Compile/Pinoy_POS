@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/data/models/user.dart';
-import 'package:pinoy_pos/data/repositories/user_repository.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
-import 'package:pinoy_pos/services/auth_service.dart';
+import 'package:pinoy_pos/providers/user_provider.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
+import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/enhanced_dialogs.dart';
 import 'package:pinoy_pos/ui/widgets/success_snackbar.dart';
@@ -21,31 +21,20 @@ class UsersScreen extends ConsumerStatefulWidget {
 }
 
 class _UsersScreenState extends ConsumerState<UsersScreen> {
-  final UserRepository _userRepository = UserRepository();
-  final AuthService _authService = AuthService();
-  List<User> _users = [];
-  bool _isLoading = true;
-
   @override
   void initState() {
     super.initState();
-    _loadUsers();
-  }
-
-  Future<void> _loadUsers() async {
-    setState(() {
-      _isLoading = true;
+    // Load users from SQLite via the controller on first build.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(userControllerProvider.notifier).loadUsers();
     });
-
-    final users = await _userRepository.getAllActive();
-
-    if (mounted) {
-      setState(() {
-        _users = users;
-        _isLoading = false;
-      });
-    }
   }
+
+  Future<void> _refresh() async {
+    await ref.read(userControllerProvider.notifier).loadUsers();
+  }
+
+  // ── DELETE (soft) ────────────────────────────────────────────────────
 
   Future<void> _deleteUser(User user) async {
     final authNotifier = ref.read(authStateProvider.notifier);
@@ -54,32 +43,50 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
       return;
     }
 
-    // Prevent deleting self
     final currentUser = ref.read(authStateProvider).user;
     if (currentUser?.id == user.id) {
       showErrorSnackbar(context, 'You cannot delete your own account');
       return;
     }
 
-    final confirmed = await EnhancedDialogs.showDeleteDialog(
+    final confirmed = await showDialog<bool>(
       context: context,
-      itemName: user.username,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete User?'),
+        content: Text(
+          '${user.fullName} (@${user.username}) will be moved to Trash.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
     );
 
     if (confirmed == true && mounted) {
-      try {
-        await _userRepository.softDelete(user.id!);
-        if (mounted) {
-          showSuccessSnackbar(context, 'User deleted successfully');
-          _loadUsers();
-        }
-      } catch (e) {
-        if (mounted) {
-          showErrorSnackbar(context, 'Failed to delete user');
+      final result = await ref
+          .read(userControllerProvider.notifier)
+          .softDeleteUser(user.id!);
+      if (mounted) {
+        if (result.success) {
+          showSuccessSnackbar(context, result.message);
+        } else {
+          showErrorSnackbar(context, result.message);
         }
       }
     }
   }
+
+  // ── ACTIVATE / DEACTIVATE ────────────────────────────────────────────
 
   Future<void> _toggleUserActive(User user) async {
     final authNotifier = ref.read(authStateProvider.notifier);
@@ -89,28 +96,54 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     }
 
     final currentUser = ref.read(authStateProvider).user;
-    if (currentUser?.id == user.id) {
+    if (currentUser?.id == user.id && user.isActive) {
       showErrorSnackbar(context, 'You cannot deactivate your own account');
       return;
     }
 
-    try {
-      final success = await _authService.toggleUserActive(user.id!, !user.isActive);
+    if (user.isActive) {
+      // Confirm deactivation.
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Deactivate User?'),
+          content: Text(
+            '${user.fullName} will no longer be able to log in.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error,
+              ),
+              child: const Text('Deactivate'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+      final result = await ref
+          .read(userControllerProvider.notifier)
+          .deactivateUser(user.id!);
       if (mounted) {
-        if (success) {
-          showSuccessSnackbar(
-              context, user.isActive ? 'User deactivated' : 'User activated');
-          _loadUsers();
-        } else {
-          showErrorSnackbar(context, 'Failed to update user status');
-        }
+        showSuccessSnackbar(context, result.message);
       }
-    } catch (e) {
+    } else {
+      // Activate directly.
+      final result = await ref
+          .read(userControllerProvider.notifier)
+          .activateUser(user.id!);
       if (mounted) {
-        showErrorSnackbar(context, 'Failed to update user status');
+        showSuccessSnackbar(context, result.message);
       }
     }
   }
+
+  // ── RESET PASSWORD ───────────────────────────────────────────────────
 
   Future<void> _resetPassword(User user) async {
     final authNotifier = ref.read(authStateProvider.notifier);
@@ -170,18 +203,14 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
               onPressed: () async {
                 if (!formKey.currentState!.validate()) return;
                 setState(() => isSaving = true);
-                try {
-                  final success = await _authService.resetPassword(
-                    user.id!,
-                    passwordController.text,
-                  );
-                  if (context.mounted) {
-                    Navigator.pop(context, success);
-                  }
-                } catch (e) {
-                  if (context.mounted) {
-                    Navigator.pop(context, false);
-                  }
+                final res = await ref
+                    .read(userControllerProvider.notifier)
+                    .resetPassword(
+                  userId: user.id!,
+                  newPassword: passwordController.text,
+                );
+                if (context.mounted) {
+                  Navigator.pop(context, res.success);
                 }
               },
               label: 'Reset',
@@ -198,6 +227,8 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     }
   }
 
+  // ── EDIT USER ────────────────────────────────────────────────────────
+
   Future<void> _editUser(User user) async {
     final authNotifier = ref.read(authStateProvider.notifier);
     if (!authNotifier.hasPermission('edit_users')) {
@@ -206,8 +237,11 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     }
 
     final formKey = GlobalKey<FormState>();
+    final usernameController = TextEditingController(text: user.username);
     final fullNameController = TextEditingController(text: user.fullName);
+    final pinController = TextEditingController(text: user.pin ?? '');
     UserRole selectedRole = user.role;
+    bool hasChanges = false;
     bool isSaving = false;
 
     final result = await showDialog<bool>(
@@ -222,13 +256,45 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   TextFormField(
+                    controller: usernameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Username',
+                      border: OutlineInputBorder(),
+                    ),
+                    autofocus: true,
+                    validator: (value) => Validators.required(value, 'Username'),
+                    onChanged: (_) {
+                      if (!hasChanges) setState(() => hasChanges = true);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
                     controller: fullNameController,
                     decoration: const InputDecoration(
                       labelText: 'Full Name',
                       border: OutlineInputBorder(),
                     ),
-                    autofocus: true,
                     validator: (value) => Validators.required(value, 'Full Name'),
+                    onChanged: (_) {
+                      if (!hasChanges) setState(() => hasChanges = true);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: pinController,
+                    decoration: const InputDecoration(
+                      labelText: 'PIN (optional)',
+                      border: OutlineInputBorder(),
+                      hintText: '4-6 digits',
+                    ),
+                    keyboardType: TextInputType.number,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) return null;
+                      return Validators.pin(value);
+                    },
+                    onChanged: (_) {
+                      if (!hasChanges) setState(() => hasChanges = true);
+                    },
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<UserRole>(
@@ -247,7 +313,10 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                     initialValue: selectedRole,
                     onChanged: (value) {
                       if (value != null) {
-                        setState(() => selectedRole = value);
+                        setState(() {
+                          selectedRole = value;
+                          hasChanges = true;
+                        });
                       }
                     },
                   ),
@@ -257,7 +326,18 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context, false),
+              onPressed: () async {
+                if (hasChanges) {
+                  final discard = await EnhancedDialogs.showUnsavedChangesDialog(
+                    context: context,
+                  );
+                  if (discard == true && context.mounted) {
+                    Navigator.pop(context, false);
+                  }
+                } else {
+                  Navigator.pop(context, false);
+                }
+              },
               child: const Text('Cancel'),
             ),
             LoadingButton(
@@ -265,19 +345,19 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
               onPressed: () async {
                 if (!formKey.currentState!.validate()) return;
                 setState(() => isSaving = true);
-                try {
-                  final success = await _authService.updateUser(
-                    userId: user.id!,
-                    fullName: fullNameController.text.trim(),
-                    role: selectedRole,
-                  );
-                  if (context.mounted) {
-                    Navigator.pop(context, success);
-                  }
-                } catch (e) {
-                  if (context.mounted) {
-                    Navigator.pop(context, false);
-                  }
+                final pinValue = pinController.text.trim();
+                final res = await ref
+                    .read(userControllerProvider.notifier)
+                    .updateUser(
+                  userId: user.id!,
+                  username: usernameController.text.trim(),
+                  fullName: fullNameController.text.trim(),
+                  role: selectedRole,
+                  pin: pinValue.isEmpty ? null : pinValue,
+                );
+                if (context.mounted) {
+                  setState(() => isSaving = false);
+                  Navigator.pop(context, res.success);
                 }
               },
               label: 'Save',
@@ -289,150 +369,29 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
 
     if (result == true && mounted) {
       showSuccessSnackbar(context, 'User updated successfully');
-      _loadUsers();
     } else if (result == false && mounted) {
-      showErrorSnackbar(context, 'Failed to update user');
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final authNotifier = ref.read(authStateProvider.notifier);
-    final canManage = authNotifier.hasPermission('manage_users');
-    final canEdit = authNotifier.hasPermission('edit_users');
-    final canDelete = authNotifier.hasPermission('delete_users');
-    final canResetPassword = authNotifier.hasPermission('reset_password');
-    final canToggleActive = authNotifier.hasPermission('toggle_user_active');
-
-    if (_isLoading) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Users'),
-        ),
-        body: const LoadingState(),
+      showErrorSnackbar(
+        context,
+        ref.read(userControllerProvider).error ?? 'Failed to update user',
       );
     }
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Users'),
-        actions: [
-          if (canManage)
-            IconButton(
-              icon: const Icon(Icons.add),
-              tooltip: 'Add User',
-              onPressed: () => _showUserDialog(),
-            ),
-        ],
-      ),
-      body: _users.isEmpty
-          ? const EmptyState(
-              icon: Icons.people,
-              title: 'No Users',
-              message: 'Add users to manage access',
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _users.length,
-              itemBuilder: (context, index) {
-                final user = _users[index];
-                final currentUser = ref.read(authStateProvider).user;
-                final isSelf = currentUser?.id == user.id;
-
-                return AppCard(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: Column(
-                    children: [
-                      ListTile(
-                        leading: CircleAvatar(
-                          child: Text(
-                            user.fullName.isNotEmpty
-                                ? user.fullName[0].toUpperCase()
-                                : '?',
-                          ),
-                        ),
-                        title: Text(user.fullName),
-                        subtitle: Text(
-                          '${user.username} • ${user.role.displayName}${user.isActive ? '' : ' (Inactive)'}',
-                        ),
-                        trailing: (canEdit || canDelete) && !isSelf
-                            ? PopupMenuButton<String>(
-                                tooltip: 'Actions',
-                                onSelected: (action) {
-                                  switch (action) {
-                                    case 'edit':
-                                      _editUser(user);
-                                      break;
-                                    case 'reset_password':
-                                      _resetPassword(user);
-                                      break;
-                                    case 'toggle_active':
-                                      _toggleUserActive(user);
-                                      break;
-                                    case 'delete':
-                                      _deleteUser(user);
-                                      break;
-                                  }
-                                },
-                                itemBuilder: (context) => [
-                                  if (canEdit)
-                                    const PopupMenuItem(
-                                      value: 'edit',
-                                      child: ListTile(
-                                        leading: Icon(Icons.edit),
-                                        title: Text('Edit'),
-                                        contentPadding: EdgeInsets.zero,
-                                      ),
-                                    ),
-                                  if (canResetPassword)
-                                    const PopupMenuItem(
-                                      value: 'reset_password',
-                                      child: ListTile(
-                                        leading: Icon(Icons.lock_reset),
-                                        title: Text('Reset Password'),
-                                        contentPadding: EdgeInsets.zero,
-                                      ),
-                                    ),
-                                  if (canToggleActive && !isSelf)
-                                    PopupMenuItem(
-                                      value: 'toggle_active',
-                                      child: ListTile(
-                                        leading: Icon(user.isActive
-                                            ? Icons.person_off
-                                            : Icons.person),
-                                        title: Text(user.isActive
-                                            ? 'Deactivate'
-                                            : 'Activate'),
-                                        contentPadding: EdgeInsets.zero,
-                                      ),
-                                    ),
-                                  if (canDelete)
-                                    const PopupMenuItem(
-                                      value: 'delete',
-                                      child: ListTile(
-                                        leading: Icon(Icons.delete),
-                                        title: Text('Delete'),
-                                        contentPadding: EdgeInsets.zero,
-                                      ),
-                                    ),
-                                ],
-                              )
-                            : null,
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-    );
   }
 
-  void _showUserDialog() {
+  // ── ADD USER ─────────────────────────────────────────────────────────
+
+  void _showAddUserDialog() {
+    final authNotifier = ref.read(authStateProvider.notifier);
+    if (!authNotifier.hasPermission('manage_users')) {
+      EnhancedDialogs.showAccessDeniedDialog(context: context);
+      return;
+    }
+
     final formKey = GlobalKey<FormState>();
     final usernameController = TextEditingController();
     final fullNameController = TextEditingController();
     final passwordController = TextEditingController();
     final confirmPasswordController = TextEditingController();
+    final pinController = TextEditingController();
     UserRole? selectedRole = UserRole.staff;
     bool hasChanges = false;
     bool isSaving = false;
@@ -457,12 +416,8 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                     autofocus: true,
                     textInputAction: TextInputAction.next,
                     validator: (value) => Validators.required(value, 'Username'),
-                    onChanged: (value) {
-                      if (!hasChanges) {
-                        setState(() {
-                          hasChanges = true;
-                        });
-                      }
+                    onChanged: (_) {
+                      if (!hasChanges) setState(() => hasChanges = true);
                     },
                     onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
                   ),
@@ -475,12 +430,8 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                     ),
                     textInputAction: TextInputAction.next,
                     validator: (value) => Validators.required(value, 'Full Name'),
-                    onChanged: (value) {
-                      if (!hasChanges) {
-                        setState(() {
-                          hasChanges = true;
-                        });
-                      }
+                    onChanged: (_) {
+                      if (!hasChanges) setState(() => hasChanges = true);
                     },
                     onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
                   ),
@@ -494,12 +445,8 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                     obscureText: true,
                     textInputAction: TextInputAction.next,
                     validator: (value) => Validators.password(value),
-                    onChanged: (value) {
-                      if (!hasChanges) {
-                        setState(() {
-                          hasChanges = true;
-                        });
-                      }
+                    onChanged: (_) {
+                      if (!hasChanges) setState(() => hasChanges = true);
                     },
                     onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
                   ),
@@ -514,12 +461,27 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                     textInputAction: TextInputAction.next,
                     validator: (value) => Validators.confirmPassword(
                         value, passwordController.text),
-                    onChanged: (value) {
-                      if (!hasChanges) {
-                        setState(() {
-                          hasChanges = true;
-                        });
-                      }
+                    onChanged: (_) {
+                      if (!hasChanges) setState(() => hasChanges = true);
+                    },
+                    onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: pinController,
+                    decoration: const InputDecoration(
+                      labelText: 'PIN (optional)',
+                      border: OutlineInputBorder(),
+                      hintText: '4-6 digits',
+                    ),
+                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.next,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) return null;
+                      return Validators.pin(value);
+                    },
+                    onChanged: (_) {
+                      if (!hasChanges) setState(() => hasChanges = true);
                     },
                     onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
                   ),
@@ -539,15 +501,15 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                     ],
                     initialValue: selectedRole,
                     onChanged: (value) {
-                      setState(() {
-                        selectedRole = value;
-                        hasChanges = true;
-                      });
+                      if (value != null) {
+                        setState(() {
+                          selectedRole = value;
+                          hasChanges = true;
+                        });
+                      }
                     },
                     validator: (value) {
-                      if (value == null) {
-                        return 'Role is required';
-                      }
+                      if (value == null) return 'Role is required';
                       return null;
                     },
                   ),
@@ -573,16 +535,29 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
             ),
             LoadingButton(
               isLoading: isSaving,
-              onPressed: () => _saveUser(
-                formKey,
-                usernameController,
-                fullNameController,
-                passwordController,
-                confirmPasswordController,
-                selectedRole,
-                setState,
-                isSaving,
-              ),
+              onPressed: () async {
+                if (!formKey.currentState!.validate()) return;
+                setState(() => isSaving = true);
+                final pinValue = pinController.text.trim();
+                final res = await ref
+                    .read(userControllerProvider.notifier)
+                    .createUser(
+                  username: usernameController.text.trim(),
+                  password: passwordController.text,
+                  fullName: fullNameController.text.trim(),
+                  role: selectedRole ?? UserRole.staff,
+                  pin: pinValue.isEmpty ? null : pinValue,
+                );
+                if (context.mounted) {
+                  setState(() => isSaving = false);
+                  if (res.success) {
+                    showSuccessSnackbar(context, res.message);
+                    Navigator.pop(context);
+                  } else {
+                    showErrorSnackbar(context, res.message);
+                  }
+                }
+              },
               label: 'Save',
             ),
           ],
@@ -591,64 +566,167 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     );
   }
 
-  Future<void> _saveUser(
-    GlobalKey<FormState> formKey,
-    TextEditingController usernameController,
-    TextEditingController fullNameController,
-    TextEditingController passwordController,
-    TextEditingController confirmPasswordController,
-    UserRole? selectedRole,
-    StateSetter setState,
-    bool isSaving,
-  ) async {
-    if (!formKey.currentState!.validate()) {
-      return;
+  // ── BUILD ────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    final userState = ref.watch(userControllerProvider);
+    final authNotifier = ref.read(authStateProvider.notifier);
+    final canManage = authNotifier.hasPermission('manage_users');
+    final canEdit = authNotifier.hasPermission('edit_users');
+    final canDelete = authNotifier.hasPermission('delete_users');
+    final canResetPassword = authNotifier.hasPermission('reset_password');
+    final canToggleActive = authNotifier.hasPermission('toggle_user_active');
+    final currentUser = ref.read(authStateProvider).user;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Users'),
+        actions: [
+          if (canManage)
+            IconButton(
+              icon: const Icon(Icons.add),
+              tooltip: 'Add User',
+              onPressed: () => _showAddUserDialog(),
+            ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh',
+            onPressed: _refresh,
+          ),
+        ],
+      ),
+      body: _buildBody(
+        userState,
+        canEdit,
+        canDelete,
+        canResetPassword,
+        canToggleActive,
+        currentUser,
+      ),
+    );
+  }
+
+  Widget _buildBody(
+    UserListState userState,
+    bool canEdit,
+    bool canDelete,
+    bool canResetPassword,
+    bool canToggleActive,
+    User? currentUser,
+  ) {
+    if (userState.isLoading) {
+      return const LoadingState();
     }
 
-    final username = usernameController.text.trim();
-
-    // Check for duplicate username
-    final existingUser =
-        await _userRepository.getByUsernameWithDeleted(username);
-    if (existingUser != null) {
-      if (mounted) {
-        showErrorSnackbar(context, 'Username already exists');
-      }
-      return;
-    }
-
-    setState(() {
-      isSaving = true;
-    });
-
-    try {
-      final success = await _authService.createUser(
-        username: username,
-        password: passwordController.text,
-        fullName: fullNameController.text.trim(),
-        role: selectedRole ?? UserRole.staff,
+    if (userState.error != null && userState.users.isEmpty) {
+      return ErrorState(
+        title: 'Failed to Load Users',
+        message: userState.error,
+        onRetry: _refresh,
       );
-
-      if (mounted) {
-        if (success) {
-          showSuccessSnackbar(context, 'User created successfully');
-          Navigator.pop(context);
-          _loadUsers();
-        } else {
-          showErrorSnackbar(context,
-              'Failed to create user (username may already exist or password too short)');
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        showErrorSnackbar(context, 'Failed to create user');
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          isSaving = false;
-        });
-      }
     }
+
+    if (userState.users.isEmpty) {
+      return const EmptyState(
+        icon: Icons.people,
+        title: 'No Users',
+        message: 'Add users to manage access',
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: userState.users.length,
+      itemBuilder: (context, index) {
+        final user = userState.users[index];
+        final isSelf = currentUser?.id == user.id;
+
+        return AppCard(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: Column(
+            children: [
+              ListTile(
+                leading: CircleAvatar(
+                  child: Text(
+                    user.fullName.isNotEmpty
+                        ? user.fullName[0].toUpperCase()
+                        : '?',
+                  ),
+                ),
+                title: Text(user.fullName),
+                subtitle: Text(
+                  '${user.username} • ${user.role.displayName}'
+                  '${user.isActive ? '' : ' (Inactive)'}',
+                ),
+                trailing: (canEdit || canDelete) && !isSelf
+                    ? PopupMenuButton<String>(
+                        tooltip: 'Actions',
+                        onSelected: (action) {
+                          switch (action) {
+                            case 'edit':
+                              _editUser(user);
+                              break;
+                            case 'reset_password':
+                              _resetPassword(user);
+                              break;
+                            case 'toggle_active':
+                              _toggleUserActive(user);
+                              break;
+                            case 'delete':
+                              _deleteUser(user);
+                              break;
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          if (canEdit)
+                            const PopupMenuItem(
+                              value: 'edit',
+                              child: ListTile(
+                                leading: Icon(Icons.edit),
+                                title: Text('Edit'),
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
+                          if (canResetPassword)
+                            const PopupMenuItem(
+                              value: 'reset_password',
+                              child: ListTile(
+                                leading: Icon(Icons.lock_reset),
+                                title: Text('Reset Password'),
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
+                          if (canToggleActive && !isSelf)
+                            PopupMenuItem(
+                              value: 'toggle_active',
+                              child: ListTile(
+                                leading: Icon(user.isActive
+                                    ? Icons.person_off
+                                    : Icons.person),
+                                title: Text(user.isActive
+                                    ? 'Deactivate'
+                                    : 'Activate'),
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
+                          if (canDelete)
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: ListTile(
+                                leading: Icon(Icons.delete),
+                                title: Text('Delete'),
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
+                        ],
+                      )
+                    : null,
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }

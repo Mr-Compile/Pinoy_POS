@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart';
@@ -39,9 +40,62 @@ class DatabaseHelper {
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    // Handle migrations when version changes
-    if (oldVersion < newVersion) {
-      // Add migration logic here when needed
+    // Migration from v1 → v2: add updated_at, color_preference to users;
+    // add role to activity_log; replace column-level UNIQUE on username with
+    // a partial unique index that only applies to non-deleted users (so that
+    // soft-deleted usernames can be reused).
+    if (oldVersion < 2) {
+      // Add new columns to users table.
+      await db.execute('ALTER TABLE users ADD COLUMN color_preference TEXT');
+      await db.execute('ALTER TABLE users ADD COLUMN updated_at TEXT');
+
+      // Add role column to activity_log.
+      await db.execute('ALTER TABLE activity_log ADD COLUMN role TEXT');
+
+      // Recreate users table without the column-level UNIQUE constraint so
+      // that soft-deleted users don't block username reuse.  We temporarily
+      // disable foreign-key enforcement for the migration; this is safe
+      // because we copy every row verbatim and preserve all ids.
+      await db.execute('PRAGMA foreign_keys = OFF');
+
+      await db.execute('''
+        CREATE TABLE users_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          username TEXT NOT NULL,
+          password_hash TEXT NOT NULL,
+          pin TEXT,
+          role TEXT NOT NULL,
+          full_name TEXT NOT NULL,
+          is_active INTEGER NOT NULL DEFAULT 1,
+          color_preference TEXT,
+          last_login TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT,
+          deleted_at TEXT
+        )
+      ''');
+
+      await db.execute('''
+        INSERT INTO users_new
+          (id, username, password_hash, pin, role, full_name, is_active,
+           color_preference, last_login, created_at, updated_at, deleted_at)
+        SELECT
+          id, username, password_hash, pin, role, full_name, is_active,
+          NULL, last_login, created_at, NULL, deleted_at
+        FROM users
+      ''');
+
+      await db.execute('DROP TABLE users');
+      await db.execute('ALTER TABLE users_new RENAME TO users');
+
+      // Partial unique index: username must be unique only among non-deleted
+      // users.  This is compatible with the soft-delete design.
+      await db.execute(
+        'CREATE UNIQUE INDEX idx_users_username_active '
+        'ON users(username) WHERE deleted_at IS NULL',
+      );
+
+      await db.execute('PRAGMA foreign_keys = ON');
     }
   }
 
@@ -50,14 +104,16 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE NOT NULL,
+        username TEXT NOT NULL,
         password_hash TEXT NOT NULL,
         pin TEXT,
         role TEXT NOT NULL,
         full_name TEXT NOT NULL,
         is_active INTEGER NOT NULL DEFAULT 1,
+        color_preference TEXT,
         last_login TEXT,
         created_at TEXT NOT NULL,
+        updated_at TEXT,
         deleted_at TEXT
       )
     ''');
@@ -191,6 +247,7 @@ class DatabaseHelper {
       CREATE TABLE activity_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
+        role TEXT,
         action TEXT NOT NULL,
         entity TEXT,
         entity_id INTEGER,
@@ -217,6 +274,12 @@ class DatabaseHelper {
   }
 
   Future<void> _createIndexes(Database db) async {
+    // Partial unique index: username must be unique only among non-deleted
+    // users.  Compatible with the soft-delete design.
+    await db.execute(
+      'CREATE UNIQUE INDEX idx_users_username_active '
+      'ON users(username) WHERE deleted_at IS NULL',
+    );
     await db.execute('CREATE INDEX idx_products_category ON products(category_id)');
     await db.execute('CREATE INDEX idx_products_active ON products(is_active)');
     await db.execute('CREATE INDEX idx_sales_user ON sales(user_id)');
@@ -236,6 +299,14 @@ class DatabaseHelper {
   Future<void> close() async {
     final db = await database;
     await db.close();
+    _database = null;
+  }
+
+  /// Resets the singleton state for testing.  Closes any open database
+  /// and clears the cached instance so the next access re-creates it.
+  @visibleForTesting
+  static void resetForTest() {
+    _database?.close();
     _database = null;
   }
 

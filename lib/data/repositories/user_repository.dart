@@ -9,7 +9,9 @@ class UserRepository {
   Future<int> delete(int id) => _userDao.delete(id);
   Future<int> softDelete(int id) => _userDao.softDelete(id);
   Future<int> restore(int id) => _userDao.restore(id);
+  Future<int> permanentlyDelete(int id) => _userDao.permanentlyDelete(id);
   Future<User?> getById(int id) => _userDao.getById(id);
+  Future<User?> getByIdWithDeleted(int id) => _userDao.getByIdWithDeleted(id);
   Future<List<User>> getAll() => _userDao.getAll();
   Future<List<User>> getAllActive() => _userDao.getAllActive();
   Future<List<User>> getDeleted() => _userDao.getDeleted();

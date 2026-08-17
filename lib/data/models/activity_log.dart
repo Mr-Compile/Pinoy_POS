@@ -1,6 +1,7 @@
 class ActivityLog {
   final int? id;
   final int userId;
+  final String? role;
   final String action;
   final String? entity;
   final int? entityId;
@@ -10,6 +11,7 @@ class ActivityLog {
   ActivityLog({
     this.id,
     required this.userId,
+    this.role,
     required this.action,
     this.entity,
     this.entityId,
@@ -21,6 +23,7 @@ class ActivityLog {
     return {
       'id': id,
       'user_id': userId,
+      'role': role,
       'action': action,
       'entity': entity,
       'entity_id': entityId,
@@ -33,6 +36,7 @@ class ActivityLog {
     return ActivityLog(
       id: map['id'] as int?,
       userId: map['user_id'] as int,
+      role: map['role'] as String?,
       action: map['action'] as String,
       entity: map['entity'] as String?,
       entityId: map['entity_id'] as int?,
@@ -44,6 +48,7 @@ class ActivityLog {
   ActivityLog copyWith({
     int? id,
     int? userId,
+    String? role,
     String? action,
     String? entity,
     int? entityId,
@@ -53,6 +58,7 @@ class ActivityLog {
     return ActivityLog(
       id: id ?? this.id,
       userId: userId ?? this.userId,
+      role: role ?? this.role,
       action: action ?? this.action,
       entity: entity ?? this.entity,
       entityId: entityId ?? this.entityId,

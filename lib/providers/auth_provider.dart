@@ -79,6 +79,15 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(user: null);
   }
 
+  /// Reloads the current user from the database and updates the auth state.
+  /// Called after the current user's own record is edited (e.g. by
+  /// UserController.updateUser) so that the session reflects the latest
+  /// database state without causing a circular dependency.
+  Future<void> refreshCurrentUser() async {
+    await _authService.refreshCurrentUser();
+    state = state.copyWith(user: _authService.currentUser);
+  }
+
   bool hasPermission(String permission) {
     return _authService.hasPermission(permission);
   }

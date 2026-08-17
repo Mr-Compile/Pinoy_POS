@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/data/models/product.dart';
 import 'package:pinoy_pos/data/models/category.dart';
+import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/data/repositories/product_repository.dart';
 import 'package:pinoy_pos/data/repositories/category_repository.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/providers/user_provider.dart';
 import 'package:pinoy_pos/services/product_service.dart';
 import 'package:pinoy_pos/services/category_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
@@ -36,7 +38,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _loadTrash();
   }
 
@@ -51,6 +53,8 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
     try {
       final products = await _productRepository.getDeleted();
       final categories = await _categoryRepository.getDeleted();
+      // Load deleted users via the user controller.
+      await ref.read(userControllerProvider.notifier).loadUsers();
       if (mounted) {
         setState(() {
           _deletedProducts = products;
@@ -64,6 +68,8 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
       }
     }
   }
+
+  // ── PRODUCT RESTORE ──────────────────────────────────────────────────
 
   Future<void> _restoreProduct(Product product) async {
     final authNotifier = ref.read(authStateProvider.notifier);
@@ -105,6 +111,8 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
     }
   }
 
+  // ── CATEGORY RESTORE ─────────────────────────────────────────────────
+
   Future<void> _restoreCategory(Category category) async {
     final authNotifier = ref.read(authStateProvider.notifier);
     if (!authNotifier.hasPermission('restore_trash')) {
@@ -145,10 +153,108 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
     }
   }
 
+  // ── USER RESTORE ─────────────────────────────────────────────────────
+
+  Future<void> _restoreUser(User user) async {
+    final authNotifier = ref.read(authStateProvider.notifier);
+    if (!authNotifier.hasPermission('restore_trash')) {
+      EnhancedDialogs.showAccessDeniedDialog(context: context);
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Restore User?'),
+        content: Text(
+          '${user.fullName} (@${user.username}) will become active '
+          'in User Management again.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Restore'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final result = await ref
+          .read(userControllerProvider.notifier)
+          .restoreUser(user.id!);
+      if (mounted) {
+        if (result.success) {
+          showSuccessSnackbar(context, result.message);
+          _loadTrash();
+        } else {
+          showErrorSnackbar(context, result.message);
+        }
+      }
+    }
+  }
+
+  // ── USER PERMANENT DELETE ────────────────────────────────────────────
+
+  Future<void> _permanentlyDeleteUser(User user) async {
+    final authNotifier = ref.read(authStateProvider.notifier);
+    if (!authNotifier.hasPermission('delete_users')) {
+      EnhancedDialogs.showAccessDeniedDialog(context: context);
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Permanently Delete User?'),
+        content: Text(
+          'Are you sure you want to permanently delete '
+          '${user.fullName} (@${user.username})?\n\n'
+          'This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('Delete Permanently'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final result = await ref
+          .read(userControllerProvider.notifier)
+          .permanentlyDeleteUser(user.id!);
+      if (mounted) {
+        if (result.success) {
+          showSuccessSnackbar(context, result.message);
+          _loadTrash();
+        } else {
+          showErrorSnackbar(context, result.message);
+        }
+      }
+    }
+  }
+
+  // ── BUILD ────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     final authNotifier = ref.read(authStateProvider.notifier);
     final canRestore = authNotifier.hasPermission('restore_trash');
+    final canDeleteUsers = authNotifier.hasPermission('delete_users');
+    final deletedUsers = ref.watch(userControllerProvider).deletedUsers;
 
     if (_isLoading) {
       return Scaffold(
@@ -169,6 +275,9 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
             Tab(
                 text: 'Categories (${_deletedCategories.length})',
                 icon: const Icon(Icons.category)),
+            Tab(
+                text: 'Users (${deletedUsers.length})',
+                icon: const Icon(Icons.people)),
           ],
         ),
       ),
@@ -177,6 +286,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
         children: [
           _buildProductsTab(canRestore),
           _buildCategoriesTab(canRestore),
+          _buildUsersTab(canRestore, canDeleteUsers, deletedUsers),
         ],
       ),
     );
@@ -243,6 +353,59 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
                     onPressed: () => _restoreCategory(category),
                   )
                 : null,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildUsersTab(
+      bool canRestore, bool canDeleteUsers, List<User> deletedUsers) {
+    if (deletedUsers.isEmpty) {
+      return const EmptyState(
+        icon: Icons.people,
+        title: 'No Deleted Users',
+        message: 'Deleted users will appear here for recovery',
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: deletedUsers.length,
+      itemBuilder: (context, index) {
+        final user = deletedUsers[index];
+        return AppCard(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: ListTile(
+            leading: CircleAvatar(
+              child: Text(
+                user.fullName.isNotEmpty
+                    ? user.fullName[0].toUpperCase()
+                    : '?',
+              ),
+            ),
+            title: Text(user.fullName),
+            subtitle: Text(
+              '${user.username} • ${user.role.displayName}',
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (canRestore)
+                  IconButton(
+                    icon: const Icon(Icons.restore),
+                    tooltip: 'Restore',
+                    onPressed: () => _restoreUser(user),
+                  ),
+                if (canDeleteUsers)
+                  IconButton(
+                    icon: Icon(Icons.delete_forever,
+                        color: Theme.of(context).colorScheme.error),
+                    tooltip: 'Delete Permanently',
+                    onPressed: () => _permanentlyDeleteUser(user),
+                  ),
+              ],
+            ),
           ),
         );
       },

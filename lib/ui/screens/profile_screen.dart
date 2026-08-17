@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
-import 'package:pinoy_pos/services/auth_service.dart';
+import 'package:pinoy_pos/providers/user_provider.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/success_snackbar.dart';
 import 'package:pinoy_pos/ui/widgets/error_snackbar.dart';
@@ -16,7 +16,6 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
-  final AuthService _authService = AuthService();
 
   @override
   Widget build(BuildContext context) {
@@ -198,18 +197,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   : () async {
                       if (!formKey.currentState!.validate()) return;
                       setState(() => isSaving = true);
-                      final success = await _authService.changePassword(
-                        user.id!,
-                        oldPasswordController.text,
-                        newPasswordController.text,
-                      );
+                      final result = await ref
+                          .read(userControllerProvider.notifier)
+                          .changePassword(
+                            userId: user.id!,
+                            oldPassword: oldPasswordController.text,
+                            newPassword: newPasswordController.text,
+                          );
                       if (context.mounted) {
                         setState(() => isSaving = false);
                         Navigator.pop(context);
-                        if (success) {
-                          showSuccessSnackbar(context, 'Password changed successfully');
+                        if (result.success) {
+                          showSuccessSnackbar(context, result.message);
                         } else {
-                          showErrorSnackbar(context, 'Current password is incorrect');
+                          showErrorSnackbar(context, result.message);
                         }
                       }
                     },

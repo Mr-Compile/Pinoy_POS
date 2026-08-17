@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 
 /// Singleton holder for the currently authenticated user.
@@ -37,6 +38,12 @@ class SessionManager {
   /// logout or when a session is invalidated.
   void clearCurrentUser() {
     _currentUser = null;
+  }
+
+  /// Resets the singleton state for testing.
+  @visibleForTesting
+  static void resetForTest() {
+    _instance._currentUser = null;
   }
 
   /// Returns true if the current user has the given [permission].
