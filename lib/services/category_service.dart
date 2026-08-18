@@ -16,6 +16,30 @@ class CategoryService {
     return _categoryRepository.getActiveCategories();
   }
 
+  Future<List<Category>> getAllCategories() async {
+    if (!_sessionManager.hasPermission('view_categories')) {
+      return [];
+    }
+    return _categoryRepository.getAll();
+  }
+
+  Future<bool> changeCategoryStatus(int id, bool isActive) async {
+    if (!_sessionManager.hasPermission('edit_categories')) {
+      throw AuthorizationException('edit_categories');
+    }
+
+    await _categoryRepository.update(
+      (await _categoryRepository.getById(id))!.copyWith(isActive: isActive),
+    );
+    await _activityLogService.logActivity(
+      action: 'change_category_status',
+      entity: 'category',
+      entityId: id,
+      details: isActive ? 'Activated category' : 'Deactivated category',
+    );
+    return true;
+  }
+
   Future<Category?> getCategoryById(int id) async {
     if (!_sessionManager.hasPermission('view_categories')) {
       return null;

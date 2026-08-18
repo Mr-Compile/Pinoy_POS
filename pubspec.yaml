@@ -59,6 +59,7 @@ dependencies:
   # PDF/CSV Export
   pdf: ^3.11.1
   csv: ^6.0.0
+  flutter_svg: ^2.3.0
 
 dev_dependencies:
   flutter_test:

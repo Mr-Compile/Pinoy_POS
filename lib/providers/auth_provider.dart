@@ -78,54 +78,6 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
     return success;
   }
 
-  /// Returns (success, errorMessage). errorMessage is null on success.
-  Future<(bool, String?)> loginWithResult(String username, String password) async {
-    state = state.copyWith(isLoading: true, error: null);
-    final result = await _authService.loginDetailed(username, password);
-    switch (result) {
-      case AuthResult.success:
-        state = state.copyWith(user: _authService.currentUser, isLoading: false);
-        _themeNotifier.syncUserColorPreference(_authService.currentUser?.colorPreference);
-        return (true, null);
-      case AuthResult.inactiveAccount:
-        final msg = 'This account is currently inactive. Please contact an administrator.';
-        state = state.copyWith(isLoading: false, error: msg);
-        return (false, msg);
-      case AuthResult.error:
-        final msg = 'Unable to sign in right now. Please try again.';
-        state = state.copyWith(isLoading: false, error: msg);
-        return (false, msg);
-      case AuthResult.invalidCredentials:
-        final msg = 'Incorrect username or password.';
-        state = state.copyWith(isLoading: false, error: msg);
-        return (false, msg);
-    }
-  }
-
-  /// Returns (success, errorMessage). errorMessage is null on success.
-  Future<(bool, String?)> loginWithPinResult(String username, String pin) async {
-    state = state.copyWith(isLoading: true, error: null);
-    final result = await _authService.loginWithPinDetailed(username, pin);
-    switch (result) {
-      case AuthResult.success:
-        state = state.copyWith(user: _authService.currentUser, isLoading: false);
-        _themeNotifier.syncUserColorPreference(_authService.currentUser?.colorPreference);
-        return (true, null);
-      case AuthResult.inactiveAccount:
-        final msg = 'This account is currently inactive. Please contact an administrator.';
-        state = state.copyWith(isLoading: false, error: msg);
-        return (false, msg);
-      case AuthResult.error:
-        final msg = 'Unable to sign in right now. Please try again.';
-        state = state.copyWith(isLoading: false, error: msg);
-        return (false, msg);
-      case AuthResult.invalidCredentials:
-        final msg = 'Incorrect username or PIN.';
-        state = state.copyWith(isLoading: false, error: msg);
-        return (false, msg);
-    }
-  }
-
   Future<void> logout() async {
     await _authService.logout();
     _themeNotifier.clearUserColorPreference();

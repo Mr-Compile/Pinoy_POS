@@ -135,7 +135,7 @@ class UserService {
       pin: (pin != null && pin.isNotEmpty) ? pin : null,
       role: role,
       fullName: trimmedFullName,
-      colorPreference: colorPreference,
+      colorPreference: colorPreference ?? 'green',
       createdAt: now,
       updatedAt: now,
     );

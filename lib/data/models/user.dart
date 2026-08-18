@@ -20,7 +20,6 @@ class User {
   final String fullName;
   final String colorPreference;
   final bool isActive;
-  final String? colorPreference;
   final DateTime? lastLogin;
   final DateTime createdAt;
   final DateTime? updatedAt;
@@ -35,7 +34,6 @@ class User {
     required this.fullName,
     this.colorPreference = 'green',
     this.isActive = true,
-    this.colorPreference,
     this.lastLogin,
     required this.createdAt,
     this.updatedAt,
@@ -52,7 +50,6 @@ class User {
       'full_name': fullName,
       'color_preference': colorPreference,
       'is_active': isActive ? 1 : 0,
-      'color_preference': colorPreference,
       'last_login': lastLogin?.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
@@ -73,7 +70,6 @@ class User {
       fullName: map['full_name'] as String,
       colorPreference: (map['color_preference'] as String?) ?? 'green',
       isActive: (map['is_active'] as int) == 1,
-      colorPreference: map['color_preference'] as String?,
       lastLogin: map['last_login'] != null
           ? DateTime.parse(map['last_login'] as String)
           : null,
@@ -96,7 +92,6 @@ class User {
     String? fullName,
     String? colorPreference,
     bool? isActive,
-    String? colorPreference,
     DateTime? lastLogin,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -111,7 +106,6 @@ class User {
       fullName: fullName ?? this.fullName,
       colorPreference: colorPreference ?? this.colorPreference,
       isActive: isActive ?? this.isActive,
-      colorPreference: colorPreference ?? this.colorPreference,
       lastLogin: lastLogin ?? this.lastLogin,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
