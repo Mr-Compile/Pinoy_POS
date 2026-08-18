@@ -41,7 +41,12 @@ class NotificationDao extends BaseDao<Notification> {
     return result.first['count'] as int? ?? 0;
   }
 
-  Future<void> markAsRead(int id) async {
+  /// Marks a single notification as read.
+  ///
+  /// The [userId] scope is enforced so that a user can only mark their own
+  /// notifications as read. Without this, a user who knew another user's
+  /// notification id could mutate it.
+  Future<void> markAsRead(int id, int userId) async {
     final database = await db;
     await database.update(
       tableName,
@@ -49,8 +54,8 @@ class NotificationDao extends BaseDao<Notification> {
         'is_read': 1,
         'read_at': DateTime.now().toIso8601String(),
       },
-      where: 'id = ?',
-      whereArgs: [id],
+      where: 'id = ? AND user_id = ?',
+      whereArgs: [id, userId],
     );
   }
 

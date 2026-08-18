@@ -24,10 +24,24 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
   List<Category> _categories = [];
   bool _isLoading = true;
 
+  // Search + filter state (view-only operations, allowed for all roles with
+  // view_products). Search delegates to ProductService.searchProducts so the
+  // query runs at the DAO/SQLite level; category filter is applied to the
+  // already-authorized list loaded from the service.
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+  int? _selectedCategoryId;
+
   @override
   void initState() {
     super.initState();
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -37,8 +51,13 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
 
     final productService = ref.read(productServiceProvider);
     final categoryService = ref.read(categoryServiceProvider);
-    final products = await productService.getActiveProducts();
     final categories = await categoryService.getActiveCategories();
+
+    // When a search query is active, run the search at the DAO level;
+    // otherwise load all active products.
+    final products = _searchQuery.isEmpty
+        ? await productService.getActiveProducts()
+        : await productService.searchProducts(_searchQuery);
 
     if (mounted) {
       setState(() {
@@ -47,6 +66,21 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  /// Products after applying the optional category filter. The category
+  /// filter is applied to the already-authorized product list, so it never
+  /// bypasses the service-layer read permission.
+  List<Product> get _filteredProducts {
+    if (_selectedCategoryId == null) return _products;
+    return _products.where((p) => p.categoryId == _selectedCategoryId).toList();
+  }
+
+  void _onSearchChanged(String value) {
+    final query = value.trim();
+    if (query == _searchQuery) return;
+    _searchQuery = query;
+    _loadData();
   }
 
   Future<void> _deleteProduct(Product product) async {
@@ -103,52 +137,109 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
             ),
         ],
       ),
-      body: _products.isEmpty
-          ? const EmptyState(
-              icon: Icons.inventory_2,
-              title: 'No Products',
-              message: 'Add your first product to get started',
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _products.length,
-              itemBuilder: (context, index) {
-                final product = _products[index];
-                final category = _categories.firstWhere(
-                  (c) => c.id == product.categoryId,
-                  orElse: () => Category(id: 0, name: 'Uncategorized', createdAt: DateTime.now()),
-                );
-                return AppCard(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: ListTile(
-                    title: Text(product.name),
-                    subtitle: Text('${category.name} • Stock: ${product.stock}'),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          '₱${product.price.toStringAsFixed(2)}',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        if (canEdit || canDelete) ...[
-                          const SizedBox(width: 8),
-                          if (canEdit)
-                            IconButton(
-                              icon: const Icon(Icons.edit),
-                              onPressed: () => _showProductDialog(product: product),
-                            ),
-                          if (canDelete)
-                            IconButton(
-                              icon: const Icon(Icons.delete),
-                              onPressed: () => _deleteProduct(product),
-                            ),
-                        ],
-                      ],
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: const InputDecoration(
+                      labelText: 'Search products',
+                      prefixIcon: Icon(Icons.search),
+                      border: OutlineInputBorder(),
+                      isDense: true,
                     ),
+                    textInputAction: TextInputAction.search,
+                    onChanged: _onSearchChanged,
                   ),
-                );
-              },
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: DropdownButtonFormField<int?>(
+                    initialValue: _selectedCategoryId,
+                    decoration: const InputDecoration(
+                      labelText: 'Category',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    items: [
+                      const DropdownMenuItem<int?>(
+                        value: null,
+                        child: Text('All'),
+                      ),
+                      ..._categories.map((category) => DropdownMenuItem<int?>(
+                            value: category.id,
+                            child: Text(category.name),
+                          )),
+                    ],
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedCategoryId = value;
+                      });
+                    },
+                  ),
+                ),
+              ],
             ),
+          ),
+          Expanded(
+            child: _filteredProducts.isEmpty
+                ? const EmptyState(
+                    icon: Icons.inventory_2,
+                    title: 'No Products',
+                    message: 'No products match your search',
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _filteredProducts.length,
+                    itemBuilder: (context, index) {
+                      final product = _filteredProducts[index];
+                      final category = _categories.firstWhere(
+                        (c) => c.id == product.categoryId,
+                        orElse: () => Category(
+                            id: 0,
+                            name: 'Uncategorized',
+                            createdAt: DateTime.now()),
+                      );
+                      return AppCard(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        child: ListTile(
+                          title: Text(product.name),
+                          subtitle: Text(
+                              '${category.name} • Stock: ${product.stock}'),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '₱${product.price.toStringAsFixed(2)}',
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                              if (canEdit || canDelete) ...[
+                                const SizedBox(width: 8),
+                                if (canEdit)
+                                  IconButton(
+                                    icon: const Icon(Icons.edit),
+                                    onPressed: () =>
+                                        _showProductDialog(product: product),
+                                  ),
+                                if (canDelete)
+                                  IconButton(
+                                    icon: const Icon(Icons.delete),
+                                    onPressed: () => _deleteProduct(product),
+                                  ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
     );
   }
 

@@ -5,9 +5,11 @@ import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/ui/screens/activity_logs_screen.dart';
 import 'package:pinoy_pos/ui/screens/ai_advisor_screen.dart';
 import 'package:pinoy_pos/ui/screens/announcements_screen.dart';
+import 'package:pinoy_pos/ui/screens/backup_restore_screen.dart';
 import 'package:pinoy_pos/ui/screens/categories_screen.dart';
 import 'package:pinoy_pos/ui/screens/notifications_screen.dart';
 import 'package:pinoy_pos/ui/screens/profile_screen.dart';
+import 'package:pinoy_pos/ui/screens/reports_screen.dart';
 import 'package:pinoy_pos/ui/screens/settings_screen.dart';
 import 'package:pinoy_pos/ui/screens/users_screen.dart';
 import 'package:pinoy_pos/ui/screens/stock_screen.dart';
@@ -25,11 +27,13 @@ class MoreScreen extends ConsumerWidget {
     final entries = <_MoreEntry>[];
 
     // --- Business modules (Owner / Staff) ---
-    if (authNotifier.hasPermission('edit_categories')) {
+    // Categories: Staff can view and toggle status, so gate on
+    // view_categories (not edit_categories) so Staff can reach the screen.
+    if (authNotifier.hasPermission('view_categories')) {
       entries.add(_MoreEntry(
         icon: Icons.category,
         title: 'Categories',
-        permission: 'edit_categories',
+        permission: 'view_categories',
         routeName: 'categories',
         screen: const CategoriesScreen(),
       ));
@@ -41,6 +45,18 @@ class MoreScreen extends ConsumerWidget {
         permission: 'add_stock',
         routeName: 'stock',
         screen: const StockScreen(),
+      ));
+    }
+    // Reports: reachable from More because the mobile bottom navigation is
+    // capped at 4 primary destinations + "More". Reports is a 5th primary
+    // destination for Owner/Staff and would otherwise be unreachable.
+    if (authNotifier.hasPermission('view_reports')) {
+      entries.add(_MoreEntry(
+        icon: Icons.analytics,
+        title: 'Reports',
+        permission: 'view_reports',
+        routeName: 'reports',
+        screen: const ReportsScreen(),
       ));
     }
     if (authNotifier.hasPermission('view_announcements')) {
@@ -78,7 +94,7 @@ class MoreScreen extends ConsumerWidget {
         title: 'Backup & Restore',
         permission: 'backup_restore',
         routeName: 'backup_restore',
-        screen: const SettingsScreen(),
+        screen: const BackupRestoreScreen(),
       ));
     }
 

@@ -1,12 +1,9 @@
-import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:pinoy_pos/core/database.dart';
 import 'package:pinoy_pos/core/database_seeder.dart';
-import 'package:pinoy_pos/core/constants.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/data/models/product.dart';
@@ -42,19 +39,17 @@ void main() {
   });
 
   setUp(() async {
-    DatabaseHelper.resetForTest();
-    final dbPath = p.join(await getDatabasesPath(), AppConstants.databaseName);
-    final file = File(dbPath);
-    if (await file.exists()) {
-      try {
-        await file.delete();
-      } catch (_) {
-        // File may still be locked on Windows; the database will re-open
-        // on top of the existing file.
-      }
-    }
+    await DatabaseHelper.resetForTest();
+    // Brief pause to let Windows release the file handle before re-opening.
+    await Future.delayed(const Duration(milliseconds: 200));
+    // Recreate the full schema explicitly.  This avoids the Windows
+    // file-lock race: a plain re-open does not trigger _onCreate when the
+    // file already exists with the same version, so a stale/corrupted file
+    // would leave tests with no tables.  recreateSchemaForTest drops and
+    // rebuilds every table + index regardless of file state.
     final dbHelper = DatabaseHelper();
-    await dbHelper.database;
+    await dbHelper.recreateSchemaForTest();
+
     final seeder = DatabaseSeeder();
     await seeder.seed();
 
@@ -63,7 +58,12 @@ void main() {
   });
 
   tearDown(() async {
-    await DatabaseHelper().close();
+    // Use resetForTest (not close()) so the singleton is fully cleared
+    // between tests.  close() re-opens the database if it was already
+    // closed, which can leave a dangling handle on Windows.
+    await DatabaseHelper.resetForTest();
+    // Brief pause to let Windows release the file handle.
+    await Future.delayed(const Duration(milliseconds: 500));
   });
 
   /// Authenticate as the seeded owner.

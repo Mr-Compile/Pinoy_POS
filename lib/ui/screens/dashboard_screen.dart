@@ -8,6 +8,7 @@ import 'package:pinoy_pos/ui/screens/products_screen.dart';
 import 'package:pinoy_pos/ui/screens/users_screen.dart';
 import 'package:pinoy_pos/ui/screens/reports_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
+import 'package:pinoy_pos/ui/widgets/error_state.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -32,6 +33,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   DateTime? _lastBackupDate;
 
   bool _isLoading = true;
+  String? _loadError;
 
   @override
   void initState() {
@@ -40,27 +42,39 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Future<void> _loadStats() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
 
-    final authState = ref.read(authStateProvider);
-    final role = authState.user?.role;
+    try {
+      final authState = ref.read(authStateProvider);
+      final role = authState.user?.role;
 
-    if (role == UserRole.owner || role == UserRole.staff) {
-      _todaySales = await _reportService.getTodaySales();
-      _monthSales = await _reportService.getMonthSales();
-      _lowStockCount = await _reportService.getLowStockCount();
-      _totalProducts = await _reportService.getTotalProducts();
-    }
+      if (role == UserRole.owner || role == UserRole.staff) {
+        _todaySales = await _reportService.getTodaySales();
+        _monthSales = await _reportService.getMonthSales();
+        _lowStockCount = await _reportService.getLowStockCount();
+        _totalProducts = await _reportService.getTotalProducts();
+      }
 
-    if (role == UserRole.admin) {
-      _totalUsers = await _reportService.getTotalUsers();
-      _activeUsers = await _reportService.getActiveUsers();
-      _lastBackupPath = await _reportService.getLastBackupPath();
-      _lastBackupDate = await _reportService.getLastBackupDate();
-    }
+      if (role == UserRole.admin) {
+        _totalUsers = await _reportService.getTotalUsers();
+        _activeUsers = await _reportService.getActiveUsers();
+        _lastBackupPath = await _reportService.getLastBackupPath();
+        _lastBackupDate = await _reportService.getLastBackupDate();
+      }
 
-    if (mounted) {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _loadError = 'Failed to load dashboard statistics. Please try again.';
+        });
+      }
     }
   }
 
@@ -73,6 +87,26 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       return Scaffold(
         appBar: AppBar(title: const Text('Dashboard')),
         body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_loadError != null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Dashboard'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _loadStats,
+              tooltip: 'Refresh',
+            ),
+          ],
+        ),
+        body: ErrorState(
+          title: 'Failed to Load Dashboard',
+          message: _loadError,
+          onRetry: _loadStats,
+        ),
       );
     }
 

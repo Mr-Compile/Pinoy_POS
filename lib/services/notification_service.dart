@@ -45,8 +45,17 @@ class NotificationService {
     await _notificationRepository.insert(notification, txn: txn);
   }
 
+  /// Marks a single notification as read. The notification must belong to
+  /// the current user; the DAO enforces `user_id = ?` so a user cannot
+  /// mutate another user's notification even if the id is known.
   Future<void> markAsRead(int id) async {
-    await _notificationRepository.markAsRead(id);
+    if (_sessionManager.currentUser == null) {
+      return;
+    }
+    await _notificationRepository.markAsRead(
+      id,
+      _sessionManager.currentUser!.id!,
+    );
   }
 
   Future<void> markAllAsRead() async {

@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
+import 'package:pinoy_pos/data/models/export_history.dart';
 import 'package:pinoy_pos/data/models/user.dart';
+import 'package:pinoy_pos/data/repositories/export_history_repository.dart';
 import 'package:pinoy_pos/data/repositories/sale_repository.dart';
 import 'package:pinoy_pos/data/repositories/product_repository.dart';
 import 'package:pinoy_pos/data/repositories/user_repository.dart';
@@ -10,6 +12,8 @@ class ReportService {
   final SaleRepository _saleRepository = SaleRepository();
   final ProductRepository _productRepository = ProductRepository();
   final UserRepository _userRepository = UserRepository();
+  final ExportHistoryRepository _exportHistoryRepository =
+      ExportHistoryRepository();
   final SessionManager _sessionManager = SessionManager();
 
   // --- Business metrics (Owner / Staff) ---
@@ -106,6 +110,36 @@ class ReportService {
       return stat.modified;
     } catch (_) {
       return null;
+    }
+  }
+
+  /// Records an export in the `export_history` table.
+  ///
+  /// Called by the Reports UI after a CSV/PDF file has actually been
+  /// written to disk. The UI never touches the repository directly; this
+  /// keeps the data-access layer behind the service. Recording is
+  /// best-effort: a failure here does not invalidate a successful export.
+  Future<void> recordExport({
+    required String fileFormat,
+    required String filePath,
+    DateTime? dateRangeStart,
+    DateTime? dateRangeEnd,
+  }) async {
+    if (!_sessionManager.hasPermission('export_reports')) {
+      return;
+    }
+    try {
+      await _exportHistoryRepository.insert(ExportHistory(
+        reportType: 'sales',
+        fileFormat: fileFormat,
+        filePath: filePath,
+        dateRangeStart: dateRangeStart,
+        dateRangeEnd: dateRangeEnd,
+        createdBy: _sessionManager.currentUser?.id,
+        createdAt: DateTime.now(),
+      ));
+    } catch (_) {
+      // Best-effort: don't fail the export if history recording fails.
     }
   }
 }

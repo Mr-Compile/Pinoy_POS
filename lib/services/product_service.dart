@@ -150,4 +150,22 @@ class ProductService {
     );
     return true;
   }
+
+  /// Permanently deletes a product row from the database.
+  /// This is irreversible and should only be called from the Trash system
+  /// for products that have already been soft-deleted.
+  Future<bool> permanentlyDeleteProduct(int id) async {
+    if (!_sessionManager.hasPermission('delete_products')) {
+      throw AuthorizationException('delete_products');
+    }
+
+    await _productRepository.delete(id);
+    await _activityLogService.logActivity(
+      action: 'permanently_delete_product',
+      entity: 'product',
+      entityId: id,
+      details: 'Permanently deleted product',
+    );
+    return true;
+  }
 }

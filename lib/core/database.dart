@@ -91,7 +91,7 @@ class DatabaseHelper {
       // Partial unique index: username must be unique only among non-deleted
       // users.  This is compatible with the soft-delete design.
       await db.execute(
-        'CREATE UNIQUE INDEX idx_users_username_active '
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username_active '
         'ON users(username) WHERE deleted_at IS NULL',
       );
 
@@ -107,8 +107,8 @@ class DatabaseHelper {
       // Recreate indexes with updated table name.
       await db.execute('DROP INDEX IF EXISTS idx_activity_log_user');
       await db.execute('DROP INDEX IF EXISTS idx_activity_log_date');
-      await db.execute('CREATE INDEX idx_activity_logs_user ON activity_logs(user_id)');
-      await db.execute('CREATE INDEX idx_activity_logs_date ON activity_logs(created_at)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_activity_logs_user ON activity_logs(user_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_activity_logs_date ON activity_logs(created_at)');
 
       // Create missing tables.
       await db.execute('''
@@ -149,16 +149,23 @@ class DatabaseHelper {
         )
       ''');
 
-      await db.execute('CREATE INDEX idx_trash_entity ON trash(entity_type, entity_id)');
-      await db.execute('CREATE INDEX idx_backup_history_date ON backup_history(created_at)');
-      await db.execute('CREATE INDEX idx_export_history_date ON export_history(created_at)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_trash_entity ON trash(entity_type, entity_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_backup_history_date ON backup_history(created_at)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_export_history_date ON export_history(created_at)');
     }
   }
 
   Future<void> _createTables(Database db) async {
     // Users table
+    // NOTE: every CREATE statement uses IF NOT EXISTS so that _onCreate is
+    // idempotent. If a previous launch crashed partway through database
+    // initialization (leaving some tables/indexes created but user_version
+    // not yet committed), the next launch re-runs _onCreate and can complete
+    // instead of throwing "table/index already exists". Without this, a
+    // single interrupted first run would permanently brick the database and
+    // every screen that depends on it (i.e. all Owner screens) would fail.
     await db.execute('''
-      CREATE TABLE users (
+      CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT NOT NULL,
         password_hash TEXT NOT NULL,
@@ -176,7 +183,7 @@ class DatabaseHelper {
 
     // Categories table
     await db.execute('''
-      CREATE TABLE categories (
+      CREATE TABLE IF NOT EXISTS categories (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT UNIQUE NOT NULL,
         description TEXT,
@@ -188,7 +195,7 @@ class DatabaseHelper {
 
     // Products table
     await db.execute('''
-      CREATE TABLE products (
+      CREATE TABLE IF NOT EXISTS products (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         description TEXT,
@@ -206,7 +213,7 @@ class DatabaseHelper {
 
     // Sales table
     await db.execute('''
-      CREATE TABLE sales (
+      CREATE TABLE IF NOT EXISTS sales (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         total_amount REAL NOT NULL,
         cash_received REAL NOT NULL,
@@ -222,7 +229,7 @@ class DatabaseHelper {
 
     // Sale items table
     await db.execute('''
-      CREATE TABLE sale_items (
+      CREATE TABLE IF NOT EXISTS sale_items (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         sale_id INTEGER NOT NULL,
         product_id INTEGER NOT NULL,
@@ -236,7 +243,7 @@ class DatabaseHelper {
 
     // Stock history table
     await db.execute('''
-      CREATE TABLE stock_history (
+      CREATE TABLE IF NOT EXISTS stock_history (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         product_id INTEGER NOT NULL,
         operation TEXT NOT NULL,
@@ -253,7 +260,7 @@ class DatabaseHelper {
 
     // Notifications table
     await db.execute('''
-      CREATE TABLE notifications (
+      CREATE TABLE IF NOT EXISTS notifications (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
         message TEXT NOT NULL,
@@ -268,7 +275,7 @@ class DatabaseHelper {
 
     // Announcements table
     await db.execute('''
-      CREATE TABLE announcements (
+      CREATE TABLE IF NOT EXISTS announcements (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
         content TEXT NOT NULL,
@@ -283,7 +290,7 @@ class DatabaseHelper {
 
     // Settings table
     await db.execute('''
-      CREATE TABLE settings (
+      CREATE TABLE IF NOT EXISTS settings (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         store_name TEXT NOT NULL,
         store_address TEXT,
@@ -299,7 +306,7 @@ class DatabaseHelper {
 
     // Activity log table
     await db.execute('''
-      CREATE TABLE activity_logs (
+      CREATE TABLE IF NOT EXISTS activity_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
         role TEXT,
@@ -314,7 +321,7 @@ class DatabaseHelper {
 
     // AI usage table
     await db.execute('''
-      CREATE TABLE ai_usage (
+      CREATE TABLE IF NOT EXISTS ai_usage (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
         query TEXT NOT NULL,
@@ -326,7 +333,7 @@ class DatabaseHelper {
 
     // Trash table
     await db.execute('''
-      CREATE TABLE trash (
+      CREATE TABLE IF NOT EXISTS trash (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         entity_type TEXT NOT NULL,
         entity_id INTEGER NOT NULL,
@@ -340,7 +347,7 @@ class DatabaseHelper {
 
     // Backup history table
     await db.execute('''
-      CREATE TABLE backup_history (
+      CREATE TABLE IF NOT EXISTS backup_history (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         file_path TEXT NOT NULL,
         file_size INTEGER,
@@ -352,7 +359,7 @@ class DatabaseHelper {
 
     // Export history table
     await db.execute('''
-      CREATE TABLE export_history (
+      CREATE TABLE IF NOT EXISTS export_history (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         report_type TEXT NOT NULL,
         file_format TEXT NOT NULL,
@@ -373,26 +380,26 @@ class DatabaseHelper {
     // Partial unique index: username must be unique only among non-deleted
     // users.  Compatible with the soft-delete design.
     await db.execute(
-      'CREATE UNIQUE INDEX idx_users_username_active '
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username_active '
       'ON users(username) WHERE deleted_at IS NULL',
     );
-    await db.execute('CREATE INDEX idx_products_category ON products(category_id)');
-    await db.execute('CREATE INDEX idx_products_active ON products(is_active)');
-    await db.execute('CREATE INDEX idx_sales_user ON sales(user_id)');
-    await db.execute('CREATE INDEX idx_sales_date ON sales(created_at)');
-    await db.execute('CREATE INDEX idx_sale_items_sale ON sale_items(sale_id)');
-    await db.execute('CREATE INDEX idx_sale_items_product ON sale_items(product_id)');
-    await db.execute('CREATE INDEX idx_stock_history_product ON stock_history(product_id)');
-    await db.execute('CREATE INDEX idx_stock_history_date ON stock_history(created_at)');
-    await db.execute('CREATE INDEX idx_notifications_user ON notifications(user_id)');
-    await db.execute('CREATE INDEX idx_notifications_read ON notifications(is_read)');
-    await db.execute('CREATE INDEX idx_activity_logs_user ON activity_logs(user_id)');
-    await db.execute('CREATE INDEX idx_activity_logs_date ON activity_logs(created_at)');
-    await db.execute('CREATE INDEX idx_trash_entity ON trash(entity_type, entity_id)');
-    await db.execute('CREATE INDEX idx_backup_history_date ON backup_history(created_at)');
-    await db.execute('CREATE INDEX idx_export_history_date ON export_history(created_at)');
-    await db.execute('CREATE INDEX idx_ai_usage_user ON ai_usage(user_id)');
-    await db.execute('CREATE INDEX idx_ai_usage_date ON ai_usage(created_at)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_products_active ON products(is_active)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_sales_user ON sales(user_id)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(created_at)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_sale_items_product ON sale_items(product_id)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_stock_history_product ON stock_history(product_id)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_stock_history_date ON stock_history(created_at)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(is_read)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_activity_logs_user ON activity_logs(user_id)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_activity_logs_date ON activity_logs(created_at)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_trash_entity ON trash(entity_type, entity_id)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_backup_history_date ON backup_history(created_at)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_export_history_date ON export_history(created_at)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_ai_usage_user ON ai_usage(user_id)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_ai_usage_date ON ai_usage(created_at)');
   }
 
   Future<void> close() async {
@@ -403,10 +410,46 @@ class DatabaseHelper {
 
   /// Resets the singleton state for testing.  Closes any open database
   /// and clears the cached instance so the next access re-creates it.
+  ///
+  /// The close is awaited so that the underlying file handle is fully
+  /// released before a test deletes the database file.  Without awaiting,
+  /// Windows keeps the file locked and the deletion fails, which previously
+  /// left a stale database on disk and caused _onCreate to re-run against
+  /// an already-initialized file (throwing "index already exists").
   @visibleForTesting
-  static void resetForTest() {
-    _database?.close();
+  static Future<void> resetForTest() async {
+    await _database?.close();
     _database = null;
+  }
+
+  /// Drops every known table and recreates the full schema + indexes on the
+  /// current database instance.  Intended for test setups only: it avoids
+  /// the Windows file-lock race that occurs when tests try to delete and
+  /// re-open the database file between runs.  Because the database version
+  /// is already at [AppConstants.databaseVersion], a plain re-open would NOT
+  /// trigger `_onCreate`, leaving dropped tables empty.  This method
+  /// explicitly recreates them.
+  @visibleForTesting
+  Future<void> recreateSchemaForTest() async {
+    final db = await database;
+    await db.transaction((txn) async {
+      await txn.execute('DROP TABLE IF EXISTS sale_items');
+      await txn.execute('DROP TABLE IF EXISTS sales');
+      await txn.execute('DROP TABLE IF EXISTS stock_history');
+      await txn.execute('DROP TABLE IF EXISTS notifications');
+      await txn.execute('DROP TABLE IF EXISTS announcements');
+      await txn.execute('DROP TABLE IF EXISTS settings');
+      await txn.execute('DROP TABLE IF EXISTS activity_logs');
+      await txn.execute('DROP TABLE IF EXISTS ai_usage');
+      await txn.execute('DROP TABLE IF EXISTS trash');
+      await txn.execute('DROP TABLE IF EXISTS backup_history');
+      await txn.execute('DROP TABLE IF EXISTS export_history');
+      await txn.execute('DROP TABLE IF EXISTS products');
+      await txn.execute('DROP TABLE IF EXISTS categories');
+      await txn.execute('DROP TABLE IF EXISTS users');
+    });
+    await _createTables(db);
+    await _createIndexes(db);
   }
 
   // Transaction support

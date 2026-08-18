@@ -1,14 +1,11 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:pinoy_pos/core/database.dart';
 import 'package:pinoy_pos/core/database_seeder.dart';
-import 'package:pinoy_pos/core/constants.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
@@ -45,24 +42,18 @@ void main() {
 
   setUp(() async {
     // Close any existing database connection first so the file handle is
-    // released before we delete it (critical on Windows where open file
-    // handles prevent deletion).
-    DatabaseHelper.resetForTest();
+    // released before we re-open.
+    await DatabaseHelper.resetForTest();
+    // Brief pause to let Windows release the file handle before re-opening.
+    await Future.delayed(const Duration(milliseconds: 200));
 
-    // Fresh database for each test.
-    final dbPath = p.join(await getDatabasesPath(), AppConstants.databaseName);
-    final file = File(dbPath);
-    if (await file.exists()) {
-      try {
-        await file.delete();
-      } catch (_) {
-        // If the file is still locked, the database will be re-initialised
-        // on top of the existing file. This is acceptable for screen build
-        // tests — we just need the tables to exist.
-      }
-    }
+    // Open the database.  If the file already exists (Windows file lock
+    // prevents deletion between tests), the tables will already be present
+    // and the seeder is idempotent (checks for existing users before
+    // inserting), so this is safe.
     final dbHelper = DatabaseHelper();
     await dbHelper.database;
+
     final seeder = DatabaseSeeder();
     await seeder.seed();
 
@@ -72,7 +63,12 @@ void main() {
   });
 
   tearDown(() async {
-    await DatabaseHelper().close();
+    // Use resetForTest (not close()) so the singleton is fully cleared
+    // between tests.  close() re-opens the database if it was already
+    // closed, which can leave a dangling handle on Windows.
+    await DatabaseHelper.resetForTest();
+    // Brief pause to let Windows release the file handle.
+    await Future.delayed(const Duration(milliseconds: 200));
   });
 
   /// Helper: authenticates as the seeded owner and returns the User.

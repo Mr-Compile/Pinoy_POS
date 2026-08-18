@@ -4,9 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:pinoy_pos/core/session_manager.dart';
-import 'package:pinoy_pos/data/models/export_history.dart';
-import 'package:pinoy_pos/data/repositories/export_history_repository.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
@@ -103,21 +100,14 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     required String fileFormat,
     required String filePath,
   }) async {
-    try {
-      final repo = ExportHistoryRepository();
-      final session = SessionManager();
-      await repo.insert(ExportHistory(
-        reportType: 'sales',
-        fileFormat: fileFormat,
-        filePath: filePath,
-        dateRangeStart: _filterStart,
-        dateRangeEnd: _filterEnd,
-        createdBy: session.currentUser?.id,
-        createdAt: DateTime.now(),
-      ));
-    } catch (_) {
-      // Best-effort: don't fail the export if history recording fails.
-    }
+    // Record through the ReportService provider so the UI never accesses
+    // the repository or session manager directly.
+    await ref.read(reportServiceProvider).recordExport(
+          fileFormat: fileFormat,
+          filePath: filePath,
+          dateRangeStart: _filterStart,
+          dateRangeEnd: _filterEnd,
+        );
   }
 
   @override

@@ -3,15 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/data/models/product.dart';
 import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/data/models/user.dart';
-import 'package:pinoy_pos/data/repositories/product_repository.dart';
-import 'package:pinoy_pos/data/repositories/category_repository.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/providers/user_provider.dart';
-import 'package:pinoy_pos/services/product_service.dart';
-import 'package:pinoy_pos/services/category_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
+import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/enhanced_dialogs.dart';
 import 'package:pinoy_pos/ui/widgets/success_snackbar.dart';
 import 'package:pinoy_pos/ui/widgets/error_snackbar.dart';
@@ -26,14 +24,11 @@ class TrashScreen extends ConsumerStatefulWidget {
 class _TrashScreenState extends ConsumerState<TrashScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final ProductRepository _productRepository = ProductRepository();
-  final CategoryRepository _categoryRepository = CategoryRepository();
-  final ProductService _productService = ProductService();
-  final CategoryService _categoryService = CategoryService();
 
   List<Product> _deletedProducts = [];
   List<Category> _deletedCategories = [];
   bool _isLoading = true;
+  String? _loadError;
 
   @override
   void initState() {
@@ -49,11 +44,18 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
   }
 
   Future<void> _loadTrash() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
     try {
-      final products = await _productRepository.getDeleted();
-      final categories = await _categoryRepository.getDeleted();
-      // Load deleted users via the user controller.
+      // Load deleted products and categories through their Riverpod
+      // service providers (UI -> Provider -> Service -> Repository -> DAO
+      // -> SQLite).  Deleted users are loaded via the user controller.
+      final productService = ref.read(productServiceProvider);
+      final categoryService = ref.read(categoryServiceProvider);
+      final products = await productService.getDeletedProducts();
+      final categories = await categoryService.getDeletedCategories();
       await ref.read(userControllerProvider.notifier).loadUsers();
       if (mounted) {
         setState(() {
@@ -64,7 +66,10 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+          _loadError = 'Failed to load trash. Please try again.';
+        });
       }
     }
   }
@@ -98,7 +103,8 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
 
     if (confirmed == true && mounted) {
       try {
-        await _productService.restoreProduct(product.id!);
+        final productService = ref.read(productServiceProvider);
+        await productService.restoreProduct(product.id!);
         if (mounted) {
           showSuccessSnackbar(context, 'Product restored successfully');
           _loadTrash();
@@ -106,6 +112,56 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
       } catch (e) {
         if (mounted) {
           showErrorSnackbar(context, 'Failed to restore product');
+        }
+      }
+    }
+  }
+
+  // ── PRODUCT PERMANENT DELETE ─────────────────────────────────────────
+
+  Future<void> _permanentlyDeleteProduct(Product product) async {
+    final authNotifier = ref.read(authStateProvider.notifier);
+    if (!authNotifier.hasPermission('delete_products')) {
+      EnhancedDialogs.showAccessDeniedDialog(context: context);
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Permanently Delete Product?'),
+        content: Text(
+          'Are you sure you want to permanently delete '
+          '"${product.name}"?\n\n'
+          'This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('Delete Permanently'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        final productService = ref.read(productServiceProvider);
+        await productService.permanentlyDeleteProduct(product.id!);
+        if (mounted) {
+          showSuccessSnackbar(context, 'Product permanently deleted');
+          _loadTrash();
+        }
+      } catch (e) {
+        if (mounted) {
+          showErrorSnackbar(context, 'Failed to permanently delete product');
         }
       }
     }
@@ -140,7 +196,8 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
 
     if (confirmed == true && mounted) {
       try {
-        await _categoryService.restoreCategory(category.id!);
+        final categoryService = ref.read(categoryServiceProvider);
+        await categoryService.restoreCategory(category.id!);
         if (mounted) {
           showSuccessSnackbar(context, 'Category restored successfully');
           _loadTrash();
@@ -148,6 +205,56 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
       } catch (e) {
         if (mounted) {
           showErrorSnackbar(context, 'Failed to restore category');
+        }
+      }
+    }
+  }
+
+  // ── CATEGORY PERMANENT DELETE ────────────────────────────────────────
+
+  Future<void> _permanentlyDeleteCategory(Category category) async {
+    final authNotifier = ref.read(authStateProvider.notifier);
+    if (!authNotifier.hasPermission('delete_categories')) {
+      EnhancedDialogs.showAccessDeniedDialog(context: context);
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Permanently Delete Category?'),
+        content: Text(
+          'Are you sure you want to permanently delete '
+          '"${category.name}"?\n\n'
+          'This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('Delete Permanently'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        final categoryService = ref.read(categoryServiceProvider);
+        await categoryService.permanentlyDeleteCategory(category.id!);
+        if (mounted) {
+          showSuccessSnackbar(context, 'Category permanently deleted');
+          _loadTrash();
+        }
+      } catch (e) {
+        if (mounted) {
+          showErrorSnackbar(context, 'Failed to permanently delete category');
         }
       }
     }
@@ -254,12 +361,25 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
     final authNotifier = ref.read(authStateProvider.notifier);
     final canRestore = authNotifier.hasPermission('restore_trash');
     final canDeleteUsers = authNotifier.hasPermission('delete_users');
+    final canDeleteProducts = authNotifier.hasPermission('delete_products');
+    final canDeleteCategories = authNotifier.hasPermission('delete_categories');
     final deletedUsers = ref.watch(userControllerProvider).deletedUsers;
 
     if (_isLoading) {
       return Scaffold(
         appBar: AppBar(title: const Text('Trash Bin')),
         body: const LoadingState(),
+      );
+    }
+
+    if (_loadError != null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Trash Bin')),
+        body: ErrorState(
+          title: 'Failed to Load Trash',
+          message: _loadError,
+          onRetry: _loadTrash,
+        ),
       );
     }
 
@@ -284,15 +404,15 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildProductsTab(canRestore),
-          _buildCategoriesTab(canRestore),
+          _buildProductsTab(canRestore, canDeleteProducts),
+          _buildCategoriesTab(canRestore, canDeleteCategories),
           _buildUsersTab(canRestore, canDeleteUsers, deletedUsers),
         ],
       ),
     );
   }
 
-  Widget _buildProductsTab(bool canRestore) {
+  Widget _buildProductsTab(bool canRestore, bool canDelete) {
     if (_deletedProducts.isEmpty) {
       return const EmptyState(
         icon: Icons.inventory_2,
@@ -313,20 +433,31 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
             subtitle: Text(
               '₱${product.price.toStringAsFixed(2)} • Stock: ${product.stock}',
             ),
-            trailing: canRestore
-                ? IconButton(
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (canRestore)
+                  IconButton(
                     icon: const Icon(Icons.restore),
                     tooltip: 'Restore',
                     onPressed: () => _restoreProduct(product),
-                  )
-                : null,
+                  ),
+                if (canDelete)
+                  IconButton(
+                    icon: Icon(Icons.delete_forever,
+                        color: Theme.of(context).colorScheme.error),
+                    tooltip: 'Delete Permanently',
+                    onPressed: () => _permanentlyDeleteProduct(product),
+                  ),
+              ],
+            ),
           ),
         );
       },
     );
   }
 
-  Widget _buildCategoriesTab(bool canRestore) {
+  Widget _buildCategoriesTab(bool canRestore, bool canDelete) {
     if (_deletedCategories.isEmpty) {
       return const EmptyState(
         icon: Icons.category,
@@ -346,13 +477,24 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
             title: Text(category.name),
             subtitle: Text(
                 category.description.isNotEmpty ? category.description : 'No description'),
-            trailing: canRestore
-                ? IconButton(
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (canRestore)
+                  IconButton(
                     icon: const Icon(Icons.restore),
                     tooltip: 'Restore',
                     onPressed: () => _restoreCategory(category),
-                  )
-                : null,
+                  ),
+                if (canDelete)
+                  IconButton(
+                    icon: Icon(Icons.delete_forever,
+                        color: Theme.of(context).colorScheme.error),
+                    tooltip: 'Delete Permanently',
+                    onPressed: () => _permanentlyDeleteCategory(category),
+                  ),
+              ],
+            ),
           ),
         );
       },

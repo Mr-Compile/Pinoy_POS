@@ -13,6 +13,6 @@ class NotificationRepository {
   Future<List<Notification>> getByUserId(int userId) => _notificationDao.getByUserId(userId);
   Future<List<Notification>> getUnreadByUserId(int userId) => _notificationDao.getUnreadByUserId(userId);
   Future<int> getUnreadCount(int userId) => _notificationDao.getUnreadCount(userId);
-  Future<void> markAsRead(int id) => _notificationDao.markAsRead(id);
+  Future<void> markAsRead(int id, int userId) => _notificationDao.markAsRead(id, userId);
   Future<void> markAllAsRead(int userId) => _notificationDao.markAllAsRead(userId);
 }

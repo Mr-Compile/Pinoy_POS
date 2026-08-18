@@ -3,8 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/data/models/product.dart';
 import 'package:pinoy_pos/data/models/sale_item.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
-import 'package:pinoy_pos/services/product_service.dart';
-import 'package:pinoy_pos/services/sales_service.dart';
+import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
@@ -21,8 +20,6 @@ class POSScreen extends ConsumerStatefulWidget {
 }
 
 class _POSScreenState extends ConsumerState<POSScreen> {
-  final ProductService _productService = ProductService();
-  final SalesService _salesService = SalesService();
   List<Product> _products = [];
   final Map<int, int> _cart = {};
   bool _isLoading = true;
@@ -39,7 +36,10 @@ class _POSScreenState extends ConsumerState<POSScreen> {
       _isLoading = true;
     });
 
-    final products = await _productService.getActiveProducts();
+    // Read ProductService through its Riverpod provider so the UI never
+    // instantiates the service directly.
+    final productService = ref.read(productServiceProvider);
+    final products = await productService.getActiveProducts();
 
     if (mounted) {
       setState(() {
@@ -137,7 +137,7 @@ class _POSScreenState extends ConsumerState<POSScreen> {
         }
       });
 
-      final success = await _salesService.createSale(
+      final success = await ref.read(salesServiceProvider).createSale(
         items: saleItems,
         totalAmount: total,
         cashReceived: result.cashReceived,

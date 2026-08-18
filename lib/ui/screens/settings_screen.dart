@@ -1,19 +1,60 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/data/models/settings.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/providers/theme_provider.dart';
-import 'package:pinoy_pos/services/backup_service.dart';
-import 'package:pinoy_pos/services/settings_service.dart';
+import 'package:pinoy_pos/ui/screens/backup_restore_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
-import 'package:pinoy_pos/ui/widgets/enhanced_dialogs.dart';
 import 'package:pinoy_pos/ui/widgets/success_snackbar.dart';
 import 'package:pinoy_pos/ui/widgets/error_snackbar.dart';
+import 'package:pinoy_pos/ui/widgets/loading_state.dart';
+import 'package:pinoy_pos/ui/widgets/error_state.dart';
 
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  Settings? _settings;
+  bool _isLoading = true;
+  String? _loadError;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+    try {
+      final settingsService = ref.read(settingsServiceProvider);
+      final settings = await settingsService.getSettings();
+      if (mounted) {
+        setState(() {
+          _settings = settings;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _loadError = 'Failed to load settings. Please try again.';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final themeState = ref.watch(themeProvider);
     final themeNotifier = ref.read(themeProvider.notifier);
     final authNotifier = ref.read(authStateProvider.notifier);
@@ -26,9 +67,36 @@ class SettingsScreen extends ConsumerWidget {
         authNotifier.hasPermission('backup_restore');
     final canBackup = authNotifier.hasPermission('backup_restore');
 
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Settings')),
+        body: const LoadingState(),
+      );
+    }
+
+    if (_loadError != null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Settings')),
+        body: ErrorState(
+          title: 'Failed to Load Settings',
+          message: _loadError,
+          onRetry: _loadSettings,
+        ),
+      );
+    }
+
+    final settings = _settings;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Settings'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadSettings,
+            tooltip: 'Refresh',
+          ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -48,17 +116,17 @@ class SettingsScreen extends ConsumerWidget {
                 const Divider(),
                 ListTile(
                   title: const Text('Accent Color'),
-                  subtitle: Text(themeState.accentColor.toUpperCase()),
+                  subtitle: Text(themeState.effectiveAccentColor.toUpperCase()),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () =>
-                      _showColorDialog(context, themeNotifier, themeState.accentColor),
+                      _showColorDialog(context, themeNotifier, themeState.effectiveAccentColor),
                 ),
               ],
             ),
           ),
 
           // --- Business Settings (Owner only) ---
-          if (canEditBusiness) ...[
+          if (canEditBusiness && settings != null) ...[
             const SizedBox(height: 24),
             _SectionHeader(title: 'Business Settings'),
             AppCard(
@@ -66,17 +134,20 @@ class SettingsScreen extends ConsumerWidget {
                 children: [
                   ListTile(
                     title: const Text('Store Name'),
-                    subtitle: const Text('Pinoy POS'),
+                    subtitle: Text(
+                        settings.storeName.isNotEmpty ? settings.storeName : 'Not set'),
                     trailing: const Icon(Icons.chevron_right),
-                    onTap: () => _editStoreName(context),
+                    onTap: () => _editStoreName(context, settings),
                   ),
                   const Divider(),
                   ListTile(
                     title: const Text('Store Address'),
-                    subtitle: const Text('Not set'),
+                    subtitle: Text(
+                        settings.storeAddress.isNotEmpty ? settings.storeAddress : 'Not set'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => _editStoreField(
                       context,
+                      settings,
                       'Store Address',
                       'store_address',
                     ),
@@ -84,10 +155,12 @@ class SettingsScreen extends ConsumerWidget {
                   const Divider(),
                   ListTile(
                     title: const Text('Store Contact'),
-                    subtitle: const Text('Not set'),
+                    subtitle: Text(
+                        settings.storePhone.isNotEmpty ? settings.storePhone : 'Not set'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => _editStoreField(
                       context,
+                      settings,
                       'Store Contact',
                       'store_phone',
                     ),
@@ -95,10 +168,14 @@ class SettingsScreen extends ConsumerWidget {
                   const Divider(),
                   ListTile(
                     title: const Text('Receipt Footer'),
-                    subtitle: const Text('Not set'),
+                    subtitle: Text(
+                        (settings.receiptFooter != null && settings.receiptFooter!.isNotEmpty)
+                            ? settings.receiptFooter!
+                            : 'Not set'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => _editStoreField(
                       context,
+                      settings,
                       'Receipt Footer',
                       'receipt_footer',
                     ),
@@ -106,9 +183,9 @@ class SettingsScreen extends ConsumerWidget {
                   const Divider(),
                   ListTile(
                     title: const Text('Currency'),
-                    subtitle: const Text('Philippine Peso (₱)'),
+                    subtitle: Text(_currencyLabel(settings.currency)),
                     trailing: const Icon(Icons.chevron_right),
-                    onTap: () => _showCurrencyDialog(context),
+                    onTap: () => _showCurrencyDialog(context, settings),
                   ),
                 ],
               ),
@@ -125,68 +202,40 @@ class SettingsScreen extends ConsumerWidget {
                   children: [
                     ListTile(
                       leading: const Icon(Icons.backup),
-                      title: const Text('Backup Data'),
-                      subtitle: const Text('Create a database backup'),
+                      title: const Text('Backup & Restore'),
+                      subtitle: const Text('Create, restore, and manage database backups'),
                       trailing: const Icon(Icons.chevron_right),
-                      onTap: () => _createBackup(context),
-                    ),
-                    const Divider(),
-                    ListTile(
-                      leading: const Icon(Icons.restore),
-                      title: const Text('Restore Data'),
-                      subtitle: const Text('Restore from a backup file'),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () => _restoreBackup(context),
+                      onTap: () => _navigateToBackupRestore(context),
                     ),
                   ],
                 ),
               ),
-            if (canEditSystem) ...[
-              const SizedBox(height: 12),
-              AppCard(
-                child: Column(
-                  children: [
-                    ListTile(
-                      leading: const Icon(Icons.policy),
-                      title: const Text('User Policies'),
-                      subtitle: const Text('Password rules, session timeout'),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () => _showPlaceholderDialog(
-                          context, 'User Policies'),
-                    ),
-                    const Divider(),
-                    ListTile(
-                      leading: const Icon(Icons.backup_table),
-                      title: const Text('Backup Policies'),
-                      subtitle: const Text('Auto-backup schedule, retention'),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () => _showPlaceholderDialog(
-                          context, 'Backup Policies'),
-                    ),
-                    const Divider(),
-                    ListTile(
-                      leading: const Icon(Icons.build),
-                      title: const Text('Maintenance'),
-                      subtitle: const Text('Database cleanup, logs purge'),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () => _showPlaceholderDialog(
-                          context, 'Maintenance'),
-                    ),
-                  ],
-                ),
-              ),
-            ],
           ],
         ],
       ),
     );
   }
 
-  Future<void> _editStoreName(BuildContext context) async {
-    final settingsService = SettingsService();
-    final settings = await settingsService.getSettings();
-    if (!context.mounted) return;
+  // ── Helpers ──────────────────────────────────────────────────────────
 
+  String _currencyLabel(String currency) {
+    return switch (currency) {
+      'PHP' => 'Philippine Peso (₱)',
+      'USD' => 'US Dollar (\$)',
+      'EUR' => 'Euro (€)',
+      _ => currency,
+    };
+  }
+
+  Future<void> _navigateToBackupRestore(BuildContext context) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const BackupRestoreScreen()),
+    );
+  }
+
+  Future<void> _editStoreName(BuildContext context, Settings settings) async {
+    final settingsService = ref.read(settingsServiceProvider);
     final controller = TextEditingController(text: settings.storeName);
     final result = await showDialog<String>(
       context: context,
@@ -214,21 +263,27 @@ class SettingsScreen extends ConsumerWidget {
     );
 
     if (result != null && result.isNotEmpty && context.mounted) {
-      await settingsService.updateSettings(settings.copyWith(storeName: result));
-      if (context.mounted) {
-        showSuccessSnackbar(context, 'Store name updated');
+      try {
+        await settingsService.updateSettings(settings.copyWith(storeName: result));
+        await _loadSettings();
+        if (context.mounted) {
+          showSuccessSnackbar(context, 'Store name updated');
+        }
+      } catch (e) {
+        if (context.mounted) {
+          showErrorSnackbar(context, 'Failed to update store name');
+        }
       }
     }
   }
 
   Future<void> _editStoreField(
     BuildContext context,
+    Settings settings,
     String label,
     String fieldKey,
   ) async {
-    final settingsService = SettingsService();
-    final settings = await settingsService.getSettings();
-    if (!context.mounted) return;
+    final settingsService = ref.read(settingsServiceProvider);
 
     String currentValue;
     switch (fieldKey) {
@@ -278,86 +333,66 @@ class SettingsScreen extends ConsumerWidget {
         storePhone: fieldKey == 'store_phone' ? result : null,
         receiptFooter: fieldKey == 'receipt_footer' ? result : null,
       );
-      await settingsService.updateSettings(updated);
-      if (context.mounted) {
-        showSuccessSnackbar(context, '$label updated');
-      }
-    }
-  }
-
-  void _showCurrencyDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Currency'),
-        content: const Text(
-            'Philippine Peso (₱) is the only supported currency in this version.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showPlaceholderDialog(BuildContext context, String title) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Text('$title configuration will be available in a future update.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _createBackup(BuildContext context) async {
-    final confirmed =
-        await EnhancedDialogs.showRestoreBackupDialog(context: context);
-    if (confirmed != true || !context.mounted) return;
-
-    try {
-      final backupService = BackupService();
-      final path = await backupService.createBackup();
-      if (context.mounted) {
-        showSuccessSnackbar(context, 'Backup created: $path');
-      }
-    } catch (e) {
-      if (context.mounted) {
-        showErrorSnackbar(context, 'Failed to create backup');
-      }
-    }
-  }
-
-  Future<void> _restoreBackup(BuildContext context) async {
-    final confirmed =
-        await EnhancedDialogs.showRestoreBackupDialog(context: context);
-    if (confirmed != true || !context.mounted) return;
-
-    try {
-      final backupService = BackupService();
-      final dir = await backupService.createBackup();
-      final success = await backupService.restoreBackup(dir);
-      if (context.mounted) {
-        if (success) {
-          showSuccessSnackbar(
-              context, 'Data restored successfully. Please restart the app.');
-        } else {
-          showErrorSnackbar(context, 'Failed to restore backup');
+      try {
+        await settingsService.updateSettings(updated);
+        await _loadSettings();
+        if (context.mounted) {
+          showSuccessSnackbar(context, '$label updated');
+        }
+      } catch (e) {
+        if (context.mounted) {
+          showErrorSnackbar(context, 'Failed to update $label');
         }
       }
-    } catch (e) {
-      if (context.mounted) {
-        showErrorSnackbar(context, 'Failed to restore backup');
-      }
     }
+  }
+
+  void _showCurrencyDialog(BuildContext context, Settings settings) {
+    final currencies = ['PHP', 'USD', 'EUR'];
+    final current = settings.currency;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Currency'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: currencies
+              .map((currency) => ListTile(
+                    title: Text(_currencyLabel(currency)),
+                    leading: Icon(
+                      currency == current
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_unchecked,
+                    ),
+                    onTap: () async {
+                      Navigator.pop(dialogContext);
+                      final settingsService = ref.read(settingsServiceProvider);
+                      try {
+                        await settingsService.updateSettings(
+                          settings.copyWith(currency: currency),
+                        );
+                        await _loadSettings();
+                        if (mounted) {
+                          showSuccessSnackbar(this.context, 'Currency updated');
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          showErrorSnackbar(this.context, 'Failed to update currency');
+                        }
+                      }
+                    },
+                  ))
+              .toList(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showThemeDialog(

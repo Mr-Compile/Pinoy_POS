@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/data/models/announcement.dart';
-import 'package:pinoy_pos/data/repositories/announcement_repository.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
@@ -20,7 +20,6 @@ class AnnouncementsScreen extends ConsumerStatefulWidget {
 }
 
 class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
-  final AnnouncementRepository _announcementRepository = AnnouncementRepository();
   List<Announcement> _announcements = [];
   bool _isLoading = true;
 
@@ -32,7 +31,11 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
 
   Future<void> _loadAnnouncements() async {
     setState(() => _isLoading = true);
-    final announcements = await _announcementRepository.getActiveAnnouncements();
+    // Load through the Riverpod service provider so the UI never accesses
+    // the repository or DAO directly (UI -> Provider -> Service ->
+    // Repository -> DAO -> SQLite).
+    final announcementService = ref.read(announcementServiceProvider);
+    final announcements = await announcementService.getActiveAnnouncements();
     if (mounted) {
       setState(() {
         _announcements = announcements;
@@ -55,10 +58,16 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
 
     if (confirmed == true && mounted) {
       try {
-        await _announcementRepository.softDelete(announcement.id!);
+        final announcementService = ref.read(announcementServiceProvider);
+        final success =
+            await announcementService.deleteAnnouncement(announcement.id!);
         if (mounted) {
-          showSuccessSnackbar(context, 'Announcement deleted successfully');
-          _loadAnnouncements();
+          if (success) {
+            showSuccessSnackbar(context, 'Announcement deleted successfully');
+            _loadAnnouncements();
+          } else {
+            showErrorSnackbar(context, 'Failed to delete announcement');
+          }
         }
       } catch (e) {
         if (mounted) {
@@ -208,23 +217,33 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
                 if (!formKey.currentState!.validate()) return;
                 setState(() => isSaving = true);
                 try {
-                  final data = Announcement(
-                    id: announcement?.id,
-                    title: titleController.text.trim(),
-                    content: contentController.text.trim(),
-                    isPinned: isPinned,
-                    createdBy: announcement?.createdBy,
-                    createdAt: announcement?.createdAt ?? DateTime.now(),
-                  );
+                  final announcementService =
+                      ref.read(announcementServiceProvider);
+                  bool success;
                   if (announcement == null) {
-                    await _announcementRepository.insert(data);
+                    success = await announcementService.createAnnouncement(
+                      title: titleController.text.trim(),
+                      content: contentController.text.trim(),
+                      isPinned: isPinned,
+                    );
                   } else {
-                    await _announcementRepository.update(data);
+                    final data = announcement.copyWith(
+                      title: titleController.text.trim(),
+                      content: contentController.text.trim(),
+                      isPinned: isPinned,
+                    );
+                    success =
+                        await announcementService.updateAnnouncement(data);
                   }
                   if (context.mounted) {
                     Navigator.pop(context);
-                    showSuccessSnackbar(context, 'Announcement saved successfully');
-                    _loadAnnouncements();
+                    if (success) {
+                      showSuccessSnackbar(
+                          context, 'Announcement saved successfully');
+                      _loadAnnouncements();
+                    } else {
+                      showErrorSnackbar(context, 'Failed to save announcement');
+                    }
                   }
                 } catch (e) {
                   if (context.mounted) {

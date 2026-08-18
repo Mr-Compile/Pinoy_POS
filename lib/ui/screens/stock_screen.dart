@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/data/models/product.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
-import 'package:pinoy_pos/services/product_service.dart';
-import 'package:pinoy_pos/services/stock_service.dart';
+import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
@@ -19,8 +18,6 @@ class StockScreen extends ConsumerStatefulWidget {
 }
 
 class _StockScreenState extends ConsumerState<StockScreen> {
-  final ProductService _productService = ProductService();
-  final StockService _stockService = StockService();
   List<Product> _products = [];
   bool _isLoading = true;
   bool _isProcessing = false;
@@ -36,7 +33,8 @@ class _StockScreenState extends ConsumerState<StockScreen> {
       _isLoading = true;
     });
 
-    final products = await _productService.getActiveProducts();
+    final productService = ref.read(productServiceProvider);
+    final products = await productService.getActiveProducts();
 
     if (mounted) {
       setState(() {
@@ -46,24 +44,40 @@ class _StockScreenState extends ConsumerState<StockScreen> {
     }
   }
 
-  Future<void> _adjustStock(Product product, int adjustment) async {
+  /// Performs a stock operation.
+  ///
+  /// Staff only have the `add_stock` permission, so an increase is routed
+  /// through [StockService.addStock] (increase-only, validated > 0). A
+  /// decrease requires the `adjust_stock` permission and is routed through
+  /// [StockService.adjustStock]; the service layer rejects it for Staff
+  /// even if this path is somehow reached.
+  Future<void> _changeStock(Product product, int adjustment) async {
     final authNotifier = ref.read(authStateProvider.notifier);
     if (!authNotifier.hasPermission('add_stock')) {
       EnhancedDialogs.showAccessDeniedDialog(context: context);
       return;
     }
 
+    final isAdd = adjustment > 0;
     final newStock = product.stock + adjustment;
     if (newStock < 0) {
       showErrorSnackbar(context, 'Insufficient stock to remove');
       return;
     }
 
+    // Staff are allowed to add stock only. A manual decrease requires the
+    // adjust_stock permission; block it at the UI layer as well so the
+    // confirmation dialog is never shown for an unauthorized action.
+    if (!isAdd && !authNotifier.hasPermission('adjust_stock')) {
+      EnhancedDialogs.showAccessDeniedDialog(context: context);
+      return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Adjust Stock'),
-        content: Text(adjustment > 0
+        title: Text(isAdd ? 'Add Stock' : 'Remove Stock'),
+        content: Text(isAdd
             ? 'Add $adjustment to ${product.name}? (New stock: $newStock)'
             : 'Remove ${-adjustment} from ${product.name}? (New stock: $newStock)'),
         actions: [
@@ -85,14 +99,41 @@ class _StockScreenState extends ConsumerState<StockScreen> {
       });
 
       try {
-        await _stockService.adjustStock(product.id!, newStock, 'Manual adjustment');
+        final stockService = ref.read(stockServiceProvider);
+        bool success;
+        if (isAdd) {
+          // Increase: permitted for Staff (add_stock). addStock validates
+          // quantity > 0, product exists and is active, then updates stock,
+          // inserts stock_history, and logs activity — all in one
+          // SQLite transaction.
+          success = await stockService.addStock(
+            product.id!,
+            adjustment,
+            'Manual stock addition',
+          );
+        } else {
+          // Decrease / absolute adjust: requires adjust_stock permission.
+          // The service enforces authorization again before mutating.
+          success = await stockService.adjustStock(
+            product.id!,
+            newStock,
+            'Manual stock adjustment',
+          );
+        }
         if (mounted) {
-          showSuccessSnackbar(context, 'Stock adjusted successfully');
-          _loadProducts();
+          if (success) {
+            showSuccessSnackbar(
+              context,
+              isAdd ? 'Stock added successfully' : 'Stock adjusted successfully',
+            );
+            _loadProducts();
+          } else {
+            showErrorSnackbar(context, 'Failed to update stock');
+          }
         }
       } catch (e) {
         if (mounted) {
-          showErrorSnackbar(context, 'Failed to adjust stock');
+          showErrorSnackbar(context, 'Failed to update stock');
         }
       } finally {
         if (mounted) {
@@ -132,13 +173,13 @@ class _StockScreenState extends ConsumerState<StockScreen> {
           IconButton(
             icon: const Icon(Icons.add),
             tooltip: 'Add stock',
-            onPressed: _isProcessing ? null : () => _adjustStock(product, 10),
+            onPressed: _isProcessing ? null : () => _changeStock(product, 10),
           ),
           if (canAdjustStock)
             IconButton(
               icon: const Icon(Icons.remove),
               tooltip: 'Remove stock',
-              onPressed: _isProcessing ? null : () => _adjustStock(product, -10),
+              onPressed: _isProcessing ? null : () => _changeStock(product, -10),
             ),
         ],
       );

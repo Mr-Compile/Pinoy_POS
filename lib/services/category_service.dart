@@ -130,4 +130,22 @@ class CategoryService {
     );
     return true;
   }
+
+  /// Permanently deletes a category row from the database.
+  /// This is irreversible and should only be called from the Trash system
+  /// for categories that have already been soft-deleted.
+  Future<bool> permanentlyDeleteCategory(int id) async {
+    if (!_sessionManager.hasPermission('delete_categories')) {
+      throw AuthorizationException('delete_categories');
+    }
+
+    await _categoryRepository.delete(id);
+    await _activityLogService.logActivity(
+      action: 'permanently_delete_category',
+      entity: 'category',
+      entityId: id,
+      details: 'Permanently deleted category',
+    );
+    return true;
+  }
 }
