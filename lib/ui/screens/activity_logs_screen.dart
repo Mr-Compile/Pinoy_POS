@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
-import 'package:pinoy_pos/services/activity_log_service.dart';
+import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/data/models/activity_log.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
+import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 
 class ActivityLogsScreen extends ConsumerStatefulWidget {
@@ -15,9 +16,9 @@ class ActivityLogsScreen extends ConsumerStatefulWidget {
 }
 
 class _ActivityLogsScreenState extends ConsumerState<ActivityLogsScreen> {
-  final ActivityLogService _activityLogService = ActivityLogService();
   List<ActivityLog> _activities = [];
   bool _isLoading = true;
+  String? _loadError;
 
   @override
   void initState() {
@@ -26,13 +27,26 @@ class _ActivityLogsScreenState extends ConsumerState<ActivityLogsScreen> {
   }
 
   Future<void> _loadActivities() async {
-    setState(() => _isLoading = true);
-    final activities = await _activityLogService.getRecentActivities();
-    if (mounted) {
-      setState(() {
-        _activities = activities;
-        _isLoading = false;
-      });
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+    try {
+      final activityLogService = ref.read(activityLogServiceProvider);
+      final activities = await activityLogService.getRecentActivities();
+      if (mounted) {
+        setState(() {
+          _activities = activities;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _loadError = 'Failed to load activity logs. Please try again.';
+        });
+      }
     }
   }
 
@@ -55,12 +69,24 @@ class _ActivityLogsScreenState extends ConsumerState<ActivityLogsScreen> {
       );
     }
 
+    if (_loadError != null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Activity Logs')),
+        body: ErrorState(
+          title: 'Failed to Load Activity Logs',
+          message: _loadError,
+          onRetry: _loadActivities,
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Activity Logs'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh',
             onPressed: _loadActivities,
           ),
         ],

@@ -63,13 +63,30 @@ class BackupService {
       throw AuthorizationException('backup_restore');
     }
 
+    // Validate the backup file exists and is non-empty (basic corruption
+    // guard). An empty or missing file cannot be a valid SQLite database.
+    final backupFile = File(backupPath);
+    if (!await backupFile.exists()) {
+      return false;
+    }
+    final stat = await backupFile.stat();
+    if (stat.size == 0) {
+      return false;
+    }
+
+    // The live database lives at db.path (getDatabasesPath()/pinoy_pos.db),
+    // which is NOT necessarily the same as getApplicationDocumentsDirectory().
+    // Restore must overwrite the actual database file, not a sibling file in
+    // a different directory.
+    final db = await _dbHelper.database;
+    final dbPath = db.path;
+
+    // Close the database handle before overwriting its file so that the
+    // file is not locked and the next access re-opens the restored data.
+    await _dbHelper.close();
+
     try {
-      final directory = await getApplicationDocumentsDirectory();
-      final dbPath = join(directory.path, 'pinoy_pos.db');
-
-      await File(backupPath).copy(dbPath);
-
-      await _dbHelper.close();
+      await backupFile.copy(dbPath);
       return true;
     } catch (e) {
       return false;

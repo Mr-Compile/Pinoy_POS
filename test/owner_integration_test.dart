@@ -8,13 +8,10 @@ import 'package:pinoy_pos/core/database.dart';
 import 'package:pinoy_pos/core/database_seeder.dart';
 import 'package:pinoy_pos/core/constants.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
-import 'package:pinoy_pos/core/security.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/data/models/product.dart';
 import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/data/models/announcement.dart';
-import 'package:pinoy_pos/data/models/activity_log.dart';
-import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/data/models/sale_item.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
 import 'package:pinoy_pos/services/product_service.dart';
@@ -45,12 +42,17 @@ void main() {
   });
 
   setUp(() async {
+    DatabaseHelper.resetForTest();
     final dbPath = p.join(await getDatabasesPath(), AppConstants.databaseName);
     final file = File(dbPath);
     if (await file.exists()) {
-      await file.delete();
+      try {
+        await file.delete();
+      } catch (_) {
+        // File may still be locked on Windows; the database will re-open
+        // on top of the existing file.
+      }
     }
-    DatabaseHelper.resetForTest();
     final dbHelper = DatabaseHelper();
     await dbHelper.database;
     final seeder = DatabaseSeeder();
@@ -67,7 +69,7 @@ void main() {
   /// Authenticate as the seeded owner.
   Future<User> authAsOwner() async {
     final authService = AuthService();
-    final ok = await authService.login('owner', 'admin123');
+    final ok = await authService.login('owner', 'owner123');
     if (!ok) {
       throw StateError('Owner login failed');
     }
@@ -515,7 +517,7 @@ void main() {
 
   group('Owner RBAC', () {
     test('Owner has all expected permissions', () async {
-      final owner = await authAsOwner();
+      await authAsOwner();
       final sm = SessionManager();
 
       const expected = [
@@ -554,7 +556,7 @@ void main() {
   group('Auth / Session chain', () {
     test('AuthService login and restoreSession work for owner', () async {
       final authService = AuthService();
-      final ok = await authService.login('owner', 'admin123');
+      final ok = await authService.login('owner', 'owner123');
       expect(ok, isTrue);
       expect(authService.currentUser, isNotNull);
       expect(authService.currentUser!.role, UserRole.owner);
@@ -569,7 +571,7 @@ void main() {
 
     test('AuthService logout clears session', () async {
       final authService = AuthService();
-      await authService.login('owner', 'admin123');
+      await authService.login('owner', 'owner123');
       expect(authService.isAuthenticated, isTrue);
 
       await authService.logout();

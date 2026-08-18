@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/data/models/notification.dart' as models;
-import 'package:pinoy_pos/services/notification_service.dart';
+import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
+import 'package:pinoy_pos/ui/widgets/success_snackbar.dart';
+import 'package:pinoy_pos/ui/widgets/error_snackbar.dart';
 
 class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
@@ -14,9 +16,9 @@ class NotificationsScreen extends ConsumerStatefulWidget {
 }
 
 class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
-  final NotificationService _notificationService = NotificationService();
   List<models.Notification> _notifications = [];
   bool _isLoading = true;
+  bool _isProcessing = false;
 
   @override
   void initState() {
@@ -29,7 +31,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       _isLoading = true;
     });
 
-    final notifications = await _notificationService.getNotifications();
+    final notificationService = ref.read(notificationServiceProvider);
+    final notifications = await notificationService.getNotifications();
 
     if (mounted) {
       setState(() {
@@ -40,8 +43,33 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   }
 
   Future<void> _markAsRead(models.Notification notification) async {
-    await _notificationService.markAsRead(notification.id!);
-    _loadNotifications();
+    try {
+      final notificationService = ref.read(notificationServiceProvider);
+      await notificationService.markAsRead(notification.id!);
+      _loadNotifications();
+    } catch (e) {
+      if (mounted) {
+        showErrorSnackbar(context, 'Failed to mark notification as read');
+      }
+    }
+  }
+
+  Future<void> _markAllAsRead() async {
+    setState(() => _isProcessing = true);
+    try {
+      final notificationService = ref.read(notificationServiceProvider);
+      await notificationService.markAllAsRead();
+      if (mounted) {
+        showSuccessSnackbar(context, 'All notifications marked as read');
+      }
+      _loadNotifications();
+    } catch (e) {
+      if (mounted) {
+        showErrorSnackbar(context, 'Failed to mark all notifications as read');
+      }
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
+    }
   }
 
   @override
@@ -55,10 +83,24 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       );
     }
 
+    final hasUnread = _notifications.any((n) => !n.isRead);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Notifications'),
         actions: [
+          if (hasUnread)
+            IconButton(
+              icon: _isProcessing
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.done_all),
+              tooltip: 'Mark all as read',
+              onPressed: _isProcessing ? null : _markAllAsRead,
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadNotifications,
@@ -85,7 +127,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                         ? null
                         : Icon(Icons.circle,
                             color: Theme.of(context).colorScheme.primary, size: 8),
-                    onTap: () => _markAsRead(notification),
+                    onTap: notification.isRead ? null : () => _markAsRead(notification),
                   ),
                 );
               },

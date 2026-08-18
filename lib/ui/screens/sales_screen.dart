@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
-import 'package:pinoy_pos/services/sales_service.dart';
+import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/screens/sale_detail_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
@@ -20,7 +20,6 @@ class SalesScreen extends ConsumerStatefulWidget {
 }
 
 class _SalesScreenState extends ConsumerState<SalesScreen> {
-  final SalesService _salesService = SalesService();
   List<Sale> _sales = [];
   bool _isLoading = true;
   bool _isProcessing = false;
@@ -36,7 +35,8 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
       _isLoading = true;
     });
 
-    final sales = await _salesService.getSales();
+    final salesService = ref.read(salesServiceProvider);
+    final sales = await salesService.getSales();
 
     if (mounted) {
       setState(() {
@@ -63,7 +63,8 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
       });
 
       try {
-        final success = await _salesService.voidSale(sale.id!);
+        final salesService = ref.read(salesServiceProvider);
+        final success = await salesService.voidSale(sale.id!);
         if (mounted) {
           setState(() {
             _isProcessing = false;
@@ -94,7 +95,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     if (_isLoading) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Sales'),
+          title: const Text('My Sales'),
         ),
         body: const LoadingState(),
       );
@@ -102,7 +103,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sales'),
+        title: const Text('My Sales'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -140,7 +141,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          '₱${sale.totalAmount.toStringAsFixed(2)}',
+                          'PHP ${sale.totalAmount.toStringAsFixed(2)}',
                           style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.bold,
                               ),

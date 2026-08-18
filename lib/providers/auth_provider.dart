@@ -58,24 +58,36 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
 
   Future<bool> login(String username, String password) async {
     state = state.copyWith(isLoading: true, error: null);
-    final success = await _authService.login(username, password);
-    if (success) {
-      state = state.copyWith(user: _authService.currentUser, isLoading: false);
-    } else {
-      state = state.copyWith(isLoading: false, error: 'Invalid credentials');
+    try {
+      final success = await _authService.login(username, password);
+      if (success) {
+        state = state.copyWith(user: _authService.currentUser, isLoading: false);
+        _themeNotifier.syncUserColorPreference(_authService.currentUser?.colorPreference);
+      } else {
+        state = state.copyWith(isLoading: false, error: 'Incorrect username or password.');
+      }
+      return success;
+    } catch (_) {
+      state = state.copyWith(isLoading: false, error: 'Unable to sign in right now. Please try again.');
+      return false;
     }
-    return success;
   }
 
   Future<bool> loginWithPin(String username, String pin) async {
     state = state.copyWith(isLoading: true, error: null);
-    final success = await _authService.loginWithPin(username, pin);
-    if (success) {
-      state = state.copyWith(user: _authService.currentUser, isLoading: false);
-    } else {
-      state = state.copyWith(isLoading: false, error: 'Invalid PIN');
+    try {
+      final success = await _authService.loginWithPin(username, pin);
+      if (success) {
+        state = state.copyWith(user: _authService.currentUser, isLoading: false);
+        _themeNotifier.syncUserColorPreference(_authService.currentUser?.colorPreference);
+      } else {
+        state = state.copyWith(isLoading: false, error: 'Incorrect username or PIN.');
+      }
+      return success;
+    } catch (_) {
+      state = state.copyWith(isLoading: false, error: 'Unable to sign in right now. Please try again.');
+      return false;
     }
-    return success;
   }
 
   Future<void> logout() async {
@@ -100,5 +112,30 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
   void refreshUser() {
     state = state.copyWith(user: _authService.currentUser);
     _themeNotifier.syncUserColorPreference(_authService.currentUser?.colorPreference);
+  }
+
+  /// Updates the current user's own profile (full name, PIN, color
+  /// preference). No special permission is required — users can always
+  /// edit their own profile. Restricted fields (role, username, isActive)
+  /// are never modified here.
+  ///
+  /// Returns true on success, false on failure.
+  Future<bool> updateProfile({
+    required int userId,
+    required String fullName,
+    String? pin,
+    String? colorPreference,
+  }) async {
+    final success = await _authService.updateProfile(
+      userId: userId,
+      fullName: fullName,
+      pin: pin,
+      colorPreference: colorPreference,
+    );
+    if (success) {
+      state = state.copyWith(user: _authService.currentUser);
+      _themeNotifier.syncUserColorPreference(_authService.currentUser?.colorPreference);
+    }
+    return success;
   }
 }

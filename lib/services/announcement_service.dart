@@ -1,10 +1,10 @@
+import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/announcement.dart';
 import 'package:pinoy_pos/data/repositories/announcement_repository.dart';
-import 'package:pinoy_pos/services/auth_service.dart';
 
 class AnnouncementService {
   final AnnouncementRepository _announcementRepository = AnnouncementRepository();
-  final AuthService _authService = AuthService();
+  final SessionManager _sessionManager = SessionManager();
 
   Future<List<Announcement>> getActiveAnnouncements() async {
     return _announcementRepository.getActiveAnnouncements();
@@ -15,7 +15,7 @@ class AnnouncementService {
   }
 
   Future<List<Announcement>> getAllAnnouncements() async {
-    if (!_authService.hasPermission('manage_users')) {
+    if (!_sessionManager.hasPermission('manage_users')) {
       return [];
     }
     return _announcementRepository.getAllActive();
@@ -27,7 +27,7 @@ class AnnouncementService {
     bool isPinned = false,
     DateTime? expiresAt,
   }) async {
-    if (!_authService.hasPermission('manage_users')) {
+    if (!_sessionManager.hasPermission('manage_users')) {
       return false;
     }
 
@@ -40,7 +40,7 @@ class AnnouncementService {
       content: content,
       isPinned: isPinned,
       expiresAt: expiresAt,
-      createdBy: _authService.currentUser?.id,
+      createdBy: _sessionManager.currentUser?.id,
       createdAt: DateTime.now(),
     );
 
@@ -49,7 +49,7 @@ class AnnouncementService {
   }
 
   Future<bool> updateAnnouncement(Announcement announcement) async {
-    if (!_authService.hasPermission('manage_users')) {
+    if (!_sessionManager.hasPermission('manage_users')) {
       return false;
     }
 
@@ -62,7 +62,7 @@ class AnnouncementService {
   }
 
   Future<bool> deleteAnnouncement(int id) async {
-    if (!_authService.hasPermission('manage_users')) {
+    if (!_sessionManager.hasPermission('manage_users')) {
       return false;
     }
 
@@ -71,7 +71,7 @@ class AnnouncementService {
   }
 
   Future<bool> togglePin(int id, bool isPinned) async {
-    if (!_authService.hasPermission('manage_users')) {
+    if (!_sessionManager.hasPermission('manage_users')) {
       return false;
     }
 

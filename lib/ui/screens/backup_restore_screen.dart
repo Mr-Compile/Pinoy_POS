@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
 import 'package:pinoy_pos/data/models/backup_history.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
+import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
-import 'package:pinoy_pos/ui/widgets/enhanced_dialogs.dart';
-import 'package:pinoy_pos/ui/widgets/success_snackbar.dart';
-import 'package:pinoy_pos/ui/widgets/error_snackbar.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
+import 'package:pinoy_pos/ui/widgets/app_feedback.dart';
 
 class BackupRestoreScreen extends ConsumerStatefulWidget {
   const BackupRestoreScreen({super.key});
@@ -21,6 +22,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
   bool _isLoading = true;
   bool _isBackingUp = false;
   bool _isRestoring = false;
+  String? _loadError;
 
   @override
   void initState() {
@@ -31,6 +33,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
   Future<void> _loadBackups() async {
     setState(() {
       _isLoading = true;
+      _loadError = null;
     });
 
     try {
@@ -46,8 +49,8 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _loadError = 'Failed to load backup history. Please try again.';
         });
-        showErrorSnackbar(context, 'Failed to load backup history');
       }
     }
   }
@@ -61,12 +64,12 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
       final backupService = ref.read(backupServiceProvider);
       await backupService.createBackup();
       if (mounted) {
-        showSuccessSnackbar(context, 'Backup created successfully');
+        AppFeedback.success(context, 'Backup created successfully');
         _loadBackups();
       }
     } catch (e) {
       if (mounted) {
-        showErrorSnackbar(context, 'Failed to create backup: $e');
+        AppFeedback.error(context, 'Failed to create backup: $e');
       }
     } finally {
       if (mounted) {
@@ -78,8 +81,8 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
   }
 
   Future<void> _restoreBackup(BackupHistory backup) async {
-    final confirmed = await EnhancedDialogs.showRestoreBackupDialog(
-      context: context,
+    final confirmed = await AppDialogService.restoreBackupConfirm(
+      context,
     );
 
     if (confirmed != true || !mounted) return;
@@ -93,14 +96,14 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
       final success = await backupService.restoreBackup(backup.filePath);
       if (mounted) {
         if (success) {
-          showSuccessSnackbar(context, 'Backup restored successfully. Please restart the app.');
+          AppFeedback.success(context, 'Backup restored successfully. Please restart the app.');
         } else {
-          showErrorSnackbar(context, 'Failed to restore backup. File may be corrupt or missing.');
+          AppFeedback.error(context, 'Failed to restore backup. File may be corrupt or missing.');
         }
       }
     } catch (e) {
       if (mounted) {
-        showErrorSnackbar(context, 'Failed to restore backup: $e');
+        AppFeedback.error(context, 'Failed to restore backup: $e');
       }
     } finally {
       if (mounted) {
@@ -112,8 +115,9 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
   }
 
   Future<void> _deleteBackup(BackupHistory backup) async {
-    final confirmed = await EnhancedDialogs.showPermanentDeleteDialog(
-      context: context,
+    final confirmed = await AppDialogService.permanentDeleteConfirm(
+      context,
+      itemName: p.basename(backup.filePath),
     );
 
     if (confirmed != true || !mounted) return;
@@ -123,15 +127,15 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
       final success = await backupService.deleteBackup(backup.id!, backup.filePath);
       if (mounted) {
         if (success) {
-          showSuccessSnackbar(context, 'Backup deleted successfully');
+          AppFeedback.success(context, 'Backup deleted successfully');
           _loadBackups();
         } else {
-          showErrorSnackbar(context, 'Failed to delete backup');
+          AppFeedback.error(context, 'Failed to delete backup');
         }
       }
     } catch (e) {
       if (mounted) {
-        showErrorSnackbar(context, 'Failed to delete backup');
+        AppFeedback.error(context, 'Failed to delete backup');
       }
     }
   }
@@ -159,7 +163,13 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
           ? const LoadingState()
           : _isRestoring
               ? const LoadingState(message: 'Restoring backup...')
-              : SingleChildScrollView(
+              : _loadError != null
+                  ? ErrorState(
+                      title: 'Failed to Load Backups',
+                      message: _loadError,
+                      onRetry: _loadBackups,
+                    )
+                  : SingleChildScrollView(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -234,7 +244,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                               child: ListTile(
                                 leading: const Icon(Icons.backup_table),
                                 title: Text(
-                                  backup.filePath.split('/').last,
+                                  p.basename(backup.filePath),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                                 subtitle: Text(

@@ -7,6 +7,8 @@ import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/success_snackbar.dart';
 import 'package:pinoy_pos/ui/widgets/error_snackbar.dart';
 import 'package:pinoy_pos/ui/widgets/validators.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -16,7 +18,6 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
-
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
@@ -83,6 +84,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     leading: const Icon(Icons.person),
                     title: const Text('Full Name'),
                     subtitle: Text(user.fullName),
+                    trailing: const Icon(Icons.edit, size: 20),
+                    onTap: () => _showEditProfileDialog(user),
                   ),
                   const Divider(),
                   ListTile(
@@ -115,16 +118,43 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
             const SizedBox(height: 24),
             Text(
-              'Security',
+              'Preferences',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 16),
             AppCard(
               child: ListTile(
-                leading: const Icon(Icons.lock),
-                title: const Text('Change Password'),
+                leading: const Icon(Icons.palette),
+                title: const Text('Accent Color'),
+                subtitle: Text(user.colorPreference.toUpperCase()),
                 trailing: const Icon(Icons.chevron_right),
-                onTap: () => _showChangePasswordDialog(user),
+                onTap: () => _showColorPreferenceDialog(user),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Security',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            AppCard(
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.lock),
+                    title: const Text('Change Password'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => _showChangePasswordDialog(user),
+                  ),
+                  const Divider(),
+                  ListTile(
+                    leading: const Icon(Icons.pin),
+                    title: const Text('PIN'),
+                    subtitle: Text(user.pin != null ? 'Set (${user.pin!.length} digits)' : 'Not set'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => _showEditPinDialog(user),
+                  ),
+                ],
               ),
             ),
           ],
@@ -132,6 +162,196 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       ),
     );
   }
+
+  // ── EDIT PROFILE (full name) ─────────────────────────────────────────
+
+  void _showEditProfileDialog(User user) {
+    final formKey = GlobalKey<FormState>();
+    final fullNameController = TextEditingController(text: user.fullName);
+    bool isSaving = false;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Edit Profile'),
+          content: SingleChildScrollView(
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: fullNameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Full Name',
+                      border: OutlineInputBorder(),
+                    ),
+                    autofocus: true,
+                    validator: (value) => Validators.required(value, 'Full Name'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            LoadingButton(
+              isLoading: isSaving,
+              onPressed: () async {
+                if (!formKey.currentState!.validate()) return;
+                setState(() => isSaving = true);
+                final success = await ref
+                    .read(authStateProvider.notifier)
+                    .updateProfile(
+                      userId: user.id!,
+                      fullName: fullNameController.text.trim(),
+                    );
+                if (context.mounted) {
+                  setState(() => isSaving = false);
+                  Navigator.pop(context);
+                  if (success) {
+                    showSuccessSnackbar(context, 'Profile updated successfully');
+                  } else {
+                    showErrorSnackbar(context, 'Failed to update profile');
+                  }
+                }
+              },
+              label: 'Save',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── EDIT PIN ─────────────────────────────────────────────────────────
+
+  void _showEditPinDialog(User user) {
+    final formKey = GlobalKey<FormState>();
+    final pinController = TextEditingController(text: user.pin ?? '');
+    bool isSaving = false;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Set PIN'),
+          content: SingleChildScrollView(
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: pinController,
+                    decoration: const InputDecoration(
+                      labelText: 'PIN (4-6 digits)',
+                      border: OutlineInputBorder(),
+                      hintText: 'Leave empty to clear',
+                    ),
+                    keyboardType: TextInputType.number,
+                    autofocus: true,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) return null;
+                      return Validators.pin(value);
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            LoadingButton(
+              isLoading: isSaving,
+              onPressed: () async {
+                if (!formKey.currentState!.validate()) return;
+                setState(() => isSaving = true);
+                final pinValue = pinController.text.trim();
+                final success = await ref
+                    .read(authStateProvider.notifier)
+                    .updateProfile(
+                      userId: user.id!,
+                      fullName: user.fullName,
+                      pin: pinValue.isEmpty ? null : pinValue,
+                    );
+                if (context.mounted) {
+                  setState(() => isSaving = false);
+                  Navigator.pop(context);
+                  if (success) {
+                    showSuccessSnackbar(context, 'PIN updated successfully');
+                  } else {
+                    showErrorSnackbar(context, 'Failed to update PIN');
+                  }
+                }
+              },
+              label: 'Save',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── COLOR PREFERENCE ─────────────────────────────────────────────────
+
+  void _showColorPreferenceDialog(User user) {
+    final colors = AppColors.accentColors.keys.toList();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Accent Color'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: GridView.builder(
+            shrinkWrap: true,
+            itemCount: colors.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              childAspectRatio: 1.0,
+            ),
+            itemBuilder: (context, index) {
+              final color = colors[index];
+              final isSelected = color == user.colorPreference;
+              return _ColorOption(
+                name: color,
+                color: AppColors.getAccentColor(color),
+                isSelected: isSelected,
+                onTap: () async {
+                  final success = await ref
+                      .read(authStateProvider.notifier)
+                      .updateProfile(
+                        userId: user.id!,
+                        fullName: user.fullName,
+                        colorPreference: color,
+                      );
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    if (success) {
+                      showSuccessSnackbar(context, 'Accent color updated');
+                    } else {
+                      showErrorSnackbar(context, 'Failed to update accent color');
+                    }
+                  }
+                },
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── CHANGE PASSWORD ──────────────────────────────────────────────────
 
   void _showChangePasswordDialog(User user) {
     final formKey = GlobalKey<FormState>();
@@ -191,41 +411,93 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               onPressed: () => Navigator.pop(context),
               child: const Text('Cancel'),
             ),
-            FilledButton(
-              onPressed: isSaving
-                  ? null
-                  : () async {
-                      if (!formKey.currentState!.validate()) return;
-                      setState(() => isSaving = true);
-                      final result = await ref
-                          .read(userControllerProvider.notifier)
-                          .changePassword(
-                            userId: user.id!,
-                            oldPassword: oldPasswordController.text,
-                            newPassword: newPasswordController.text,
-                          );
-                      if (context.mounted) {
-                        setState(() => isSaving = false);
-                        Navigator.pop(context);
-                        if (result.success) {
-                          showSuccessSnackbar(context, result.message);
-                        } else {
-                          showErrorSnackbar(context, result.message);
-                        }
-                      }
-                    },
-              child: isSaving
-                  ? SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Theme.of(context).colorScheme.onPrimary,
-                      ),
-                    )
-                  : const Text('Change'),
+            LoadingButton(
+              isLoading: isSaving,
+              onPressed: () async {
+                if (!formKey.currentState!.validate()) return;
+                setState(() => isSaving = true);
+                final result = await ref
+                    .read(userControllerProvider.notifier)
+                    .changePassword(
+                      userId: user.id!,
+                      oldPassword: oldPasswordController.text,
+                      newPassword: newPasswordController.text,
+                    );
+                if (context.mounted) {
+                  setState(() => isSaving = false);
+                  Navigator.pop(context);
+                  if (result.success) {
+                    showSuccessSnackbar(context, result.message);
+                  } else {
+                    showErrorSnackbar(context, result.message);
+                  }
+                }
+              },
+              label: 'Change',
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ColorOption extends StatelessWidget {
+  final String name;
+  final Color color;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _ColorOption({
+    required this.name,
+    required this.color,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: '${name[0].toUpperCase()}${name.substring(1)} accent',
+      selected: isSelected,
+      button: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: isSelected
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.outlineVariant,
+              width: isSelected ? 3 : 1,
+            ),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                name[0].toUpperCase() + name.substring(1),
+                style: Theme.of(context).textTheme.labelSmall,
+              ),
+              if (isSelected)
+                Icon(
+                  Icons.check_circle,
+                  size: 16,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+            ],
+          ),
         ),
       ),
     );

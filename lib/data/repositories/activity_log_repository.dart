@@ -1,10 +1,11 @@
 import 'package:pinoy_pos/data/dao/activity_log_dao.dart';
 import 'package:pinoy_pos/data/models/activity_log.dart';
+import 'package:sqflite/sqflite.dart';
 
 class ActivityLogRepository {
   final ActivityLogDao _activityLogDao = ActivityLogDao();
 
-  Future<int> insert(ActivityLog activityLog) => _activityLogDao.insert(activityLog);
+  Future<int> insert(ActivityLog activityLog, {DatabaseExecutor? txn}) => _activityLogDao.insert(activityLog, txn: txn);
   Future<int> update(ActivityLog activityLog) => _activityLogDao.update(activityLog);
   Future<int> delete(int id) => _activityLogDao.delete(id);
   Future<ActivityLog?> getById(int id) => _activityLogDao.getById(id);

@@ -6,9 +6,8 @@ import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
-import 'package:pinoy_pos/ui/widgets/enhanced_dialogs.dart';
-import 'package:pinoy_pos/ui/widgets/success_snackbar.dart';
-import 'package:pinoy_pos/ui/widgets/error_snackbar.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
+import 'package:pinoy_pos/ui/widgets/app_feedback.dart';
 import 'package:pinoy_pos/ui/widgets/validators.dart';
 import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 
@@ -48,26 +47,14 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
   Future<void> _toggleCategoryStatus(Category category) async {
     final authNotifier = ref.read(authStateProvider.notifier);
     if (!authNotifier.hasPermission('change_category_status')) {
-      EnhancedDialogs.showAccessDeniedDialog(context: context);
+      AppDialogService.accessDenied(context);
       return;
     }
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(category.isActive ? 'Deactivate Category' : 'Activate Category'),
-        content: Text('${category.isActive ? "Deactivate" : "Activate"} "${category.name}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Confirm'),
-          ),
-        ],
-      ),
+    final confirmed = await AppDialogService.toggleCategoryConfirm(
+      context,
+      categoryName: category.name,
+      isActivate: !category.isActive,
     );
 
     if (confirmed == true && mounted) {
@@ -79,18 +66,18 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
         );
         if (mounted) {
           if (success) {
-            showSuccessSnackbar(
+            AppFeedback.success(
               context,
               category.isActive ? 'Category deactivated' : 'Category activated',
             );
             _loadCategories();
           } else {
-            showErrorSnackbar(context, 'Failed to update category status');
+            AppFeedback.error(context, 'Failed to update category status');
           }
         }
       } catch (e) {
         if (mounted) {
-          showErrorSnackbar(context, 'Failed to update category status');
+          AppFeedback.error(context, 'Failed to update category status');
         }
       }
     }
@@ -99,12 +86,12 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
   Future<void> _deleteCategory(Category category) async {
     final authNotifier = ref.read(authStateProvider.notifier);
     if (!authNotifier.hasPermission('delete_categories')) {
-      EnhancedDialogs.showAccessDeniedDialog(context: context);
+      AppDialogService.accessDenied(context);
       return;
     }
 
-    final confirmed = await EnhancedDialogs.showDeleteDialog(
-      context: context,
+    final confirmed = await AppDialogService.deleteConfirm(
+      context,
       itemName: category.name,
     );
 
@@ -113,12 +100,12 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
         final categoryService = ref.read(categoryServiceProvider);
         await categoryService.deleteCategory(category.id!);
         if (mounted) {
-          showSuccessSnackbar(context, 'Category deleted successfully');
+          AppFeedback.success(context, 'Category deleted successfully');
           _loadCategories();
         }
       } catch (e) {
         if (mounted) {
-          showErrorSnackbar(context, 'Failed to delete category');
+          AppFeedback.error(context, 'Failed to delete category');
         }
       }
     }
@@ -244,8 +231,8 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
             TextButton(
               onPressed: () async {
                 if (hasChanges) {
-                  final discard = await EnhancedDialogs.showUnsavedChangesDialog(
-                    context: context,
+                  final discard = await AppDialogService.unsavedChanges(
+                    context,
                   );
                   if (discard == true && context.mounted) {
                     Navigator.pop(context);
@@ -292,7 +279,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
     );
 
     if (isDuplicate) {
-      showErrorSnackbar(context, 'Category name already exists');
+      AppFeedback.error(context, 'Category name already exists');
       return;
     }
 
@@ -310,14 +297,14 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
       if (category == null) {
         await categoryService.createCategory(categoryData);
         if (mounted) {
-          showSuccessSnackbar(context, 'Category created successfully');
+          AppFeedback.success(context, 'Category created successfully');
         }
       } else {
         await categoryService.updateCategory(
           category.copyWith(name: categoryData.name),
         );
         if (mounted) {
-          showSuccessSnackbar(context, 'Category updated successfully');
+          AppFeedback.success(context, 'Category updated successfully');
         }
       }
 
@@ -327,7 +314,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
       }
     } catch (e) {
       if (mounted) {
-        showErrorSnackbar(context, 'Failed to save category');
+        AppFeedback.error(context, 'Failed to save category');
       }
     } finally {
       if (mounted) {

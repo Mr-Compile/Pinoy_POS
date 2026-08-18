@@ -10,6 +10,7 @@ class AuthTextField extends StatelessWidget {
   final TextInputAction textInputAction;
   final TextInputType keyboardType;
   final ValueChanged<String>? onFieldSubmitted;
+  final ValueChanged<String>? onChanged;
   final String? Function(String?)? validator;
   final bool autofocus;
 
@@ -24,6 +25,7 @@ class AuthTextField extends StatelessWidget {
     this.textInputAction = TextInputAction.next,
     this.keyboardType = TextInputType.text,
     this.onFieldSubmitted,
+    this.onChanged,
     this.validator,
     this.autofocus = false,
   });
@@ -37,13 +39,13 @@ class AuthTextField extends StatelessWidget {
         labelText: label,
         prefixIcon: Icon(prefixIcon),
         suffixIcon: suffixIcon,
-        border: const OutlineInputBorder(),
       ),
       obscureText: obscureText,
       textInputAction: textInputAction,
       keyboardType: keyboardType,
       autofocus: autofocus,
       onFieldSubmitted: onFieldSubmitted,
+      onChanged: onChanged,
       validator: validator,
     );
   }

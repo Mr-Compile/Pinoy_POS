@@ -1,6 +1,7 @@
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/notification.dart';
 import 'package:pinoy_pos/data/repositories/notification_repository.dart';
+import 'package:sqflite/sqflite.dart';
 
 class NotificationService {
   final NotificationRepository _notificationRepository = NotificationRepository();
@@ -32,6 +33,7 @@ class NotificationService {
     required String message,
     String? type,
     int? userId,
+    DatabaseExecutor? txn,
   }) async {
     final notification = Notification(
       title: title,
@@ -40,7 +42,7 @@ class NotificationService {
       userId: userId ?? _sessionManager.currentUser?.id,
       createdAt: DateTime.now(),
     );
-    await _notificationRepository.insert(notification);
+    await _notificationRepository.insert(notification, txn: txn);
   }
 
   Future<void> markAsRead(int id) async {

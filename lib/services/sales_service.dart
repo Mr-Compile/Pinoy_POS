@@ -8,6 +8,8 @@ import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/data/repositories/sale_repository.dart';
 import 'package:pinoy_pos/data/repositories/sale_item_repository.dart';
 import 'package:pinoy_pos/data/repositories/product_repository.dart';
+import 'package:pinoy_pos/data/repositories/stock_history_repository.dart';
+import 'package:pinoy_pos/data/models/stock_history.dart';
 import 'package:pinoy_pos/services/activity_log_service.dart';
 import 'package:pinoy_pos/services/stock_service.dart';
 
@@ -18,6 +20,7 @@ class SalesService {
   final SessionManager _sessionManager = SessionManager();
   final ActivityLogService _activityLogService = ActivityLogService();
   final ProductRepository _productRepository = ProductRepository();
+  final StockHistoryRepository _stockHistoryRepository = StockHistoryRepository();
   final DatabaseHelper _dbHelper = DatabaseHelper();
 
   Future<List<Sale>> getSales() async {
@@ -68,6 +71,16 @@ class SalesService {
   Future<List<SaleItem>> getSaleItems(int saleId) async {
     if (!_sessionManager.hasPermission('view_sales')) {
       return [];
+    }
+
+    // For Staff, verify the sale belongs to the current user before
+    // returning items. This prevents accessing another user's sale items
+    // by simply knowing the sale id.
+    if (_sessionManager.currentUser?.role == UserRole.staff) {
+      final sale = await _saleRepository.getById(saleId);
+      if (sale == null || sale.userId != _sessionManager.currentUser!.id) {
+        return [];
+      }
     }
 
     return _saleItemRepository.getBySaleId(saleId);
@@ -129,15 +142,16 @@ class SalesService {
         notes: notes,
       );
 
-      final saleId = await _saleRepository.insert(sale);
+      final saleId = await _saleRepository.insert(sale, txn: txn);
 
       for (var item in items) {
         final saleItem = item.copyWith(saleId: saleId);
-        await _saleItemRepository.insert(saleItem);
+        await _saleItemRepository.insert(saleItem, txn: txn);
 
         final stockDeducted = await _stockService.deductStockForSale(
           item.productId,
           item.quantity,
+          txn: txn,
         );
 
         if (!stockDeducted) {
@@ -152,6 +166,7 @@ class SalesService {
         entity: 'sale',
         entityId: saleId,
         details: 'Sale $receiptNumber created for ₱${totalAmount.toStringAsFixed(2)}',
+        txn: txn,
       );
 
       return true;
@@ -172,20 +187,35 @@ class SalesService {
     }
 
     return await _dbHelper.transaction((txn) async {
-      final sale = await _saleRepository.getById(saleId);
+      final sale = await _saleRepository.getById(saleId, txn: txn);
       if (sale == null) return false;
 
-      final items = await _saleItemRepository.getBySaleId(saleId);
+      final items = await _saleItemRepository.getBySaleId(saleId, txn: txn);
 
       for (var item in items) {
-        await _stockService.addStock(
-          item.productId,
-          item.quantity,
-          'Void sale: ${sale.receiptNumber}',
+        // addStock opens its own transaction; for void we restore stock
+        // directly via the repository within this transaction.
+        final product = await _productRepository.getById(item.productId, txn: txn);
+        if (product == null) continue;
+
+        final previousStock = product.stock;
+        final newStock = previousStock + item.quantity;
+        await _productRepository.updateStock(item.productId, newStock, txn: txn);
+
+        final history = StockHistory(
+          productId: item.productId,
+          operation: StockOperationType.return_,
+          quantity: item.quantity,
+          previousStock: previousStock,
+          newStock: newStock,
+          reason: 'Void sale: ${sale.receiptNumber}',
+          userId: _sessionManager.currentUser?.id,
+          createdAt: DateTime.now(),
         );
+        await _stockHistoryRepository.insert(history, txn: txn);
       }
 
-      await _saleRepository.softDelete(saleId);
+      await _saleRepository.softDelete(saleId, txn: txn);
 
       // Log activity
       await _activityLogService.logActivity(
@@ -193,6 +223,7 @@ class SalesService {
         entity: 'sale',
         entityId: saleId,
         details: 'Sale ${sale.receiptNumber} voided',
+        txn: txn,
       );
 
       return true;

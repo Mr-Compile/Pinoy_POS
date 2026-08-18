@@ -10,6 +10,7 @@ enum AppDialogType {
   confirmation,
   offline,
   loading,
+  validation,
 }
 
 extension AppDialogTypeX on AppDialogType {
@@ -31,6 +32,8 @@ extension AppDialogTypeX on AppDialogType {
         return Icons.cloud_off;
       case AppDialogType.loading:
         return Icons.hourglass_empty;
+      case AppDialogType.validation:
+        return Icons.task_alt;
     }
   }
 
@@ -38,21 +41,70 @@ extension AppDialogTypeX on AppDialogType {
     final cs = Theme.of(context).colorScheme;
     switch (this) {
       case AppDialogType.success:
-        return Colors.green;
+        return cs.tertiary;
       case AppDialogType.error:
         return cs.error;
       case AppDialogType.warning:
-        return Colors.orange;
+        return cs.secondary;
       case AppDialogType.info:
         return cs.primary;
       case AppDialogType.restriction:
-        return Colors.orange;
+        return cs.secondary;
       case AppDialogType.confirmation:
-        return Colors.orange;
+        return cs.secondary;
       case AppDialogType.offline:
         return cs.primary;
       case AppDialogType.loading:
         return cs.primary;
+      case AppDialogType.validation:
+        return cs.tertiary;
+    }
+  }
+
+  Color iconBgColor(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    switch (this) {
+      case AppDialogType.success:
+        return cs.tertiaryContainer;
+      case AppDialogType.error:
+        return cs.errorContainer;
+      case AppDialogType.warning:
+        return cs.secondaryContainer;
+      case AppDialogType.info:
+        return cs.primaryContainer;
+      case AppDialogType.restriction:
+        return cs.secondaryContainer;
+      case AppDialogType.confirmation:
+        return cs.secondaryContainer;
+      case AppDialogType.offline:
+        return cs.primaryContainer;
+      case AppDialogType.loading:
+        return cs.primaryContainer;
+      case AppDialogType.validation:
+        return cs.tertiaryContainer;
+    }
+  }
+
+  String get semanticLabel {
+    switch (this) {
+      case AppDialogType.success:
+        return 'Success';
+      case AppDialogType.error:
+        return 'Error';
+      case AppDialogType.warning:
+        return 'Warning';
+      case AppDialogType.info:
+        return 'Information';
+      case AppDialogType.restriction:
+        return 'Access restricted';
+      case AppDialogType.confirmation:
+        return 'Confirmation required';
+      case AppDialogType.offline:
+        return 'No internet connection';
+      case AppDialogType.loading:
+        return 'Loading';
+      case AppDialogType.validation:
+        return 'Validation error';
     }
   }
 }
@@ -97,36 +149,42 @@ class AppDialog extends StatelessWidget {
     final isTablet = screenWidth >= 600;
     final maxDialogWidth = isTablet ? 480.0 : double.infinity;
 
-    return Dialog(
-      backgroundColor: cs.surface,
-      elevation: 3,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(28),
-      ),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxDialogWidth),
-        child: Padding(
-          padding: const EdgeInsets.all(Spacing.xxl),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildIcon(context),
-              const SizedBox(height: Spacing.lg),
-              _buildTitle(context),
-              if (message != null) ...[
-                const SizedBox(height: Spacing.sm),
-                _buildMessage(context),
-              ],
-              if (details != null) ...[
-                const SizedBox(height: Spacing.sm),
-                _buildDetails(context),
-              ],
-              if (actions.isNotEmpty) ...[
-                const SizedBox(height: Spacing.xxl),
-                _buildActions(context),
-              ],
-            ],
+    return Semantics(
+      label: type.semanticLabel,
+      container: true,
+      child: Dialog(
+        backgroundColor: cs.surface,
+        elevation: 3,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(28),
+        ),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxDialogWidth),
+          child: Padding(
+            padding: const EdgeInsets.all(Spacing.xxl),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildIcon(context),
+                  const SizedBox(height: Spacing.lg),
+                  _buildTitle(context),
+                  if (message != null) ...[
+                    const SizedBox(height: Spacing.sm),
+                    _buildMessage(context),
+                  ],
+                  if (details != null) ...[
+                    const SizedBox(height: Spacing.sm),
+                    _buildDetails(context),
+                  ],
+                  if (actions.isNotEmpty) ...[
+                    const SizedBox(height: Spacing.xxl),
+                    _buildActions(context, isTablet),
+                  ],
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -149,10 +207,18 @@ class AppDialog extends StatelessWidget {
 
     return Align(
       alignment: Alignment.centerLeft,
-      child: Icon(
-        type.icon,
-        size: 48,
-        color: type.iconColor(context),
+      child: Container(
+        width: 56,
+        height: 56,
+        decoration: BoxDecoration(
+          color: type.iconBgColor(context),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          type.icon,
+          size: 32,
+          color: type.iconColor(context),
+        ),
       ),
     );
   }
@@ -192,8 +258,50 @@ class AppDialog extends StatelessWidget {
     );
   }
 
-  Widget _buildActions(BuildContext context) {
+  Widget _buildActions(BuildContext context, bool isTablet) {
     final cs = Theme.of(context).colorScheme;
+
+    Widget buildAction(AppDialogAction action) {
+      return action.isPrimary
+          ? FilledButton(
+              onPressed: action.onPressed,
+              style: action.isDestructive
+                  ? FilledButton.styleFrom(
+                      backgroundColor: cs.error,
+                      foregroundColor: cs.onError,
+                      minimumSize: const Size(88, 48),
+                    )
+                  : FilledButton.styleFrom(
+                      minimumSize: const Size(88, 48),
+                    ),
+              child: Text(action.label),
+            )
+          : TextButton(
+              onPressed: action.onPressed,
+              style: action.isDestructive
+                  ? TextButton.styleFrom(
+                      foregroundColor: cs.error,
+                      minimumSize: const Size(88, 48),
+                    )
+                  : TextButton.styleFrom(
+                      minimumSize: const Size(88, 48),
+                    ),
+              child: Text(action.label),
+            );
+    }
+
+    if (actions.length > 2 || !isTablet) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: actions.reversed.map((action) {
+          final isFirst = action == actions.first;
+          return Padding(
+            padding: EdgeInsets.only(top: isFirst ? 0 : Spacing.sm),
+            child: buildAction(action),
+          );
+        }).toList(),
+      );
+    }
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
@@ -204,24 +312,7 @@ class AppDialog extends StatelessWidget {
 
         return Padding(
           padding: EdgeInsets.only(left: isLast ? 0 : Spacing.sm),
-          child: action.isPrimary
-              ? FilledButton(
-                  onPressed: action.onPressed,
-                  style: action.isDestructive
-                      ? FilledButton.styleFrom(
-                          backgroundColor: cs.error,
-                          foregroundColor: cs.onError,
-                        )
-                      : null,
-                  child: Text(action.label),
-                )
-              : TextButton(
-                  onPressed: action.onPressed,
-                  style: action.isDestructive
-                      ? TextButton.styleFrom(foregroundColor: cs.error)
-                      : null,
-                  child: Text(action.label),
-                ),
+          child: buildAction(action),
         );
       }).toList(),
     );

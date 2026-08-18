@@ -7,9 +7,8 @@ import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
-import 'package:pinoy_pos/ui/widgets/enhanced_dialogs.dart';
-import 'package:pinoy_pos/ui/widgets/success_snackbar.dart';
-import 'package:pinoy_pos/ui/widgets/error_snackbar.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
+import 'package:pinoy_pos/ui/widgets/app_feedback.dart';
 import 'package:pinoy_pos/ui/widgets/validators.dart';
 import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 
@@ -53,12 +52,12 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
   Future<void> _deleteProduct(Product product) async {
     final authNotifier = ref.read(authStateProvider.notifier);
     if (!authNotifier.hasPermission('delete_products')) {
-      EnhancedDialogs.showAccessDeniedDialog(context: context);
+      AppDialogService.accessDenied(context);
       return;
     }
 
-    final confirmed = await EnhancedDialogs.showDeleteDialog(
-      context: context,
+    final confirmed = await AppDialogService.deleteConfirm(
+      context,
       itemName: product.name,
     );
 
@@ -67,12 +66,12 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
         final productService = ref.read(productServiceProvider);
       await productService.deleteProduct(product.id!);
         if (mounted) {
-          showSuccessSnackbar(context, 'Product deleted successfully');
+          AppFeedback.success(context, 'Product deleted successfully');
           _loadData();
         }
       } catch (e) {
         if (mounted) {
-          showErrorSnackbar(context, 'Failed to delete product');
+          AppFeedback.error(context, 'Failed to delete product');
         }
       }
     }
@@ -269,8 +268,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
             TextButton(
               onPressed: () async {
                 if (hasChanges) {
-                  final discard = await EnhancedDialogs.showUnsavedChangesDialog(
-                    context: context,
+                  final discard = await AppDialogService.unsavedChanges(
+                    context,
                   );
                   if (discard == true && context.mounted) {
                     Navigator.pop(context);
@@ -325,7 +324,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     );
     
     if (isDuplicate) {
-      showErrorSnackbar(context, 'Product name already exists in this category');
+      AppFeedback.error(context, 'Product name already exists in this category');
       return;
     }
 
@@ -344,7 +343,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
         final productService = ref.read(productServiceProvider);
         await productService.createProduct(productData);
         if (mounted) {
-          showSuccessSnackbar(context, 'Product created successfully');
+          AppFeedback.success(context, 'Product created successfully');
         }
       } else {
         final productService = ref.read(productServiceProvider);
@@ -357,7 +356,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
           ),
         );
         if (mounted) {
-          showSuccessSnackbar(context, 'Product updated successfully');
+          AppFeedback.success(context, 'Product updated successfully');
         }
       }
 
@@ -367,7 +366,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        showErrorSnackbar(context, 'Failed to save product');
+        AppFeedback.error(context, 'Failed to save product');
       }
     } finally {
       setSaving(false);

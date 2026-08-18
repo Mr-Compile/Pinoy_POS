@@ -49,7 +49,7 @@ class DatabaseHelper {
       await db.execute('ALTER TABLE users ADD COLUMN color_preference TEXT');
       await db.execute('ALTER TABLE users ADD COLUMN updated_at TEXT');
 
-      // Add role column to activity_log.
+      // Add role column to activity_log (renamed to activity_logs in v3).
       await db.execute('ALTER TABLE activity_log ADD COLUMN role TEXT');
 
       // Recreate users table without the column-level UNIQUE constraint so
@@ -97,6 +97,62 @@ class DatabaseHelper {
 
       await db.execute('PRAGMA foreign_keys = ON');
     }
+
+    // Migration from v2 → v3: rename activity_log → activity_logs;
+    // create trash, backup_history, export_history tables.
+    if (oldVersion < 3) {
+      // Rename activity_log to activity_logs to match DAO convention.
+      await db.execute('ALTER TABLE activity_log RENAME TO activity_logs');
+
+      // Recreate indexes with updated table name.
+      await db.execute('DROP INDEX IF EXISTS idx_activity_log_user');
+      await db.execute('DROP INDEX IF EXISTS idx_activity_log_date');
+      await db.execute('CREATE INDEX idx_activity_logs_user ON activity_logs(user_id)');
+      await db.execute('CREATE INDEX idx_activity_logs_date ON activity_logs(created_at)');
+
+      // Create missing tables.
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS trash (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          entity_type TEXT NOT NULL,
+          entity_id INTEGER NOT NULL,
+          entity_name TEXT,
+          deleted_by INTEGER,
+          deleted_at TEXT NOT NULL,
+          expires_at TEXT,
+          FOREIGN KEY (deleted_by) REFERENCES users(id)
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS backup_history (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          file_path TEXT NOT NULL,
+          file_size INTEGER,
+          created_by INTEGER,
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (created_by) REFERENCES users(id)
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS export_history (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          report_type TEXT NOT NULL,
+          file_format TEXT NOT NULL,
+          file_path TEXT NOT NULL,
+          date_range_start TEXT,
+          date_range_end TEXT,
+          created_by INTEGER,
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (created_by) REFERENCES users(id)
+        )
+      ''');
+
+      await db.execute('CREATE INDEX idx_trash_entity ON trash(entity_type, entity_id)');
+      await db.execute('CREATE INDEX idx_backup_history_date ON backup_history(created_at)');
+      await db.execute('CREATE INDEX idx_export_history_date ON export_history(created_at)');
+    }
   }
 
   Future<void> _createTables(Database db) async {
@@ -139,7 +195,6 @@ class DatabaseHelper {
         price REAL NOT NULL,
         stock INTEGER NOT NULL DEFAULT 0,
         min_stock INTEGER NOT NULL DEFAULT 10,
-        barcode TEXT UNIQUE,
         image_url TEXT,
         category_id INTEGER,
         is_active INTEGER NOT NULL DEFAULT 1,
@@ -244,7 +299,7 @@ class DatabaseHelper {
 
     // Activity log table
     await db.execute('''
-      CREATE TABLE activity_log (
+      CREATE TABLE activity_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
         role TEXT,
@@ -269,6 +324,47 @@ class DatabaseHelper {
       )
     ''');
 
+    // Trash table
+    await db.execute('''
+      CREATE TABLE trash (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        entity_type TEXT NOT NULL,
+        entity_id INTEGER NOT NULL,
+        entity_name TEXT,
+        deleted_by INTEGER,
+        deleted_at TEXT NOT NULL,
+        expires_at TEXT,
+        FOREIGN KEY (deleted_by) REFERENCES users(id)
+      )
+    ''');
+
+    // Backup history table
+    await db.execute('''
+      CREATE TABLE backup_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        file_path TEXT NOT NULL,
+        file_size INTEGER,
+        created_by INTEGER,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (created_by) REFERENCES users(id)
+      )
+    ''');
+
+    // Export history table
+    await db.execute('''
+      CREATE TABLE export_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        report_type TEXT NOT NULL,
+        file_format TEXT NOT NULL,
+        file_path TEXT NOT NULL,
+        date_range_start TEXT,
+        date_range_end TEXT,
+        created_by INTEGER,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (created_by) REFERENCES users(id)
+      )
+    ''');
+
     // Create indexes
     await _createIndexes(db);
   }
@@ -290,8 +386,11 @@ class DatabaseHelper {
     await db.execute('CREATE INDEX idx_stock_history_date ON stock_history(created_at)');
     await db.execute('CREATE INDEX idx_notifications_user ON notifications(user_id)');
     await db.execute('CREATE INDEX idx_notifications_read ON notifications(is_read)');
-    await db.execute('CREATE INDEX idx_activity_log_user ON activity_log(user_id)');
-    await db.execute('CREATE INDEX idx_activity_log_date ON activity_log(created_at)');
+    await db.execute('CREATE INDEX idx_activity_logs_user ON activity_logs(user_id)');
+    await db.execute('CREATE INDEX idx_activity_logs_date ON activity_logs(created_at)');
+    await db.execute('CREATE INDEX idx_trash_entity ON trash(entity_type, entity_id)');
+    await db.execute('CREATE INDEX idx_backup_history_date ON backup_history(created_at)');
+    await db.execute('CREATE INDEX idx_export_history_date ON export_history(created_at)');
     await db.execute('CREATE INDEX idx_ai_usage_user ON ai_usage(user_id)');
     await db.execute('CREATE INDEX idx_ai_usage_date ON ai_usage(created_at)');
   }

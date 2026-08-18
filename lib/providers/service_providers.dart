@@ -11,6 +11,7 @@ import 'package:pinoy_pos/services/backup_service.dart';
 import 'package:pinoy_pos/services/ai_usage_service.dart';
 import 'package:pinoy_pos/services/trash_service.dart';
 import 'package:pinoy_pos/services/announcement_service.dart';
+import 'package:pinoy_pos/services/user_service.dart';
 
 final productServiceProvider = Provider<ProductService>((ref) {
   return ProductService();
@@ -58,4 +59,8 @@ final trashServiceProvider = Provider<TrashService>((ref) {
 
 final announcementServiceProvider = Provider<AnnouncementService>((ref) {
   return AnnouncementService();
+});
+
+final userServiceProvider = Provider<UserService>((ref) {
+  return UserService();
 });

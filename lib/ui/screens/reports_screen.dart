@@ -1,10 +1,14 @@
-import 'dart:io';
+﻿import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:pinoy_pos/core/session_manager.dart';
+import 'package:pinoy_pos/data/models/export_history.dart';
+import 'package:pinoy_pos/data/repositories/export_history_repository.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
-import 'package:pinoy_pos/services/report_service.dart';
-import 'package:pinoy_pos/services/sales_service.dart';
+import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/success_snackbar.dart';
@@ -18,14 +22,15 @@ class ReportsScreen extends ConsumerStatefulWidget {
 }
 
 class _ReportsScreenState extends ConsumerState<ReportsScreen> {
-  final ReportService _reportService = ReportService();
-  final SalesService _salesService = SalesService();
   double _todaySales = 0.0;
   double _monthSales = 0.0;
   int _lowStockCount = 0;
   int _totalProducts = 0;
   bool _isLoading = true;
   bool _isExporting = false;
+
+  DateTime? _filterStart;
+  DateTime? _filterEnd;
 
   @override
   void initState() {
@@ -38,10 +43,11 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       _isLoading = true;
     });
 
-    final todaySales = await _reportService.getTodaySales();
-    final monthSales = await _reportService.getMonthSales();
-    final lowStockCount = await _reportService.getLowStockCount();
-    final totalProducts = await _reportService.getTotalProducts();
+    final reportService = ref.read(reportServiceProvider);
+    final todaySales = await reportService.getTodaySales();
+    final monthSales = await reportService.getMonthSales();
+    final lowStockCount = await reportService.getLowStockCount();
+    final totalProducts = await reportService.getTotalProducts();
 
     if (mounted) {
       setState(() {
@@ -51,6 +57,66 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         _totalProducts = totalProducts;
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _pickDateRange() async {
+    final now = DateTime.now();
+    final initial = DateTimeRange(
+      start: _filterStart ?? DateTime(now.year, now.month, 1),
+      end: _filterEnd ?? now,
+    );
+
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: now,
+      initialDateRange: initial,
+    );
+
+    if (picked != null) {
+      setState(() {
+        _filterStart = picked.start;
+        _filterEnd = picked.end.add(const Duration(days: 1)).subtract(const Duration(seconds: 1));
+      });
+    }
+  }
+
+  String get _filterLabel {
+    if (_filterStart == null || _filterEnd == null) {
+      return 'All sales';
+    }
+    String fmt(DateTime d) =>
+        '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    return '${fmt(_filterStart!)} to ${fmt(_filterEnd!)}';
+  }
+
+  Future<List> _getSalesForExport() async {
+    final salesService = ref.read(salesServiceProvider);
+    if (_filterStart != null && _filterEnd != null) {
+      return salesService.getSalesByDateRange(_filterStart!, _filterEnd!);
+    }
+    return salesService.getSales();
+  }
+
+  Future<void> _recordExport({
+    required String fileFormat,
+    required String filePath,
+  }) async {
+    try {
+      final repo = ExportHistoryRepository();
+      final session = SessionManager();
+      await repo.insert(ExportHistory(
+        reportType: 'sales',
+        fileFormat: fileFormat,
+        filePath: filePath,
+        dateRangeStart: _filterStart,
+        dateRangeEnd: _filterEnd,
+        createdBy: session.currentUser?.id,
+        createdAt: DateTime.now(),
+      ));
+    } catch (_) {
+      // Best-effort: don't fail the export if history recording fails.
     }
   }
 
@@ -91,9 +157,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             AppCard(
               child: Column(
                 children: [
-                  _buildStatRow('Today\'s Sales', '₱${_todaySales.toStringAsFixed(2)}'),
+                  _buildStatRow("Today's Sales", 'PHP ${_todaySales.toStringAsFixed(2)}'),
                   const Divider(),
-                  _buildStatRow('Month Sales', '₱${_monthSales.toStringAsFixed(2)}'),
+                  _buildStatRow('Month Sales', 'PHP ${_monthSales.toStringAsFixed(2)}'),
                 ],
               ),
             ),
@@ -118,6 +184,44 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 16),
+            AppCard(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.date_range),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Date Range'),
+                          Text(
+                            _filterLabel,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _pickDateRange,
+                      child: const Text('Filter'),
+                    ),
+                    if (_filterStart != null)
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _filterStart = null;
+                            _filterEnd = null;
+                          });
+                        },
+                        child: const Text('Clear'),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
             AppCard(
               child: ListTile(
                 leading: const Icon(Icons.picture_as_pdf),
@@ -162,7 +266,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   Future<void> _exportToCsv() async {
     setState(() => _isExporting = true);
     try {
-      final sales = await _salesService.getSales();
+      final sales = await _getSalesForExport();
       final buffer = StringBuffer();
       buffer.writeln('Receipt Number,Date,Total Amount,Cash Received,Change,Notes');
       for (final sale in sales) {
@@ -174,6 +278,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
       final file = File('${dir.path}/pinoy_pos_sales_$timestamp.csv');
       await file.writeAsString(buffer.toString());
+
+      await _recordExport(fileFormat: 'csv', filePath: file.path);
+
       if (mounted) {
         showSuccessSnackbar(context, 'CSV exported: ${file.path}');
       }
@@ -189,33 +296,71 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   Future<void> _exportToPdf() async {
     setState(() => _isExporting = true);
     try {
-      // PDF export requires the pdf package widget API.
-      // This is a minimal text-based PDF export.
-      final sales = await _salesService.getSales();
+      final sales = await _getSalesForExport();
+      final pdf = pw.Document();
+
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          build: (pw.Context context) => [
+            pw.Header(
+              level: 0,
+              child: pw.Text('Pinoy POS - Sales Report'),
+            ),
+            pw.Paragraph(
+              text: 'Generated: ${DateTime.now().toLocal().toString().split('.')[0]}',
+            ),
+            pw.Paragraph(
+              text: 'Date Range: $_filterLabel',
+            ),
+            pw.SizedBox(height: 20),
+            pw.Header(level: 1, child: pw.Text('Summary')),
+            pw.TableHelper.fromTextArray(
+              headers: ['Metric', 'Value'],
+              data: [
+                ["Today's Sales", 'PHP ${_todaySales.toStringAsFixed(2)}'],
+                ['Month Sales', 'PHP ${_monthSales.toStringAsFixed(2)}'],
+                ['Total Products', '$_totalProducts'],
+                ['Low Stock Items', '$_lowStockCount'],
+              ],
+              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+              headerDecoration: pw.BoxDecoration(color: PdfColors.grey300),
+              cellAlignment: pw.Alignment.centerLeft,
+              cellPadding: const pw.EdgeInsets.all(8),
+            ),
+            pw.SizedBox(height: 20),
+            pw.Header(level: 1, child: pw.Text('Sales Detail')),
+            pw.TableHelper.fromTextArray(
+              headers: ['Receipt #', 'Date', 'Total'],
+              data: sales
+                  .map((s) => [
+                        '${s.receiptNumber ?? s.id}',
+                        s.createdAt.toLocal().toString().split('.')[0],
+                        'PHP ${s.totalAmount.toStringAsFixed(2)}',
+                      ])
+                  .toList(),
+              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+              headerDecoration: pw.BoxDecoration(color: PdfColors.grey300),
+              cellAlignment: pw.Alignment.centerLeft,
+              cellPadding: const pw.EdgeInsets.all(6),
+            ),
+          ],
+        ),
+      );
+
       final dir = await getApplicationDocumentsDirectory();
       final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
-      final file = File('${dir.path}/pinoy_pos_sales_$timestamp.txt');
-      final buffer = StringBuffer();
-      buffer.writeln('Pinoy POS - Sales Report');
-      buffer.writeln('Generated: ${DateTime.now().toIso8601String()}');
-      buffer.writeln('Today Sales: ₱${_todaySales.toStringAsFixed(2)}');
-      buffer.writeln('Month Sales: ₱${_monthSales.toStringAsFixed(2)}');
-      buffer.writeln('Total Products: $_totalProducts');
-      buffer.writeln('Low Stock Items: $_lowStockCount');
-      buffer.writeln('');
-      buffer.writeln('--- Sales Detail ---');
-      for (final sale in sales) {
-        buffer.writeln(
-          '${sale.receiptNumber ?? sale.id} | ${sale.createdAt.toLocal()} | ₱${sale.totalAmount.toStringAsFixed(2)}',
-        );
-      }
-      await file.writeAsString(buffer.toString());
+      final file = File('${dir.path}/pinoy_pos_sales_$timestamp.pdf');
+      await file.writeAsBytes(await pdf.save());
+
+      await _recordExport(fileFormat: 'pdf', filePath: file.path);
+
       if (mounted) {
-        showSuccessSnackbar(context, 'Report exported: ${file.path}');
+        showSuccessSnackbar(context, 'PDF exported: ${file.path}');
       }
     } catch (e) {
       if (mounted) {
-        showErrorSnackbar(context, 'Failed to export report');
+        showErrorSnackbar(context, 'Failed to export PDF');
       }
     } finally {
       if (mounted) setState(() => _isExporting = false);

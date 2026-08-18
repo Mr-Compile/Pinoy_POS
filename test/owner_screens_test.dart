@@ -12,6 +12,7 @@ import 'package:pinoy_pos/core/constants.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/providers/theme_provider.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
 import 'package:pinoy_pos/ui/screens/dashboard_screen.dart';
 import 'package:pinoy_pos/ui/screens/pos_screen.dart';
@@ -43,13 +44,23 @@ void main() {
   });
 
   setUp(() async {
+    // Close any existing database connection first so the file handle is
+    // released before we delete it (critical on Windows where open file
+    // handles prevent deletion).
+    DatabaseHelper.resetForTest();
+
     // Fresh database for each test.
     final dbPath = p.join(await getDatabasesPath(), AppConstants.databaseName);
     final file = File(dbPath);
     if (await file.exists()) {
-      await file.delete();
+      try {
+        await file.delete();
+      } catch (_) {
+        // If the file is still locked, the database will be re-initialised
+        // on top of the existing file. This is acceptable for screen build
+        // tests — we just need the tables to exist.
+      }
     }
-    DatabaseHelper.resetForTest();
     final dbHelper = DatabaseHelper();
     await dbHelper.database;
     final seeder = DatabaseSeeder();
@@ -68,7 +79,7 @@ void main() {
   /// This sets the SessionManager singleton so all services see the owner.
   Future<User> authenticateAsOwner() async {
     final authService = AuthService();
-    final success = await authService.login('owner', 'admin123');
+    final success = await authService.login('owner', 'owner123');
     if (!success) {
       throw StateError('Owner login failed');
     }
@@ -88,6 +99,12 @@ void main() {
   }) async {
     await tester.pumpWidget(
       ProviderScope(
+        overrides: [
+          authStateProvider.overrideWith((ref) {
+            final notifier = _TestAuthNotifier(owner);
+            return notifier;
+          }),
+        ],
         child: MaterialApp(
           home: screen,
         ),
@@ -184,4 +201,11 @@ void main() {
     await pumpOwnerScreen(tester, const MoreScreen(), owner: owner);
     expect(find.text('More'), findsWidgets);
   });
+}
+
+class _TestAuthNotifier extends AuthStateNotifier {
+  _TestAuthNotifier(User owner)
+      : super(AuthService(), ThemeNotifier()) {
+    state = AuthState(user: owner, isLoading: false);
+  }
 }

@@ -12,17 +12,22 @@ class AppFeedback {
     Duration duration = const Duration(seconds: 3),
   }) {
     final messenger = ScaffoldMessenger.of(context);
+    final cs = Theme.of(context).colorScheme;
+    final bgColor = _colorFor(context, type);
     messenger.clearSnackBars();
     messenger.showSnackBar(
       SnackBar(
-        content: Row(
-          children: [
-            Icon(_iconFor(type), color: Colors.white, size: 20),
-            const SizedBox(width: 8),
-            Expanded(child: Text(message)),
-          ],
+        content: Semantics(
+          label: _semanticLabel(type),
+          child: Row(
+            children: [
+              Icon(_iconFor(type), color: _iconColorFor(type, cs), size: 20),
+              const SizedBox(width: 8),
+              Expanded(child: Text(message)),
+            ],
+          ),
         ),
-        backgroundColor: _colorFor(context, type),
+        backgroundColor: bgColor,
         behavior: SnackBarBehavior.floating,
         duration: duration,
       ),
@@ -55,15 +60,42 @@ class AppFeedback {
   }
 
   static Color _colorFor(BuildContext context, FeedbackType type) {
+    final cs = Theme.of(context).colorScheme;
     switch (type) {
       case FeedbackType.success:
-        return Colors.green.shade700;
+        return cs.tertiary;
       case FeedbackType.error:
-        return Theme.of(context).colorScheme.error;
+        return cs.error;
       case FeedbackType.warning:
-        return Colors.orange.shade700;
+        return cs.secondary;
       case FeedbackType.info:
-        return Theme.of(context).colorScheme.primary;
+        return cs.primary;
+    }
+  }
+
+  static Color _iconColorFor(FeedbackType type, ColorScheme cs) {
+    switch (type) {
+      case FeedbackType.success:
+        return cs.onTertiary;
+      case FeedbackType.error:
+        return cs.onError;
+      case FeedbackType.warning:
+        return cs.onSecondary;
+      case FeedbackType.info:
+        return cs.onPrimary;
+    }
+  }
+
+  static String _semanticLabel(FeedbackType type) {
+    switch (type) {
+      case FeedbackType.success:
+        return 'Success';
+      case FeedbackType.error:
+        return 'Error';
+      case FeedbackType.warning:
+        return 'Warning';
+      case FeedbackType.info:
+        return 'Information';
     }
   }
 }

@@ -16,6 +16,13 @@ class CategoryService {
     return _categoryRepository.getActiveCategories();
   }
 
+  Future<List<Category>> getDeletedCategories() async {
+    if (!_sessionManager.hasPermission('view_trash')) {
+      return [];
+    }
+    return _categoryRepository.getDeleted();
+  }
+
   Future<List<Category>> getAllCategories() async {
     if (!_sessionManager.hasPermission('view_categories')) {
       return [];
@@ -24,8 +31,8 @@ class CategoryService {
   }
 
   Future<bool> changeCategoryStatus(int id, bool isActive) async {
-    if (!_sessionManager.hasPermission('edit_categories')) {
-      throw AuthorizationException('edit_categories');
+    if (!_sessionManager.hasPermission('change_category_status')) {
+      throw AuthorizationException('change_category_status');
     }
 
     await _categoryRepository.update(

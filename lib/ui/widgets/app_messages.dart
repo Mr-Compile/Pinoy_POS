@@ -77,9 +77,60 @@ class AppMessages {
   // Void Sale
   static const String voidSaleReasonRequired =
       'Enter a reason for voiding this sale.';
+  static const String voidSaleSuccess = 'Sale voided successfully.';
+  static const String voidSaleError = 'Failed to void sale.';
 
   // Cart
   static const String cartEmpty = 'Add at least one product before completing a sale.';
   static const String insufficientCash =
       'Cash received is less than the total amount due.';
+
+  // Unsaved Changes
+  static const String unsavedChanges =
+      'You have unsaved changes. Discard them and close?';
+
+  // User CRUD
+  static const String userSaved = 'User saved successfully.';
+  static const String userSaveError = 'Failed to save user.';
+  static const String userDeleted = 'User moved to trash.';
+  static const String userDeleteError = 'Failed to delete user.';
+  static const String userActivated = 'User activated successfully.';
+  static const String userDeactivated = 'User deactivated successfully.';
+  static const String userSelfDelete = 'You cannot delete your own account.';
+  static const String userSelfDeactivate = 'You cannot deactivate your own account.';
+  static const String passwordReset = 'Password reset successfully.';
+  static const String passwordResetError = 'Failed to reset password.';
+
+  // Announcement
+  static const String announcementSaved = 'Announcement saved successfully.';
+  static const String announcementSaveError = 'Failed to save announcement.';
+  static const String announcementDeleted = 'Announcement deleted successfully.';
+  static const String announcementDeleteError = 'Failed to delete announcement.';
+
+  // Notifications
+  static const String notificationMarkedRead = 'Notification marked as read.';
+  static const String notificationMarkAllRead = 'All notifications marked as read.';
+  static const String notificationMarkReadError = 'Failed to mark notification as read.';
+  static const String notificationMarkAllReadError = 'Failed to mark all notifications as read.';
+
+  // Export
+  static const String exportCsvSuccess = 'CSV exported successfully.';
+  static const String exportCsvError = 'Failed to export CSV.';
+  static const String exportPdfSuccess = 'PDF exported successfully.';
+  static const String exportPdfError = 'Failed to export PDF.';
+
+  // Restore / Trash
+  static const String restoreSuccess = 'Item restored successfully.';
+  static const String trashRestoreError = 'Failed to restore item.';
+  static const String permanentDeleteSuccess = 'Item permanently deleted.';
+  static const String permanentDeleteError = 'Failed to permanently delete item.';
+
+  // Stock
+  static const String stockAdjustSuccess = 'Stock adjusted successfully.';
+  static const String stockAdjustError = 'Failed to adjust stock.';
+
+  // Category toggle
+  static const String categoryActivated = 'Category activated successfully.';
+  static const String categoryDeactivated = 'Category deactivated successfully.';
+  static const String categoryToggleError = 'Failed to toggle category status.';
 }

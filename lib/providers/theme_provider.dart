@@ -1,7 +1,5 @@
-﻿import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+﻿import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:pinoy_pos/core/app_theme.dart';
 
 final themeProvider = StateNotifierProvider<ThemeNotifier, ThemeState>((ref) {
   return ThemeNotifier();
@@ -76,20 +74,5 @@ class ThemeNotifier extends StateNotifier<ThemeState> {
   /// Called on logout — clears user-specific color, reverts to global default.
   void clearUserColorPreference() {
     state = state.copyWith(clearUserColor: true);
-  }
-
-  ThemeData getTheme(BuildContext context) {
-    final brightness = switch (state.themeMode) {
-      'light' => Brightness.light,
-      'dark' => Brightness.dark,
-      _ => MediaQuery.of(context).platformBrightness,
-    };
-
-    final effectiveColor = state.effectiveAccentColor;
-
-    if (brightness == Brightness.dark) {
-      return AppColors.getDarkTheme(effectiveColor);
-    }
-    return AppColors.getLightTheme(effectiveColor);
   }
 }

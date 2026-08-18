@@ -18,6 +18,13 @@ class ProductService {
     return _productRepository.getActiveProducts();
   }
 
+  Future<List<Product>> getDeletedProducts() async {
+    if (!_sessionManager.hasPermission('view_trash')) {
+      return [];
+    }
+    return _productRepository.getDeleted();
+  }
+
   Future<List<Product>> getLowStockProducts() async {
     if (!_sessionManager.hasPermission('view_products')) {
       return [];

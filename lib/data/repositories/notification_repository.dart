@@ -1,10 +1,11 @@
 import 'package:pinoy_pos/data/dao/notification_dao.dart';
 import 'package:pinoy_pos/data/models/notification.dart';
+import 'package:sqflite/sqflite.dart';
 
 class NotificationRepository {
   final NotificationDao _notificationDao = NotificationDao();
 
-  Future<int> insert(Notification notification) => _notificationDao.insert(notification);
+  Future<int> insert(Notification notification, {DatabaseExecutor? txn}) => _notificationDao.insert(notification, txn: txn);
   Future<int> update(Notification notification) => _notificationDao.update(notification);
   Future<int> delete(int id) => _notificationDao.delete(id);
   Future<Notification?> getById(int id) => _notificationDao.getById(id);

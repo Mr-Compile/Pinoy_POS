@@ -1,26 +1,26 @@
+import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/trash_item.dart';
 import 'package:pinoy_pos/data/repositories/trash_repository.dart';
 import 'package:pinoy_pos/data/repositories/product_repository.dart';
 import 'package:pinoy_pos/data/repositories/category_repository.dart';
 import 'package:pinoy_pos/data/repositories/user_repository.dart';
-import 'package:pinoy_pos/services/auth_service.dart';
 
 class TrashService {
   final TrashRepository _trashRepository = TrashRepository();
   final ProductRepository _productRepository = ProductRepository();
   final CategoryRepository _categoryRepository = CategoryRepository();
   final UserRepository _userRepository = UserRepository();
-  final AuthService _authService = AuthService();
+  final SessionManager _sessionManager = SessionManager();
 
   Future<List<TrashItem>> getAllTrash() async {
-    if (!_authService.hasPermission('view_trash')) {
+    if (!_sessionManager.hasPermission('view_trash')) {
       return [];
     }
     return _trashRepository.getAll();
   }
 
   Future<List<TrashItem>> getByEntityType(String entityType) async {
-    if (!_authService.hasPermission('view_trash')) {
+    if (!_sessionManager.hasPermission('view_trash')) {
       return [];
     }
     return _trashRepository.getByEntityType(entityType);
@@ -35,7 +35,7 @@ class TrashService {
       entityType: entityType,
       entityId: entityId,
       entityName: entityName,
-      deletedBy: _authService.currentUser?.id,
+      deletedBy: _sessionManager.currentUser?.id,
       deletedAt: DateTime.now(),
       expiresAt: DateTime.now().add(const Duration(days: 30)),
     );
@@ -44,7 +44,7 @@ class TrashService {
   }
 
   Future<bool> restoreFromTrash(int trashId, String entityType, int entityId) async {
-    if (!_authService.hasPermission('view_trash')) {
+    if (!_sessionManager.hasPermission('restore_trash')) {
       return false;
     }
 
@@ -65,7 +65,7 @@ class TrashService {
   }
 
   Future<bool> permanentDelete(int trashId, String entityType, int entityId) async {
-    if (!_authService.hasPermission('view_trash')) {
+    if (!_sessionManager.hasPermission('view_trash')) {
       return false;
     }
 
@@ -77,7 +77,7 @@ class TrashService {
         await _categoryRepository.delete(entityId);
         break;
       case 'user':
-        await _userRepository.delete(entityId);
+        await _userRepository.permanentlyDelete(entityId);
         break;
     }
 
@@ -86,7 +86,7 @@ class TrashService {
   }
 
   Future<bool> emptyTrash() async {
-    if (!_authService.hasPermission('view_trash')) {
+    if (!_sessionManager.hasPermission('view_trash')) {
       return false;
     }
 

@@ -2,26 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/authorization_exception.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/services/user_service.dart';
-
-// ──────────────────────────────────────────────────────────────────────────
-//  Service provider
-// ──────────────────────────────────────────────────────────────────────────
-
-/// Provides a singleton [UserService] instance.
-///
-/// Dependency graph:
-///   userServiceProvider
-///     → UserService
-//        → UserRepository → UserDao → SQLite
-//        → ActivityLogService → ActivityLogRepository → DAO → SQLite
-//        → SessionManager (singleton, reads current user)
-///
-/// There is NO dependency on AuthService or authStateProvider, so no
-/// circular dependency can form.
-final userServiceProvider = Provider<UserService>((ref) {
-  return UserService();
-});
 
 // ──────────────────────────────────────────────────────────────────────────
 //  State

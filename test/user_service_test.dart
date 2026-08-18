@@ -24,15 +24,21 @@ void main() {
   });
 
   setUp(() async {
+    // Reset the singleton DatabaseHelper first so the file handle is
+    // released before we delete the database file.
+    DatabaseHelper.resetForTest();
+
     // Delete any existing database file so each test starts fresh.
     final dbPath = p.join(await getDatabasesPath(), AppConstants.databaseName);
     final file = File(dbPath);
     if (await file.exists()) {
-      await file.delete();
+      try {
+        await file.delete();
+      } catch (_) {
+        // File may still be locked on Windows; re-initialise on top of it.
+      }
     }
 
-    // Reset the singleton DatabaseHelper so each test starts fresh.
-    DatabaseHelper.resetForTest();
     final dbHelper = DatabaseHelper();
     await dbHelper.database;
     final seeder = DatabaseSeeder();
@@ -476,7 +482,7 @@ void main() {
     final dbHelper = DatabaseHelper();
     final db = await dbHelper.database;
     final logs = await db.query(
-      'activity_log',
+      'activity_logs',
       where: 'action = ?',
       whereArgs: ['USER_CREATED'],
     );

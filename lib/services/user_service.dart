@@ -51,6 +51,25 @@ class UserService {
 
   User? get currentUser => _sessionManager.currentUser;
 
+  /// Validates password complexity.  Mirrors the rules enforced by the UI
+  /// [Validators.password] so that business-layer validation does not rely
+  /// on the UI alone.  Returns null when valid, or an error message.
+  String? _validatePasswordComplexity(String password) {
+    if (password.length < AppConstants.minPasswordLength) {
+      return 'Password must be at least ${AppConstants.minPasswordLength} characters';
+    }
+    if (!password.contains(RegExp(r'[A-Z]'))) {
+      return 'Password must contain at least one uppercase letter';
+    }
+    if (!password.contains(RegExp(r'[a-z]'))) {
+      return 'Password must contain at least one lowercase letter';
+    }
+    if (!password.contains(RegExp(r'[0-9]'))) {
+      return 'Password must contain at least one number';
+    }
+    return null;
+  }
+
   // ───────────────────────────────────────────────
   //  READ
   // ───────────────────────────────────────────────
@@ -104,11 +123,9 @@ class UserService {
     if (trimmedFullName.isEmpty) {
       return UserOperationResult(success: false, message: 'Full name is required');
     }
-    if (password.length < AppConstants.minPasswordLength) {
-      return UserOperationResult(
-        success: false,
-        message: 'Password must be at least ${AppConstants.minPasswordLength} characters',
-      );
+    final passwordError = _validatePasswordComplexity(password);
+    if (passwordError != null) {
+      return UserOperationResult(success: false, message: passwordError);
     }
     if (pin != null && pin.isNotEmpty) {
       final pinRegex = RegExp(r'^\d{4,6}$');
@@ -276,11 +293,9 @@ class UserService {
       }
     }
 
-    if (newPassword.length < AppConstants.minPasswordLength) {
-      return UserOperationResult(
-        success: false,
-        message: 'Password must be at least ${AppConstants.minPasswordLength} characters',
-      );
+    final complexityError = _validatePasswordComplexity(newPassword);
+    if (complexityError != null) {
+      return UserOperationResult(success: false, message: complexityError);
     }
 
     final newPasswordHash = SecurityHelper.hashPassword(newPassword);
@@ -314,11 +329,9 @@ class UserService {
       return UserOperationResult(success: false, message: 'User not found');
     }
 
-    if (newPassword.length < AppConstants.minPasswordLength) {
-      return UserOperationResult(
-        success: false,
-        message: 'Password must be at least ${AppConstants.minPasswordLength} characters',
-      );
+    final resetComplexityError = _validatePasswordComplexity(newPassword);
+    if (resetComplexityError != null) {
+      return UserOperationResult(success: false, message: resetComplexityError);
     }
 
     final newPasswordHash = SecurityHelper.hashPassword(newPassword);

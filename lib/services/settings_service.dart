@@ -16,12 +16,13 @@ class SettingsService {
     _currentSettings = await _settingsRepository.getSettings();
     
     if (_currentSettings == null) {
-      _currentSettings = Settings(
+      final defaultSettings = Settings(
         storeName: 'My Store',
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       );
-      await _settingsRepository.insert(_currentSettings!);
+      final id = await _settingsRepository.insert(defaultSettings);
+      _currentSettings = defaultSettings.copyWith(id: id);
     }
 
     return _currentSettings!;
