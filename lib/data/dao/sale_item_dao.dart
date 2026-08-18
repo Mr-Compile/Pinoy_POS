@@ -1,5 +1,6 @@
 import 'package:pinoy_pos/data/dao/base_dao.dart';
 import 'package:pinoy_pos/data/models/sale_item.dart';
+import 'package:sqflite/sqflite.dart';
 
 class SaleItemDao extends BaseDao<SaleItem> {
   @override
@@ -8,9 +9,9 @@ class SaleItemDao extends BaseDao<SaleItem> {
   @override
   SaleItem fromMap(Map<String, dynamic> map) => SaleItem.fromMap(map);
 
-  Future<List<SaleItem>> getBySaleId(int saleId) async {
-    final database = await db;
-    final maps = await database.query(
+  Future<List<SaleItem>> getBySaleId(int saleId, {DatabaseExecutor? txn}) async {
+    final executor = txn ?? await db;
+    final maps = await executor.query(
       tableName,
       where: 'sale_id = ?',
       whereArgs: [saleId],

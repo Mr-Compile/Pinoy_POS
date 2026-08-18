@@ -1,5 +1,6 @@
 import 'package:pinoy_pos/data/dao/base_dao.dart';
 import 'package:pinoy_pos/data/models/product.dart';
+import 'package:sqflite/sqflite.dart';
 
 class ProductDao extends BaseDao<Product> {
   @override
@@ -7,18 +8,6 @@ class ProductDao extends BaseDao<Product> {
 
   @override
   Product fromMap(Map<String, dynamic> map) => Product.fromMap(map);
-
-  Future<Product?> getByBarcode(String barcode) async {
-    final database = await db;
-    final maps = await database.query(
-      tableName,
-      where: 'barcode = ? AND deleted_at IS NULL',
-      whereArgs: [barcode],
-      limit: 1,
-    );
-    if (maps.isEmpty) return null;
-    return fromMap(maps.first);
-  }
 
   Future<List<Product>> getByCategory(int categoryId) async {
     final database = await db;
@@ -55,16 +44,16 @@ class ProductDao extends BaseDao<Product> {
     final database = await db;
     final maps = await database.query(
       tableName,
-      where: '(name LIKE ? OR barcode LIKE ?) AND deleted_at IS NULL',
-      whereArgs: ['%$query%', '%$query%'],
+      where: '(name LIKE ?) AND deleted_at IS NULL',
+      whereArgs: ['%$query%'],
       orderBy: 'name ASC',
     );
     return maps.map((map) => fromMap(map)).toList();
   }
 
-  Future<void> updateStock(int productId, int newStock) async {
-    final database = await db;
-    await database.update(
+  Future<void> updateStock(int productId, int newStock, {DatabaseExecutor? txn}) async {
+    final executor = txn ?? await db;
+    await executor.update(
       tableName,
       {'stock': newStock},
       where: 'id = ?',

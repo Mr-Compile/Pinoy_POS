@@ -3,8 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/data/models/product.dart';
 import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
-import 'package:pinoy_pos/services/product_service.dart';
-import 'package:pinoy_pos/services/category_service.dart';
+import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
@@ -22,8 +21,6 @@ class ProductsScreen extends ConsumerStatefulWidget {
 }
 
 class _ProductsScreenState extends ConsumerState<ProductsScreen> {
-  final ProductService _productService = ProductService();
-  final CategoryService _categoryService = CategoryService();
   List<Product> _products = [];
   List<Category> _categories = [];
   bool _isLoading = true;
@@ -39,8 +36,10 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
       _isLoading = true;
     });
 
-    final products = await _productService.getActiveProducts();
-    final categories = await _categoryService.getActiveCategories();
+    final productService = ref.read(productServiceProvider);
+    final categoryService = ref.read(categoryServiceProvider);
+    final products = await productService.getActiveProducts();
+    final categories = await categoryService.getActiveCategories();
 
     if (mounted) {
       setState(() {
@@ -65,7 +64,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
 
     if (confirmed == true && mounted) {
       try {
-        await _productService.deleteProduct(product.id!);
+        final productService = ref.read(productServiceProvider);
+      await productService.deleteProduct(product.id!);
         if (mounted) {
           showSuccessSnackbar(context, 'Product deleted successfully');
           _loadData();
@@ -158,7 +158,6 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     final nameController = TextEditingController(text: product?.name ?? '');
     final priceController = TextEditingController(text: product?.price.toString() ?? '');
     final stockController = TextEditingController(text: product?.stock.toString() ?? '');
-    final barcodeController = TextEditingController(text: product?.barcode ?? '');
     int? selectedCategoryId = product?.categoryId;
     bool hasChanges = false;
     bool isSaving = false;
@@ -237,23 +236,6 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                     onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
                   ),
                   const SizedBox(height: 12),
-                  TextFormField(
-                    controller: barcodeController,
-                    decoration: const InputDecoration(
-                      labelText: 'Barcode',
-                      border: OutlineInputBorder(),
-                    ),
-                    textInputAction: TextInputAction.next,
-                    onChanged: (value) {
-                      if (!hasChanges) {
-                        setState(() {
-                          hasChanges = true;
-                        });
-                      }
-                    },
-                    onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
-                  ),
-                  const SizedBox(height: 12),
                   DropdownButtonFormField<int>(
                     decoration: const InputDecoration(
                       labelText: 'Category',
@@ -306,7 +288,6 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                 nameController,
                 priceController,
                 stockController,
-                barcodeController,
                 selectedCategoryId,
                 product,
                 setState,
@@ -325,7 +306,6 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     TextEditingController nameController,
     TextEditingController priceController,
     TextEditingController stockController,
-    TextEditingController barcodeController,
     int? selectedCategoryId,
     Product? product,
     StateSetter setState,
@@ -356,23 +336,23 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
         name: name,
         price: double.parse(priceController.text),
         stock: int.parse(stockController.text),
-        barcode: barcodeController.text.trim(),
         categoryId: selectedCategoryId,
         createdAt: DateTime.now(),
       );
 
       if (product == null) {
-        await _productService.createProduct(productData);
+        final productService = ref.read(productServiceProvider);
+        await productService.createProduct(productData);
         if (mounted) {
           showSuccessSnackbar(context, 'Product created successfully');
         }
       } else {
-        await _productService.updateProduct(
+        final productService = ref.read(productServiceProvider);
+        await productService.updateProduct(
           product.copyWith(
             name: productData.name,
             price: productData.price,
             stock: productData.stock,
-            barcode: productData.barcode,
             categoryId: productData.categoryId,
           ),
         );

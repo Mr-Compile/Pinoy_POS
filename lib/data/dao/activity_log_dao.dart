@@ -3,7 +3,7 @@ import 'package:pinoy_pos/data/models/activity_log.dart';
 
 class ActivityLogDao extends BaseDao<ActivityLog> {
   @override
-  String get tableName => 'activity_log';
+  String get tableName => 'activity_logs';
 
   @override
   ActivityLog fromMap(Map<String, dynamic> map) => ActivityLog.fromMap(map);

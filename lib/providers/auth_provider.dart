@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
 import 'package:pinoy_pos/data/models/user.dart';
+import 'package:pinoy_pos/providers/theme_provider.dart';
 
 final authServiceProvider = Provider<AuthService>((ref) {
   return AuthService();
@@ -8,7 +9,8 @@ final authServiceProvider = Provider<AuthService>((ref) {
 
 final authStateProvider = StateNotifierProvider<AuthStateNotifier, AuthState>((ref) {
   final authService = ref.watch(authServiceProvider);
-  return AuthStateNotifier(authService);
+  final themeNotifier = ref.watch(themeProvider.notifier);
+  return AuthStateNotifier(authService, themeNotifier);
 });
 
 class AuthState {
@@ -37,8 +39,9 @@ class AuthState {
 
 class AuthStateNotifier extends StateNotifier<AuthState> {
   final AuthService _authService;
+  final ThemeNotifier _themeNotifier;
 
-  AuthStateNotifier(this._authService) : super(AuthState()) {
+  AuthStateNotifier(this._authService, this._themeNotifier) : super(AuthState()) {
     _init();
   }
 
@@ -47,6 +50,7 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
     final restored = await _authService.restoreSession();
     if (restored) {
       state = state.copyWith(user: _authService.currentUser, isLoading: false);
+      _themeNotifier.syncUserColorPreference(_authService.currentUser?.colorPreference);
     } else {
       state = state.copyWith(isLoading: false);
     }
@@ -74,8 +78,57 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
     return success;
   }
 
+  /// Returns (success, errorMessage). errorMessage is null on success.
+  Future<(bool, String?)> loginWithResult(String username, String password) async {
+    state = state.copyWith(isLoading: true, error: null);
+    final result = await _authService.loginDetailed(username, password);
+    switch (result) {
+      case AuthResult.success:
+        state = state.copyWith(user: _authService.currentUser, isLoading: false);
+        _themeNotifier.syncUserColorPreference(_authService.currentUser?.colorPreference);
+        return (true, null);
+      case AuthResult.inactiveAccount:
+        final msg = 'This account is currently inactive. Please contact an administrator.';
+        state = state.copyWith(isLoading: false, error: msg);
+        return (false, msg);
+      case AuthResult.error:
+        final msg = 'Unable to sign in right now. Please try again.';
+        state = state.copyWith(isLoading: false, error: msg);
+        return (false, msg);
+      case AuthResult.invalidCredentials:
+        final msg = 'Incorrect username or password.';
+        state = state.copyWith(isLoading: false, error: msg);
+        return (false, msg);
+    }
+  }
+
+  /// Returns (success, errorMessage). errorMessage is null on success.
+  Future<(bool, String?)> loginWithPinResult(String username, String pin) async {
+    state = state.copyWith(isLoading: true, error: null);
+    final result = await _authService.loginWithPinDetailed(username, pin);
+    switch (result) {
+      case AuthResult.success:
+        state = state.copyWith(user: _authService.currentUser, isLoading: false);
+        _themeNotifier.syncUserColorPreference(_authService.currentUser?.colorPreference);
+        return (true, null);
+      case AuthResult.inactiveAccount:
+        final msg = 'This account is currently inactive. Please contact an administrator.';
+        state = state.copyWith(isLoading: false, error: msg);
+        return (false, msg);
+      case AuthResult.error:
+        final msg = 'Unable to sign in right now. Please try again.';
+        state = state.copyWith(isLoading: false, error: msg);
+        return (false, msg);
+      case AuthResult.invalidCredentials:
+        final msg = 'Incorrect username or PIN.';
+        state = state.copyWith(isLoading: false, error: msg);
+        return (false, msg);
+    }
+  }
+
   Future<void> logout() async {
     await _authService.logout();
+    _themeNotifier.clearUserColorPreference();
     state = state.copyWith(user: null);
   }
 
@@ -90,5 +143,10 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
 
   bool hasPermission(String permission) {
     return _authService.hasPermission(permission);
+  }
+
+  void refreshUser() {
+    state = state.copyWith(user: _authService.currentUser);
+    _themeNotifier.syncUserColorPreference(_authService.currentUser?.colorPreference);
   }
 }

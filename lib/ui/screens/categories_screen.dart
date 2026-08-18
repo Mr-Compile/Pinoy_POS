@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
-import 'package:pinoy_pos/services/category_service.dart';
+import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
@@ -20,7 +20,6 @@ class CategoriesScreen extends ConsumerStatefulWidget {
 }
 
 class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
-  final CategoryService _categoryService = CategoryService();
   List<Category> _categories = [];
   bool _isLoading = true;
 
@@ -35,13 +34,65 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
       _isLoading = true;
     });
 
-    final categories = await _categoryService.getActiveCategories();
+    final categoryService = ref.read(categoryServiceProvider);
+    final categories = await categoryService.getAllCategories();
 
     if (mounted) {
       setState(() {
-        _categories = categories;
+        _categories = categories.where((c) => !c.isDeleted).toList();
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _toggleCategoryStatus(Category category) async {
+    final authNotifier = ref.read(authStateProvider.notifier);
+    if (!authNotifier.hasPermission('change_category_status')) {
+      EnhancedDialogs.showAccessDeniedDialog(context: context);
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(category.isActive ? 'Deactivate Category' : 'Activate Category'),
+        content: Text('${category.isActive ? "Deactivate" : "Activate"} "${category.name}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        final categoryService = ref.read(categoryServiceProvider);
+        final success = await categoryService.changeCategoryStatus(
+          category.id!,
+          !category.isActive,
+        );
+        if (mounted) {
+          if (success) {
+            showSuccessSnackbar(
+              context,
+              category.isActive ? 'Category deactivated' : 'Category activated',
+            );
+            _loadCategories();
+          } else {
+            showErrorSnackbar(context, 'Failed to update category status');
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          showErrorSnackbar(context, 'Failed to update category status');
+        }
+      }
     }
   }
 
@@ -59,7 +110,8 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
 
     if (confirmed == true && mounted) {
       try {
-        await _categoryService.deleteCategory(category.id!);
+        final categoryService = ref.read(categoryServiceProvider);
+        await categoryService.deleteCategory(category.id!);
         if (mounted) {
           showSuccessSnackbar(context, 'Category deleted successfully');
           _loadCategories();
@@ -77,6 +129,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
     final authNotifier = ref.read(authStateProvider.notifier);
     final canEdit = authNotifier.hasPermission('edit_categories');
     final canDelete = authNotifier.hasPermission('delete_categories');
+    final canToggleStatus = authNotifier.hasPermission('change_category_status');
 
     if (_isLoading) {
       return Scaffold(
@@ -96,13 +149,17 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
               icon: const Icon(Icons.add),
               onPressed: () => _showCategoryDialog(),
             ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadCategories,
+          ),
         ],
       ),
       body: _categories.isEmpty
           ? const EmptyState(
               icon: Icons.category,
               title: 'No Categories',
-              message: 'Add your first category to get started',
+              message: 'No categories available',
             )
           : ListView.builder(
               padding: const EdgeInsets.all(16),
@@ -113,9 +170,19 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
                   margin: const EdgeInsets.only(bottom: 12),
                   child: ListTile(
                     title: Text(category.name),
+                    subtitle: Text(category.isActive ? 'Active' : 'Inactive'),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        if (canToggleStatus)
+                          IconButton(
+                            icon: Icon(
+                              category.isActive ? Icons.toggle_on : Icons.toggle_off,
+                              color: category.isActive ? Colors.green : Colors.grey,
+                            ),
+                            tooltip: category.isActive ? 'Deactivate' : 'Activate',
+                            onPressed: () => _toggleCategoryStatus(category),
+                          ),
                         if (canEdit)
                           IconButton(
                             icon: const Icon(Icons.edit),
@@ -218,13 +285,12 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
     }
 
     final name = nameController.text.trim();
-    
-    // Check for duplicate name
-    final isDuplicate = _categories.any((c) => 
-      c.name.toLowerCase() == name.toLowerCase() && 
+
+    final isDuplicate = _categories.any((c) =>
+      c.name.toLowerCase() == name.toLowerCase() &&
       (category == null || c.id != category.id)
     );
-    
+
     if (isDuplicate) {
       showErrorSnackbar(context, 'Category name already exists');
       return;
@@ -235,21 +301,20 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
     });
 
     try {
+      final categoryService = ref.read(categoryServiceProvider);
       final categoryData = Category(
         name: name,
         createdAt: DateTime.now(),
       );
 
       if (category == null) {
-        await _categoryService.createCategory(categoryData);
+        await categoryService.createCategory(categoryData);
         if (mounted) {
           showSuccessSnackbar(context, 'Category created successfully');
         }
       } else {
-        await _categoryService.updateCategory(
-          category.copyWith(
-            name: categoryData.name,
-          ),
+        await categoryService.updateCategory(
+          category.copyWith(name: categoryData.name),
         );
         if (mounted) {
           showSuccessSnackbar(context, 'Category updated successfully');

@@ -1,4 +1,4 @@
-allprojects {
+﻿allprojects {
     repositories {
         google()
         mavenCentral()
@@ -14,14 +14,17 @@ rootProject.layout.buildDirectory.value(newBuildDir)
 subprojects {
     val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
     project.layout.buildDirectory.value(newSubprojectBuildDir)
+    afterEvaluate {
+        if (project.hasProperty("android")) {
+            val android = project.extensions.getByName("android")
+            if (android is com.android.build.gradle.LibraryExtension) {
+                android.compileSdk = 36
+            }
+        }
+    }
 }
 subprojects {
     project.evaluationDependsOn(":app")
-    configurations.all {
-        resolutionStrategy {
-            force("androidx.core:core-ktx:1.12.0")
-        }
-    }
 }
 
 tasks.register<Delete>("clean") {

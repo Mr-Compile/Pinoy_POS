@@ -1,15 +1,16 @@
 import 'package:pinoy_pos/data/dao/sale_dao.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
+import 'package:sqflite/sqflite.dart';
 
 class SaleRepository {
   final SaleDao _saleDao = SaleDao();
 
-  Future<int> insert(Sale sale) => _saleDao.insert(sale);
-  Future<int> update(Sale sale) => _saleDao.update(sale);
-  Future<int> delete(int id) => _saleDao.delete(id);
-  Future<int> softDelete(int id) => _saleDao.softDelete(id);
-  Future<int> restore(int id) => _saleDao.restore(id);
-  Future<Sale?> getById(int id) => _saleDao.getById(id);
+  Future<int> insert(Sale sale, {DatabaseExecutor? txn}) => _saleDao.insert(sale, txn: txn);
+  Future<int> update(Sale sale, {DatabaseExecutor? txn}) => _saleDao.update(sale, txn: txn);
+  Future<int> delete(int id, {DatabaseExecutor? txn}) => _saleDao.delete(id, txn: txn);
+  Future<int> softDelete(int id, {DatabaseExecutor? txn}) => _saleDao.softDelete(id, txn: txn);
+  Future<int> restore(int id, {DatabaseExecutor? txn}) => _saleDao.restore(id, txn: txn);
+  Future<Sale?> getById(int id, {DatabaseExecutor? txn}) => _saleDao.getById(id, txn: txn);
   Future<List<Sale>> getAll() => _saleDao.getAll();
   Future<List<Sale>> getAllActive() => _saleDao.getAllActive();
   Future<List<Sale>> getDeleted() => _saleDao.getDeleted();

@@ -9,15 +9,20 @@ abstract class BaseDao<T> {
   String get tableName;
   T fromMap(Map<String, dynamic> map);
 
-  Future<int> insert(T item) async {
-    final database = await db;
-    return await database.insert(tableName, (item as dynamic).toMap() as Map<String, dynamic>);
+  Future<DatabaseExecutor> _executor([DatabaseExecutor? txn]) async {
+    if (txn != null) return txn;
+    return await db;
   }
 
-  Future<int> update(T item) async {
-    final database = await db;
+  Future<int> insert(T item, {DatabaseExecutor? txn}) async {
+    final executor = await _executor(txn);
+    return await executor.insert(tableName, (item as dynamic).toMap() as Map<String, dynamic>);
+  }
+
+  Future<int> update(T item, {DatabaseExecutor? txn}) async {
+    final executor = await _executor(txn);
     final id = (item as dynamic).id;
-    return await database.update(
+    return await executor.update(
       tableName,
       (item as dynamic).toMap() as Map<String, dynamic>,
       where: 'id = ?',
@@ -25,18 +30,18 @@ abstract class BaseDao<T> {
     );
   }
 
-  Future<int> delete(int id) async {
-    final database = await db;
-    return await database.delete(
+  Future<int> delete(int id, {DatabaseExecutor? txn}) async {
+    final executor = await _executor(txn);
+    return await executor.delete(
       tableName,
       where: 'id = ?',
       whereArgs: [id],
     );
   }
 
-  Future<int> softDelete(int id) async {
-    final database = await db;
-    return await database.update(
+  Future<int> softDelete(int id, {DatabaseExecutor? txn}) async {
+    final executor = await _executor(txn);
+    return await executor.update(
       tableName,
       {'deleted_at': DateTime.now().toIso8601String()},
       where: 'id = ?',
@@ -44,9 +49,9 @@ abstract class BaseDao<T> {
     );
   }
 
-  Future<int> restore(int id) async {
-    final database = await db;
-    return await database.update(
+  Future<int> restore(int id, {DatabaseExecutor? txn}) async {
+    final executor = await _executor(txn);
+    return await executor.update(
       tableName,
       {'deleted_at': null},
       where: 'id = ?',
@@ -54,9 +59,9 @@ abstract class BaseDao<T> {
     );
   }
 
-  Future<T?> getById(int id) async {
-    final database = await db;
-    final maps = await database.query(
+  Future<T?> getById(int id, {DatabaseExecutor? txn}) async {
+    final executor = await _executor(txn);
+    final maps = await executor.query(
       tableName,
       where: 'id = ?',
       whereArgs: [id],
@@ -66,9 +71,9 @@ abstract class BaseDao<T> {
     return fromMap(maps.first);
   }
 
-  Future<List<T>> getAll({String? where, List<Object?>? whereArgs}) async {
-    final database = await db;
-    final maps = await database.query(
+  Future<List<T>> getAll({String? where, List<Object?>? whereArgs, DatabaseExecutor? txn}) async {
+    final executor = await _executor(txn);
+    final maps = await executor.query(
       tableName,
       where: where,
       whereArgs: whereArgs,
@@ -76,18 +81,18 @@ abstract class BaseDao<T> {
     return maps.map((map) => fromMap(map)).toList();
   }
 
-  Future<List<T>> getAllActive() async {
-    final database = await db;
-    final maps = await database.query(
+  Future<List<T>> getAllActive({DatabaseExecutor? txn}) async {
+    final executor = await _executor(txn);
+    final maps = await executor.query(
       tableName,
       where: 'deleted_at IS NULL',
     );
     return maps.map((map) => fromMap(map)).toList();
   }
 
-  Future<List<T>> getDeleted() async {
-    final database = await db;
-    final maps = await database.query(
+  Future<List<T>> getDeleted({DatabaseExecutor? txn}) async {
+    final executor = await _executor(txn);
+    final maps = await executor.query(
       tableName,
       where: 'deleted_at IS NOT NULL',
     );

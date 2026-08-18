@@ -1,0 +1,52 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="250dp"
+    android:viewportWidth="200"
+    android:viewportHeight="250">
+    <!-- Awning -->
+    <path
+        android:strokeColor="#3567D6"
+        android:strokeWidth="5"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000"
+        android:pathData="M 40 20 L 160 20 Q 165 20 165 25 L 165 52 Q 148.75 65 132.5 52 Q 116.25 65 100 52 Q 83.75 65 67.5 52 Q 51.25 65 35 52 L 35 25 Q 35 20 40 20 Z" />
+    <!-- Storefront body -->
+    <path
+        android:strokeColor="#3567D6"
+        android:strokeWidth="5"
+        android:fillColor="#00000000"
+        android:pathData="M 50 58 L 150 58 Q 160 58 160 68 L 160 160 Q 160 170 150 170 L 60 170 Q 50 170 50 160 L 50 68 Q 50 58 60 58 Z" />
+    <!-- Peso symbol: vertical stem -->
+    <path
+        android:strokeColor="#E91E63"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M 90 85 L 90 150" />
+    <!-- Peso symbol: P bowl curve -->
+    <path
+        android:strokeColor="#E91E63"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000"
+        android:pathData="M 90 85 C 112 85 120 96 120 108 C 120 120 112 128 90 128" />
+    <!-- Peso symbol: top bar -->
+    <path
+        android:strokeColor="#E91E63"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M 75 103 L 102 103" />
+    <!-- Peso symbol: bottom bar -->
+    <path
+        android:strokeColor="#E91E63"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M 75 113 L 102 113" />
+    <!-- ePOS wordmark -->
+    <path
+        android:fillColor="#3567D6"
+        android:pathData="M 70 195 L 70 215 L 75 215 L 75 207 L 82 207 Q 86 207 88 205 Q 90 203 90 200 Q 90 197 88 196 Q 86 195 82 195 L 70 195 Z M 75 199 L 82 199 Q 84 199 85 199.5 Q 86 200 86 201 Q 86 202 85 202.5 Q 84 203 82 203 L 75 203 Z M 95 195 L 95 215 L 105 215 Q 110 215 113 213 Q 116 211 116 207 Q 116 204 114 202 Q 112 200 109 200 Q 111 199 112 198 Q 113 196 113 195 Q 113 192 110 193 Q 107 195 103 195 L 95 195 Z M 100 199 L 103 199 Q 105 199 106 199.5 Q 107 200 107 201 Q 107 202 106 202.5 Q 105 203 103 203 L 100 203 Z M 100 207 L 105 207 Q 107 207 108 207.5 Q 109 208 109 210 Q 109 211 108 211.5 Q 107 212 105 212 L 100 212 Z M 122 195 L 122 215 L 140 215 L 140 211 L 127 211 L 127 207 L 138 207 L 138 203 L 127 203 L 127 199 L 140 199 L 140 195 Z M 145 195 L 145 215 L 150 215 L 150 207 L 157 207 Q 161 207 163 205 Q 165 203 165 200 Q 165 197 163 196 Q 161 195 157 195 L 145 195 Z M 150 199 L 157 199 Q 159 199 160 199.5 Q 161 200 161 201 Q 161 202 160 202.5 Q 159 203 157 203 L 150 203 Z" />
+</vector>

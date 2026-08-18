@@ -5,7 +5,6 @@ class Product {
   final double price;
   final int stock;
   final int minStock;
-  final String? barcode;
   final String? imageUrl;
   final int? categoryId;
   final bool isActive;
@@ -19,7 +18,6 @@ class Product {
     required this.price,
     required this.stock,
     this.minStock = 10,
-    this.barcode,
     this.imageUrl,
     this.categoryId,
     this.isActive = true,
@@ -35,7 +33,6 @@ class Product {
       'price': price,
       'stock': stock,
       'min_stock': minStock,
-      'barcode': barcode,
       'image_url': imageUrl,
       'category_id': categoryId,
       'is_active': isActive ? 1 : 0,
@@ -52,7 +49,6 @@ class Product {
       price: (map['price'] as num).toDouble(),
       stock: map['stock'] as int,
       minStock: map['min_stock'] as int? ?? 10,
-      barcode: map['barcode'] as String?,
       imageUrl: map['image_url'] as String?,
       categoryId: map['category_id'] as int?,
       isActive: (map['is_active'] as int) == 1,
@@ -70,7 +66,6 @@ class Product {
     double? price,
     int? stock,
     int? minStock,
-    String? barcode,
     String? imageUrl,
     int? categoryId,
     bool? isActive,
@@ -84,7 +79,6 @@ class Product {
       price: price ?? this.price,
       stock: stock ?? this.stock,
       minStock: minStock ?? this.minStock,
-      barcode: barcode ?? this.barcode,
       imageUrl: imageUrl ?? this.imageUrl,
       categoryId: categoryId ?? this.categoryId,
       isActive: isActive ?? this.isActive,

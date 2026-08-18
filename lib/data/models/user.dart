@@ -1,4 +1,4 @@
-enum UserRole {
+﻿enum UserRole {
   owner,
   admin,
   staff;
@@ -18,6 +18,7 @@ class User {
   final String? pin;
   final UserRole role;
   final String fullName;
+  final String colorPreference;
   final bool isActive;
   final String? colorPreference;
   final DateTime? lastLogin;
@@ -32,6 +33,7 @@ class User {
     this.pin,
     required this.role,
     required this.fullName,
+    this.colorPreference = 'green',
     this.isActive = true,
     this.colorPreference,
     this.lastLogin,
@@ -48,6 +50,7 @@ class User {
       'pin': pin,
       'role': role.name,
       'full_name': fullName,
+      'color_preference': colorPreference,
       'is_active': isActive ? 1 : 0,
       'color_preference': colorPreference,
       'last_login': lastLogin?.toIso8601String(),
@@ -68,6 +71,7 @@ class User {
         orElse: () => UserRole.staff,
       ),
       fullName: map['full_name'] as String,
+      colorPreference: (map['color_preference'] as String?) ?? 'green',
       isActive: (map['is_active'] as int) == 1,
       colorPreference: map['color_preference'] as String?,
       lastLogin: map['last_login'] != null
@@ -90,6 +94,7 @@ class User {
     String? pin,
     UserRole? role,
     String? fullName,
+    String? colorPreference,
     bool? isActive,
     String? colorPreference,
     DateTime? lastLogin,
@@ -104,6 +109,7 @@ class User {
       pin: pin ?? this.pin,
       role: role ?? this.role,
       fullName: fullName ?? this.fullName,
+      colorPreference: colorPreference ?? this.colorPreference,
       isActive: isActive ?? this.isActive,
       colorPreference: colorPreference ?? this.colorPreference,
       lastLogin: lastLogin ?? this.lastLogin,
