@@ -137,8 +137,8 @@ class ProductService {
   }
 
   Future<bool> restoreProduct(int id) async {
-    if (!_sessionManager.hasPermission('delete_products')) {
-      throw AuthorizationException('delete_products');
+    if (!_sessionManager.hasPermission('restore_trash')) {
+      throw AuthorizationException('restore_trash');
     }
 
     await _productRepository.restore(id);

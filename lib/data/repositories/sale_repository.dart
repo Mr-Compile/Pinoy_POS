@@ -12,11 +12,11 @@ class SaleRepository {
   Future<int> restore(int id, {DatabaseExecutor? txn}) => _saleDao.restore(id, txn: txn);
   Future<Sale?> getById(int id, {DatabaseExecutor? txn}) => _saleDao.getById(id, txn: txn);
   Future<List<Sale>> getAll() => _saleDao.getAll();
-  Future<List<Sale>> getAllActive() => _saleDao.getAllActive();
+  Future<List<Sale>> getAllActive({int? limit}) => _saleDao.getAllActive(limit: limit);
   Future<List<Sale>> getDeleted() => _saleDao.getDeleted();
-  Future<List<Sale>> getByUserId(int userId) => _saleDao.getByUserId(userId);
-  Future<List<Sale>> getByDateRange(DateTime start, DateTime end) => _saleDao.getByDateRange(start, end);
-  Future<List<Sale>> getByDateRangeAndUser(DateTime start, DateTime end, int userId) => _saleDao.getByDateRangeAndUser(start, end, userId);
+  Future<List<Sale>> getByUserId(int userId, {int limit = 200}) => _saleDao.getByUserId(userId, limit: limit);
+  Future<List<Sale>> getByDateRange(DateTime start, DateTime end, {int limit = 500}) => _saleDao.getByDateRange(start, end, limit: limit);
+  Future<List<Sale>> getByDateRangeAndUser(DateTime start, DateTime end, int userId, {int limit = 200}) => _saleDao.getByDateRangeAndUser(start, end, userId, limit: limit);
   Future<double> getTotalSalesForDate(DateTime date) => _saleDao.getTotalSalesForDate(date);
   Future<double> getTotalSalesForMonth(int year, int month) => _saleDao.getTotalSalesForMonth(year, month);
   Future<double> getTotalSalesForUser(int userId) => _saleDao.getTotalSalesForUser(userId);

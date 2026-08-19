@@ -30,13 +30,14 @@ class ActivityLogDao extends BaseDao<ActivityLog> {
     return maps.map((map) => fromMap(map)).toList();
   }
 
-  Future<List<ActivityLog>> getByDateRange(DateTime start, DateTime end) async {
+  Future<List<ActivityLog>> getByDateRange(DateTime start, DateTime end, {int limit = 500}) async {
     final database = await db;
     final maps = await database.query(
       tableName,
       where: 'created_at BETWEEN ? AND ?',
       whereArgs: [start.toIso8601String(), end.toIso8601String()],
       orderBy: 'created_at DESC',
+      limit: limit,
     );
     return maps.map((map) => fromMap(map)).toList();
   }

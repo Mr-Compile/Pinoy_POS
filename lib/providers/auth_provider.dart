@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/theme_provider.dart';
+import 'package:pinoy_pos/providers/service_providers.dart';
+import 'package:pinoy_pos/providers/user_provider.dart';
 
 final authServiceProvider = Provider<AuthService>((ref) {
   return AuthService();
@@ -10,7 +12,7 @@ final authServiceProvider = Provider<AuthService>((ref) {
 final authStateProvider = StateNotifierProvider<AuthStateNotifier, AuthState>((ref) {
   final authService = ref.watch(authServiceProvider);
   final themeNotifier = ref.watch(themeProvider.notifier);
-  return AuthStateNotifier(authService, themeNotifier);
+  return AuthStateNotifier(ref, authService, themeNotifier);
 });
 
 class AuthState {
@@ -38,10 +40,11 @@ class AuthState {
 }
 
 class AuthStateNotifier extends StateNotifier<AuthState> {
+  final Ref _ref;
   final AuthService _authService;
   final ThemeNotifier _themeNotifier;
 
-  AuthStateNotifier(this._authService, this._themeNotifier) : super(AuthState()) {
+  AuthStateNotifier(this._ref, this._authService, this._themeNotifier) : super(AuthState()) {
     _init();
   }
 
@@ -93,6 +96,23 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
   Future<void> logout() async {
     await _authService.logout();
     _themeNotifier.clearUserColorPreference();
+    // Invalidate all service providers so cached state from the previous
+    // user's session is discarded.  The next read will create fresh
+    // service instances that query the database for the new user.
+    _ref.invalidate(productServiceProvider);
+    _ref.invalidate(categoryServiceProvider);
+    _ref.invalidate(salesServiceProvider);
+    _ref.invalidate(stockServiceProvider);
+    _ref.invalidate(activityLogServiceProvider);
+    _ref.invalidate(notificationServiceProvider);
+    _ref.invalidate(settingsServiceProvider);
+    _ref.invalidate(reportServiceProvider);
+    _ref.invalidate(backupServiceProvider);
+    _ref.invalidate(aiUsageServiceProvider);
+    _ref.invalidate(trashServiceProvider);
+    _ref.invalidate(announcementServiceProvider);
+    _ref.invalidate(userServiceProvider);
+    _ref.invalidate(userControllerProvider);
     state = AuthState();
   }
 

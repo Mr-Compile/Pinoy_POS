@@ -126,6 +126,7 @@ class _AppImageState extends State<AppImage> {
           _imageFile!,
           fit: widget.fit,
           semanticLabel: widget.semanticLabel,
+          cacheWidth: 512,
           errorBuilder: (context, error, stackTrace) {
             return _buildPlaceholder(
               child: Icon(

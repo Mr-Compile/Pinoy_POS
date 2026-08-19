@@ -81,11 +81,12 @@ abstract class BaseDao<T> {
     return maps.map((map) => fromMap(map)).toList();
   }
 
-  Future<List<T>> getAllActive({DatabaseExecutor? txn}) async {
+  Future<List<T>> getAllActive({DatabaseExecutor? txn, int? limit}) async {
     final executor = await _executor(txn);
     final maps = await executor.query(
       tableName,
       where: 'deleted_at IS NULL',
+      limit: limit,
     );
     return maps.map((map) => fromMap(map)).toList();
   }

@@ -53,7 +53,11 @@ class BackupService {
       if (await file.exists()) {
         await file.delete();
       }
-    } catch (_) {}
+    } catch (e) {
+      // Best-effort file cleanup; the database record is still removed
+      // below, so the backup is logically deleted even if the file on
+      // disk is locked or already gone.
+    }
     await _backupHistoryDao.delete(id);
     return true;
   }

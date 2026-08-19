@@ -15,6 +15,7 @@ class NotificationDao extends BaseDao<Notification> {
       where: 'user_id = ?',
       whereArgs: [userId],
       orderBy: 'created_at DESC',
+      limit: 100,
     );
     return maps.map((map) => fromMap(map)).toList();
   }

@@ -8,24 +8,26 @@ class SaleDao extends BaseDao<Sale> {
   @override
   Sale fromMap(Map<String, dynamic> map) => Sale.fromMap(map);
 
-  Future<List<Sale>> getByUserId(int userId) async {
+  Future<List<Sale>> getByUserId(int userId, {int limit = 200}) async {
     final database = await db;
     final maps = await database.query(
       tableName,
       where: 'user_id = ? AND deleted_at IS NULL',
       whereArgs: [userId],
       orderBy: 'created_at DESC',
+      limit: limit,
     );
     return maps.map((map) => fromMap(map)).toList();
   }
 
-  Future<List<Sale>> getByDateRange(DateTime start, DateTime end) async {
+  Future<List<Sale>> getByDateRange(DateTime start, DateTime end, {int limit = 500}) async {
     final database = await db;
     final maps = await database.query(
       tableName,
       where: 'created_at BETWEEN ? AND ? AND deleted_at IS NULL',
       whereArgs: [start.toIso8601String(), end.toIso8601String()],
       orderBy: 'created_at DESC',
+      limit: limit,
     );
     return maps.map((map) => fromMap(map)).toList();
   }
@@ -33,14 +35,16 @@ class SaleDao extends BaseDao<Sale> {
   Future<List<Sale>> getByDateRangeAndUser(
     DateTime start,
     DateTime end,
-    int userId,
-  ) async {
+    int userId, {
+    int limit = 200,
+  }) async {
     final database = await db;
     final maps = await database.query(
       tableName,
       where: 'created_at BETWEEN ? AND ? AND user_id = ? AND deleted_at IS NULL',
       whereArgs: [start.toIso8601String(), end.toIso8601String(), userId],
       orderBy: 'created_at DESC',
+      limit: limit,
     );
     return maps.map((map) => fromMap(map)).toList();
   }

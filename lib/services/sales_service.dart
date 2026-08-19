@@ -32,7 +32,7 @@ class SalesService {
       return _saleRepository.getByUserId(_sessionManager.currentUser!.id!);
     }
 
-    return _saleRepository.getAllActive();
+    return _saleRepository.getAllActive(limit: 200);
   }
 
   Future<List<Sale>> getSalesByDateRange(DateTime start, DateTime end) async {

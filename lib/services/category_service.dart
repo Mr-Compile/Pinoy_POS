@@ -117,8 +117,8 @@ class CategoryService {
   }
 
   Future<bool> restoreCategory(int id) async {
-    if (!_sessionManager.hasPermission('delete_categories')) {
-      throw AuthorizationException('delete_categories');
+    if (!_sessionManager.hasPermission('restore_trash')) {
+      throw AuthorizationException('restore_trash');
     }
 
     await _categoryRepository.restore(id);

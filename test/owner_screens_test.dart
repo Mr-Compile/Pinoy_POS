@@ -97,7 +97,7 @@ void main() {
       ProviderScope(
         overrides: [
           authStateProvider.overrideWith((ref) {
-            final notifier = _TestAuthNotifier(owner);
+            final notifier = _TestAuthNotifier(ref, owner);
             return notifier;
           }),
         ],
@@ -200,8 +200,8 @@ void main() {
 }
 
 class _TestAuthNotifier extends AuthStateNotifier {
-  _TestAuthNotifier(User owner)
-      : super(AuthService(), ThemeNotifier()) {
+  _TestAuthNotifier(Ref ref, User owner)
+      : super(ref, AuthService(), ThemeNotifier()) {
     state = AuthState(user: owner, isLoading: false);
   }
 }

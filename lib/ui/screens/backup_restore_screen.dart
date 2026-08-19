@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:pinoy_pos/data/models/backup_history.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
+import 'package:pinoy_pos/providers/user_provider.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
@@ -95,6 +96,24 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
       final success = await backupService.restoreBackup(backup.filePath);
       if (mounted) {
         if (success) {
+          // Invalidate all service providers so cached state (e.g.
+          // SettingsService._currentSettings, UserController user list)
+          // is discarded.  The next read will create fresh service
+          // instances that query the restored database.
+          ref.invalidate(productServiceProvider);
+          ref.invalidate(categoryServiceProvider);
+          ref.invalidate(salesServiceProvider);
+          ref.invalidate(stockServiceProvider);
+          ref.invalidate(activityLogServiceProvider);
+          ref.invalidate(notificationServiceProvider);
+          ref.invalidate(settingsServiceProvider);
+          ref.invalidate(reportServiceProvider);
+          ref.invalidate(backupServiceProvider);
+          ref.invalidate(aiUsageServiceProvider);
+          ref.invalidate(trashServiceProvider);
+          ref.invalidate(announcementServiceProvider);
+          ref.invalidate(userServiceProvider);
+          ref.invalidate(userControllerProvider);
           await AppDialogService.success(context, title: 'Restore Complete', message: 'Backup restored successfully. Please restart the app.');
         } else {
           AppDialogService.error(context, title: 'Restore Failed', message: 'Failed to restore backup. The file may be corrupt or missing.');
