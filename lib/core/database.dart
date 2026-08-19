@@ -160,6 +160,12 @@ class DatabaseHelper {
         'ALTER TABLE users ADD COLUMN profile_image_path TEXT',
       );
     }
+
+    // Migration from v4 → v5: add Groq AI configuration columns to settings.
+    if (oldVersion < 5) {
+      await db.execute('ALTER TABLE settings ADD COLUMN groq_api_key TEXT');
+      await db.execute('ALTER TABLE settings ADD COLUMN groq_model TEXT');
+    }
   }
 
   Future<void> _createTables(Database db) async {
@@ -307,6 +313,8 @@ class DatabaseHelper {
         receipt_footer TEXT,
         theme TEXT,
         accent_color TEXT,
+        groq_api_key TEXT,
+        groq_model TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       )

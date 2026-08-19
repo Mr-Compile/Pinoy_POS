@@ -9,6 +9,8 @@ import 'package:pinoy_pos/services/settings_service.dart';
 import 'package:pinoy_pos/services/report_service.dart';
 import 'package:pinoy_pos/services/backup_service.dart';
 import 'package:pinoy_pos/services/ai_usage_service.dart';
+import 'package:pinoy_pos/services/ai_advisor_service.dart';
+import 'package:pinoy_pos/services/groq_service.dart';
 import 'package:pinoy_pos/services/trash_service.dart';
 import 'package:pinoy_pos/services/announcement_service.dart';
 import 'package:pinoy_pos/services/user_service.dart';
@@ -52,6 +54,14 @@ final backupServiceProvider = Provider<BackupService>((ref) {
 
 final aiUsageServiceProvider = Provider<AIUsageService>((ref) {
   return AIUsageService();
+});
+
+final aiAdvisorServiceProvider = Provider<AIAdvisorService>((ref) {
+  return AIAdvisorService();
+});
+
+final groqServiceProvider = Provider<GroqService>((ref) {
+  return GroqService();
 });
 
 final trashServiceProvider = Provider<TrashService>((ref) {

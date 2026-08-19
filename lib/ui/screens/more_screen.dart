@@ -4,6 +4,7 @@ import 'package:pinoy_pos/core/route_guard.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/ui/screens/activity_logs_screen.dart';
 import 'package:pinoy_pos/ui/screens/ai_advisor_screen.dart';
+import 'package:pinoy_pos/ui/screens/ai_config_screen.dart';
 import 'package:pinoy_pos/ui/screens/announcements_screen.dart';
 import 'package:pinoy_pos/ui/screens/backup_restore_screen.dart';
 import 'package:pinoy_pos/ui/screens/categories_screen.dart';
@@ -95,6 +96,15 @@ class MoreScreen extends ConsumerWidget {
         permission: 'backup_restore',
         routeName: 'backup_restore',
         screen: const BackupRestoreScreen(),
+      ));
+    }
+    if (authNotifier.hasPermission('manage_ai_config')) {
+      entries.add(_MoreEntry(
+        icon: Icons.smart_toy,
+        title: 'AI Configuration',
+        permission: 'manage_ai_config',
+        routeName: 'ai_config',
+        screen: const AIConfigScreen(),
       ));
     }
 

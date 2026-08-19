@@ -113,6 +113,7 @@ class SessionManager {
     'view_settings',
     'edit_settings',
     'backup_restore',
+    'manage_ai_config',
     'view_trash',
     'restore_trash',
     'view_activity_logs',

@@ -7,6 +7,8 @@ class Settings {
   final String? receiptFooter;
   final String? theme;
   final String? accentColor;
+  final String? groqApiKey;
+  final String? groqModel;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -19,6 +21,8 @@ class Settings {
     this.receiptFooter,
     this.theme,
     this.accentColor,
+    this.groqApiKey,
+    this.groqModel,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -33,6 +37,8 @@ class Settings {
       'receipt_footer': receiptFooter,
       'theme': theme,
       'accent_color': accentColor,
+      'groq_api_key': groqApiKey,
+      'groq_model': groqModel,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -48,6 +54,8 @@ class Settings {
       receiptFooter: map['receipt_footer'] as String?,
       theme: map['theme'] as String?,
       accentColor: map['accent_color'] as String?,
+      groqApiKey: map['groq_api_key'] as String?,
+      groqModel: map['groq_model'] as String?,
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
     );
@@ -62,6 +70,8 @@ class Settings {
     String? receiptFooter,
     String? theme,
     String? accentColor,
+    String? groqApiKey,
+    String? groqModel,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -74,6 +84,8 @@ class Settings {
       receiptFooter: receiptFooter ?? this.receiptFooter,
       theme: theme ?? this.theme,
       accentColor: accentColor ?? this.accentColor,
+      groqApiKey: groqApiKey ?? this.groqApiKey,
+      groqModel: groqModel ?? this.groqModel,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

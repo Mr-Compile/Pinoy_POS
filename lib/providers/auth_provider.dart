@@ -109,6 +109,8 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
     _ref.invalidate(reportServiceProvider);
     _ref.invalidate(backupServiceProvider);
     _ref.invalidate(aiUsageServiceProvider);
+    _ref.invalidate(aiAdvisorServiceProvider);
+    _ref.invalidate(groqServiceProvider);
     _ref.invalidate(trashServiceProvider);
     _ref.invalidate(announcementServiceProvider);
     _ref.invalidate(userServiceProvider);

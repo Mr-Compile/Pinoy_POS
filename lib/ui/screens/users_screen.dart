@@ -573,17 +573,32 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     final canResetPassword = authNotifier.hasPermission('reset_password');
     final canToggleActive = authNotifier.hasPermission('toggle_user_active');
     final currentUser = ref.read(authStateProvider).user;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isTablet = screenWidth >= 600;
+
+    // Primary create action widget. On tablet/desktop a visible labeled
+    // FilledButton.icon is placed in the AppBar so it is clearly readable;
+    // on mobile a FloatingActionButton.extended is used so the action is
+    // always reachable and clearly labeled (a bare + IconButton tooltip is
+    // not visible on touch devices).
+    final Widget? createAction = canManage
+        ? (isTablet
+            ? Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: FilledButton.icon(
+                  icon: const Icon(Icons.person_add),
+                  label: const Text('Add User'),
+                  onPressed: () => _showAddUserDialog(),
+                ),
+              )
+            : null)
+        : null;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Users'),
         actions: [
-          if (canManage)
-            IconButton(
-              icon: const Icon(Icons.add),
-              tooltip: 'Add User',
-              onPressed: () => _showAddUserDialog(),
-            ),
+          ?createAction,
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh',
@@ -591,6 +606,13 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
           ),
         ],
       ),
+      floatingActionButton: canManage && !isTablet
+          ? FloatingActionButton.extended(
+              icon: const Icon(Icons.person_add),
+              label: const Text('Add User'),
+              onPressed: () => _showAddUserDialog(),
+            )
+          : null,
       body: _buildBody(
         userState,
         canEdit,
