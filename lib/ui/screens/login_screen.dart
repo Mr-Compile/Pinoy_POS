@@ -59,6 +59,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
     final themeMode = ref.watch(themeProvider).themeMode;
+    final colorScheme = Theme.of(context).colorScheme;
 
     if (authState.user != null) {
       return const SizedBox.shrink();
@@ -67,91 +68,135 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return GestureDetector(
       onTap: _dismissKeyboard,
       child: Scaffold(
-        body: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 400),
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Pinoy POS',
-                              style: Theme.of(context).textTheme.headlineMedium,
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24.0),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 400),
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(28.0),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // ── Logo + Title ──
+                          Container(
+                            width: 72,
+                            height: 72,
+                            decoration: BoxDecoration(
+                              color: colorScheme.primaryContainer,
+                              shape: BoxShape.circle,
                             ),
-                            IconButton(
-                              icon: Icon(
+                            child: Icon(
+                              Icons.storefront,
+                              size: 36,
+                              color: colorScheme.onPrimaryContainer,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Pinoy POS',
+                            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: colorScheme.onSurface,
+                                ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Sign in to your account',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                          ),
+                          const SizedBox(height: 28),
+
+                          // ── Username field ──
+                          TextFormField(
+                            controller: _usernameController,
+                            decoration: const InputDecoration(
+                              labelText: 'Username',
+                              prefixIcon: Icon(Icons.person_outline),
+                              border: OutlineInputBorder(),
+                            ),
+                            autofocus: true,
+                            textInputAction: TextInputAction.next,
+                            validator: (value) => Validators.required(value, 'Username'),
+                            onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // ── Password field ──
+                          TextFormField(
+                            controller: _passwordController,
+                            decoration: InputDecoration(
+                              labelText: 'Password',
+                              prefixIcon: const Icon(Icons.lock_outline),
+                              border: const OutlineInputBorder(),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscurePassword
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _obscurePassword = !_obscurePassword;
+                                  });
+                                },
+                                tooltip: _obscurePassword ? 'Show password' : 'Hide password',
+                              ),
+                            ),
+                            obscureText: _obscurePassword,
+                            onFieldSubmitted: (_) => _login(),
+                            validator: (value) => Validators.required(value, 'Password'),
+                          ),
+                          const SizedBox(height: 24),
+
+                          // ── Login button ──
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.icon(
+                              onPressed: authState.isLoading ? null : _login,
+                              icon: authState.isLoading
+                                  ? SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: colorScheme.onPrimary,
+                                      ),
+                                    )
+                                  : const Icon(Icons.login),
+                              label: Text(authState.isLoading ? 'Signing in...' : 'Sign In'),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // ── Theme toggle ──
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
                                 themeMode == 'light'
-                                    ? Icons.dark_mode
-                                    : Icons.light_mode,
+                                    ? Icons.dark_mode_outlined
+                                    : Icons.light_mode_outlined,
+                                size: 20,
+                                color: colorScheme.onSurfaceVariant,
                               ),
-                              onPressed: _toggleTheme,
-                              tooltip: 'Toggle theme',
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 32),
-                        TextFormField(
-                          controller: _usernameController,
-                          decoration: const InputDecoration(
-                            labelText: 'Username',
-                            border: OutlineInputBorder(),
-                          ),
-                          autofocus: true,
-                          textInputAction: TextInputAction.next,
-                          validator: (value) => Validators.required(value, 'Username'),
-                          onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _passwordController,
-                          decoration: InputDecoration(
-                            labelText: 'Password',
-                            border: const OutlineInputBorder(),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscurePassword
-                                    ? Icons.visibility
-                                    : Icons.visibility_off,
+                              const SizedBox(width: 8),
+                              TextButton(
+                                onPressed: _toggleTheme,
+                                child: Text(
+                                  themeMode == 'light' ? 'Switch to Dark' : 'Switch to Light',
+                                ),
                               ),
-                              onPressed: () {
-                                setState(() {
-                                  _obscurePassword = !_obscurePassword;
-                                });
-                              },
-                              tooltip: _obscurePassword ? 'Show password' : 'Hide password',
-                            ),
+                            ],
                           ),
-                          obscureText: _obscurePassword,
-                          onFieldSubmitted: (_) => _login(),
-                          validator: (value) => Validators.required(value, 'Password'),
-                        ),
-                        const SizedBox(height: 24),
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton(
-                            onPressed: authState.isLoading ? null : _login,
-                            child: authState.isLoading
-                                ? SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Theme.of(context).colorScheme.onPrimary,
-                                    ),
-                                  )
-                                : const Text('Login'),
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),

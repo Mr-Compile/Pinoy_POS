@@ -615,6 +615,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
           : null,
       body: _buildBody(
         userState,
+        canManage,
         canEdit,
         canDelete,
         canResetPassword,
@@ -626,6 +627,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
 
   Widget _buildBody(
     UserListState userState,
+    bool canManage,
     bool canEdit,
     bool canDelete,
     bool canResetPassword,
@@ -645,10 +647,17 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     }
 
     if (userState.users.isEmpty) {
-      return const EmptyState(
+      return EmptyState(
         icon: Icons.people,
-        title: 'No Users',
-        message: 'Add users to manage access',
+        title: 'No Users Yet',
+        message: 'Create a user account to get started.',
+        action: canManage
+            ? FilledButton.icon(
+                icon: const Icon(Icons.person_add),
+                label: const Text('Add User'),
+                onPressed: () => _showAddUserDialog(),
+              )
+            : null,
       );
     }
 

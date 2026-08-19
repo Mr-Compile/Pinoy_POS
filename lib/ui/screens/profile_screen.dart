@@ -119,7 +119,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               child: ListTile(
                 leading: const Icon(Icons.palette),
                 title: const Text('Accent Color'),
-                subtitle: Text(user.colorPreference.toUpperCase()),
+                subtitle: Text(AppColors.validateUserAccent(user.colorPreference).toUpperCase()),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => _showColorPreferenceDialog(user),
               ),
@@ -379,7 +379,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   // ── COLOR PREFERENCE ─────────────────────────────────────────────────
 
   void _showColorPreferenceDialog(User user) {
-    final colors = AppColors.accentColors.keys.toList();
+    final colors = AppColors.userAccentColors.keys.toList();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -400,7 +400,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               final isSelected = color == user.colorPreference;
               return _ColorOption(
                 name: color,
-                color: AppColors.getAccentColor(color),
+                color: AppColors.getUserAccentColor(color),
                 isSelected: isSelected,
                 onTap: () async {
                   final success = await ref

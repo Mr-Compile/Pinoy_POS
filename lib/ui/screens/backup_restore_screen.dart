@@ -223,12 +223,12 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                               child: FilledButton.icon(
                                 onPressed: _isBackingUp ? null : _createBackup,
                                 icon: _isBackingUp
-                                    ? const SizedBox(
+                                    ? SizedBox(
                                         height: 20,
                                         width: 20,
                                         child: CircularProgressIndicator(
                                           strokeWidth: 2,
-                                          color: Colors.white,
+                                          color: Theme.of(context).colorScheme.onPrimary,
                                         ),
                                       )
                                     : const Icon(Icons.cloud_upload),

@@ -113,6 +113,8 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
     final canEdit = authNotifier.hasPermission('edit_categories');
     final canDelete = authNotifier.hasPermission('delete_categories');
     final canToggleStatus = authNotifier.hasPermission('change_category_status');
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isTablet = screenWidth >= 600;
 
     if (_isLoading) {
       return Scaffold(
@@ -123,26 +125,52 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
       );
     }
 
+    // Primary create action. On tablet/desktop a visible labeled
+    // FilledButton.icon is placed in the AppBar; on mobile a FAB.extended
+    // is used so the action is always reachable and clearly labeled.
+    final Widget? createAction = canEdit
+        ? (isTablet
+            ? Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: FilledButton.icon(
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add Category'),
+                  onPressed: () => _showCategoryDialog(),
+                ),
+              )
+            : null)
+        : null;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Categories'),
         actions: [
-          if (canEdit)
-            IconButton(
-              icon: const Icon(Icons.add),
-              onPressed: () => _showCategoryDialog(),
-            ),
+          ?createAction,
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadCategories,
           ),
         ],
       ),
+      floatingActionButton: canEdit && !isTablet
+          ? FloatingActionButton.extended(
+              icon: const Icon(Icons.add),
+              label: const Text('Add Category'),
+              onPressed: () => _showCategoryDialog(),
+            )
+          : null,
       body: _categories.isEmpty
-          ? const EmptyState(
+          ? EmptyState(
               icon: Icons.category,
-              title: 'No Categories',
-              message: 'No categories available',
+              title: 'No Categories Yet',
+              message: 'Create a category to organize your products.',
+              action: canEdit
+                  ? FilledButton.icon(
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add Category'),
+                      onPressed: () => _showCategoryDialog(),
+                    )
+                  : null,
             )
           : ListView.builder(
               padding: const EdgeInsets.all(16),
@@ -161,7 +189,9 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
                           IconButton(
                             icon: Icon(
                               category.isActive ? Icons.toggle_on : Icons.toggle_off,
-                              color: category.isActive ? Colors.green : Colors.grey,
+                              color: category.isActive
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Theme.of(context).colorScheme.outline,
                             ),
                             tooltip: category.isActive ? 'Deactivate' : 'Activate',
                             onPressed: () => _toggleCategoryStatus(category),

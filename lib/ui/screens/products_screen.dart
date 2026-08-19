@@ -117,6 +117,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     final authNotifier = ref.read(authStateProvider.notifier);
     final canEdit = authNotifier.hasPermission('edit_products');
     final canDelete = authNotifier.hasPermission('delete_products');
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isTablet = screenWidth >= 600;
 
     if (_isLoading) {
       return Scaffold(
@@ -127,17 +129,36 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
       );
     }
 
+    // Primary create action. On tablet/desktop a visible labeled
+    // FilledButton.icon is placed in the AppBar; on mobile a FAB.extended
+    // is used so the action is always reachable and clearly labeled.
+    final Widget? createAction = canEdit
+        ? (isTablet
+            ? Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: FilledButton.icon(
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add Product'),
+                  onPressed: () => _showProductDialog(),
+                ),
+              )
+            : null)
+        : null;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Products'),
         actions: [
-          if (canEdit)
-            IconButton(
-              icon: const Icon(Icons.add),
-              onPressed: () => _showProductDialog(),
-            ),
+          ?createAction,
         ],
       ),
+      floatingActionButton: canEdit && !isTablet
+          ? FloatingActionButton.extended(
+              icon: const Icon(Icons.add),
+              label: const Text('Add Product'),
+              onPressed: () => _showProductDialog(),
+            )
+          : null,
       body: Column(
         children: [
           Padding(
@@ -188,10 +209,19 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
           ),
           Expanded(
             child: _filteredProducts.isEmpty
-                ? const EmptyState(
+                ? EmptyState(
                     icon: Icons.inventory_2,
-                    title: 'No Products',
-                    message: 'No products match your search',
+                    title: _products.isEmpty ? 'No Products Yet' : 'No Products Found',
+                    message: _products.isEmpty
+                        ? 'Add your first product to start building your inventory.'
+                        : 'No products match your search.',
+                    action: _products.isEmpty && canEdit
+                        ? FilledButton.icon(
+                            icon: const Icon(Icons.add),
+                            label: const Text('Add Product'),
+                            onPressed: () => _showProductDialog(),
+                          )
+                        : null,
                   )
                 : ListView.builder(
                     padding: const EdgeInsets.all(16),

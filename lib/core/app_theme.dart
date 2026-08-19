@@ -42,78 +42,103 @@ class AppTypography {
       const TextStyle(fontSize: 24, fontWeight: FontWeight.w600);
 }
 
+/// Centralized color and theme definitions.
+///
+/// The application has TWO visual theme contexts:
+///
+/// 1. **Login / Unauthenticated** — always uses a fixed **Blue** accent,
+///    independent of any user preference.
+/// 2. **Authenticated Application** — uses the current user's saved
+///    `color_preference` from the `users` table.  Only 5 accent colors
+///    are user-selectable: green, purple, teal, orange, indigo.
 class AppColors {
-  static const Map<String, Color> accentColors = {
+  AppColors._();
+
+  // ── User-selectable accent colors (authenticated app) ──────────────
+
+  /// The 5 approved user-selectable accent colors.
+  /// Blue is intentionally excluded — it is reserved for the Login screen.
+  static const Map<String, Color> userAccentColors = {
     'green': Colors.green,
-    'blue': Colors.blue,
     'purple': Colors.purple,
-    'indigo': Colors.indigo,
-    'orange': Colors.orange,
-    'amber': Colors.amber,
-    'cyan': Colors.cyan,
     'teal': Colors.teal,
-    'red': Colors.red,
-    'pink': Colors.pink,
+    'orange': Colors.orange,
+    'indigo': Colors.indigo,
   };
 
-  static Color getAccentColor(String colorName) {
-    return accentColors[colorName] ?? Colors.green;
+  /// The default authenticated accent color when a user's preference is
+  /// null, empty, or contains a removed/invalid value.
+  static const String defaultUserAccent = 'green';
+
+  /// Login screen fixed accent color.
+  static const String loginAccent = 'blue';
+  static const Color _loginColor = Colors.blue;
+
+  // ── Migration helper ───────────────────────────────────────────────
+
+  /// Returns a valid user accent color name.
+  ///
+  /// If [preference] is null, empty, or contains a removed/invalid color
+  /// (e.g. 'blue', 'amber', 'cyan', 'red', 'pink'), it falls back to
+  /// [defaultUserAccent] ('green').
+  static String validateUserAccent(String? preference) {
+    if (preference == null || preference.isEmpty) return defaultUserAccent;
+    if (userAccentColors.containsKey(preference)) return preference;
+    return defaultUserAccent;
   }
 
+  /// Returns the [Color] for a validated user accent name.
+  /// Always call [validateUserAccent] first if the preference may be
+  /// invalid.
+  static Color getUserAccentColor(String colorName) {
+    return userAccentColors[colorName] ?? Colors.green;
+  }
+
+  // ── Login theme (fixed Blue) ───────────────────────────────────────
+
+  static ThemeData getLoginLightTheme() {
+    return _buildTheme(
+      seedColor: _loginColor,
+      brightness: Brightness.light,
+    );
+  }
+
+  static ThemeData getLoginDarkTheme() {
+    return _buildTheme(
+      seedColor: _loginColor,
+      brightness: Brightness.dark,
+    );
+  }
+
+  // ── Authenticated user theme ───────────────────────────────────────
+
   static ThemeData getLightTheme(String accentColorName) {
-    final accentColor = getAccentColor(accentColorName);
-    return ThemeData(
-      useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: accentColor,
-        brightness: Brightness.light,
-      ),
-      cardTheme: CardThemeData(
-        elevation: 2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-      ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        ),
-      ),
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        ),
-      ),
-      outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        ),
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        filled: true,
-      ),
+    final accentColor = userAccentColors[accentColorName] ?? Colors.green;
+    return _buildTheme(
+      seedColor: accentColor,
+      brightness: Brightness.light,
     );
   }
 
   static ThemeData getDarkTheme(String accentColorName) {
-    final accentColor = getAccentColor(accentColorName);
+    final accentColor = userAccentColors[accentColorName] ?? Colors.green;
+    return _buildTheme(
+      seedColor: accentColor,
+      brightness: Brightness.dark,
+    );
+  }
+
+  // ── Shared theme builder ───────────────────────────────────────────
+
+  static ThemeData _buildTheme({
+    required Color seedColor,
+    required Brightness brightness,
+  }) {
     return ThemeData(
       useMaterial3: true,
       colorScheme: ColorScheme.fromSeed(
-        seedColor: accentColor,
-        brightness: Brightness.dark,
+        seedColor: seedColor,
+        brightness: brightness,
       ),
       cardTheme: CardThemeData(
         elevation: 2,

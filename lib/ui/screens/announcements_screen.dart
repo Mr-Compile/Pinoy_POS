@@ -76,10 +76,39 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
     }
   }
 
+  Future<void> _togglePin(Announcement announcement) async {
+    final authNotifier = ref.read(authStateProvider.notifier);
+    if (!authNotifier.hasPermission('manage_announcements')) {
+      AppDialogService.accessDenied(context);
+      return;
+    }
+
+    try {
+      final announcementService = ref.read(announcementServiceProvider);
+      final success = await announcementService.togglePin(
+        announcement.id!,
+        !announcement.isPinned,
+      );
+      if (mounted) {
+        if (success) {
+          _loadAnnouncements();
+        } else {
+          AppDialogService.error(context, title: 'Error', message: 'Failed to update pin status.');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        AppDialogService.error(context, title: 'Error', message: 'Failed to update pin status.');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authNotifier = ref.read(authStateProvider.notifier);
     final canManage = authNotifier.hasPermission('manage_announcements');
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isTablet = screenWidth >= 600;
 
     if (_isLoading) {
       return Scaffold(
@@ -87,6 +116,22 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
         body: const LoadingState(),
       );
     }
+
+    // Primary create action. On tablet/desktop a visible labeled
+    // FilledButton.icon is placed in the AppBar; on mobile a FAB.extended
+    // is used so the action is always reachable and clearly labeled.
+    final Widget? createAction = canManage
+        ? (isTablet
+            ? Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: FilledButton.icon(
+                  icon: const Icon(Icons.campaign),
+                  label: const Text('Add Announcement'),
+                  onPressed: () => _showAnnouncementDialog(),
+                ),
+              )
+            : null)
+        : null;
 
     return Scaffold(
       appBar: AppBar(
@@ -96,18 +141,28 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
             icon: const Icon(Icons.refresh),
             onPressed: _loadAnnouncements,
           ),
-          if (canManage)
-            IconButton(
-              icon: const Icon(Icons.add),
-              onPressed: () => _showAnnouncementDialog(),
-            ),
+          ?createAction,
         ],
       ),
+      floatingActionButton: canManage && !isTablet
+          ? FloatingActionButton.extended(
+              icon: const Icon(Icons.campaign),
+              label: const Text('Add Announcement'),
+              onPressed: () => _showAnnouncementDialog(),
+            )
+          : null,
       body: _announcements.isEmpty
-          ? const EmptyState(
+          ? EmptyState(
               icon: Icons.campaign,
-              title: 'No Announcements',
-              message: 'Announcements will appear here',
+              title: 'No Announcements Yet',
+              message: 'Create an announcement to share updates with your team.',
+              action: canManage
+                  ? FilledButton.icon(
+                      icon: const Icon(Icons.campaign),
+                      label: const Text('Add Announcement'),
+                      onPressed: () => _showAnnouncementDialog(),
+                    )
+                  : null,
             )
           : ListView.builder(
               padding: const EdgeInsets.all(16),
@@ -132,11 +187,28 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
                               style: AppTypography.titleMediumBold(context),
                             ),
                           ),
-                          if (canManage)
+                          if (canManage) ...[
+                            IconButton(
+                              icon: Icon(
+                                announcement.isPinned
+                                    ? Icons.push_pin
+                                    : Icons.push_pin_outlined,
+                                size: 20,
+                              ),
+                              tooltip: announcement.isPinned ? 'Unpin' : 'Pin',
+                              onPressed: () => _togglePin(announcement),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.edit),
+                              tooltip: 'Edit',
+                              onPressed: () => _showAnnouncementDialog(announcement: announcement),
+                            ),
                             IconButton(
                               icon: const Icon(Icons.delete),
+                              tooltip: 'Delete',
                               onPressed: () => _deleteAnnouncement(announcement),
                             ),
+                          ],
                         ],
                       ),
                       const SizedBox(height: 8),

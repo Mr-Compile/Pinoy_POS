@@ -116,10 +116,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 const Divider(),
                 ListTile(
                   title: const Text('Accent Color'),
-                  subtitle: Text(themeState.effectiveAccentColor.toUpperCase()),
+                  subtitle: Text(themeState.authenticatedAccentColor.toUpperCase()),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () =>
-                      _showColorDialog(context, themeNotifier, themeState.effectiveAccentColor),
+                      _showColorDialog(context, themeNotifier, themeState.authenticatedAccentColor),
                 ),
               ],
             ),
@@ -431,7 +431,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   void _showColorDialog(
       BuildContext context, ThemeNotifier notifier, String currentColor) {
-    final colors = AppColors.accentColors.keys.toList();
+    final colors = AppColors.userAccentColors.keys.toList();
     final authState = ref.read(authStateProvider);
     final user = authState.user;
     showDialog(
@@ -454,7 +454,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               final isSelected = color == currentColor;
               return _ColorOption(
                 name: color,
-                color: AppColors.getAccentColor(color),
+                color: AppColors.getUserAccentColor(color),
                 isSelected: isSelected,
                 onTap: () async {
                   if (user != null) {
@@ -472,11 +472,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       } else {
                         AppDialogService.error(dialogContext, title: 'Error', message: 'Failed to update accent color.');
                       }
-                    }
-                  } else {
-                    notifier.setAccentColor(color);
-                    if (dialogContext.mounted) {
-                      Navigator.pop(dialogContext);
                     }
                   }
                 },
