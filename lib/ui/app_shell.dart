@@ -23,15 +23,33 @@ class AppShell extends ConsumerStatefulWidget {
 
 class _AppShellState extends ConsumerState<AppShell> {
   int _selectedIndex = 0;
+  ProviderSubscription<AuthState>? _authSubscription;
 
   @override
   void initState() {
     super.initState();
-    ref.listen<AuthState>(authStateProvider, (previous, next) {
-      if (previous?.user?.id != next.user?.id) {
-        _selectedIndex = 0;
-      }
-    });
+    // ref.listen is only valid inside build(). For a ConsumerStatefulWidget
+    // that must react to auth changes from initState, Riverpod 2.x exposes
+    // ref.listenManual, which returns a ProviderSubscription we own and
+    // must dispose ourselves. This avoids re-subscribing on every rebuild
+    // and keeps the navigation-reset side effect out of the build phase.
+    _authSubscription = ref.listenManual<AuthState>(
+      authStateProvider,
+      (previous, next) {
+        if (previous?.user?.id != next.user?.id) {
+          setState(() {
+            _selectedIndex = 0;
+          });
+        }
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.close();
+    _authSubscription = null;
+    super.dispose();
   }
 
   @override
