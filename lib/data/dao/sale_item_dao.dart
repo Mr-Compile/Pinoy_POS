@@ -28,4 +28,50 @@ class SaleItemDao extends BaseDao<SaleItem> {
     );
     return maps.map((map) => SaleItem.fromMap(map)).toList();
   }
+
+  /// Returns the top-selling products by total quantity sold, joining
+  /// `sale_items` with non-voided `sales` and active `products`.
+  ///
+  /// Parameters:
+  /// - [limit]: maximum number of rows to return.
+  /// - [since]: optional lower bound on `sales.created_at` (inclusive).
+  ///   When null, all history is considered.
+  /// - [userId]: optional filter restricting to sales made by [userId].
+  ///   Used for Staff dashboards so a Staff member only sees their own
+  ///   top products.  When null, all users' sales are aggregated.
+  ///
+  /// Returns a list of maps with keys:
+  ///   `product_id` (int), `product_name` (String), `total_quantity` (int).
+  Future<List<Map<String, dynamic>>> getTopProductsByQuantity({
+    int limit = 5,
+    DateTime? since,
+    int? userId,
+  }) async {
+    final database = await db;
+    final args = <Object?>[];
+    final conditions = <String>['s.deleted_at IS NULL'];
+
+    if (since != null) {
+      conditions.add('s.created_at >= ?');
+      args.add(since.toIso8601String());
+    }
+    if (userId != null) {
+      conditions.add('s.user_id = ?');
+      args.add(userId);
+    }
+    args.add(limit);
+
+    return database.rawQuery('''
+      SELECT si.product_id AS product_id,
+             p.name AS product_name,
+             SUM(si.quantity) AS total_quantity
+      FROM sale_items si
+      INNER JOIN sales s ON si.sale_id = s.id
+      INNER JOIN products p ON si.product_id = p.id
+      WHERE ${conditions.join(' AND ')}
+      GROUP BY si.product_id, p.name
+      ORDER BY total_quantity DESC
+      LIMIT ?
+    ''', args);
+  }
 }

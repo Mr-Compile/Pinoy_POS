@@ -5,6 +5,7 @@ import 'package:pinoy_pos/data/repositories/trash_repository.dart';
 import 'package:pinoy_pos/data/repositories/product_repository.dart';
 import 'package:pinoy_pos/data/repositories/category_repository.dart';
 import 'package:pinoy_pos/data/repositories/user_repository.dart';
+import 'package:pinoy_pos/services/image_service.dart';
 
 class TrashService {
   final TrashRepository _trashRepository = TrashRepository();
@@ -12,6 +13,7 @@ class TrashService {
   final CategoryRepository _categoryRepository = CategoryRepository();
   final UserRepository _userRepository = UserRepository();
   final SessionManager _sessionManager = SessionManager();
+  final ImageService _imageService = ImageService();
 
   Future<List<TrashItem>> getAllTrash() async {
     if (!_sessionManager.hasPermission('view_trash')) {
@@ -72,7 +74,12 @@ class TrashService {
 
     switch (entityType) {
       case 'product':
+        // Capture the image path before destroying the row so the file can
+        // be cleaned up afterwards, leaving no orphan image behind.
+        final product = await _productRepository.getById(entityId);
+        final imagePath = product?.imageUrl;
         await _productRepository.delete(entityId);
+        await _imageService.deleteImage(imagePath);
         break;
       case 'category':
         await _categoryRepository.delete(entityId);

@@ -572,7 +572,6 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
         }
       } else {
         final productService = ref.read(productServiceProvider);
-        final oldImagePath = product.imageUrl;
         await productService.updateProduct(
           product.copyWith(
             name: productData.name,
@@ -582,12 +581,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
             imageUrl: productData.imageUrl,
           ),
         );
-        // Clean up old image if it was replaced or removed
-        if (oldImagePath != null &&
-            oldImagePath.isNotEmpty &&
-            oldImagePath != selectedImagePath) {
-          await ImageService().deleteImage(oldImagePath);
-        }
+        // Old image cleanup is handled by ProductService.updateProduct so
+        // the UI does not contain image-persistence logic.
         if (mounted) {
           await AppDialogService.success(context, title: 'Updated', message: 'Product updated successfully.');
         }

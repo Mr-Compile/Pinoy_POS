@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
 import 'package:pinoy_pos/data/models/user.dart';
+import 'package:pinoy_pos/providers/dashboard_provider.dart';
 import 'package:pinoy_pos/providers/theme_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/providers/user_provider.dart';
@@ -115,6 +116,7 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
     _ref.invalidate(announcementServiceProvider);
     _ref.invalidate(userServiceProvider);
     _ref.invalidate(userControllerProvider);
+    _ref.invalidate(dashboardProvider);
     state = AuthState();
   }
 
