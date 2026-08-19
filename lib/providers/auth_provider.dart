@@ -2,18 +2,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/dashboard_provider.dart';
-import 'package:pinoy_pos/providers/theme_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/providers/user_provider.dart';
-
 final authServiceProvider = Provider<AuthService>((ref) {
   return AuthService();
 });
 
 final authStateProvider = StateNotifierProvider<AuthStateNotifier, AuthState>((ref) {
   final authService = ref.watch(authServiceProvider);
-  final themeNotifier = ref.watch(themeProvider.notifier);
-  return AuthStateNotifier(ref, authService, themeNotifier);
+  return AuthStateNotifier(ref, authService);
 });
 
 class AuthState {
@@ -43,9 +40,8 @@ class AuthState {
 class AuthStateNotifier extends StateNotifier<AuthState> {
   final Ref _ref;
   final AuthService _authService;
-  final ThemeNotifier _themeNotifier;
 
-  AuthStateNotifier(this._ref, this._authService, this._themeNotifier) : super(AuthState()) {
+  AuthStateNotifier(this._ref, this._authService) : super(AuthState()) {
     _init();
   }
 
@@ -54,27 +50,25 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
     final restored = await _authService.restoreSession();
     if (restored) {
       state = state.copyWith(user: _authService.currentUser, isLoading: false);
-      _themeNotifier.syncUserColorPreference(_authService.currentUser?.colorPreference);
     } else {
       state = state.copyWith(isLoading: false);
     }
   }
 
-  Future<bool> login(String username, String password) async {
+  Future<LoginResult> login(String username, String password) async {
     state = state.copyWith(isLoading: true, error: null);
-    try {
-      final success = await _authService.login(username, password);
-      if (success) {
+    final result = await _authService.login(username, password);
+    switch (result) {
+      case LoginResult.success:
         state = state.copyWith(user: _authService.currentUser, isLoading: false);
-        _themeNotifier.syncUserColorPreference(_authService.currentUser?.colorPreference);
-      } else {
-        state = state.copyWith(isLoading: false, error: 'Incorrect username or password.');
-      }
-      return success;
-    } catch (_) {
-      state = state.copyWith(isLoading: false, error: 'Unable to sign in right now. Please try again.');
-      return false;
+      case LoginResult.invalidCredentials:
+        state = state.copyWith(isLoading: false, error: 'Username or password is incorrect.');
+      case LoginResult.inactiveAccount:
+        state = state.copyWith(isLoading: false, error: 'Your account is currently inactive. Please contact an administrator.');
+      case LoginResult.error:
+        state = state.copyWith(isLoading: false, error: 'Unable to sign in right now. Please try again.');
     }
+    return result;
   }
 
   Future<bool> loginWithPin(String username, String pin) async {
@@ -83,7 +77,6 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
       final success = await _authService.loginWithPin(username, pin);
       if (success) {
         state = state.copyWith(user: _authService.currentUser, isLoading: false);
-        _themeNotifier.syncUserColorPreference(_authService.currentUser?.colorPreference);
       } else {
         state = state.copyWith(isLoading: false, error: 'Incorrect username or PIN.');
       }
@@ -96,7 +89,6 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
 
   Future<void> logout() async {
     await _authService.logout();
-    _themeNotifier.clearUserColorPreference();
     // Invalidate all service providers so cached state from the previous
     // user's session is discarded.  The next read will create fresh
     // service instances that query the database for the new user.
@@ -135,11 +127,10 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
 
   void refreshUser() {
     state = state.copyWith(user: _authService.currentUser);
-    _themeNotifier.syncUserColorPreference(_authService.currentUser?.colorPreference);
   }
 
-  /// Updates the current user's own profile (full name, PIN, color
-  /// preference). No special permission is required — users can always
+  /// Updates the current user's own profile (full name, PIN, profile
+  /// image). No special permission is required — users can always
   /// edit their own profile. Restricted fields (role, username, isActive)
   /// are never modified here.
   ///
@@ -148,19 +139,16 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
     required int userId,
     required String fullName,
     String? pin,
-    String? colorPreference,
     String? profileImagePath,
   }) async {
     final success = await _authService.updateProfile(
       userId: userId,
       fullName: fullName,
       pin: pin,
-      colorPreference: colorPreference,
       profileImagePath: profileImagePath,
     );
     if (success) {
       state = state.copyWith(user: _authService.currentUser);
-      _themeNotifier.syncUserColorPreference(_authService.currentUser?.colorPreference);
     }
     return success;
   }

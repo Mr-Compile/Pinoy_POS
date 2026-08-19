@@ -7,6 +7,7 @@ import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
+import 'package:pinoy_pos/ui/widgets/app_header.dart';
 
 class SaleDetailScreen extends ConsumerStatefulWidget {
   final Sale sale;
@@ -68,8 +69,9 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Receipt #${widget.sale.receiptNumber ?? widget.sale.id}'),
+      appBar: AppHeader(
+        title: 'Receipt #${widget.sale.receiptNumber ?? widget.sale.id}',
+        showBackButton: true,
       ),
       body: _isLoading
           ? const LoadingState()

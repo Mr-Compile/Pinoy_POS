@@ -17,6 +17,12 @@ class AppDialogService {
   }) {
     return showDialog<T>(
       context: context,
+      // Always use the root navigator so dialog dismissal via
+      // Navigator.of(context, rootNavigator: true).pop() targets the
+      // correct route. Without this, a dialog shown from inside a
+      // nested Navigator (e.g. inside an inner Scaffold) could pop the
+      // wrong route, leaving the dialog stuck open.
+      useRootNavigator: true,
       barrierDismissible: dismissible,
       builder: (context) => AppDialog(
         type: type,
@@ -53,7 +59,7 @@ class AppDialogService {
         AppDialogAction(
           label: primaryLabel,
           isPrimary: true,
-          onPressed: onPrimary ?? () => Navigator.of(context).pop(),
+          onPressed: onPrimary ?? () => Navigator.of(context, rootNavigator: true).pop(),
         ),
       ],
     );
@@ -78,11 +84,11 @@ class AppDialogService {
       message: message,
       details: details,
       actions: [
-        AppDialogAction(label: secondaryLabel, onPressed: onSecondary ?? () => Navigator.of(context).pop()),
+        AppDialogAction(label: secondaryLabel, onPressed: onSecondary ?? () => Navigator.of(context, rootNavigator: true).pop()),
         AppDialogAction(
           label: primaryLabel,
           isPrimary: true,
-          onPressed: onPrimary ?? () => Navigator.of(context).pop(),
+          onPressed: onPrimary ?? () => Navigator.of(context, rootNavigator: true).pop(),
         ),
       ],
     );
@@ -112,7 +118,7 @@ class AppDialogService {
         AppDialogAction(
           label: primaryLabel,
           isPrimary: true,
-          onPressed: onPrimary ?? () => Navigator.of(context).pop(),
+          onPressed: onPrimary ?? () => Navigator.of(context, rootNavigator: true).pop(),
         ),
       ],
     );
@@ -142,7 +148,7 @@ class AppDialogService {
         AppDialogAction(
           label: primaryLabel,
           isPrimary: true,
-          onPressed: onPrimary ?? () => Navigator.of(context).pop(),
+          onPressed: onPrimary ?? () => Navigator.of(context, rootNavigator: true).pop(),
         ),
       ],
     );
@@ -168,7 +174,7 @@ class AppDialogService {
         AppDialogAction(
           label: primaryLabel,
           isPrimary: true,
-          onPressed: onPrimary ?? () => Navigator.of(context).pop(),
+          onPressed: onPrimary ?? () => Navigator.of(context, rootNavigator: true).pop(),
         ),
       ],
     );
@@ -188,7 +194,7 @@ class AppDialogService {
         AppDialogAction(
           label: 'Close',
           isPrimary: true,
-          onPressed: onPrimary ?? () => Navigator.of(context).pop(),
+          onPressed: onPrimary ?? () => Navigator.of(context, rootNavigator: true).pop(),
         ),
       ],
     );
@@ -214,13 +220,13 @@ class AppDialogService {
       actions: [
         AppDialogAction(
           label: cancelLabel,
-          onPressed: () => Navigator.of(context).pop(false),
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
         ),
         AppDialogAction(
           label: confirmLabel,
           isPrimary: true,
           isDestructive: destructive,
-          onPressed: () => Navigator.of(context).pop(true),
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
         ),
       ],
     );
@@ -245,13 +251,13 @@ class AppDialogService {
       actions: [
         AppDialogAction(
           label: 'Cancel',
-          onPressed: () => Navigator.of(context).pop(false),
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
         ),
         AppDialogAction(
           label: confirmLabel,
           isPrimary: true,
           isDestructive: true,
-          onPressed: () => Navigator.of(context).pop(true),
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
         ),
       ],
     );
@@ -269,13 +275,13 @@ class AppDialogService {
       actions: [
         AppDialogAction(
           label: 'Cancel',
-          onPressed: () => Navigator.of(context).pop(false),
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
         ),
         AppDialogAction(
           label: 'Delete Permanently',
           isPrimary: true,
           isDestructive: true,
-          onPressed: () => Navigator.of(context).pop(true),
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
         ),
       ],
     );
@@ -293,12 +299,12 @@ class AppDialogService {
       actions: [
         AppDialogAction(
           label: 'Cancel',
-          onPressed: () => Navigator.of(context).pop(false),
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
         ),
         AppDialogAction(
           label: 'Restore',
           isPrimary: true,
-          onPressed: () => Navigator.of(context).pop(true),
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
         ),
       ],
     );
@@ -313,12 +319,12 @@ class AppDialogService {
       actions: [
         AppDialogAction(
           label: 'Cancel',
-          onPressed: () => Navigator.of(context).pop(false),
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
         ),
         AppDialogAction(
           label: 'Log Out',
           isPrimary: true,
-          onPressed: () => Navigator.of(context).pop(true),
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
         ),
       ],
     );
@@ -333,13 +339,13 @@ class AppDialogService {
       actions: [
         AppDialogAction(
           label: 'Keep Editing',
-          onPressed: () => Navigator.of(context).pop(false),
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
         ),
         AppDialogAction(
           label: 'Discard',
           isPrimary: true,
           isDestructive: true,
-          onPressed: () => Navigator.of(context).pop(true),
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
         ),
       ],
     );
@@ -355,7 +361,7 @@ class AppDialogService {
         AppDialogAction(
           label: 'OK',
           isPrimary: true,
-          onPressed: () => Navigator.of(context).pop(true),
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
         ),
       ],
     );
@@ -371,6 +377,7 @@ class AppDialogService {
 
     return showDialog<String>(
       context: context,
+      useRootNavigator: true,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => Semantics(
           label: 'Confirmation required',
@@ -430,7 +437,7 @@ class AppDialogService {
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
                             TextButton(
-                              onPressed: () => Navigator.of(context).pop(null),
+                              onPressed: () => Navigator.of(context, rootNavigator: true).pop(null),
                               style: TextButton.styleFrom(minimumSize: const Size(88, 48)),
                               child: const Text('Cancel'),
                             ),
@@ -438,7 +445,7 @@ class AppDialogService {
                             FilledButton(
                               onPressed: reasonController.text.trim().isEmpty
                                   ? null
-                                  : () => Navigator.of(context).pop(reasonController.text.trim()),
+                                  : () => Navigator.of(context, rootNavigator: true).pop(reasonController.text.trim()),
                               style: FilledButton.styleFrom(
                                 backgroundColor: cs.error,
                                 foregroundColor: cs.onError,
@@ -453,7 +460,7 @@ class AppDialogService {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             TextButton(
-                              onPressed: () => Navigator.of(context).pop(null),
+                              onPressed: () => Navigator.of(context, rootNavigator: true).pop(null),
                               style: TextButton.styleFrom(minimumSize: const Size(88, 48)),
                               child: const Text('Cancel'),
                             ),
@@ -461,7 +468,7 @@ class AppDialogService {
                             FilledButton(
                               onPressed: reasonController.text.trim().isEmpty
                                   ? null
-                                  : () => Navigator.of(context).pop(reasonController.text.trim()),
+                                  : () => Navigator.of(context, rootNavigator: true).pop(reasonController.text.trim()),
                               style: FilledButton.styleFrom(
                                 backgroundColor: cs.error,
                                 foregroundColor: cs.onError,
@@ -498,7 +505,7 @@ class AppDialogService {
         AppDialogAction(
           label: 'Sign In Again',
           isPrimary: true,
-          onPressed: onLogin ?? () => Navigator.of(context).pop(),
+          onPressed: onLogin ?? () => Navigator.of(context, rootNavigator: true).pop(),
         ),
       ],
     );
@@ -522,7 +529,7 @@ class AppDialogService {
         AppDialogAction(
           label: 'Fix',
           isPrimary: true,
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
         ),
       ],
     );
@@ -540,12 +547,12 @@ class AppDialogService {
       actions: [
         AppDialogAction(
           label: 'Close',
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
         ),
         AppDialogAction(
           label: 'Continue Offline',
           isPrimary: true,
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
         ),
       ],
     );
@@ -597,13 +604,13 @@ class AppDialogService {
       actions: [
         AppDialogAction(
           label: 'Cancel',
-          onPressed: () => Navigator.of(context).pop(false),
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
         ),
         AppDialogAction(
           label: 'Restore',
           isPrimary: true,
           isDestructive: true,
-          onPressed: () => Navigator.of(context).pop(true),
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
         ),
       ],
     );
@@ -623,13 +630,13 @@ class AppDialogService {
       actions: [
         AppDialogAction(
           label: 'Cancel',
-          onPressed: () => Navigator.of(context).pop(false),
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
         ),
         AppDialogAction(
           label: 'Deactivate',
           isPrimary: true,
           isDestructive: true,
-          onPressed: () => Navigator.of(context).pop(true),
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
         ),
       ],
     );
@@ -654,12 +661,12 @@ class AppDialogService {
       actions: [
         AppDialogAction(
           label: 'Cancel',
-          onPressed: () => Navigator.of(context).pop(false),
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
         ),
         AppDialogAction(
           label: 'Confirm',
           isPrimary: true,
-          onPressed: () => Navigator.of(context).pop(true),
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
         ),
       ],
     );
@@ -680,12 +687,12 @@ class AppDialogService {
       actions: [
         AppDialogAction(
           label: 'Cancel',
-          onPressed: () => Navigator.of(context).pop(false),
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
         ),
         AppDialogAction(
           label: 'Confirm',
           isPrimary: true,
-          onPressed: () => Navigator.of(context).pop(true),
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
         ),
       ],
     );

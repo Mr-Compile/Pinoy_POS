@@ -54,16 +54,6 @@ class SettingsService {
     await prefs.setString('theme', theme);
   }
 
-  Future<String> getAccentColor() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('accent_color') ?? 'green';
-  }
-
-  Future<void> setAccentColor(String color) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('accent_color', color);
-  }
-
   // ── Groq AI configuration ────────────────────────────────────────────
   //
   // The Groq API key and model are stored in the settings table. Only

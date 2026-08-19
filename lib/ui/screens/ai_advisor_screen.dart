@@ -6,6 +6,7 @@ import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/services/ai_advisor_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
+import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_button.dart';
@@ -159,8 +160,9 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('AI Business Advisor'),
+      appBar: AppHeader(
+        title: 'AI Business Advisor',
+        showBackButton: true,
         actions: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),

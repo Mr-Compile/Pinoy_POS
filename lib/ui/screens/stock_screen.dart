@@ -14,6 +14,7 @@ import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/spacing.dart';
+import 'package:pinoy_pos/ui/widgets/app_header.dart';
 
 /// Stock status filter options.
 enum StockFilter { all, lowStock, outOfStock }
@@ -298,13 +299,19 @@ class _StockScreenState extends ConsumerState<StockScreen> {
 
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Stock Management')),
+        appBar: AppHeader(
+          title: 'Stock Management',
+          showBackButton: true,
+        ),
         body: const LoadingState(),
       );
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Stock Management')),
+      appBar: AppHeader(
+        title: 'Stock Management',
+        showBackButton: true,
+      ),
       floatingActionButton: canAddStock && _products.isNotEmpty
           ? FloatingActionButton.extended(
               icon: const Icon(Icons.add),

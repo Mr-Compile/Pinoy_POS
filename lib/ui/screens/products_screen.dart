@@ -6,6 +6,7 @@ import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/services/image_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
+import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
@@ -122,8 +123,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
 
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text('Products'),
+        appBar: AppHeader(
+          title: 'Products',
         ),
         body: const LoadingState(),
       );
@@ -146,8 +147,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
         : null;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Products'),
+      appBar: AppHeader(
+        title: 'Products',
         actions: [
           ?createAction,
         ],
@@ -215,13 +216,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                     message: _products.isEmpty
                         ? 'Add your first product to start building your inventory.'
                         : 'No products match your search.',
-                    action: _products.isEmpty && canEdit
-                        ? FilledButton.icon(
-                            icon: const Icon(Icons.add),
-                            label: const Text('Add Product'),
-                            onPressed: () => _showProductDialog(),
-                          )
-                        : null,
+                    // No create button here — the FAB (mobile) / AppBar
+                    // action (tablet) is the single primary create action.
                   )
                 : ListView.builder(
                     padding: const EdgeInsets.all(16),

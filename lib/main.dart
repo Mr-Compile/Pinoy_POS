@@ -7,8 +7,7 @@ import 'package:pinoy_pos/core/constants.dart';
 import 'package:pinoy_pos/core/database_seeder.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/providers/theme_provider.dart';
-import 'package:pinoy_pos/providers/auth_provider.dart';
-import 'package:pinoy_pos/ui/app_shell.dart';
+import 'package:pinoy_pos/ui/screens/splash_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,7 +32,6 @@ class MyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeState = ref.watch(themeProvider);
-    final authState = ref.watch(authStateProvider);
 
     final themeMode = switch (themeState.themeMode) {
       'light' => ThemeMode.light,
@@ -41,20 +39,9 @@ class MyApp extends ConsumerWidget {
       _ => ThemeMode.system,
     };
 
-    // When unauthenticated, use the fixed Login (Blue) theme.
-    // When authenticated, use the user's saved accent color.
-    final isAuthenticated = authState.user != null && themeState.isAuthenticated;
-
-    final ThemeData lightTheme;
-    final ThemeData darkTheme;
-
-    if (isAuthenticated) {
-      lightTheme = AppColors.getLightTheme(themeState.authenticatedAccentColor);
-      darkTheme = AppColors.getDarkTheme(themeState.authenticatedAccentColor);
-    } else {
-      lightTheme = AppColors.getLoginLightTheme();
-      darkTheme = AppColors.getLoginDarkTheme();
-    }
+    // Universal Pinoy POS Blue theme for all users and the login screen.
+    final lightTheme = AppColors.getLightTheme();
+    final darkTheme = AppColors.getDarkTheme();
 
     return MaterialApp(
       title: AppConstants.appName,
@@ -62,7 +49,7 @@ class MyApp extends ConsumerWidget {
       theme: lightTheme,
       darkTheme: darkTheme,
       themeMode: themeMode,
-      home: const AppShell(),
+      home: const SplashScreen(),
     );
   }
 }

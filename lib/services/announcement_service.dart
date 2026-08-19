@@ -1,13 +1,18 @@
 import 'package:pinoy_pos/core/authorization_exception.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/announcement.dart';
+import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/data/repositories/announcement_repository.dart';
+import 'package:pinoy_pos/data/repositories/user_repository.dart';
 import 'package:pinoy_pos/services/activity_log_service.dart';
+import 'package:pinoy_pos/services/notification_service.dart';
 
 class AnnouncementService {
   final AnnouncementRepository _announcementRepository = AnnouncementRepository();
   final SessionManager _sessionManager = SessionManager();
   final ActivityLogService _activityLogService = ActivityLogService();
+  final NotificationService _notificationService = NotificationService();
+  final UserRepository _userRepository = UserRepository();
 
   Future<List<Announcement>> getActiveAnnouncements() async {
     if (!_sessionManager.hasPermission('view_announcements')) {
@@ -30,6 +35,12 @@ class AnnouncementService {
     return _announcementRepository.getAllActive();
   }
 
+  /// Creates a new announcement and notifies all active Staff users.
+  ///
+  /// Notifications are created AFTER the announcement is persisted so
+  /// that a notification failure does not prevent the announcement from
+  /// being saved. Each Staff user receives their own notification row
+  /// so that read/unread state is per-user.
   Future<bool> createAnnouncement({
     required String title,
     required String content,
@@ -59,7 +70,39 @@ class AnnouncementService {
       entity: 'announcement',
       details: 'Created announcement: $title',
     );
+
+    // Notify all active Staff users about the new announcement.
+    // Owner and Admin do not receive announcement notifications because
+    // the Owner is the one creating them and Admin does not have access
+    // to announcements.
+    await _notifyStaffOfNewAnnouncement(title);
+
     return true;
+  }
+
+  /// Creates a "New Announcement" notification for every active Staff
+  /// user. Failures are swallowed so that a notification issue never
+  /// prevents the announcement from being created.
+  Future<void> _notifyStaffOfNewAnnouncement(String title) async {
+    try {
+      final staffUsers = await _userRepository.getByRole(UserRole.staff);
+      final activeStaffIds = staffUsers
+          .where((u) => u.isActive && u.id != null)
+          .map((u) => u.id!)
+          .toList();
+
+      if (activeStaffIds.isEmpty) return;
+
+      await _notificationService.createNotificationForUsers(
+        title: 'New Announcement',
+        message: title,
+        type: 'announcement',
+        userIds: activeStaffIds,
+      );
+    } catch (_) {
+      // Notification creation is best-effort. Do not fail the
+      // announcement creation if notifications cannot be sent.
+    }
   }
 
   Future<bool> updateAnnouncement(Announcement announcement) async {

@@ -5,6 +5,7 @@ import 'package:pinoy_pos/data/models/backup_history.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/providers/user_provider.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
+import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
@@ -168,8 +169,9 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Backup & Restore'),
+      appBar: AppHeader(
+        title: 'Backup & Restore',
+        showBackButton: true,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),

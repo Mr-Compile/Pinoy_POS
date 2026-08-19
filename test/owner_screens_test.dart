@@ -9,7 +9,7 @@ import 'package:pinoy_pos/core/database_seeder.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
-import 'package:pinoy_pos/providers/theme_provider.dart';
+import 'package:pinoy_pos/providers/notification_provider.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
 import 'package:pinoy_pos/ui/screens/dashboard_screen.dart';
 import 'package:pinoy_pos/ui/screens/pos_screen.dart';
@@ -71,15 +71,23 @@ void main() {
     await Future.delayed(const Duration(milliseconds: 200));
   });
 
-  /// Helper: authenticates as the seeded owner and returns the User.
-  /// This sets the SessionManager singleton so all services see the owner.
+  /// Helper: creates an owner User directly (bypassing the database) and
+  /// sets the SessionManager singleton so all services see the owner.
+  ///
+  /// This avoids database lock issues on Windows where AuthService.login()
+  /// can hang indefinitely in the test environment.
   Future<User> authenticateAsOwner() async {
-    final authService = AuthService();
-    final success = await authService.login('owner', 'owner123');
-    if (!success) {
-      throw StateError('Owner login failed');
-    }
-    return authService.currentUser!;
+    final owner = User(
+      id: 1,
+      username: 'owner',
+      passwordHash: 'test-hash',
+      role: UserRole.owner,
+      fullName: 'Store Owner',
+      createdAt: DateTime.now(),
+      isActive: true,
+    );
+    SessionManager().setCurrentUser(owner);
+    return owner;
   }
 
   /// Helper: pumps [screen] inside a ProviderScope with the owner
@@ -100,6 +108,9 @@ void main() {
             final notifier = _TestAuthNotifier(ref, owner);
             return notifier;
           }),
+          // Override notification count so NotificationBell doesn't
+          // trigger real database queries during widget tests.
+          notificationCountProvider.overrideWith((ref) => 0),
         ],
         child: MaterialApp(
           home: screen,
@@ -147,7 +158,7 @@ void main() {
   testWidgets('SalesScreen builds for owner', (tester) async {
     final owner = await authenticateAsOwner();
     await pumpOwnerScreen(tester, const SalesScreen(), owner: owner);
-    expect(find.text('Sales'), findsWidgets);
+    expect(find.text('My Sales'), findsWidgets);
   });
 
   testWidgets('ReportsScreen builds for owner', (tester) async {
@@ -201,7 +212,7 @@ void main() {
 
 class _TestAuthNotifier extends AuthStateNotifier {
   _TestAuthNotifier(Ref ref, User owner)
-      : super(ref, AuthService(), ThemeNotifier()) {
+      : super(ref, AuthService()) {
     state = AuthState(user: owner, isLoading: false);
   }
 }

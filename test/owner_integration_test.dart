@@ -69,9 +69,9 @@ void main() {
   /// Authenticate as the seeded owner.
   Future<User> authAsOwner() async {
     final authService = AuthService();
-    final ok = await authService.login('owner', 'owner123');
-    if (!ok) {
-      throw StateError('Owner login failed');
+    final result = await authService.login('owner', 'owner123');
+    if (result != LoginResult.success) {
+      throw StateError('Owner login failed: $result');
     }
     return authService.currentUser!;
   }
@@ -556,8 +556,8 @@ void main() {
   group('Auth / Session chain', () {
     test('AuthService login and restoreSession work for owner', () async {
       final authService = AuthService();
-      final ok = await authService.login('owner', 'owner123');
-      expect(ok, isTrue);
+      final result = await authService.login('owner', 'owner123');
+      expect(result, LoginResult.success);
       expect(authService.currentUser, isNotNull);
       expect(authService.currentUser!.role, UserRole.owner);
 

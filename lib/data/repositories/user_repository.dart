@@ -21,5 +21,4 @@ class UserRepository {
   Future<List<User>> getActiveUsers() => _userDao.getActiveUsers();
   Future<void> updateLastLogin(int userId) => _userDao.updateLastLogin(userId);
   Future<void> toggleActive(int userId, bool isActive) => _userDao.toggleActive(userId, isActive);
-  Future<void> updateColorPreference(int userId, String colorPreference) => _userDao.updateColorPreference(userId, colorPreference);
 }

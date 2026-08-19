@@ -7,6 +7,7 @@ import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
+import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
@@ -292,13 +293,13 @@ class _POSScreenState extends ConsumerState<POSScreen> {
 
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('POS')),
+        appBar: AppHeader(title: 'POS'),
         body: const LoadingState(),
       );
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('POS')),
+      appBar: AppHeader(title: 'POS'),
       body: _products.isEmpty
           ? _buildNoProductsState(canSell)
           : isTablet

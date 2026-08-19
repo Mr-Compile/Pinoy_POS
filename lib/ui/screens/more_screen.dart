@@ -4,35 +4,40 @@ import 'package:pinoy_pos/core/route_guard.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/ui/screens/activity_logs_screen.dart';
 import 'package:pinoy_pos/ui/screens/ai_advisor_screen.dart';
-import 'package:pinoy_pos/ui/screens/ai_config_screen.dart';
 import 'package:pinoy_pos/ui/screens/announcements_screen.dart';
-import 'package:pinoy_pos/ui/screens/backup_restore_screen.dart';
 import 'package:pinoy_pos/ui/screens/categories_screen.dart';
-import 'package:pinoy_pos/ui/screens/notifications_screen.dart';
-import 'package:pinoy_pos/ui/screens/profile_screen.dart';
 import 'package:pinoy_pos/ui/screens/reports_screen.dart';
-import 'package:pinoy_pos/ui/screens/settings_screen.dart';
-import 'package:pinoy_pos/ui/screens/users_screen.dart';
 import 'package:pinoy_pos/ui/screens/stock_screen.dart';
 import 'package:pinoy_pos/ui/screens/trash_screen.dart';
-import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
+import 'package:pinoy_pos/ui/screens/users_screen.dart';
+import 'package:pinoy_pos/ui/widgets/app_header.dart';
 
+/// "More" screen — lists secondary feature screens that don't fit in the
+/// main bottom navigation.
+///
+/// NOTE: Settings, Profile, Notifications, Backup & Restore, and AI
+/// Configuration have been moved OUT of this screen:
+///   - Profile      → profile dropdown (header avatar)
+///   - Settings     → profile dropdown (header avatar)
+///   - Notifications → notification bell (header)
+///   - Backup & Restore → Settings hub (Admin only)
+///   - AI Configuration  → Settings hub (Admin only)
+///
+/// Only feature screens remain here: Categories, Stock, Reports,
+/// Announcements, AI Advisor, Users, Trash, Activity Logs.
 class MoreScreen extends ConsumerWidget {
   const MoreScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authNotifier = ref.read(authStateProvider.notifier);
-    final colorScheme = Theme.of(context).colorScheme;
 
     final entries = <_MoreEntry>[];
 
     // --- Business modules (Owner / Staff) ---
-    // Categories: Staff can view and toggle status, so gate on
-    // view_categories (not edit_categories) so Staff can reach the screen.
     if (authNotifier.hasPermission('view_categories')) {
       entries.add(_MoreEntry(
-        icon: Icons.category,
+        icon: Icons.category_outlined,
         title: 'Categories',
         permission: 'view_categories',
         routeName: 'categories',
@@ -41,19 +46,16 @@ class MoreScreen extends ConsumerWidget {
     }
     if (authNotifier.hasPermission('add_stock')) {
       entries.add(_MoreEntry(
-        icon: Icons.warehouse,
+        icon: Icons.warehouse_outlined,
         title: 'Stock',
         permission: 'add_stock',
         routeName: 'stock',
         screen: const StockScreen(),
       ));
     }
-    // Reports: reachable from More because the mobile bottom navigation is
-    // capped at 4 primary destinations + "More". Reports is a 5th primary
-    // destination for Owner/Staff and would otherwise be unreachable.
     if (authNotifier.hasPermission('view_reports')) {
       entries.add(_MoreEntry(
-        icon: Icons.analytics,
+        icon: Icons.analytics_outlined,
         title: 'Reports',
         permission: 'view_reports',
         routeName: 'reports',
@@ -62,7 +64,7 @@ class MoreScreen extends ConsumerWidget {
     }
     if (authNotifier.hasPermission('view_announcements')) {
       entries.add(_MoreEntry(
-        icon: Icons.campaign,
+        icon: Icons.campaign_outlined,
         title: 'Announcements',
         permission: 'view_announcements',
         routeName: 'announcements',
@@ -71,7 +73,7 @@ class MoreScreen extends ConsumerWidget {
     }
     if (authNotifier.hasPermission('view_ai_advisor')) {
       entries.add(_MoreEntry(
-        icon: Icons.smart_toy,
+        icon: Icons.smart_toy_outlined,
         title: 'AI Advisor',
         permission: 'view_ai_advisor',
         routeName: 'ai_advisor',
@@ -79,45 +81,18 @@ class MoreScreen extends ConsumerWidget {
       ));
     }
 
-    // --- System modules (System Admin) ---
+    // --- System modules (Admin) ---
     if (authNotifier.hasPermission('manage_users')) {
       entries.add(_MoreEntry(
-        icon: Icons.people,
+        icon: Icons.people_outline,
         title: 'Users',
         permission: 'manage_users',
         routeName: 'users',
         screen: const UsersScreen(),
       ));
     }
-    if (authNotifier.hasPermission('backup_restore')) {
-      entries.add(_MoreEntry(
-        icon: Icons.backup,
-        title: 'Backup & Restore',
-        permission: 'backup_restore',
-        routeName: 'backup_restore',
-        screen: const BackupRestoreScreen(),
-      ));
-    }
-    if (authNotifier.hasPermission('manage_ai_config')) {
-      entries.add(_MoreEntry(
-        icon: Icons.smart_toy,
-        title: 'AI Configuration',
-        permission: 'manage_ai_config',
-        routeName: 'ai_config',
-        screen: const AIConfigScreen(),
-      ));
-    }
 
     // --- Shared modules ---
-    if (authNotifier.hasPermission('view_settings')) {
-      entries.add(_MoreEntry(
-        icon: Icons.settings,
-        title: 'Settings',
-        permission: 'view_settings',
-        routeName: 'settings',
-        screen: const SettingsScreen(),
-      ));
-    }
     if (authNotifier.hasPermission('view_trash')) {
       entries.add(_MoreEntry(
         icon: Icons.delete_outline,
@@ -129,69 +104,39 @@ class MoreScreen extends ConsumerWidget {
     }
     if (authNotifier.hasPermission('view_activity_logs')) {
       entries.add(_MoreEntry(
-        icon: Icons.history,
+        icon: Icons.history_rounded,
         title: 'Activity Logs',
         permission: 'view_activity_logs',
         routeName: 'activity_logs',
         screen: const ActivityLogsScreen(),
       ));
     }
-    if (authNotifier.hasPermission('view_notifications')) {
-      entries.add(_MoreEntry(
-        icon: Icons.notifications,
-        title: 'Notifications',
-        permission: 'view_notifications',
-        routeName: 'notifications',
-        screen: const NotificationsScreen(),
-      ));
-    }
-
-    // Profile (all roles)
-    entries.add(_MoreEntry(
-      icon: Icons.person,
-      title: 'Profile',
-      permission: null,
-      routeName: 'profile',
-      screen: const ProfileScreen(),
-    ));
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('More'),
-      ),
+      appBar: const AppHeader(title: 'More'),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Grid of navigation entries
-          GridView.count(
-            crossAxisCount: MediaQuery.of(context).size.width >= 600 ? 4 : 3,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 1.0,
-            children: entries.map((entry) {
-              return _buildEntryCard(context, ref, entry);
-            }).toList(),
-          ),
-          const SizedBox(height: 24),
-          // Logout button
-          Card(
-            child: ListTile(
-              leading: Icon(Icons.logout, color: colorScheme.error),
-              title: Text(
-                'Logout',
-                style: TextStyle(color: colorScheme.error),
+          if (entries.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(32),
+              child: Center(
+                child: Text('No additional screens available.'),
               ),
-              trailing: Icon(Icons.chevron_right, color: colorScheme.error),
-              onTap: () async {
-                final confirmed = await AppDialogService.logoutConfirm(context);
-                if (confirmed == true) {
-                  await authNotifier.logout();
-                }
-              },
+            )
+          else
+            GridView.count(
+              crossAxisCount:
+                  MediaQuery.of(context).size.width >= 600 ? 4 : 3,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              childAspectRatio: 1.0,
+              children: entries.map((entry) {
+                return _buildEntryCard(context, ref, entry);
+              }).toList(),
             ),
-          ),
         ],
       ),
     );
@@ -204,21 +149,13 @@ class MoreScreen extends ConsumerWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () {
-          if (entry.permission == null) {
-            // No permission required (e.g. Profile)
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => entry.screen),
-            );
-          } else {
-            RouteGuard.pushIfAuthorized(
-              context,
-              ref,
-              screen: entry.screen,
-              permission: entry.permission!,
-              routeName: entry.routeName,
-            );
-          }
+          RouteGuard.pushIfAuthorized(
+            context,
+            ref,
+            screen: entry.screen,
+            permission: entry.permission,
+            routeName: entry.routeName,
+          );
         },
         borderRadius: BorderRadius.circular(12),
         child: Padding(
@@ -246,14 +183,14 @@ class MoreScreen extends ConsumerWidget {
 class _MoreEntry {
   final IconData icon;
   final String title;
-  final String? permission;
+  final String permission;
   final String routeName;
   final Widget screen;
 
   _MoreEntry({
     required this.icon,
     required this.title,
-    this.permission,
+    required this.permission,
     required this.routeName,
     required this.screen,
   });

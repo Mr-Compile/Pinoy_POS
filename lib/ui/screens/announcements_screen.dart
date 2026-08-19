@@ -10,6 +10,7 @@ import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/validators.dart';
 import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/ui/widgets/app_header.dart';
 
 class AnnouncementsScreen extends ConsumerStatefulWidget {
   const AnnouncementsScreen({super.key});
@@ -112,7 +113,10 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
 
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Announcements')),
+        appBar: AppHeader(
+          title: 'Announcements',
+          showBackButton: true,
+        ),
         body: const LoadingState(),
       );
     }
@@ -134,8 +138,9 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
         : null;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Announcements'),
+      appBar: AppHeader(
+        title: 'Announcements',
+        showBackButton: true,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -156,13 +161,8 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
               icon: Icons.campaign,
               title: 'No Announcements Yet',
               message: 'Create an announcement to share updates with your team.',
-              action: canManage
-                  ? FilledButton.icon(
-                      icon: const Icon(Icons.campaign),
-                      label: const Text('Add Announcement'),
-                      onPressed: () => _showAnnouncementDialog(),
-                    )
-                  : null,
+              // No create button here — the FAB (mobile) / AppBar
+              // action (tablet) is the single primary create action.
             )
           : ListView.builder(
               padding: const EdgeInsets.all(16),

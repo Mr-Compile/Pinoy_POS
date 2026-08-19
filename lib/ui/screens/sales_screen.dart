@@ -5,6 +5,7 @@ import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/screens/sale_detail_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
+import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_button.dart';
@@ -91,16 +92,16 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
 
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text('My Sales'),
+        appBar: AppHeader(
+          title: 'My Sales',
         ),
         body: const LoadingState(),
       );
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Sales'),
+      appBar: AppHeader(
+        title: 'My Sales',
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),

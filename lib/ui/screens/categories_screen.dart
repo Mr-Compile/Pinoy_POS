@@ -9,6 +9,7 @@ import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/validators.dart';
 import 'package:pinoy_pos/ui/widgets/loading_button.dart';
+import 'package:pinoy_pos/ui/widgets/app_header.dart';
 
 class CategoriesScreen extends ConsumerStatefulWidget {
   const CategoriesScreen({super.key});
@@ -118,8 +119,9 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
 
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text('Categories'),
+        appBar: AppHeader(
+          title: 'Categories',
+          showBackButton: true,
         ),
         body: const LoadingState(),
       );
@@ -142,8 +144,9 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
         : null;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Categories'),
+      appBar: AppHeader(
+        title: 'Categories',
+        showBackButton: true,
         actions: [
           ?createAction,
           IconButton(
@@ -164,13 +167,8 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
               icon: Icons.category,
               title: 'No Categories Yet',
               message: 'Create a category to organize your products.',
-              action: canEdit
-                  ? FilledButton.icon(
-                      icon: const Icon(Icons.add),
-                      label: const Text('Add Category'),
-                      onPressed: () => _showCategoryDialog(),
-                    )
-                  : null,
+              // No create button here — the FAB (mobile) / AppBar
+              // action (tablet) is the single primary create action.
             )
           : ListView.builder(
               padding: const EdgeInsets.all(16),

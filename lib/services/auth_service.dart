@@ -4,6 +4,17 @@ import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/data/repositories/user_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// Result of a login attempt.
+///
+/// Allows the UI to show differentiated error messages instead of a
+/// generic "invalid credentials" for every failure.
+enum LoginResult {
+  success,
+  invalidCredentials,
+  inactiveAccount,
+  error,
+}
+
 /// Authentication service.
 ///
 /// Owns ONLY login / logout / session-restore logic.  User management CRUD
@@ -22,26 +33,30 @@ class AuthService {
   User? get currentUser => _sessionManager.currentUser;
   bool get isAuthenticated => _sessionManager.isAuthenticated;
 
-  Future<bool> login(String username, String password) async {
-    final user = await _userRepository.getByUsername(username);
+  Future<LoginResult> login(String username, String password) async {
+    try {
+      final user = await _userRepository.getByUsername(username);
 
-    if (user == null) {
-      return false;
+      if (user == null) {
+        return LoginResult.invalidCredentials;
+      }
+
+      if (!user.isActive) {
+        return LoginResult.inactiveAccount;
+      }
+
+      if (!SecurityHelper.verifyPassword(password, user.passwordHash)) {
+        return LoginResult.invalidCredentials;
+      }
+
+      _sessionManager.setCurrentUser(user);
+      await _userRepository.updateLastLogin(user.id!);
+      await _saveSession(user.id!);
+
+      return LoginResult.success;
+    } catch (_) {
+      return LoginResult.error;
     }
-
-    if (!user.isActive) {
-      return false;
-    }
-
-    if (!SecurityHelper.verifyPassword(password, user.passwordHash)) {
-      return false;
-    }
-
-    _sessionManager.setCurrentUser(user);
-    await _userRepository.updateLastLogin(user.id!);
-    await _saveSession(user.id!);
-
-    return true;
   }
 
   Future<bool> loginWithPin(String username, String pin) async {
@@ -112,17 +127,16 @@ class AuthService {
     return _sessionManager.hasPermission(permission);
   }
 
-  /// Updates the current user's own profile (full name, PIN, color
-  /// preference, profile image). No special permission is required - users
-  /// can always edit their own profile. Restricted fields (role, username,
-  /// isActive) are never modified here.
+  /// Updates the current user's own profile (full name, PIN, profile
+  /// image). No special permission is required - users can always edit
+  /// their own profile. Restricted fields (role, username, isActive) are
+  /// never modified here.
   ///
   /// Returns true on success, false on failure.
   Future<bool> updateProfile({
     required int userId,
     required String fullName,
     String? pin,
-    String? colorPreference,
     String? profileImagePath,
   }) async {
     final current = _sessionManager.currentUser;
@@ -133,7 +147,6 @@ class AuthService {
     final updated = current.copyWith(
       fullName: fullName,
       pin: pin ?? current.pin,
-      colorPreference: colorPreference ?? current.colorPreference,
       profileImagePath: profileImagePath ?? current.profileImagePath,
       updatedAt: DateTime.now(),
     );
@@ -141,15 +154,5 @@ class AuthService {
     await _userRepository.update(updated);
     _sessionManager.setCurrentUser(updated);
     return true;
-  }
-
-  /// Updates only the current user's color preference. Convenience wrapper
-  /// around [updateProfile] for the color-preference picker dialog.
-  Future<bool> updateColorPreference(int userId, String colorPreference) async {
-    return updateProfile(
-      userId: userId,
-      fullName: _sessionManager.currentUser?.fullName ?? '',
-      colorPreference: colorPreference,
-    );
   }
 }

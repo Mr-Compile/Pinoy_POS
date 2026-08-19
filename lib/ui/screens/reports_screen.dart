@@ -7,6 +7,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
+import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
@@ -117,16 +118,16 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text('Reports'),
+        appBar: AppHeader(
+          title: 'Reports',
         ),
         body: const LoadingState(),
       );
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Reports'),
+      appBar: AppHeader(
+        title: 'Reports',
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),

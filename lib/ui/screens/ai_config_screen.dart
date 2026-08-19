@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
+import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
@@ -212,14 +213,14 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
 
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('AI Configuration')),
+        appBar: AppHeader(title: 'AI Configuration', showBackButton: true),
         body: const LoadingState(),
       );
     }
 
     if (_loadError != null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('AI Configuration')),
+        appBar: AppHeader(title: 'AI Configuration', showBackButton: true),
         body: ErrorState(
           title: 'Failed to Load',
           message: _loadError,
@@ -229,8 +230,9 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('AI Configuration'),
+      appBar: AppHeader(
+        title: 'AI Configuration',
+        showBackButton: true,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),

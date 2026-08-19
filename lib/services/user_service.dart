@@ -117,7 +117,6 @@ class UserService {
     required String fullName,
     required UserRole role,
     String? pin,
-    String? colorPreference,
   }) async {
     if (!_sessionManager.hasPermission('manage_users')) {
       throw AuthorizationException('manage_users');
@@ -161,7 +160,6 @@ class UserService {
       pin: (pin != null && pin.isNotEmpty) ? pin : null,
       role: role,
       fullName: trimmedFullName,
-      colorPreference: colorPreference ?? 'green',
       createdAt: now,
       updatedAt: now,
     );
@@ -198,7 +196,6 @@ class UserService {
     String? fullName,
     UserRole? role,
     String? pin,
-    String? colorPreference,
     String? profileImagePath,
   }) async {
     if (!_sessionManager.hasPermission('edit_users')) {
@@ -245,7 +242,6 @@ class UserService {
       fullName: trimmedFullName ?? user.fullName,
       role: role ?? user.role,
       pin: (pin != null && pin.isNotEmpty) ? pin : user.pin,
-      colorPreference: colorPreference ?? user.colorPreference,
       profileImagePath: profileImagePath ?? user.profileImagePath,
       updatedAt: DateTime.now(),
     );

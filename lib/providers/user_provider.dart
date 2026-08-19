@@ -109,7 +109,6 @@ class UserController extends StateNotifier<UserListState> {
     required String fullName,
     required UserRole role,
     String? pin,
-    String? colorPreference,
   }) async {
     state = state.copyWith(isSubmitting: true, error: null);
     try {
@@ -119,7 +118,6 @@ class UserController extends StateNotifier<UserListState> {
         fullName: fullName,
         role: role,
         pin: pin,
-        colorPreference: colorPreference,
       );
       if (result.success) {
         await loadUsers();
@@ -140,7 +138,6 @@ class UserController extends StateNotifier<UserListState> {
     String? fullName,
     UserRole? role,
     String? pin,
-    String? colorPreference,
   }) async {
     state = state.copyWith(isSubmitting: true, error: null);
     try {
@@ -150,7 +147,6 @@ class UserController extends StateNotifier<UserListState> {
         fullName: fullName,
         role: role,
         pin: pin,
-        colorPreference: colorPreference,
       );
       if (result.success) {
         await loadUsers();

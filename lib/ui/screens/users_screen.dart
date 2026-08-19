@@ -4,6 +4,7 @@ import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/user_provider.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
+import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
@@ -595,8 +596,8 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
         : null;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Users'),
+      appBar: AppHeader(
+        title: 'Users',
         actions: [
           ?createAction,
           IconButton(
@@ -651,13 +652,8 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
         icon: Icons.people,
         title: 'No Users Yet',
         message: 'Create a user account to get started.',
-        action: canManage
-            ? FilledButton.icon(
-                icon: const Icon(Icons.person_add),
-                label: const Text('Add User'),
-                onPressed: () => _showAddUserDialog(),
-              )
-            : null,
+        // No create button here — the FAB (mobile) / AppBar
+        // action (tablet) is the single primary create action.
       );
     }
 

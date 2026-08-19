@@ -89,19 +89,6 @@ class UserDao extends BaseDao<User> {
     );
   }
 
-  Future<void> updateColorPreference(int userId, String colorPreference) async {
-    final database = await db;
-    await database.update(
-      tableName,
-      {
-        'color_preference': colorPreference,
-        'updated_at': DateTime.now().toIso8601String(),
-      },
-      where: 'id = ?',
-      whereArgs: [userId],
-    );
-  }
-
   /// Permanently deletes a user row from the database.
   /// This is irreversible and should only be called from the Trash system.
   Future<int> permanentlyDelete(int id) async {

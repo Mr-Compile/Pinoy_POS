@@ -42,10 +42,12 @@ class AppTypography {
       const TextStyle(fontSize: 24, fontWeight: FontWeight.w600);
 }
 
-/// Semantic colors that are independent of the user's accent preference.
+/// Semantic colors that communicate meaning (success, warning, error, info).
 ///
-/// These colors communicate meaning (success, warning, error, info) and
-/// must NOT be overridden by the user's selected accent color.
+/// These are independent of the brand color and must NOT be overridden.
+/// They are intentionally hardcoded because they carry universal meaning
+/// (red = error, green = success, amber = warning, blue = info) and should
+/// remain consistent across light/dark mode and across all users.
 class AppSemanticColors {
   AppSemanticColors._();
 
@@ -70,94 +72,39 @@ class AppSemanticColors {
   static const Color onInfoContainer = Color(0xFF001F3F);
 }
 
-/// Centralized color and theme definitions.
+/// Centralized color and theme definitions — the SINGLE SOURCE OF TRUTH.
 ///
-/// The application has TWO visual theme contexts:
+/// The application uses ONE universal brand color: **Pinoy POS Blue**.
+/// There are no per-user accent colors. The same blue is used by Owner,
+/// Admin, Staff, and the login screen in both light and dark mode.
 ///
-/// 1. **Login / Unauthenticated** — always uses a fixed **Blue** accent,
-///    independent of any user preference.
-/// 2. **Authenticated Application** — uses the current user's saved
-///    `color_preference` from the `users` table.  Only 5 accent colors
-///    are user-selectable: green, purple, teal, orange, indigo.
-///
-/// The theme uses `ColorScheme.fromSeed()` with **vibrant seed colors**
-/// (not the muted Material default 500-shade) and custom surface tints
-/// to avoid the ash-gray appearance that default Material 3 produces.
+/// The theme uses `ColorScheme.fromSeed()` with a vibrant blue seed and
+/// custom surface tints to avoid the ash-gray appearance that default
+/// Material 3 produces.
 class AppColors {
   AppColors._();
 
-  // ── User-selectable accent colors (authenticated app) ──────────────
+  // ── Universal Pinoy POS Blue brand color ────────────────────────────
 
-  /// The 5 approved user-selectable accent colors mapped to vibrant
-  /// seed values.  We use deeper shades (600-700) as seeds because
-  /// `ColorScheme.fromSeed` lightens the primary, and using the 500
-  /// shade produces overly muted results.
-  static const Map<String, Color> userAccentColors = {
-    'green': Color(0xFF2E7D32), // green.shade700 — vibrant
-    'purple': Color(0xFF7B1FA2), // purple.shade700 — vibrant
-    'teal': Color(0xFF00695C), // teal.shade800 — vibrant
-    'orange': Color(0xFFE65100), // orange.shade800 — vibrant
-    'indigo': Color(0xFF283593), // indigo.shade800 — vibrant
-  };
+  /// The single brand seed color for the entire application.
+  /// A modern, vibrant blue (blue.shade800) that produces a clean
+  /// Material 3 ColorScheme in both light and dark mode.
+  static const Color brandBlue = Color(0xFF1565C0); // blue.shade800
 
-  /// The default authenticated accent color when a user's preference is
-  /// null, empty, or contains a removed/invalid value.
-  static const String defaultUserAccent = 'green';
+  // ── Light theme ─────────────────────────────────────────────────────
 
-  /// Login screen fixed accent color.
-  static const String loginAccent = 'blue';
-  static const Color _loginColor = Color(0xFF1565C0); // blue.shade800
-
-  // ── Migration helper ───────────────────────────────────────────────
-
-  /// Returns a valid user accent color name.
-  ///
-  /// If [preference] is null, empty, or contains a removed/invalid color
-  /// (e.g. 'blue', 'amber', 'cyan', 'red', 'pink'), it falls back to
-  /// [defaultUserAccent] ('green').
-  static String validateUserAccent(String? preference) {
-    if (preference == null || preference.isEmpty) return defaultUserAccent;
-    if (userAccentColors.containsKey(preference)) return preference;
-    return defaultUserAccent;
-  }
-
-  /// Returns the [Color] for a validated user accent name.
-  /// Always call [validateUserAccent] first if the preference may be
-  /// invalid.
-  static Color getUserAccentColor(String colorName) {
-    return userAccentColors[colorName] ?? userAccentColors['green']!;
-  }
-
-  // ── Login theme (fixed Blue) ───────────────────────────────────────
-
-  static ThemeData getLoginLightTheme() {
+  static ThemeData getLightTheme() {
     return _buildTheme(
-      seedColor: _loginColor,
+      seedColor: brandBlue,
       brightness: Brightness.light,
     );
   }
 
-  static ThemeData getLoginDarkTheme() {
-    return _buildTheme(
-      seedColor: _loginColor,
-      brightness: Brightness.dark,
-    );
-  }
+  // ── Dark theme ──────────────────────────────────────────────────────
 
-  // ── Authenticated user theme ───────────────────────────────────────
-
-  static ThemeData getLightTheme(String accentColorName) {
-    final accentColor = userAccentColors[accentColorName] ?? userAccentColors['green']!;
+  static ThemeData getDarkTheme() {
     return _buildTheme(
-      seedColor: accentColor,
-      brightness: Brightness.light,
-    );
-  }
-
-  static ThemeData getDarkTheme(String accentColorName) {
-    final accentColor = userAccentColors[accentColorName] ?? userAccentColors['green']!;
-    return _buildTheme(
-      seedColor: accentColor,
+      seedColor: brandBlue,
       brightness: Brightness.dark,
     );
   }
@@ -325,7 +272,7 @@ class AppColors {
         space: 1,
       ),
 
-      // ── SnackBar (used by dead code but kept for safety) ─────────
+      // ── SnackBar (kept for safety; AppSnackBar is unused) ────────
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
@@ -379,7 +326,7 @@ class AppColors {
   // ── Dark mode premium button gradient ──────────────────────────────
 
   /// Returns a subtle vertical gradient for a primary button in dark
-  /// mode, derived from the active accent color.
+  /// mode, derived from the brand color.
   ///
   /// The gradient goes from the primary color (top) to a slightly
   /// darkened primary (bottom), creating a subtle depth effect.

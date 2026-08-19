@@ -9,9 +9,7 @@ import 'package:pinoy_pos/ui/screens/products_screen.dart';
 import 'package:pinoy_pos/ui/screens/reports_screen.dart';
 import 'package:pinoy_pos/ui/screens/sales_screen.dart';
 import 'package:pinoy_pos/ui/screens/users_screen.dart';
-import 'package:pinoy_pos/ui/screens/settings_screen.dart';
 import 'package:pinoy_pos/ui/screens/more_screen.dart';
-import 'package:pinoy_pos/ui/screens/login_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_logo.dart';
 
 class AppShell extends ConsumerStatefulWidget {
@@ -58,8 +56,17 @@ class _AppShellState extends ConsumerState<AppShell> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isTablet = screenWidth >= 600;
 
+    // If not authenticated, show a loading indicator while the
+    // SplashScreen or login flow handles navigation. AppShell should
+    // only be visible when authenticated.
     if (authState.user == null) {
-      return const LoginScreen();
+      return Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(
+            color: Theme.of(context).colorScheme.primary,
+          ),
+        ),
+      );
     }
 
     final role = authState.user!.role;
@@ -225,13 +232,6 @@ class _AppShellState extends ConsumerState<AppShell> {
         selectedIcon: Icons.people,
         screen: const UsersScreen(),
         permission: 'manage_users',
-      ),
-      AppTab(
-        label: 'Settings',
-        icon: Icons.settings_outlined,
-        selectedIcon: Icons.settings,
-        screen: const SettingsScreen(),
-        permission: 'view_settings',
       ),
     ];
 

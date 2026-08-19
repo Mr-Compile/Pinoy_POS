@@ -7,6 +7,7 @@ import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
+import 'package:pinoy_pos/ui/widgets/app_header.dart';
 
 class ActivityLogsScreen extends ConsumerStatefulWidget {
   const ActivityLogsScreen({super.key});
@@ -55,7 +56,7 @@ class _ActivityLogsScreenState extends ConsumerState<ActivityLogsScreen> {
     final authNotifier = ref.read(authStateProvider.notifier);
     if (!authNotifier.hasPermission('view_activity_logs')) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Activity Logs')),
+        appBar: AppHeader(title: 'Activity Logs', showBackButton: true),
         body: const Center(
           child: Text('You do not have permission to view activity logs.'),
         ),
@@ -64,14 +65,14 @@ class _ActivityLogsScreenState extends ConsumerState<ActivityLogsScreen> {
 
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Activity Logs')),
+        appBar: AppHeader(title: 'Activity Logs', showBackButton: true),
         body: const LoadingState(),
       );
     }
 
     if (_loadError != null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Activity Logs')),
+        appBar: AppHeader(title: 'Activity Logs', showBackButton: true),
         body: ErrorState(
           title: 'Failed to Load Activity Logs',
           message: _loadError,
@@ -81,8 +82,9 @@ class _ActivityLogsScreenState extends ConsumerState<ActivityLogsScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Activity Logs'),
+      appBar: AppHeader(
+        title: 'Activity Logs',
+        showBackButton: true,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),

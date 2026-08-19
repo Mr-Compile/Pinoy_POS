@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/data/models/notification.dart' as models;
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
+import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
@@ -75,8 +76,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text('Notifications'),
+        appBar: AppHeader(
+          title: 'Notifications',
+          showBackButton: true,
         ),
         body: const LoadingState(),
       );
@@ -85,8 +87,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     final hasUnread = _notifications.any((n) => !n.isRead);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Notifications'),
+      appBar: AppHeader(
+        title: 'Notifications',
+        showBackButton: true,
         actions: [
           if (hasUnread)
             IconButton(

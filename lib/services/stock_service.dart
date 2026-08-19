@@ -136,14 +136,34 @@ class StockService {
         txn: txn,
       );
 
-      // Generate low-stock notification if product is now low
+      // Generate low-stock notification if product is now low.
+      // Dedup: only create a notification if there isn't already an
+      // unread one with the same title/message for the current user.
+      // This prevents spam when multiple adjustments keep the product
+      // below the threshold. Once the user reads the notification, a
+      // new low-stock event will generate a fresh alert.
       if (product.minStock > 0 && newStock <= product.minStock) {
-        await _notificationService.createNotification(
-          title: 'Low Stock Alert',
-          message: '${product.name} is at $newStock units (min: ${product.minStock})',
-          type: 'low_stock',
-          txn: txn,
-        );
+        final userId = _sessionManager.currentUser?.id;
+        if (userId != null) {
+          final title = 'Low Stock Alert';
+          final message =
+              '${product.name} is at $newStock units (min: ${product.minStock})';
+          final alreadyNotified = await _notificationService.hasUnreadNotification(
+            userId: userId,
+            type: 'low_stock',
+            title: title,
+            message: message,
+            txn: txn,
+          );
+          if (!alreadyNotified) {
+            await _notificationService.createNotification(
+              title: title,
+              message: message,
+              type: 'low_stock',
+              txn: txn,
+            );
+          }
+        }
       }
 
       return true;
@@ -184,14 +204,31 @@ class StockService {
 
       await _stockHistoryRepository.insert(history, txn: executor);
 
-      // Generate low-stock notification if product is now low
+      // Generate low-stock notification if product is now low.
+      // Dedup: only create a notification if there isn't already an
+      // unread one with the same title/message for the current user.
       if (product.minStock > 0 && newStock <= product.minStock) {
-        await _notificationService.createNotification(
-          title: 'Low Stock Alert',
-          message: '${product.name} is at $newStock units (min: ${product.minStock})',
-          type: 'low_stock',
-          txn: executor,
-        );
+        final userId = _sessionManager.currentUser?.id;
+        if (userId != null) {
+          final title = 'Low Stock Alert';
+          final message =
+              '${product.name} is at $newStock units (min: ${product.minStock})';
+          final alreadyNotified = await _notificationService.hasUnreadNotification(
+            userId: userId,
+            type: 'low_stock',
+            title: title,
+            message: message,
+            txn: executor,
+          );
+          if (!alreadyNotified) {
+            await _notificationService.createNotification(
+              title: title,
+              message: message,
+              type: 'low_stock',
+              txn: executor,
+            );
+          }
+        }
       }
 
       return true;

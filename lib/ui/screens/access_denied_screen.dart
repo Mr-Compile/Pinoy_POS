@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/ui/widgets/app_header.dart';
 
 class AccessDeniedScreen extends StatelessWidget {
   const AccessDeniedScreen({super.key});
@@ -10,8 +11,9 @@ class AccessDeniedScreen extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Access Denied'),
+      appBar: AppHeader(
+        title: 'Access Denied',
+        showBackButton: true,
       ),
       body: Center(
         child: Padding(

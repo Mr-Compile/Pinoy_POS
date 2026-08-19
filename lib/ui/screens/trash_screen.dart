@@ -11,6 +11,7 @@ import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
+import 'package:pinoy_pos/ui/widgets/app_header.dart';
 
 class TrashScreen extends ConsumerStatefulWidget {
   const TrashScreen({super.key});
@@ -365,14 +366,14 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
 
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Trash Bin')),
+        appBar: AppHeader(title: 'Trash Bin', showBackButton: true),
         body: const LoadingState(),
       );
     }
 
     if (_loadError != null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Trash Bin')),
+        appBar: AppHeader(title: 'Trash Bin', showBackButton: true),
         body: ErrorState(
           title: 'Failed to Load Trash',
           message: _loadError,
@@ -382,20 +383,15 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Trash Bin'),
+      appBar: AppHeader(
+        title: 'Trash Bin',
+        showBackButton: true,
         bottom: TabBar(
           controller: _tabController,
-          tabs: [
-            Tab(
-                text: 'Products (${_deletedProducts.length})',
-                icon: const Icon(Icons.inventory_2)),
-            Tab(
-                text: 'Categories (${_deletedCategories.length})',
-                icon: const Icon(Icons.category)),
-            Tab(
-                text: 'Users (${deletedUsers.length})',
-                icon: const Icon(Icons.people)),
+          tabs: const [
+            Tab(icon: Icon(Icons.inventory_2_outlined), text: 'Products'),
+            Tab(icon: Icon(Icons.category_outlined), text: 'Categories'),
+            Tab(icon: Icon(Icons.people_outline), text: 'Users'),
           ],
         ),
       ),

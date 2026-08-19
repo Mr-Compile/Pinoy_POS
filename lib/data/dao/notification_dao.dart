@@ -1,5 +1,6 @@
 import 'package:pinoy_pos/data/dao/base_dao.dart';
 import 'package:pinoy_pos/data/models/notification.dart';
+import 'package:sqflite/sqflite.dart';
 
 class NotificationDao extends BaseDao<Notification> {
   @override
@@ -71,5 +72,34 @@ class NotificationDao extends BaseDao<Notification> {
       where: 'user_id = ? AND is_read = 0',
       whereArgs: [userId],
     );
+  }
+
+  /// Checks whether an unread notification matching all of [type],
+  /// [title], and [message] already exists for [userId].
+  ///
+  /// Used for low-stock deduplication so that repeated stock adjustments
+  /// on a product that is already below its threshold do not spam the
+  /// user with identical notifications.
+  Future<bool> hasUnreadNotification({
+    required int userId,
+    required String type,
+    required String title,
+    required String message,
+    DatabaseExecutor? txn,
+  }) async {
+    final executor = txn ?? await db;
+    final result = await executor.rawQuery(
+      '''
+        SELECT COUNT(*) AS count
+        FROM notifications
+        WHERE user_id = ?
+          AND is_read = 0
+          AND type = ?
+          AND title = ?
+          AND message = ?
+      ''',
+      [userId, type, title, message],
+    );
+    return (result.first['count'] as int? ?? 0) > 0;
   }
 }
