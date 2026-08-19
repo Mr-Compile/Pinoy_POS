@@ -591,16 +591,54 @@ class AppDialogService {
     );
   }
 
-  // ── Restore Backup Warning ───────────────────────────────────────────
+  // ── Backup: Export Success ───────────────────────────────────────────
 
-  static Future<bool?> restoreBackupConfirm(BuildContext context) {
+  static Future<void> backupExportSuccess(
+    BuildContext context, {
+    required String displayName,
+    required String location,
+    String? fileSize,
+  }) {
+    return success(
+      context,
+      title: 'Backup Created Successfully',
+      message: 'Your Pinoy POS backup was saved successfully.',
+      details: 'File: $displayName\nLocation: $location${fileSize != null ? '\nSize: $fileSize' : ''}',
+      primaryLabel: 'Done',
+    );
+  }
+
+  // ── Backup: Export Failed ────────────────────────────────────────────
+
+  static Future<void> backupExportFailed(BuildContext context) {
+    return error(
+      context,
+      title: 'Backup Failed',
+      message: 'Failed to create the backup. Please try again.',
+    );
+  }
+
+  // ── Backup: Restore Confirmation ─────────────────────────────────────
+
+  static Future<bool?> restoreBackupConfirm(
+    BuildContext context, {
+    String? displayName,
+    String? fileSize,
+  }) {
+    final info = StringBuffer()
+      ..writeln('Restoring this backup may replace the current Pinoy POS data.')
+      ..writeln('Make sure you have created a recent backup before continuing.');
+    if (displayName != null) {
+      info.writeln('\nFile: $displayName');
+    }
+    if (fileSize != null) {
+      info.writeln('Size: $fileSize');
+    }
     return _show<bool>(
       context: context,
       type: AppDialogType.warning,
       title: 'Restore Backup?',
-      message:
-          'Restoring will replace all current data with the backup.\n'
-          'Please restart the app after restoring.',
+      message: info.toString(),
       actions: [
         AppDialogAction(
           label: 'Cancel',
@@ -613,6 +651,49 @@ class AppDialogService {
           onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
         ),
       ],
+    );
+  }
+
+  // ── Backup: Restore Success ──────────────────────────────────────────
+
+  static Future<void> backupRestoreSuccess(BuildContext context) {
+    return success(
+      context,
+      title: 'Backup Restored Successfully',
+      message: 'Your data has been restored successfully.\nThe application will refresh to load the restored data.',
+      primaryLabel: 'Continue',
+    );
+  }
+
+  // ── Backup: Restore Failed ───────────────────────────────────────────
+
+  static Future<void> backupRestoreFailed(BuildContext context) {
+    return error(
+      context,
+      title: 'Restore Failed',
+      message: 'Failed to restore the backup. The file may be corrupt or incompatible.',
+    );
+  }
+
+  // ── Backup: Invalid File ─────────────────────────────────────────────
+
+  static Future<void> invalidBackupFile(BuildContext context) {
+    return error(
+      context,
+      title: 'Invalid Backup File',
+      message: 'The selected file is not a valid Pinoy POS backup or cannot be restored.',
+      primaryLabel: 'Choose Another File',
+    );
+  }
+
+  // ── Backup: Incompatible ─────────────────────────────────────────────
+
+  static Future<void> incompatibleBackupFile(BuildContext context) {
+    return error(
+      context,
+      title: 'Incompatible Backup',
+      message: 'This backup file does not contain the required Pinoy POS data tables and cannot be restored.',
+      primaryLabel: 'Choose Another File',
     );
   }
 

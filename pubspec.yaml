@@ -55,6 +55,9 @@ dependencies:
   
   # Image Handling
   image_picker: ^1.1.2
+
+  # File / directory picker for backup & restore (cross-platform)
+  file_picker: ^8.1.2
   
   # PDF/CSV Export
   pdf: ^3.11.1
