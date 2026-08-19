@@ -10,9 +10,7 @@ import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
-import 'package:pinoy_pos/ui/widgets/enhanced_dialogs.dart';
-import 'package:pinoy_pos/ui/widgets/success_snackbar.dart';
-import 'package:pinoy_pos/ui/widgets/error_snackbar.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 
 class TrashScreen extends ConsumerStatefulWidget {
   const TrashScreen({super.key});
@@ -79,7 +77,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
   Future<void> _restoreProduct(Product product) async {
     final authNotifier = ref.read(authStateProvider.notifier);
     if (!authNotifier.hasPermission('restore_trash')) {
-      EnhancedDialogs.showAccessDeniedDialog(context: context);
+      AppDialogService.accessDenied(context);
       return;
     }
 
@@ -106,12 +104,12 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
         final productService = ref.read(productServiceProvider);
         await productService.restoreProduct(product.id!);
         if (mounted) {
-          showSuccessSnackbar(context, 'Product restored successfully');
+          await AppDialogService.success(context, title: 'Restored', message: 'Product restored successfully.');
           _loadTrash();
         }
       } catch (e) {
         if (mounted) {
-          showErrorSnackbar(context, 'Failed to restore product');
+          AppDialogService.error(context, title: 'Restore Failed', message: 'Failed to restore product.');
         }
       }
     }
@@ -122,7 +120,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
   Future<void> _permanentlyDeleteProduct(Product product) async {
     final authNotifier = ref.read(authStateProvider.notifier);
     if (!authNotifier.hasPermission('delete_products')) {
-      EnhancedDialogs.showAccessDeniedDialog(context: context);
+      AppDialogService.accessDenied(context);
       return;
     }
 
@@ -156,12 +154,12 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
         final productService = ref.read(productServiceProvider);
         await productService.permanentlyDeleteProduct(product.id!);
         if (mounted) {
-          showSuccessSnackbar(context, 'Product permanently deleted');
+          await AppDialogService.success(context, title: 'Deleted', message: 'Product permanently deleted.');
           _loadTrash();
         }
       } catch (e) {
         if (mounted) {
-          showErrorSnackbar(context, 'Failed to permanently delete product');
+          AppDialogService.error(context, title: 'Delete Failed', message: 'Failed to permanently delete product.');
         }
       }
     }
@@ -172,7 +170,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
   Future<void> _restoreCategory(Category category) async {
     final authNotifier = ref.read(authStateProvider.notifier);
     if (!authNotifier.hasPermission('restore_trash')) {
-      EnhancedDialogs.showAccessDeniedDialog(context: context);
+      AppDialogService.accessDenied(context);
       return;
     }
 
@@ -199,12 +197,12 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
         final categoryService = ref.read(categoryServiceProvider);
         await categoryService.restoreCategory(category.id!);
         if (mounted) {
-          showSuccessSnackbar(context, 'Category restored successfully');
+          await AppDialogService.success(context, title: 'Restored', message: 'Category restored successfully.');
           _loadTrash();
         }
       } catch (e) {
         if (mounted) {
-          showErrorSnackbar(context, 'Failed to restore category');
+          AppDialogService.error(context, title: 'Restore Failed', message: 'Failed to restore category.');
         }
       }
     }
@@ -215,7 +213,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
   Future<void> _permanentlyDeleteCategory(Category category) async {
     final authNotifier = ref.read(authStateProvider.notifier);
     if (!authNotifier.hasPermission('delete_categories')) {
-      EnhancedDialogs.showAccessDeniedDialog(context: context);
+      AppDialogService.accessDenied(context);
       return;
     }
 
@@ -249,12 +247,12 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
         final categoryService = ref.read(categoryServiceProvider);
         await categoryService.permanentlyDeleteCategory(category.id!);
         if (mounted) {
-          showSuccessSnackbar(context, 'Category permanently deleted');
+          await AppDialogService.success(context, title: 'Deleted', message: 'Category permanently deleted.');
           _loadTrash();
         }
       } catch (e) {
         if (mounted) {
-          showErrorSnackbar(context, 'Failed to permanently delete category');
+          AppDialogService.error(context, title: 'Delete Failed', message: 'Failed to permanently delete category.');
         }
       }
     }
@@ -265,7 +263,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
   Future<void> _restoreUser(User user) async {
     final authNotifier = ref.read(authStateProvider.notifier);
     if (!authNotifier.hasPermission('restore_trash')) {
-      EnhancedDialogs.showAccessDeniedDialog(context: context);
+      AppDialogService.accessDenied(context);
       return;
     }
 
@@ -296,10 +294,10 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
           .restoreUser(user.id!);
       if (mounted) {
         if (result.success) {
-          showSuccessSnackbar(context, result.message);
+          await AppDialogService.success(context, title: 'Done', message: result.message);
           _loadTrash();
         } else {
-          showErrorSnackbar(context, result.message);
+          AppDialogService.error(context, title: 'Error', message: result.message);
         }
       }
     }
@@ -310,7 +308,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
   Future<void> _permanentlyDeleteUser(User user) async {
     final authNotifier = ref.read(authStateProvider.notifier);
     if (!authNotifier.hasPermission('delete_users')) {
-      EnhancedDialogs.showAccessDeniedDialog(context: context);
+      AppDialogService.accessDenied(context);
       return;
     }
 
@@ -345,10 +343,10 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
           .permanentlyDeleteUser(user.id!);
       if (mounted) {
         if (result.success) {
-          showSuccessSnackbar(context, result.message);
+          await AppDialogService.success(context, title: 'Done', message: result.message);
           _loadTrash();
         } else {
-          showErrorSnackbar(context, result.message);
+          AppDialogService.error(context, title: 'Error', message: result.message);
         }
       }
     }

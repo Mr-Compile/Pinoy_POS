@@ -1,4 +1,4 @@
-﻿enum UserRole {
+enum UserRole {
   owner,
   admin,
   staff;
@@ -19,6 +19,7 @@ class User {
   final UserRole role;
   final String fullName;
   final String colorPreference;
+  final String? profileImagePath;
   final bool isActive;
   final DateTime? lastLogin;
   final DateTime createdAt;
@@ -33,6 +34,7 @@ class User {
     required this.role,
     required this.fullName,
     this.colorPreference = 'green',
+    this.profileImagePath,
     this.isActive = true,
     this.lastLogin,
     required this.createdAt,
@@ -49,6 +51,7 @@ class User {
       'role': role.name,
       'full_name': fullName,
       'color_preference': colorPreference,
+      'profile_image_path': profileImagePath,
       'is_active': isActive ? 1 : 0,
       'last_login': lastLogin?.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
@@ -69,6 +72,7 @@ class User {
       ),
       fullName: map['full_name'] as String,
       colorPreference: (map['color_preference'] as String?) ?? 'green',
+      profileImagePath: map['profile_image_path'] as String?,
       isActive: (map['is_active'] as int) == 1,
       lastLogin: map['last_login'] != null
           ? DateTime.parse(map['last_login'] as String)
@@ -91,6 +95,7 @@ class User {
     UserRole? role,
     String? fullName,
     String? colorPreference,
+    String? profileImagePath,
     bool? isActive,
     DateTime? lastLogin,
     DateTime? createdAt,
@@ -105,6 +110,7 @@ class User {
       role: role ?? this.role,
       fullName: fullName ?? this.fullName,
       colorPreference: colorPreference ?? this.colorPreference,
+      profileImagePath: profileImagePath ?? this.profileImagePath,
       isActive: isActive ?? this.isActive,
       lastLogin: lastLogin ?? this.lastLogin,
       createdAt: createdAt ?? this.createdAt,

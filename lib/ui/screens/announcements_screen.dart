@@ -6,11 +6,10 @@ import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
-import 'package:pinoy_pos/ui/widgets/enhanced_dialogs.dart';
-import 'package:pinoy_pos/ui/widgets/success_snackbar.dart';
-import 'package:pinoy_pos/ui/widgets/error_snackbar.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/validators.dart';
 import 'package:pinoy_pos/ui/widgets/loading_button.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 
 class AnnouncementsScreen extends ConsumerStatefulWidget {
   const AnnouncementsScreen({super.key});
@@ -47,12 +46,12 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
   Future<void> _deleteAnnouncement(Announcement announcement) async {
     final authNotifier = ref.read(authStateProvider.notifier);
     if (!authNotifier.hasPermission('manage_announcements')) {
-      EnhancedDialogs.showAccessDeniedDialog(context: context);
+      AppDialogService.accessDenied(context);
       return;
     }
 
-    final confirmed = await EnhancedDialogs.showDeleteDialog(
-      context: context,
+    final confirmed = await AppDialogService.deleteConfirm(
+      context,
       itemName: announcement.title,
     );
 
@@ -63,15 +62,15 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
             await announcementService.deleteAnnouncement(announcement.id!);
         if (mounted) {
           if (success) {
-            showSuccessSnackbar(context, 'Announcement deleted successfully');
+            await AppDialogService.success(context, title: 'Deleted', message: 'Announcement deleted successfully.');
             _loadAnnouncements();
           } else {
-            showErrorSnackbar(context, 'Failed to delete announcement');
+            AppDialogService.error(context, title: 'Delete Failed', message: 'Failed to delete announcement.');
           }
         }
       } catch (e) {
         if (mounted) {
-          showErrorSnackbar(context, 'Failed to delete announcement');
+          AppDialogService.error(context, title: 'Delete Failed', message: 'Failed to delete announcement.');
         }
       }
     }
@@ -130,9 +129,7 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
                           Expanded(
                             child: Text(
                               announcement.title,
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                              style: AppTypography.titleMediumBold(context),
                             ),
                           ),
                           if (canManage)
@@ -238,16 +235,15 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
                   if (context.mounted) {
                     Navigator.pop(context);
                     if (success) {
-                      showSuccessSnackbar(
-                          context, 'Announcement saved successfully');
+                      await AppDialogService.success(context, title: 'Saved', message: 'Announcement saved successfully.');
                       _loadAnnouncements();
                     } else {
-                      showErrorSnackbar(context, 'Failed to save announcement');
+                      AppDialogService.error(context, title: 'Save Failed', message: 'Failed to save announcement.');
                     }
                   }
                 } catch (e) {
                   if (context.mounted) {
-                    showErrorSnackbar(context, 'Failed to save announcement');
+                    AppDialogService.error(context, title: 'Save Failed', message: 'Failed to save announcement.');
                   }
                 } finally {
                   if (context.mounted) setState(() => isSaving = false);

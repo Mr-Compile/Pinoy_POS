@@ -12,6 +12,7 @@ import 'package:pinoy_pos/services/ai_usage_service.dart';
 import 'package:pinoy_pos/services/trash_service.dart';
 import 'package:pinoy_pos/services/announcement_service.dart';
 import 'package:pinoy_pos/services/user_service.dart';
+import 'package:pinoy_pos/services/image_service.dart';
 
 final productServiceProvider = Provider<ProductService>((ref) {
   return ProductService();
@@ -63,4 +64,8 @@ final announcementServiceProvider = Provider<AnnouncementService>((ref) {
 
 final userServiceProvider = Provider<UserService>((ref) {
   return UserService();
+});
+
+final imageServiceProvider = Provider<ImageService>((ref) {
+  return ImageService();
 });

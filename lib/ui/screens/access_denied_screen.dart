@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 
 class AccessDeniedScreen extends StatelessWidget {
   const AccessDeniedScreen({super.key});
@@ -29,9 +30,7 @@ class AccessDeniedScreen extends StatelessWidget {
               const SizedBox(height: 16),
               Text(
                 'Access Denied',
-                style: textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: AppTypography.headlineSmallBold(context),
               ),
               const SizedBox(height: 8),
               Text(

@@ -1,3 +1,4 @@
+import 'package:pinoy_pos/core/authorization_exception.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/announcement.dart';
 import 'package:pinoy_pos/data/repositories/announcement_repository.dart';
@@ -9,10 +10,16 @@ class AnnouncementService {
   final ActivityLogService _activityLogService = ActivityLogService();
 
   Future<List<Announcement>> getActiveAnnouncements() async {
+    if (!_sessionManager.hasPermission('view_announcements')) {
+      return [];
+    }
     return _announcementRepository.getActiveAnnouncements();
   }
 
   Future<List<Announcement>> getPinnedAnnouncements() async {
+    if (!_sessionManager.hasPermission('view_announcements')) {
+      return [];
+    }
     return _announcementRepository.getPinnedAnnouncements();
   }
 
@@ -30,7 +37,7 @@ class AnnouncementService {
     DateTime? expiresAt,
   }) async {
     if (!_sessionManager.hasPermission('manage_announcements')) {
-      return false;
+      throw AuthorizationException('manage_announcements');
     }
 
     if (title.isEmpty || content.isEmpty) {
@@ -57,7 +64,7 @@ class AnnouncementService {
 
   Future<bool> updateAnnouncement(Announcement announcement) async {
     if (!_sessionManager.hasPermission('manage_announcements')) {
-      return false;
+      throw AuthorizationException('manage_announcements');
     }
 
     if (announcement.title.isEmpty || announcement.content.isEmpty) {
@@ -76,7 +83,7 @@ class AnnouncementService {
 
   Future<bool> deleteAnnouncement(int id) async {
     if (!_sessionManager.hasPermission('manage_announcements')) {
-      return false;
+      throw AuthorizationException('manage_announcements');
     }
 
     await _announcementRepository.softDelete(id);
@@ -91,7 +98,7 @@ class AnnouncementService {
 
   Future<bool> togglePin(int id, bool isPinned) async {
     if (!_sessionManager.hasPermission('manage_announcements')) {
-      return false;
+      throw AuthorizationException('manage_announcements');
     }
 
     final announcement = await _announcementRepository.getById(id);

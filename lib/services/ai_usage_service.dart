@@ -1,3 +1,4 @@
+import 'package:pinoy_pos/core/authorization_exception.dart';
 import 'package:pinoy_pos/core/constants.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/ai_usage.dart';
@@ -8,6 +9,9 @@ class AIUsageService {
   final SessionManager _sessionManager = SessionManager();
 
   Future<int> getTodayUsageCount() async {
+    if (!_sessionManager.hasPermission('view_ai_advisor')) {
+      return 0;
+    }
     if (_sessionManager.currentUser == null) {
       return 0;
     }
@@ -15,11 +19,17 @@ class AIUsageService {
   }
 
   Future<bool> canUseAI() async {
+    if (!_sessionManager.hasPermission('view_ai_advisor')) {
+      return false;
+    }
     final todayCount = await getTodayUsageCount();
     return todayCount < AppConstants.maxDailyAIQueries;
   }
 
   Future<bool> recordQuery(String query, String? response) async {
+    if (!_sessionManager.hasPermission('view_ai_advisor')) {
+      throw AuthorizationException('view_ai_advisor');
+    }
     if (_sessionManager.currentUser == null) {
       return false;
     }
@@ -40,6 +50,9 @@ class AIUsageService {
   }
 
   Future<List<AIUsage>> getQueryHistory() async {
+    if (!_sessionManager.hasPermission('view_ai_advisor')) {
+      return [];
+    }
     if (_sessionManager.currentUser == null) {
       return [];
     }

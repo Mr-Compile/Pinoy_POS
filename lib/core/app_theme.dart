@@ -1,5 +1,47 @@
 import 'package:flutter/material.dart';
 
+/// Centralized typography helpers for consistent bold/semibold text styles
+/// across the app. Use these instead of `copyWith(fontWeight: FontWeight.bold)`.
+class AppTypography {
+  AppTypography._();
+
+  static TextStyle headlineSmallBold(BuildContext context) =>
+      Theme.of(context).textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+          ) ??
+      const TextStyle(fontSize: 24, fontWeight: FontWeight.bold);
+
+  static TextStyle titleLargeBold(BuildContext context) =>
+      Theme.of(context).textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+          ) ??
+      const TextStyle(fontSize: 22, fontWeight: FontWeight.bold);
+
+  static TextStyle titleMediumBold(BuildContext context) =>
+      Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ) ??
+      const TextStyle(fontSize: 16, fontWeight: FontWeight.bold);
+
+  static TextStyle titleMediumSemibold(BuildContext context) =>
+      Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ) ??
+      const TextStyle(fontSize: 16, fontWeight: FontWeight.w600);
+
+  static TextStyle titleSmallBold(BuildContext context) =>
+      Theme.of(context).textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+          ) ??
+      const TextStyle(fontSize: 14, fontWeight: FontWeight.bold);
+
+  static TextStyle headlineSmallSemibold(BuildContext context) =>
+      Theme.of(context).textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w600,
+          ) ??
+      const TextStyle(fontSize: 24, fontWeight: FontWeight.w600);
+}
+
 class AppColors {
   static const Map<String, Color> accentColors = {
     'green': Colors.green,

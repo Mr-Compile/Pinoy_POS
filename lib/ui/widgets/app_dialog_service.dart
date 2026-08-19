@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_messages.dart';
 
@@ -364,27 +365,120 @@ class AppDialogService {
 
   static Future<String?> voidSaleConfirm(BuildContext context) {
     final reasonController = TextEditingController();
+    final cs = Theme.of(context).colorScheme;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isTablet = screenWidth >= 600;
 
-    return _show<String>(
+    return showDialog<String>(
       context: context,
-      type: AppDialogType.warning,
-      title: 'Void Sale?',
-      message: 'Voiding a sale reverses the transaction. This action cannot be undone.',
-      actions: [
-        AppDialogAction(
-          label: 'Cancel',
-          onPressed: () => Navigator.of(context).pop(null),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => Semantics(
+          label: 'Confirmation required',
+          container: true,
+          child: Dialog(
+            backgroundColor: cs.surface,
+            elevation: 3,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(28),
+            ),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: isTablet ? 480.0 : double.infinity),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            color: cs.secondaryContainer,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(Icons.warning, size: 32, color: cs.secondary),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text('Void Sale?',
+                        style: AppTypography.headlineSmallSemibold(context),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Voiding a sale reverses the transaction. This action cannot be undone.',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: reasonController,
+                        decoration: const InputDecoration(
+                          labelText: 'Reason',
+                          border: OutlineInputBorder(),
+                        ),
+                        autofocus: true,
+                        maxLines: 2,
+                        onChanged: (_) => setState(() {}),
+                      ),
+                      const SizedBox(height: 24),
+                      if (isTablet)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(null),
+                              style: TextButton.styleFrom(minimumSize: const Size(88, 48)),
+                              child: const Text('Cancel'),
+                            ),
+                            const SizedBox(width: 8),
+                            FilledButton(
+                              onPressed: reasonController.text.trim().isEmpty
+                                  ? null
+                                  : () => Navigator.of(context).pop(reasonController.text.trim()),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: cs.error,
+                                foregroundColor: cs.onError,
+                                minimumSize: const Size(88, 48),
+                              ),
+                              child: const Text('Void Sale'),
+                            ),
+                          ],
+                        )
+                      else
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(null),
+                              style: TextButton.styleFrom(minimumSize: const Size(88, 48)),
+                              child: const Text('Cancel'),
+                            ),
+                            const SizedBox(height: 8),
+                            FilledButton(
+                              onPressed: reasonController.text.trim().isEmpty
+                                  ? null
+                                  : () => Navigator.of(context).pop(reasonController.text.trim()),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: cs.error,
+                                foregroundColor: cs.onError,
+                                minimumSize: const Size(88, 48),
+                              ),
+                              child: const Text('Void Sale'),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
-        AppDialogAction(
-          label: 'Void Sale',
-          isPrimary: true,
-          isDestructive: true,
-          onPressed: () {
-            final reason = reasonController.text.trim();
-            Navigator.of(context).pop(reason.isEmpty ? 'No reason provided' : reason);
-          },
-        ),
-      ],
+      ),
     );
   }
 

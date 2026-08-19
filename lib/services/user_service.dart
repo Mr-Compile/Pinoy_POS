@@ -76,16 +76,25 @@ class UserService {
 
   /// Returns all non-deleted users (User Management list).
   Future<List<User>> getAllUsers() async {
+    if (!_sessionManager.hasPermission('manage_users')) {
+      return [];
+    }
     return _userRepository.getAllActive();
   }
 
   /// Returns all soft-deleted users (Trash list).
   Future<List<User>> getDeletedUsers() async {
+    if (!_sessionManager.hasPermission('view_trash')) {
+      return [];
+    }
     return _userRepository.getDeleted();
   }
 
   /// Returns a single non-deleted user by id.
   Future<User?> getUserById(int id) async {
+    if (!_sessionManager.hasPermission('manage_users')) {
+      return null;
+    }
     return _userRepository.getById(id);
   }
 
@@ -190,6 +199,7 @@ class UserService {
     UserRole? role,
     String? pin,
     String? colorPreference,
+    String? profileImagePath,
   }) async {
     if (!_sessionManager.hasPermission('edit_users')) {
       throw AuthorizationException('edit_users');
@@ -236,6 +246,7 @@ class UserService {
       role: role ?? user.role,
       pin: (pin != null && pin.isNotEmpty) ? pin : user.pin,
       colorPreference: colorPreference ?? user.colorPreference,
+      profileImagePath: profileImagePath ?? user.profileImagePath,
       updatedAt: DateTime.now(),
     );
 

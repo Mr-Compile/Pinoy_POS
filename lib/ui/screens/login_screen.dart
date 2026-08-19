@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/theme_provider.dart';
-import 'package:pinoy_pos/ui/widgets/error_snackbar.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/validators.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -37,7 +37,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
 
     if (!success && mounted) {
-      showErrorSnackbar(context, 'Invalid username or password');
+      AppDialogService.error(context, title: 'Login Failed', message: 'Invalid username or password.');
     }
   }
 

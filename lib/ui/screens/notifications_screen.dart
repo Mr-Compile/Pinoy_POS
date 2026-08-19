@@ -5,8 +5,7 @@ import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
-import 'package:pinoy_pos/ui/widgets/success_snackbar.dart';
-import 'package:pinoy_pos/ui/widgets/error_snackbar.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 
 class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
@@ -49,7 +48,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       _loadNotifications();
     } catch (e) {
       if (mounted) {
-        showErrorSnackbar(context, 'Failed to mark notification as read');
+        AppDialogService.error(context, title: 'Error', message: 'Failed to mark notification as read.');
       }
     }
   }
@@ -60,12 +59,12 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       final notificationService = ref.read(notificationServiceProvider);
       await notificationService.markAllAsRead();
       if (mounted) {
-        showSuccessSnackbar(context, 'All notifications marked as read');
+        await AppDialogService.success(context, title: 'Done', message: 'All notifications marked as read.');
       }
       _loadNotifications();
     } catch (e) {
       if (mounted) {
-        showErrorSnackbar(context, 'Failed to mark all notifications as read');
+        AppDialogService.error(context, title: 'Error', message: 'Failed to mark all notifications as read.');
       }
     } finally {
       if (mounted) setState(() => _isProcessing = false);

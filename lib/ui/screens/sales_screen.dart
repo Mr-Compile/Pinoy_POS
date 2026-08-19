@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
@@ -7,10 +7,9 @@ import 'package:pinoy_pos/ui/screens/sale_detail_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
-import 'package:pinoy_pos/ui/widgets/enhanced_dialogs.dart';
 import 'package:pinoy_pos/ui/widgets/loading_button.dart';
-import 'package:pinoy_pos/ui/widgets/success_snackbar.dart';
-import 'package:pinoy_pos/ui/widgets/error_snackbar.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 
 class SalesScreen extends ConsumerStatefulWidget {
   const SalesScreen({super.key});
@@ -49,13 +48,11 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
   Future<void> _voidSale(Sale sale) async {
     final authNotifier = ref.read(authStateProvider.notifier);
     if (!authNotifier.hasPermission('void_sales')) {
-      EnhancedDialogs.showAccessDeniedDialog(context: context);
+      AppDialogService.accessDenied(context);
       return;
     }
 
-    final reason = await EnhancedDialogs.showVoidSaleDialog(
-      context: context,
-    );
+    final reason = await AppDialogService.voidSaleConfirm(context);
 
     if (reason != null && mounted) {
       setState(() {
@@ -70,10 +67,10 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
             _isProcessing = false;
           });
           if (success) {
-            showSuccessSnackbar(context, 'Sale voided successfully');
+            await AppDialogService.success(context, title: 'Done', message: 'Sale voided successfully.');
             _loadSales();
           } else {
-            showErrorSnackbar(context, 'Failed to void sale');
+            AppDialogService.error(context, title: 'Error', message: 'Failed to void sale.');
           }
         }
       } catch (e) {
@@ -81,7 +78,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
           setState(() {
             _isProcessing = false;
           });
-          showErrorSnackbar(context, 'Failed to void sale');
+          AppDialogService.error(context, title: 'Error', message: 'Failed to void sale.');
         }
       }
     }
@@ -142,9 +139,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                       children: [
                         Text(
                           'PHP ${sale.totalAmount.toStringAsFixed(2)}',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
+                          style: AppTypography.titleMediumBold(context),
                         ),
                         if (canVoid) ...[
                           const SizedBox(width: 8),

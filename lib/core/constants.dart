@@ -1,10 +1,10 @@
-﻿/// Application-wide constants
+/// Application-wide constants
 class AppConstants {
   AppConstants._();
 
   // Database
   static const String databaseName = 'pinoy_pos.db';
-  static const int databaseVersion = 3;
+  static const int databaseVersion = 4;
 
   // App Info
   static const String appName = 'Pinoy POS';
@@ -22,4 +22,7 @@ class AppConstants {
 
   // Stock
   static const int defaultLowStockThreshold = 10;
+
+  // Images
+  static const int maxImageSizeBytes = 5 * 1024 * 1024; // 5 MB
 }

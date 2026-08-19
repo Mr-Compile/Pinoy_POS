@@ -1,14 +1,20 @@
+import 'package:pinoy_pos/core/authorization_exception.dart';
+import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
 import 'package:pinoy_pos/data/repositories/settings_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsService {
   final SettingsRepository _settingsRepository = SettingsRepository();
+  final SessionManager _sessionManager = SessionManager();
   Settings? _currentSettings;
 
   Settings? get currentSettings => _currentSettings;
 
   Future<Settings> getSettings() async {
+    if (!_sessionManager.hasPermission('view_settings')) {
+      throw AuthorizationException('view_settings');
+    }
     if (_currentSettings != null) {
       return _currentSettings!;
     }
@@ -29,6 +35,9 @@ class SettingsService {
   }
 
   Future<bool> updateSettings(Settings settings) async {
+    if (!_sessionManager.hasPermission('edit_settings')) {
+      throw AuthorizationException('edit_settings');
+    }
     final updated = settings.copyWith(updatedAt: DateTime.now());
     await _settingsRepository.update(updated);
     _currentSettings = updated;

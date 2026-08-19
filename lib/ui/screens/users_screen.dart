@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
@@ -7,9 +7,7 @@ import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
-import 'package:pinoy_pos/ui/widgets/enhanced_dialogs.dart';
-import 'package:pinoy_pos/ui/widgets/success_snackbar.dart';
-import 'package:pinoy_pos/ui/widgets/error_snackbar.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/validators.dart';
 import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 
@@ -39,13 +37,13 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
   Future<void> _deleteUser(User user) async {
     final authNotifier = ref.read(authStateProvider.notifier);
     if (!authNotifier.hasPermission('delete_users')) {
-      EnhancedDialogs.showAccessDeniedDialog(context: context);
+      AppDialogService.accessDenied(context);
       return;
     }
 
     final currentUser = ref.read(authStateProvider).user;
     if (currentUser?.id == user.id) {
-      showErrorSnackbar(context, 'You cannot delete your own account');
+      AppDialogService.warning(context, title: 'Action Not Allowed', message: 'You cannot delete your own account.');
       return;
     }
 
@@ -78,9 +76,9 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
           .softDeleteUser(user.id!);
       if (mounted) {
         if (result.success) {
-          showSuccessSnackbar(context, result.message);
+          await AppDialogService.success(context, title: 'Done', message: result.message);
         } else {
-          showErrorSnackbar(context, result.message);
+          AppDialogService.error(context, title: 'Error', message: result.message);
         }
       }
     }
@@ -91,13 +89,13 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
   Future<void> _toggleUserActive(User user) async {
     final authNotifier = ref.read(authStateProvider.notifier);
     if (!authNotifier.hasPermission('toggle_user_active')) {
-      EnhancedDialogs.showAccessDeniedDialog(context: context);
+      AppDialogService.accessDenied(context);
       return;
     }
 
     final currentUser = ref.read(authStateProvider).user;
     if (currentUser?.id == user.id && user.isActive) {
-      showErrorSnackbar(context, 'You cannot deactivate your own account');
+      AppDialogService.warning(context, title: 'Action Not Allowed', message: 'You cannot deactivate your own account.');
       return;
     }
 
@@ -130,7 +128,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
           .read(userControllerProvider.notifier)
           .deactivateUser(user.id!);
       if (mounted) {
-        showSuccessSnackbar(context, result.message);
+        await AppDialogService.success(context, title: 'Done', message: result.message);
       }
     } else {
       // Activate directly.
@@ -138,7 +136,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
           .read(userControllerProvider.notifier)
           .activateUser(user.id!);
       if (mounted) {
-        showSuccessSnackbar(context, result.message);
+        await AppDialogService.success(context, title: 'Done', message: result.message);
       }
     }
   }
@@ -148,7 +146,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
   Future<void> _resetPassword(User user) async {
     final authNotifier = ref.read(authStateProvider.notifier);
     if (!authNotifier.hasPermission('reset_password')) {
-      EnhancedDialogs.showAccessDeniedDialog(context: context);
+      AppDialogService.accessDenied(context);
       return;
     }
 
@@ -221,9 +219,9 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     );
 
     if (result == true && mounted) {
-      showSuccessSnackbar(context, 'Password reset successfully');
+      await AppDialogService.success(context, title: 'Password Reset', message: 'Password reset successfully.');
     } else if (result == false && mounted) {
-      showErrorSnackbar(context, 'Failed to reset password');
+      AppDialogService.error(context, title: 'Reset Failed', message: 'Failed to reset password.');
     }
   }
 
@@ -232,7 +230,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
   Future<void> _editUser(User user) async {
     final authNotifier = ref.read(authStateProvider.notifier);
     if (!authNotifier.hasPermission('edit_users')) {
-      EnhancedDialogs.showAccessDeniedDialog(context: context);
+      AppDialogService.accessDenied(context);
       return;
     }
 
@@ -328,9 +326,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
             TextButton(
               onPressed: () async {
                 if (hasChanges) {
-                  final discard = await EnhancedDialogs.showUnsavedChangesDialog(
-                    context: context,
-                  );
+                  final discard = await AppDialogService.unsavedChanges(context);
                   if (discard == true && context.mounted) {
                     Navigator.pop(context, false);
                   }
@@ -368,12 +364,9 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     );
 
     if (result == true && mounted) {
-      showSuccessSnackbar(context, 'User updated successfully');
+      await AppDialogService.success(context, title: 'Updated', message: 'User updated successfully.');
     } else if (result == false && mounted) {
-      showErrorSnackbar(
-        context,
-        ref.read(userControllerProvider).error ?? 'Failed to update user',
-      );
+      AppDialogService.error(context, title: 'Update Failed', message: ref.read(userControllerProvider).error ?? 'Failed to update user');
     }
   }
 
@@ -382,7 +375,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
   void _showAddUserDialog() {
     final authNotifier = ref.read(authStateProvider.notifier);
     if (!authNotifier.hasPermission('manage_users')) {
-      EnhancedDialogs.showAccessDeniedDialog(context: context);
+      AppDialogService.accessDenied(context);
       return;
     }
 
@@ -521,9 +514,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
             TextButton(
               onPressed: () async {
                 if (hasChanges) {
-                  final discard = await EnhancedDialogs.showUnsavedChangesDialog(
-                    context: context,
-                  );
+                  final discard = await AppDialogService.unsavedChanges(context);
                   if (discard == true && context.mounted) {
                     Navigator.pop(context);
                   }
@@ -550,11 +541,15 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                 );
                 if (context.mounted) {
                   setState(() => isSaving = false);
-                  if (res.success) {
-                    showSuccessSnackbar(context, res.message);
-                    Navigator.pop(context);
-                  } else {
-                    showErrorSnackbar(context, res.message);
+                }
+                if (res.success) {
+                  if (context.mounted) {
+                    await AppDialogService.success(context, title: 'Created', message: res.message);
+                  }
+                  if (context.mounted) Navigator.pop(context);
+                } else {
+                  if (context.mounted) {
+                    AppDialogService.error(context, title: 'Create Failed', message: res.message);
                   }
                 }
               },

@@ -1,3 +1,4 @@
+import 'package:pinoy_pos/core/authorization_exception.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/trash_item.dart';
 import 'package:pinoy_pos/data/repositories/trash_repository.dart';
@@ -45,7 +46,7 @@ class TrashService {
 
   Future<bool> restoreFromTrash(int trashId, String entityType, int entityId) async {
     if (!_sessionManager.hasPermission('restore_trash')) {
-      return false;
+      throw AuthorizationException('restore_trash');
     }
 
     switch (entityType) {
@@ -65,8 +66,8 @@ class TrashService {
   }
 
   Future<bool> permanentDelete(int trashId, String entityType, int entityId) async {
-    if (!_sessionManager.hasPermission('view_trash')) {
-      return false;
+    if (!_sessionManager.hasPermission('restore_trash')) {
+      throw AuthorizationException('restore_trash');
     }
 
     switch (entityType) {
@@ -86,8 +87,8 @@ class TrashService {
   }
 
   Future<bool> emptyTrash() async {
-    if (!_sessionManager.hasPermission('view_trash')) {
-      return false;
+    if (!_sessionManager.hasPermission('restore_trash')) {
+      throw AuthorizationException('restore_trash');
     }
 
     final items = await _trashRepository.getAll();

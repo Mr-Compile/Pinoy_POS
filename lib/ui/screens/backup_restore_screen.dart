@@ -8,7 +8,6 @@ import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
-import 'package:pinoy_pos/ui/widgets/app_feedback.dart';
 
 class BackupRestoreScreen extends ConsumerStatefulWidget {
   const BackupRestoreScreen({super.key});
@@ -64,12 +63,12 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
       final backupService = ref.read(backupServiceProvider);
       await backupService.createBackup();
       if (mounted) {
-        AppFeedback.success(context, 'Backup created successfully');
+        await AppDialogService.success(context, title: 'Backup Created', message: 'Your backup was successfully saved.');
         _loadBackups();
       }
     } catch (e) {
       if (mounted) {
-        AppFeedback.error(context, 'Failed to create backup: $e');
+        AppDialogService.error(context, title: 'Backup Failed', message: 'Failed to create backup. Please try again.');
       }
     } finally {
       if (mounted) {
@@ -96,14 +95,14 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
       final success = await backupService.restoreBackup(backup.filePath);
       if (mounted) {
         if (success) {
-          AppFeedback.success(context, 'Backup restored successfully. Please restart the app.');
+          await AppDialogService.success(context, title: 'Restore Complete', message: 'Backup restored successfully. Please restart the app.');
         } else {
-          AppFeedback.error(context, 'Failed to restore backup. File may be corrupt or missing.');
+          AppDialogService.error(context, title: 'Restore Failed', message: 'Failed to restore backup. The file may be corrupt or missing.');
         }
       }
     } catch (e) {
       if (mounted) {
-        AppFeedback.error(context, 'Failed to restore backup: $e');
+        AppDialogService.error(context, title: 'Restore Failed', message: 'Failed to restore backup. Please try again.');
       }
     } finally {
       if (mounted) {
@@ -127,15 +126,15 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
       final success = await backupService.deleteBackup(backup.id!, backup.filePath);
       if (mounted) {
         if (success) {
-          AppFeedback.success(context, 'Backup deleted successfully');
+          await AppDialogService.success(context, title: 'Deleted', message: 'Backup deleted successfully.');
           _loadBackups();
         } else {
-          AppFeedback.error(context, 'Failed to delete backup');
+          AppDialogService.error(context, title: 'Delete Failed', message: 'Failed to delete backup.');
         }
       }
     } catch (e) {
       if (mounted) {
-        AppFeedback.error(context, 'Failed to delete backup');
+        AppDialogService.error(context, title: 'Delete Failed', message: 'Failed to delete backup.');
       }
     }
   }

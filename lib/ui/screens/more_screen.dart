@@ -14,7 +14,7 @@ import 'package:pinoy_pos/ui/screens/settings_screen.dart';
 import 'package:pinoy_pos/ui/screens/users_screen.dart';
 import 'package:pinoy_pos/ui/screens/stock_screen.dart';
 import 'package:pinoy_pos/ui/screens/trash_screen.dart';
-import 'package:pinoy_pos/ui/widgets/enhanced_dialogs.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 
 class MoreScreen extends ConsumerWidget {
   const MoreScreen({super.key});
@@ -175,9 +175,7 @@ class MoreScreen extends ConsumerWidget {
               ),
               trailing: Icon(Icons.chevron_right, color: colorScheme.error),
               onTap: () async {
-                final confirmed = await EnhancedDialogs.showLogoutDialog(
-                  context: context,
-                );
+                final confirmed = await AppDialogService.logoutConfirm(context);
                 if (confirmed == true) {
                   await authNotifier.logout();
                 }

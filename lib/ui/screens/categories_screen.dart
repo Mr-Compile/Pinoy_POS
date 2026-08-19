@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
@@ -7,7 +7,6 @@ import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
-import 'package:pinoy_pos/ui/widgets/app_feedback.dart';
 import 'package:pinoy_pos/ui/widgets/validators.dart';
 import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 
@@ -66,18 +65,15 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
         );
         if (mounted) {
           if (success) {
-            AppFeedback.success(
-              context,
-              category.isActive ? 'Category deactivated' : 'Category activated',
-            );
+            await AppDialogService.success(context, title: 'Done', message: category.isActive ? 'Category deactivated.' : 'Category activated.');
             _loadCategories();
           } else {
-            AppFeedback.error(context, 'Failed to update category status');
+            AppDialogService.error(context, title: 'Error', message: 'Failed to update category status.');
           }
         }
       } catch (e) {
         if (mounted) {
-          AppFeedback.error(context, 'Failed to update category status');
+          AppDialogService.error(context, title: 'Error', message: 'Failed to update category status.');
         }
       }
     }
@@ -100,12 +96,12 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
         final categoryService = ref.read(categoryServiceProvider);
         await categoryService.deleteCategory(category.id!);
         if (mounted) {
-          AppFeedback.success(context, 'Category deleted successfully');
+          await AppDialogService.success(context, title: 'Deleted', message: 'Category deleted successfully.');
           _loadCategories();
         }
       } catch (e) {
         if (mounted) {
-          AppFeedback.error(context, 'Failed to delete category');
+          AppDialogService.error(context, title: 'Delete Failed', message: 'Failed to delete category.');
         }
       }
     }
@@ -279,7 +275,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
     );
 
     if (isDuplicate) {
-      AppFeedback.error(context, 'Category name already exists');
+      AppDialogService.error(context, title: 'Duplicate Name', message: 'Category name already exists.');
       return;
     }
 
@@ -297,14 +293,14 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
       if (category == null) {
         await categoryService.createCategory(categoryData);
         if (mounted) {
-          AppFeedback.success(context, 'Category created successfully');
+          await AppDialogService.success(context, title: 'Created', message: 'Category created successfully.');
         }
       } else {
         await categoryService.updateCategory(
           category.copyWith(name: categoryData.name),
         );
         if (mounted) {
-          AppFeedback.success(context, 'Category updated successfully');
+          await AppDialogService.success(context, title: 'Updated', message: 'Category updated successfully.');
         }
       }
 
@@ -314,7 +310,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
       }
     } catch (e) {
       if (mounted) {
-        AppFeedback.error(context, 'Failed to save category');
+        AppDialogService.error(context, title: 'Save Failed', message: 'Failed to save category.');
       }
     } finally {
       if (mounted) {

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/data/models/sale_item.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
@@ -94,9 +95,7 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
                               children: [
                                 Text(
                                   'Pinoy POS',
-                                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                  style: AppTypography.titleMediumBold(context),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
@@ -199,13 +198,13 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
           Text(
             label,
             style: isTotal
-                ? Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)
+                ? AppTypography.titleMediumBold(context)
                 : Theme.of(context).textTheme.bodyMedium,
           ),
           Text(
             value,
             style: isTotal
-                ? Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)
+                ? AppTypography.titleMediumBold(context)
                 : Theme.of(context).textTheme.bodyMedium,
           ),
         ],

@@ -236,6 +236,13 @@ class SalesService {
     }
 
     final now = DateTime.now();
+    // Staff: only own sales
+    if (_sessionManager.currentUser?.role == UserRole.staff) {
+      return _saleRepository.getTotalSalesForDateForUser(
+        now,
+        _sessionManager.currentUser!.id!,
+      );
+    }
     return _saleRepository.getTotalSalesForDate(now);
   }
 
@@ -245,11 +252,25 @@ class SalesService {
     }
 
     final now = DateTime.now();
+    // Staff: only own sales
+    if (_sessionManager.currentUser?.role == UserRole.staff) {
+      return _saleRepository.getTotalSalesForMonthForUser(
+        now.year,
+        now.month,
+        _sessionManager.currentUser!.id!,
+      );
+    }
     return _saleRepository.getTotalSalesForMonth(now.year, now.month);
   }
 
   Future<double> getUserSales(int userId) async {
     if (!_sessionManager.hasPermission('view_sales')) {
+      return 0.0;
+    }
+
+    // Staff can only query their own sales total.
+    if (_sessionManager.currentUser?.role == UserRole.staff &&
+        _sessionManager.currentUser?.id != userId) {
       return 0.0;
     }
 

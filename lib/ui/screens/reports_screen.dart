@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
@@ -8,8 +8,8 @@ import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
-import 'package:pinoy_pos/ui/widgets/success_snackbar.dart';
-import 'package:pinoy_pos/ui/widgets/error_snackbar.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 
 class ReportsScreen extends ConsumerStatefulWidget {
   const ReportsScreen({super.key});
@@ -244,9 +244,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           Text(label),
           Text(
             value,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+            style: AppTypography.titleMediumBold(context),
           ),
         ],
       ),
@@ -272,11 +270,11 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       await _recordExport(fileFormat: 'csv', filePath: file.path);
 
       if (mounted) {
-        showSuccessSnackbar(context, 'CSV exported: ${file.path}');
+        await AppDialogService.success(context, title: 'Exported', message: 'CSV exported: ${file.path}');
       }
     } catch (e) {
       if (mounted) {
-        showErrorSnackbar(context, 'Failed to export CSV');
+        AppDialogService.error(context, title: 'Export Failed', message: 'Failed to export CSV.');
       }
     } finally {
       if (mounted) setState(() => _isExporting = false);
@@ -346,11 +344,11 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       await _recordExport(fileFormat: 'pdf', filePath: file.path);
 
       if (mounted) {
-        showSuccessSnackbar(context, 'PDF exported: ${file.path}');
+        await AppDialogService.success(context, title: 'Exported', message: 'PDF exported: ${file.path}');
       }
     } catch (e) {
       if (mounted) {
-        showErrorSnackbar(context, 'Failed to export PDF');
+        AppDialogService.error(context, title: 'Export Failed', message: 'Failed to export PDF.');
       }
     } finally {
       if (mounted) setState(() => _isExporting = false);

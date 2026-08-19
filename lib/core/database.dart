@@ -153,6 +153,13 @@ class DatabaseHelper {
       await db.execute('CREATE INDEX IF NOT EXISTS idx_backup_history_date ON backup_history(created_at)');
       await db.execute('CREATE INDEX IF NOT EXISTS idx_export_history_date ON export_history(created_at)');
     }
+
+    // Migration from v3 → v4: add profile_image_path to users table.
+    if (oldVersion < 4) {
+      await db.execute(
+        'ALTER TABLE users ADD COLUMN profile_image_path TEXT',
+      );
+    }
   }
 
   Future<void> _createTables(Database db) async {
@@ -174,6 +181,7 @@ class DatabaseHelper {
         full_name TEXT NOT NULL,
         is_active INTEGER NOT NULL DEFAULT 1,
         color_preference TEXT,
+        profile_image_path TEXT,
         last_login TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT,

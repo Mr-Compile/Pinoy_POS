@@ -9,6 +9,7 @@ import 'package:pinoy_pos/ui/screens/users_screen.dart';
 import 'package:pinoy_pos/ui/screens/reports_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -273,9 +274,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           Flexible(
             child: Text(
               stat.value,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: AppTypography.headlineSmallBold(context),
               overflow: TextOverflow.ellipsis,
             ),
           ),

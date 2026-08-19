@@ -4,11 +4,12 @@ import 'package:pinoy_pos/data/models/product.dart';
 import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
+import 'package:pinoy_pos/services/image_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
+import 'package:pinoy_pos/ui/widgets/app_image.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
-import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
-import 'package:pinoy_pos/ui/widgets/app_feedback.dart';
 import 'package:pinoy_pos/ui/widgets/validators.dart';
 import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 
@@ -100,12 +101,12 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
         final productService = ref.read(productServiceProvider);
       await productService.deleteProduct(product.id!);
         if (mounted) {
-          AppFeedback.success(context, 'Product deleted successfully');
+          await AppDialogService.success(context, title: 'Deleted', message: 'Product deleted successfully.');
           _loadData();
         }
       } catch (e) {
         if (mounted) {
-          AppFeedback.error(context, 'Failed to delete product');
+          AppDialogService.error(context, title: 'Delete Failed', message: 'Failed to delete product.');
         }
       }
     }
@@ -207,6 +208,17 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                       return AppCard(
                         margin: const EdgeInsets.only(bottom: 12),
                         child: ListTile(
+                          leading: SizedBox(
+                            width: 56,
+                            height: 56,
+                            child: AppImage(
+                              imagePath: product.imageUrl,
+                              borderRadius: 8,
+                              placeholderIcon: Icons.inventory_2,
+                              placeholderIconSize: 28,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
                           title: Text(product.name),
                           subtitle: Text(
                               '${category.name} • Stock: ${product.stock}'),
@@ -251,6 +263,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     int? selectedCategoryId = product?.categoryId;
     bool hasChanges = false;
     bool isSaving = false;
+    String? selectedImagePath = product?.imageUrl;
 
     showDialog(
       context: context,
@@ -263,6 +276,94 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // ── Image section ──
+                  GestureDetector(
+                    onTap: () async {
+                      final imageService = ImageService();
+                      final result = await imageService.pickAndStoreImage();
+                      if (!context.mounted) return;
+                      if (result.isSuccess) {
+                        setState(() {
+                          selectedImagePath = result.filePath;
+                          hasChanges = true;
+                        });
+                      } else if (result.error != 'No image selected') {
+                        await AppDialogService.error(
+                          context,
+                          title: 'Image Error',
+                          message: result.error ?? 'Failed to select image.',
+                        );
+                      }
+                    },
+                    child: Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: selectedImagePath != null && selectedImagePath!.isNotEmpty
+                          ? Stack(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: AppImage(
+                                    imagePath: selectedImagePath,
+                                    borderRadius: 12,
+                                    placeholderIcon: Icons.inventory_2,
+                                    placeholderIconSize: 32,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                                Positioned(
+                                  bottom: 4,
+                                  right: 4,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context).colorScheme.primary,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      Icons.camera_alt,
+                                      size: 16,
+                                      color: Theme.of(context).colorScheme.onPrimary,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            )
+                          : Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.add_a_photo,
+                                  size: 32,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Add Image',
+                                  style: Theme.of(context).textTheme.labelSmall,
+                                ),
+                              ],
+                            ),
+                    ),
+                  ),
+                  if (selectedImagePath != null && selectedImagePath!.isNotEmpty)
+                    TextButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          selectedImagePath = null;
+                          hasChanges = true;
+                        });
+                      },
+                      icon: const Icon(Icons.remove_circle_outline, size: 18),
+                      label: const Text('Remove Image'),
+                    ),
+                  const SizedBox(height: 12),
                   TextFormField(
                     controller: nameController,
                     decoration: const InputDecoration(
@@ -379,6 +480,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                 priceController,
                 stockController,
                 selectedCategoryId,
+                selectedImagePath,
                 product,
                 setState,
                 (value) => setState(() => isSaving = value),
@@ -397,6 +499,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     TextEditingController priceController,
     TextEditingController stockController,
     int? selectedCategoryId,
+    String? selectedImagePath,
     Product? product,
     StateSetter setState,
     ValueChanged<bool> setSaving,
@@ -415,7 +518,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     );
     
     if (isDuplicate) {
-      AppFeedback.error(context, 'Product name already exists in this category');
+      AppDialogService.error(context, title: 'Duplicate Name', message: 'Product name already exists in this category.');
       return;
     }
 
@@ -427,6 +530,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
         price: double.parse(priceController.text),
         stock: int.parse(stockController.text),
         categoryId: selectedCategoryId,
+        imageUrl: selectedImagePath,
         createdAt: DateTime.now(),
       );
 
@@ -434,20 +538,28 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
         final productService = ref.read(productServiceProvider);
         await productService.createProduct(productData);
         if (mounted) {
-          AppFeedback.success(context, 'Product created successfully');
+          await AppDialogService.success(context, title: 'Created', message: 'Product created successfully.');
         }
       } else {
         final productService = ref.read(productServiceProvider);
+        final oldImagePath = product.imageUrl;
         await productService.updateProduct(
           product.copyWith(
             name: productData.name,
             price: productData.price,
             stock: productData.stock,
             categoryId: productData.categoryId,
+            imageUrl: productData.imageUrl,
           ),
         );
+        // Clean up old image if it was replaced or removed
+        if (oldImagePath != null &&
+            oldImagePath.isNotEmpty &&
+            oldImagePath != selectedImagePath) {
+          await ImageService().deleteImage(oldImagePath);
+        }
         if (mounted) {
-          AppFeedback.success(context, 'Product updated successfully');
+          await AppDialogService.success(context, title: 'Updated', message: 'Product updated successfully.');
         }
       }
 
@@ -457,7 +569,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        AppFeedback.error(context, 'Failed to save product');
+        AppDialogService.error(context, title: 'Save Failed', message: 'Failed to save product.');
       }
     } finally {
       setSaving(false);

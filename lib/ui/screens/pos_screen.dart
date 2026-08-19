@@ -8,9 +8,8 @@ import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_button.dart';
-import 'package:pinoy_pos/ui/widgets/success_snackbar.dart';
-import 'package:pinoy_pos/ui/widgets/error_snackbar.dart';
-import 'package:pinoy_pos/ui/widgets/enhanced_dialogs.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 
 class POSScreen extends ConsumerStatefulWidget {
   const POSScreen({super.key});
@@ -64,18 +63,18 @@ class _POSScreenState extends ConsumerState<POSScreen> {
 
   void _addToCart(Product product) {
     if (product.id == null) {
-      showErrorSnackbar(context, 'Invalid product');
+      AppDialogService.error(context, title: 'Error', message: 'Invalid product');
       return;
     }
 
     if (product.stock <= 0) {
-      showErrorSnackbar(context, 'Product is out of stock');
+      AppDialogService.error(context, title: 'Error', message: 'Product is out of stock');
       return;
     }
     
     final currentQuantity = _cart[product.id!] ?? 0;
     if (currentQuantity >= product.stock) {
-      showErrorSnackbar(context, 'Not enough stock available');
+      AppDialogService.error(context, title: 'Error', message: 'Not enough stock available');
       return;
     }
     
@@ -98,13 +97,13 @@ class _POSScreenState extends ConsumerState<POSScreen> {
 
   Future<void> _checkout() async {
     if (_cart.isEmpty) {
-      showErrorSnackbar(context, 'Cart is empty');
+      AppDialogService.error(context, title: 'Error', message: 'Cart is empty');
       return;
     }
 
     final authNotifier = ref.read(authStateProvider.notifier);
     if (!authNotifier.hasPermission('create_sales')) {
-      EnhancedDialogs.showAccessDeniedDialog(context: context);
+      AppDialogService.accessDenied(context);
       return;
     }
 
@@ -150,13 +149,13 @@ class _POSScreenState extends ConsumerState<POSScreen> {
             _cart.clear();
             _isProcessing = false;
           });
-          showSuccessSnackbar(context, 'Sale completed successfully');
+          AppDialogService.success(context, title: 'Success', message: 'Sale completed successfully');
           _loadProducts();
         } else {
           setState(() {
             _isProcessing = false;
           });
-          showErrorSnackbar(context, 'Failed to complete sale');
+          AppDialogService.error(context, title: 'Error', message: 'Failed to complete sale');
         }
       }
     } catch (e) {
@@ -164,7 +163,7 @@ class _POSScreenState extends ConsumerState<POSScreen> {
         setState(() {
           _isProcessing = false;
         });
-        showErrorSnackbar(context, 'Failed to complete sale: $e');
+        AppDialogService.error(context, title: 'Error', message: 'Failed to complete sale');
       }
     }
   }
@@ -240,9 +239,7 @@ class _POSScreenState extends ConsumerState<POSScreen> {
                     const SizedBox(height: 4),
                     Text(
                       '₱${product.price.toStringAsFixed(2)}',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                      style: AppTypography.titleMediumBold(context),
                     ),
                     const SizedBox(height: 8),
                     Row(
@@ -300,9 +297,7 @@ class _POSScreenState extends ConsumerState<POSScreen> {
                       ),
                       Text(
                         '₱${_total.toStringAsFixed(2)}',
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                        style: AppTypography.headlineSmallBold(context),
                       ),
                     ],
                   ),
@@ -363,9 +358,7 @@ class _POSScreenState extends ConsumerState<POSScreen> {
                     const SizedBox(height: 4),
                     Text(
                       '₱${product.price.toStringAsFixed(2)}',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                      style: AppTypography.titleLargeBold(context),
                     ),
                     const SizedBox(height: 8),
                     Row(
@@ -455,9 +448,7 @@ class _POSScreenState extends ConsumerState<POSScreen> {
                     ),
                     Text(
                       '₱${_total.toStringAsFixed(2)}',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                      style: AppTypography.headlineSmallBold(context),
                     ),
                   ],
                 ),

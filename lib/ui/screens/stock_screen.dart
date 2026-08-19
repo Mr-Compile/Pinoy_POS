@@ -6,9 +6,7 @@ import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
-import 'package:pinoy_pos/ui/widgets/enhanced_dialogs.dart';
-import 'package:pinoy_pos/ui/widgets/success_snackbar.dart';
-import 'package:pinoy_pos/ui/widgets/error_snackbar.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 
 class StockScreen extends ConsumerStatefulWidget {
   const StockScreen({super.key});
@@ -54,14 +52,14 @@ class _StockScreenState extends ConsumerState<StockScreen> {
   Future<void> _changeStock(Product product, int adjustment) async {
     final authNotifier = ref.read(authStateProvider.notifier);
     if (!authNotifier.hasPermission('add_stock')) {
-      EnhancedDialogs.showAccessDeniedDialog(context: context);
+      AppDialogService.accessDenied(context);
       return;
     }
 
     final isAdd = adjustment > 0;
     final newStock = product.stock + adjustment;
     if (newStock < 0) {
-      showErrorSnackbar(context, 'Insufficient stock to remove');
+      AppDialogService.warning(context, title: 'Insufficient Stock', message: 'Insufficient stock to remove.');
       return;
     }
 
@@ -69,7 +67,7 @@ class _StockScreenState extends ConsumerState<StockScreen> {
     // adjust_stock permission; block it at the UI layer as well so the
     // confirmation dialog is never shown for an unauthorized action.
     if (!isAdd && !authNotifier.hasPermission('adjust_stock')) {
-      EnhancedDialogs.showAccessDeniedDialog(context: context);
+      AppDialogService.accessDenied(context);
       return;
     }
 
@@ -122,18 +120,15 @@ class _StockScreenState extends ConsumerState<StockScreen> {
         }
         if (mounted) {
           if (success) {
-            showSuccessSnackbar(
-              context,
-              isAdd ? 'Stock added successfully' : 'Stock adjusted successfully',
-            );
+            await AppDialogService.success(context, title: 'Done', message: isAdd ? 'Stock added successfully.' : 'Stock adjusted successfully.');
             _loadProducts();
           } else {
-            showErrorSnackbar(context, 'Failed to update stock');
+            AppDialogService.error(context, title: 'Error', message: 'Failed to update stock.');
           }
         }
       } catch (e) {
         if (mounted) {
-          showErrorSnackbar(context, 'Failed to update stock');
+          AppDialogService.error(context, title: 'Error', message: 'Failed to update stock.');
         }
       } finally {
         if (mounted) {

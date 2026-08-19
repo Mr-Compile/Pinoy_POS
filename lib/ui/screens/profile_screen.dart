@@ -3,9 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/user_provider.dart';
+import 'package:pinoy_pos/services/image_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
-import 'package:pinoy_pos/ui/widgets/success_snackbar.dart';
-import 'package:pinoy_pos/ui/widgets/error_snackbar.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
+import 'package:pinoy_pos/ui/widgets/app_image.dart';
 import 'package:pinoy_pos/ui/widgets/validators.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/ui/widgets/loading_button.dart';
@@ -42,15 +43,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             Center(
               child: Column(
                 children: [
-                  CircleAvatar(
-                    radius: 48,
-                    child: Text(
-                      user.fullName.isNotEmpty
-                          ? user.fullName[0].toUpperCase()
-                          : '?',
-                      style: const TextStyle(fontSize: 36),
-                    ),
-                  ),
+                  _buildAvatar(user),
                   const SizedBox(height: 16),
                   Text(
                     user.fullName,
@@ -163,6 +156,89 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
+  // ── AVATAR ───────────────────────────────────────────────────────────
+
+  Widget _buildAvatar(User user) {
+    return Stack(
+      children: [
+        AppAvatar(
+          imagePath: user.profileImagePath,
+          initials: user.fullName,
+          radius: 48,
+          semanticLabel: 'Profile picture',
+        ),
+        Positioned(
+          bottom: 0,
+          right: 0,
+          child: Material(
+            color: Theme.of(context).colorScheme.primary,
+            shape: const CircleBorder(),
+            child: InkWell(
+              onTap: () => _changeProfilePicture(user),
+              customBorder: const CircleBorder(),
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Icon(
+                  Icons.camera_alt,
+                  size: 20,
+                  color: Theme.of(context).colorScheme.onPrimary,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── CHANGE PROFILE PICTURE ───────────────────────────────────────────
+
+  Future<void> _changeProfilePicture(User user) async {
+    final imageService = ImageService();
+    final result = await imageService.pickAndStoreImage();
+
+    if (!mounted) return;
+
+    if (!result.isSuccess) {
+      if (result.error != 'No image selected') {
+        await AppDialogService.error(
+          context,
+          title: 'Image Error',
+          message: result.error ?? 'Failed to select image.',
+        );
+      }
+      return;
+    }
+
+    final oldImagePath = user.profileImagePath;
+
+    final success = await ref.read(authStateProvider.notifier).updateProfile(
+          userId: user.id!,
+          fullName: user.fullName,
+          profileImagePath: result.filePath,
+        );
+
+    if (!mounted) return;
+
+    if (success) {
+      if (oldImagePath != null && oldImagePath.isNotEmpty) {
+        await imageService.deleteImage(oldImagePath);
+      }
+      if (!mounted) return;
+      await AppDialogService.success(
+        context,
+        title: 'Profile Picture Updated',
+        message: 'Your profile picture has been saved.',
+      );
+    } else {
+      await AppDialogService.error(
+        context,
+        title: 'Update Failed',
+        message: 'Failed to update profile picture. Please try again.',
+      );
+    }
+  }
+
   // ── EDIT PROFILE (full name) ─────────────────────────────────────────
 
   void _showEditProfileDialog(User user) {
@@ -214,9 +290,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   setState(() => isSaving = false);
                   Navigator.pop(context);
                   if (success) {
-                    showSuccessSnackbar(context, 'Profile updated successfully');
+                    await AppDialogService.success(context, title: 'Profile Updated', message: 'Profile updated successfully.');
                   } else {
-                    showErrorSnackbar(context, 'Failed to update profile');
+                    AppDialogService.error(context, title: 'Update Failed', message: 'Failed to update profile.');
                   }
                 }
               },
@@ -286,9 +362,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   setState(() => isSaving = false);
                   Navigator.pop(context);
                   if (success) {
-                    showSuccessSnackbar(context, 'PIN updated successfully');
+                    await AppDialogService.success(context, title: 'PIN Updated', message: 'PIN updated successfully.');
                   } else {
-                    showErrorSnackbar(context, 'Failed to update PIN');
+                    AppDialogService.error(context, title: 'Update Failed', message: 'Failed to update PIN.');
                   }
                 }
               },
@@ -337,9 +413,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   if (context.mounted) {
                     Navigator.pop(context);
                     if (success) {
-                      showSuccessSnackbar(context, 'Accent color updated');
+                      await AppDialogService.success(context, title: 'Color Updated', message: 'Accent color updated successfully.');
                     } else {
-                      showErrorSnackbar(context, 'Failed to update accent color');
+                      AppDialogService.error(context, title: 'Update Failed', message: 'Failed to update accent color.');
                     }
                   }
                 },
@@ -427,9 +503,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   setState(() => isSaving = false);
                   Navigator.pop(context);
                   if (result.success) {
-                    showSuccessSnackbar(context, result.message);
+                    await AppDialogService.success(context, title: 'Password Changed', message: result.message);
                   } else {
-                    showErrorSnackbar(context, result.message);
+                    AppDialogService.error(context, title: 'Change Failed', message: result.message);
                   }
                 }
               },

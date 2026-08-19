@@ -93,7 +93,7 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
   Future<void> logout() async {
     await _authService.logout();
     _themeNotifier.clearUserColorPreference();
-    state = state.copyWith(user: null);
+    state = AuthState();
   }
 
   /// Reloads the current user from the database and updates the auth state.
@@ -125,12 +125,14 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
     required String fullName,
     String? pin,
     String? colorPreference,
+    String? profileImagePath,
   }) async {
     final success = await _authService.updateProfile(
       userId: userId,
       fullName: fullName,
       pin: pin,
       colorPreference: colorPreference,
+      profileImagePath: profileImagePath,
     );
     if (success) {
       state = state.copyWith(user: _authService.currentUser);

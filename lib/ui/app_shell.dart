@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/user.dart';
@@ -25,6 +25,16 @@ class _AppShellState extends ConsumerState<AppShell> {
   int _selectedIndex = 0;
 
   @override
+  void initState() {
+    super.initState();
+    ref.listen<AuthState>(authStateProvider, (previous, next) {
+      if (previous?.user?.id != next.user?.id) {
+        _selectedIndex = 0;
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
     final screenWidth = MediaQuery.of(context).size.width;
@@ -37,18 +47,17 @@ class _AppShellState extends ConsumerState<AppShell> {
     final role = authState.user!.role;
     final tabs = _getTabsForRole(role);
 
-    if (_selectedIndex >= tabs.length) {
-      _selectedIndex = 0;
-    }
+    final selectedIndex =
+        _selectedIndex < tabs.length ? _selectedIndex : 0;
 
     if (isTablet) {
       return Scaffold(
         body: Row(
           children: [
-            _buildNavigationRail(tabs, screenWidth),
+            _buildNavigationRail(tabs, screenWidth, selectedIndex),
             const VerticalDivider(thickness: 1, width: 1),
             Expanded(
-              child: _getScreen(tabs[_selectedIndex].screen),
+              child: _getScreen(tabs[selectedIndex].screen),
             ),
           ],
         ),
@@ -56,9 +65,9 @@ class _AppShellState extends ConsumerState<AppShell> {
     }
 
     return Scaffold(
-      drawer: _buildDrawer(tabs),
-      body: _getScreen(tabs[_selectedIndex].screen),
-      bottomNavigationBar: _buildBottomNavigationBar(tabs),
+      drawer: _buildDrawer(tabs, selectedIndex),
+      body: _getScreen(tabs[selectedIndex].screen),
+      bottomNavigationBar: _buildBottomNavigationBar(tabs, selectedIndex),
     );
   }
 
@@ -66,9 +75,10 @@ class _AppShellState extends ConsumerState<AppShell> {
     return screen;
   }
 
-  NavigationRail _buildNavigationRail(List<AppTab> tabs, double screenWidth) {
+  NavigationRail _buildNavigationRail(
+      List<AppTab> tabs, double screenWidth, int selectedIndex) {
     return NavigationRail(
-      selectedIndex: _selectedIndex,
+      selectedIndex: selectedIndex,
       onDestinationSelected: (index) {
         setState(() {
           _selectedIndex = index;
@@ -92,7 +102,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     );
   }
 
-  Widget _buildDrawer(List<AppTab> tabs) {
+  Widget _buildDrawer(List<AppTab> tabs, int selectedIndex) {
     return Drawer(
       child: ListView(
         padding: EdgeInsets.zero,
@@ -114,7 +124,7 @@ class _AppShellState extends ConsumerState<AppShell> {
             return ListTile(
               leading: Icon(tab.icon),
               title: Text(tab.label),
-              selected: _selectedIndex == index,
+              selected: selectedIndex == index,
               onTap: () {
                 setState(() {
                   _selectedIndex = index;
@@ -128,9 +138,10 @@ class _AppShellState extends ConsumerState<AppShell> {
     );
   }
 
-  NavigationBar _buildBottomNavigationBar(List<AppTab> tabs) {
+  NavigationBar _buildBottomNavigationBar(
+      List<AppTab> tabs, int selectedIndex) {
     return NavigationBar(
-      selectedIndex: _selectedIndex,
+      selectedIndex: selectedIndex,
       onDestinationSelected: (index) {
         setState(() {
           _selectedIndex = index;
