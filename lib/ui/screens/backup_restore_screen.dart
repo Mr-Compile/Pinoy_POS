@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/backup_history.dart';
@@ -37,38 +35,6 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
   bool _isExporting = false;
   bool _isImporting = false;
   String? _loadError;
-  String _defaultLocation = '';
-
-  @override
-  void initState() {
-    super.initState();
-    _loadBackups();
-    _loadDefaultLocation();
-  }
-
-  Future<void> _loadDefaultLocation() async {
-    try {
-      final appDir = await getApplicationDocumentsDirectory();
-      if (mounted) {
-        setState(() {
-          _defaultLocation = appDir.path;
-        });
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _defaultLocation = 'App Documents';
-        });
-      }
-    }
-  }
-
-  String _getDisplayLocation(String path) {
-    final dir = p.dirname(path);
-    final parts = p.split(dir);
-    if (parts.length <= 3) return parts.join(' › ');
-    return '... › ${parts.sublist(parts.length - 3).join(' › ')}';
-  }
 
   Future<void> _loadBackups() async {
     setState(() {
@@ -104,7 +70,17 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
 
     try {
       final backupService = ref.read(backupServiceProvider);
-      final result = await backupService.exportBackup();
+      final result = await backupService.exportBackup(
+        onConfirm: (selectedPath, displayName) async {
+          if (!mounted) return false;
+          final location = backupService.getDisplayLocation(selectedPath);
+          return AppDialogService.backupDestinationConfirm(
+            context,
+            displayName: displayName,
+            location: location,
+          );
+        },
+      );
 
       if (!mounted) return;
 
@@ -179,9 +155,12 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
   Future<void> _restoreFromHistory(BackupHistory backup) async {
     if (_isImporting) return;
 
+    final backupService = ref.read(backupServiceProvider);
+    final displayName = backupService.getDisplayName(backup.filePath);
+
     final confirmed = await AppDialogService.restoreBackupConfirm(
       context,
-      displayName: backup.filePath.split('/').last,
+      displayName: displayName,
       fileSize: _formatFileSize(backup.fileSize),
     );
 
@@ -190,7 +169,6 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
     setState(() => _isImporting = true);
 
     try {
-      final backupService = ref.read(backupServiceProvider);
       final result = await backupService.restoreFromPath(backup.filePath);
 
       if (!mounted) return;
@@ -223,15 +201,17 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
   // ── Delete Backup ────────────────────────────────────────────────────
 
   Future<void> _deleteBackup(BackupHistory backup) async {
+    final backupService = ref.read(backupServiceProvider);
+    final displayName = backupService.getDisplayName(backup.filePath);
+
     final confirmed = await AppDialogService.permanentDeleteConfirm(
       context,
-      itemName: backup.filePath.split('/').last,
+      itemName: displayName,
     );
 
     if (confirmed != true || !mounted) return;
 
     try {
-      final backupService = ref.read(backupServiceProvider);
       final success = await backupService.deleteBackup(backup.id!, backup.filePath);
       if (!mounted) return;
       if (success) {
@@ -384,6 +364,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
   Widget _buildStatusCard(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final backupService = ref.read(backupServiceProvider);
 
     final sortedBackups = List<BackupHistory>.from(_backups)
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -405,9 +386,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
               const SizedBox(width: Spacing.sm),
               Text(
                 'Data Protection',
-                style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                style: AppTypography.titleMediumBold(context),
               ),
             ],
           ),
@@ -430,11 +409,28 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
               ],
             ),
             const SizedBox(height: Spacing.xs),
-            Text(
-              'Size: ${_formatFileSize(actualLatest.fileSize)}',
-              style: theme.textTheme.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant,
+            Row(
+              children: [
+                Icon(Icons.folder_outlined, size: 16, color: cs.onSurfaceVariant),
+                const SizedBox(width: Spacing.xs),
+                Expanded(
+                  child: Text(
+                    backupService.getDisplayLocation(actualLatest.filePath),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
+                ),
+                const SizedBox(width: Spacing.sm),
+                Text(
+                  _formatFileSize(actualLatest.fileSize),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                ),
+              ],
             ),
           ] else ...[
             Row(
@@ -456,48 +452,6 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
               ],
             ),
           ],
-          const SizedBox(height: Spacing.lg),
-          // Default backup location info
-          Row(
-            children: [
-              Icon(
-                Icons.folder_outlined,
-                size: 20,
-                color: cs.onSurfaceVariant,
-              ),
-              const SizedBox(width: Spacing.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Default backup location:',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                            color: cs.onSurfaceVariant,
-                          ),
-                    ),
-                    if (_defaultLocation.isNotEmpty)
-                      Text(
-                        _getDisplayLocation(_defaultLocation),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                              fontWeight: FontWeight.w500,
-                            ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: Spacing.sm),
-          Text(
-            'You can choose a different location each time you export.',
-            style: theme.textTheme.bodySmall?.copyWith(
-                  color: cs.onSurfaceVariant.withValues(alpha: 0.7),
-                  fontStyle: FontStyle.italic,
-                ),
-          ),
           const SizedBox(height: Spacing.lg),
           SizedBox(
             width: double.infinity,
@@ -526,9 +480,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
   Widget _buildSectionHeader(BuildContext context, String title) {
     return Text(
       title,
-      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+      style: AppTypography.titleLargeBold(context),
     );
   }
 
@@ -619,9 +571,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                   children: [
                     Text(
                       fileName,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
+                      style: AppTypography.titleMediumSemibold(context),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -753,9 +703,7 @@ class _QuickActionCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   title,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                  style: AppTypography.titleMediumSemibold(context),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),

@@ -236,6 +236,20 @@ class _AppShellState extends ConsumerState<AppShell> {
   }
 
   List<AppTab> _getTabsForRole(UserRole role) {
+    final authNotifier = ref.read(authStateProvider.notifier);
+
+    // Determine whether the More screen would have any accessible entries
+    // for the current user.  More is only shown if at least one More
+    // screen permission is granted.
+    final morePermissions = [
+      'view_categories',
+      'add_stock',
+      'view_reports',
+      'view_announcements',
+    ];
+    final hasMoreEntries =
+        morePermissions.any((p) => authNotifier.hasPermission(p));
+
     final moreTab = AppTab(
       label: 'More',
       icon: Icons.more_horiz,
@@ -274,7 +288,7 @@ class _AppShellState extends ConsumerState<AppShell> {
             screen: const SalesScreen(),
             permission: 'view_sales',
           ),
-          moreTab,
+          if (hasMoreEntries) moreTab,
         ];
 
       case UserRole.admin:
@@ -307,7 +321,7 @@ class _AppShellState extends ConsumerState<AppShell> {
             screen: const SettingsScreen(),
             permission: 'view_settings',
           ),
-          moreTab,
+          if (hasMoreEntries) moreTab,
         ];
 
       case UserRole.staff:
@@ -340,7 +354,7 @@ class _AppShellState extends ConsumerState<AppShell> {
             screen: const SalesScreen(),
             permission: 'view_sales',
           ),
-          moreTab,
+          if (hasMoreEntries) moreTab,
         ];
     }
   }

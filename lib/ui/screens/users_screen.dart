@@ -83,27 +83,10 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
       return;
     }
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete User?'),
-        content: Text(
-          '${user.fullName} (@${user.username}) will be moved to Trash.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final confirmed = await AppDialogService.deleteConfirm(
+      context,
+      itemName: '${user.fullName} (@${user.username})',
+      permanent: false,
     );
 
     if (confirmed == true && mounted) {
@@ -137,27 +120,9 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
 
     if (user.isActive) {
       // Confirm deactivation.
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Deactivate User?'),
-          content: Text(
-            '${user.fullName} will no longer be able to log in.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: FilledButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.error,
-              ),
-              child: const Text('Deactivate'),
-            ),
-          ],
-        ),
+      final confirmed = await AppDialogService.deactivateUserConfirm(
+        context,
+        userName: user.fullName,
       );
       if (confirmed != true || !mounted) return;
       final result = await ref

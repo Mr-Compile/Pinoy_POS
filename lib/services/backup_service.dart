@@ -74,10 +74,17 @@ class BackupService {
   /// On mobile (Android/iOS), uses the system file picker save dialog
   /// (SAF / document picker). On web, triggers a browser download.
   ///
+  /// If [onConfirm] is provided, it is called after the user selects a
+  /// destination but before the backup is written.  If it returns false,
+  /// the export is canceled and the temp file is cleaned up.  This lets
+  /// the UI show a confirmation dialog with the selected location.
+  ///
   /// Returns [BackupExportResult.success] with the saved path, or
   /// [BackupExportResult.canceled] / [BackupExportResult.failed].
   Future<({BackupExportResult result, String? path, String? displayName})>
-      exportBackup() async {
+      exportBackup({
+    Future<bool> Function(String selectedPath, String displayName)? onConfirm,
+  }) async {
     if (!_sessionManager.hasPermission('backup_restore')) {
       throw AuthorizationException('backup_restore');
     }
@@ -121,16 +128,27 @@ class BackupService {
       );
 
       if (result == null || result.isEmpty) {
-        // User canceled
+        // User canceled the save dialog
         await _safeDelete(tempFile);
         return (result: BackupExportResult.canceled, path: null, displayName: null);
       }
 
       savedPath = result;
     } catch (e) {
-      // Fallback: save to app documents directory if picker unavailable
-      final appDir = await getApplicationDocumentsDirectory();
-      savedPath = p.join(appDir.path, defaultName);
+      // Picker failed — do NOT silently fall back to a default directory.
+      // The admin must explicitly choose where to save the backup.
+      await _safeDelete(tempFile);
+      return (result: BackupExportResult.failed, path: null, displayName: null);
+    }
+
+    // Show confirmation dialog if callback is provided
+    final prospectiveName = p.basename(savedPath);
+    if (onConfirm != null) {
+      final confirmed = await onConfirm(savedPath, prospectiveName);
+      if (!confirmed) {
+        await _safeDelete(tempFile);
+        return (result: BackupExportResult.canceled, path: null, displayName: null);
+      }
     }
 
     // 3. Copy temp backup to the chosen destination

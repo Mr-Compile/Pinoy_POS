@@ -591,6 +591,37 @@ class AppDialogService {
     );
   }
 
+  // ── Backup: Export Destination Confirmation ──────────────────────────
+
+  /// Shows a confirmation dialog with the selected backup destination
+  /// before the backup file is actually written.
+  ///
+  /// Returns true if the user confirms, false if they cancel.
+  static Future<bool> backupDestinationConfirm(
+    BuildContext context, {
+    required String displayName,
+    required String location,
+  }) {
+    return _show<bool>(
+      context: context,
+      type: AppDialogType.info,
+      title: 'Save Backup To',
+      message: 'Please confirm the backup destination.',
+      details: 'File: $displayName\nLocation: $location',
+      actions: [
+        AppDialogAction(
+          label: 'Cancel',
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
+        ),
+        AppDialogAction(
+          label: 'Save Backup',
+          isPrimary: true,
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
+        ),
+      ],
+    ).then((v) => v ?? false);
+  }
+
   // ── Backup: Export Success ───────────────────────────────────────────
 
   static Future<void> backupExportSuccess(
