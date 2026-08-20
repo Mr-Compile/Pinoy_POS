@@ -3,6 +3,7 @@ import 'package:pinoy_pos/services/auth_service.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/ai_advisor_provider.dart';
 import 'package:pinoy_pos/providers/dashboard_provider.dart';
+import 'package:pinoy_pos/providers/notification_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/providers/user_provider.dart';
 import 'package:pinoy_pos/services/user_service.dart';
@@ -114,6 +115,12 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
           isLoading: false,
           phase: phase,
         );
+        // Invalidate providers that hold per-user cached state so they
+        // reload with the new user's data.  Without this, the dashboard
+        // and notification badge show stale data (or the "Not
+        // authenticated" error left over from the previous logout).
+        _ref.invalidate(dashboardProvider);
+        _ref.invalidate(notificationCountProvider);
       case LoginResult.invalidCredentials:
         state = state.copyWith(isLoading: false, error: 'Username or password is incorrect.');
       case LoginResult.inactiveAccount:
@@ -134,6 +141,9 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
           isLoading: false,
           phase: AuthSessionPhase.fullyAuthenticated,
         );
+        // Reload per-user cached state for the new session.
+        _ref.invalidate(dashboardProvider);
+        _ref.invalidate(notificationCountProvider);
       } else {
         state = state.copyWith(isLoading: false, error: 'Incorrect username or PIN.');
       }
@@ -155,6 +165,7 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
     _ref.invalidate(stockServiceProvider);
     _ref.invalidate(activityLogServiceProvider);
     _ref.invalidate(notificationServiceProvider);
+    _ref.invalidate(notificationCountProvider);
     _ref.invalidate(settingsServiceProvider);
     _ref.invalidate(reportServiceProvider);
     _ref.invalidate(backupServiceProvider);
@@ -212,6 +223,9 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
         phase: phase,
         error: null,
       );
+      // Reload per-user cached state after password change.
+      _ref.invalidate(dashboardProvider);
+      _ref.invalidate(notificationCountProvider);
     }
     return result;
   }
@@ -227,6 +241,9 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
         phase: AuthSessionPhase.fullyAuthenticated,
         error: null,
       );
+      // Reload per-user cached state after PIN verification.
+      _ref.invalidate(dashboardProvider);
+      _ref.invalidate(notificationCountProvider);
     }
     return result;
   }
@@ -241,6 +258,7 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
     _ref.invalidate(stockServiceProvider);
     _ref.invalidate(activityLogServiceProvider);
     _ref.invalidate(notificationServiceProvider);
+    _ref.invalidate(notificationCountProvider);
     _ref.invalidate(settingsServiceProvider);
     _ref.invalidate(reportServiceProvider);
     _ref.invalidate(backupServiceProvider);

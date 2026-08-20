@@ -3,6 +3,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:pinoy_pos/core/authorization_exception.dart';
+import 'package:pinoy_pos/core/constants.dart';
 import 'package:pinoy_pos/core/database.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/dao/backup_history_dao.dart';
@@ -62,6 +63,7 @@ class BackupService {
     'trash',
     'backup_history',
     'export_history',
+    'backup_metadata',
   ];
 
   // ── Export / Create Backup ───────────────────────────────────────────
@@ -92,6 +94,10 @@ class BackupService {
     } catch (e) {
       return (result: BackupExportResult.failed, path: null, displayName: null);
     }
+
+    // Write backup metadata into the temp copy so import can verify
+    // this is a genuine Pinoy POS backup.
+    await _writeBackupMetadata(tempBackupPath);
 
     // Validate the temp backup is non-empty
     final tempFile = File(tempBackupPath);
@@ -470,6 +476,27 @@ class BackupService {
           return BackupImportResult.incompatible;
         }
       }
+
+      // Verify backup_metadata row identifies this as a Pinoy POS backup.
+      try {
+        final metaRows = await testDb.query(
+          'backup_metadata',
+          where: 'id = 1',
+          limit: 1,
+        );
+        if (metaRows.isEmpty) {
+          await testDb.close();
+          return BackupImportResult.incompatible;
+        }
+        final appName = metaRows.first['app_name'] as String?;
+        if (appName != AppConstants.appName) {
+          await testDb.close();
+          return BackupImportResult.incompatible;
+        }
+      } catch (_) {
+        await testDb.close();
+        return BackupImportResult.incompatible;
+      }
     } catch (_) {
       await _safeClose(testDb);
       return BackupImportResult.invalidFile;
@@ -493,6 +520,7 @@ class BackupService {
       final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
       final safetyPath = p.join(tempDir.path, 'pinoy_pos_safety_$timestamp.db');
       await File(dbPath).copy(safetyPath);
+      await _writeBackupMetadata(safetyPath);
       return safetyPath;
     } catch (_) {
       return null;
@@ -522,6 +550,32 @@ class BackupService {
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────
+
+  /// Writes a metadata row into the backup database file identifying it
+  /// as a genuine Pinoy POS backup.  This is called after copying the
+  /// live database to a temp file during export.
+  Future<void> _writeBackupMetadata(String backupPath) async {
+    Database? metaDb;
+    try {
+      metaDb = await openDatabase(backupPath);
+      await metaDb.insert(
+        'backup_metadata',
+        {
+          'id': 1,
+          'app_name': AppConstants.appName,
+          'app_version': AppConstants.appVersion,
+          'database_version': AppConstants.databaseVersion,
+          'created_at': DateTime.now().toIso8601String(),
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    } catch (_) {
+      // Best-effort: old backups created before this feature won't have
+      // the table, and that's fine — they'll fail validation on import.
+    } finally {
+      await _safeClose(metaDb);
+    }
+  }
 
   String _formatFileSize(int bytes) {
     if (bytes < 1024) return '$bytes B';

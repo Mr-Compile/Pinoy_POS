@@ -209,6 +209,20 @@ class DatabaseHelper {
         'ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0',
       );
     }
+
+    // Migration from v7 → v8: create backup_metadata table for strict
+    // backup import validation.
+    if (oldVersion < 8) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS backup_metadata (
+          id INTEGER PRIMARY KEY CHECK (id = 1),
+          app_name TEXT NOT NULL,
+          app_version TEXT NOT NULL,
+          database_version INTEGER NOT NULL,
+          created_at TEXT NOT NULL
+        )
+      ''');
+    }
   }
 
   Future<void> _createTables(Database db) async {
@@ -433,6 +447,20 @@ class DatabaseHelper {
       )
     ''');
 
+    // Backup metadata table — stores a single row identifying this
+    // database as a genuine Pinoy POS backup.  Used by the import
+    // validation to reject arbitrary SQLite files that happen to have
+    // the right table names.
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS backup_metadata (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        app_name TEXT NOT NULL,
+        app_version TEXT NOT NULL,
+        database_version INTEGER NOT NULL,
+        created_at TEXT NOT NULL
+      )
+    ''');
+
     // Create indexes
     await _createIndexes(db);
   }
@@ -505,6 +533,7 @@ class DatabaseHelper {
       await txn.execute('DROP TABLE IF EXISTS trash');
       await txn.execute('DROP TABLE IF EXISTS backup_history');
       await txn.execute('DROP TABLE IF EXISTS export_history');
+      await txn.execute('DROP TABLE IF EXISTS backup_metadata');
       await txn.execute('DROP TABLE IF EXISTS products');
       await txn.execute('DROP TABLE IF EXISTS categories');
       await txn.execute('DROP TABLE IF EXISTS users');

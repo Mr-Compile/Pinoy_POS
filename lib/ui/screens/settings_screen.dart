@@ -9,6 +9,7 @@ import 'package:pinoy_pos/ui/screens/settings/appearance_settings_page.dart';
 import 'package:pinoy_pos/ui/screens/settings/pin_settings_page.dart';
 import 'package:pinoy_pos/ui/screens/settings/security_settings_page.dart';
 import 'package:pinoy_pos/ui/screens/settings/store_information_settings_page.dart';
+import 'package:pinoy_pos/ui/screens/trash_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 
@@ -26,6 +27,8 @@ import 'package:pinoy_pos/ui/widgets/app_header.dart';
 ///   - Activity Logs:  all roles with view_activity_logs permission
 ///     (Owner sees authorized scope, Admin sees system scope,
 ///      Staff sees own logs only — enforced at DAO level)
+///   - Trash Bin:      roles with view_trash permission
+///     (Owner and Admin)
 ///
 /// This screen does NOT contain any settings logic itself — each
 /// sub-page owns its own state and persistence.
@@ -42,6 +45,7 @@ class SettingsScreen extends ConsumerWidget {
     final canBackup = authNotifier.hasPermission('backup_restore');
     final canManageAi = authNotifier.hasPermission('manage_ai_config');
     final canViewActivityLogs = authNotifier.hasPermission('view_activity_logs');
+    final canViewTrash = authNotifier.hasPermission('view_trash');
 
     final personalEntries = <_SettingsEntry>[];
     final systemEntries = <_SettingsEntry>[];
@@ -107,6 +111,16 @@ class SettingsScreen extends ConsumerWidget {
         title: 'Activity Logs',
         subtitle: 'View system and account activity history',
         screen: const ActivityLogsScreen(),
+      ));
+    }
+
+    // ── Trash Bin (roles with view_trash permission) ──
+    if (canViewTrash) {
+      systemEntries.add(_SettingsEntry(
+        icon: Icons.delete_outline,
+        title: 'Trash Bin',
+        subtitle: 'View and restore deleted items',
+        screen: const TrashScreen(),
       ));
     }
 

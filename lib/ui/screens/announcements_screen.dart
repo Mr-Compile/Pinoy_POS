@@ -306,13 +306,27 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
                         await announcementService.updateAnnouncement(data);
                   }
                   if (context.mounted) {
-                    Navigator.pop(context);
+                    // Capture the parent context before popping the dialog,
+                    // so the success/error dialog is shown on a valid
+                    // navigator context. Using the dialog's own context
+                    // after Navigator.pop can result in the button being
+                    // unresponsive or the dialog not appearing.
+                    final parentContext = context;
+                    Navigator.of(parentContext, rootNavigator: true).pop();
                     if (success) {
                       refreshNotificationCount(ref);
-                      await AppDialogService.success(context, title: 'Saved', message: 'Announcement saved successfully.');
+                      await AppDialogService.success(
+                        parentContext,
+                        title: 'Saved',
+                        message: 'Announcement saved successfully.',
+                      );
                       _loadAnnouncements();
                     } else {
-                      AppDialogService.error(context, title: 'Save Failed', message: 'Failed to save announcement.');
+                      AppDialogService.error(
+                        parentContext,
+                        title: 'Save Failed',
+                        message: 'Failed to save announcement.',
+                      );
                     }
                   }
                 } catch (e) {

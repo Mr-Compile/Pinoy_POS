@@ -6,7 +6,6 @@ import 'package:pinoy_pos/ui/screens/announcements_screen.dart';
 import 'package:pinoy_pos/ui/screens/categories_screen.dart';
 import 'package:pinoy_pos/ui/screens/reports_screen.dart';
 import 'package:pinoy_pos/ui/screens/stock_screen.dart';
-import 'package:pinoy_pos/ui/screens/trash_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 
 /// "More" screen — lists secondary feature screens that don't fit in the
@@ -16,7 +15,9 @@ import 'package:pinoy_pos/ui/widgets/app_header.dart';
 /// Activity Logs is accessed via Settings → Activity Logs.
 ///
 /// Only feature screens remain here: Categories, Stock, Reports,
-/// Announcements, Trash.
+/// Announcements.
+///
+/// Trash Bin has been moved to Settings → System / Management.
 class MoreScreen extends ConsumerWidget {
   const MoreScreen({super.key});
 
@@ -61,16 +62,6 @@ class MoreScreen extends ConsumerWidget {
         permission: 'view_announcements',
         routeName: 'announcements',
         screen: const AnnouncementsScreen(),
-      ));
-    }
-    // --- Shared modules ---
-    if (authNotifier.hasPermission('view_trash')) {
-      entries.add(_MoreEntry(
-        icon: Icons.delete_outline,
-        title: 'Trash Bin',
-        permission: 'view_trash',
-        routeName: 'trash',
-        screen: const TrashScreen(),
       ));
     }
 

@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/backup_history.dart';
+import 'package:pinoy_pos/providers/notification_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/providers/user_provider.dart';
 import 'package:pinoy_pos/services/backup_service.dart';
@@ -267,6 +268,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
     ref.invalidate(stockServiceProvider);
     ref.invalidate(activityLogServiceProvider);
     ref.invalidate(notificationServiceProvider);
+    ref.invalidate(notificationCountProvider);
     ref.invalidate(settingsServiceProvider);
     ref.invalidate(reportServiceProvider);
     ref.invalidate(backupServiceProvider);
