@@ -1,27 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/ai_config_status.dart';
 import 'package:pinoy_pos/core/constants.dart';
-import 'package:pinoy_pos/providers/auth_provider.dart';
-import 'package:pinoy_pos/providers/service_providers.dart';
-import 'package:pinoy_pos/services/ai_advisor_service.dart';
-import 'package:pinoy_pos/ui/widgets/app_card.dart';
+import 'package:pinoy_pos/core/spacing.dart';
+import 'package:pinoy_pos/providers/ai_advisor_provider.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
-import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
-import 'package:pinoy_pos/ui/widgets/empty_state.dart';
-import 'package:pinoy_pos/ui/widgets/loading_button.dart';
-import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 
 /// Owner-only AI Business Advisor screen.
 ///
-/// Uses [AIAdvisorService] which calls the Groq chat/completions API with
-/// real local business data as context. Requires internet access and a
-/// configured Groq API key (set by System Admin via [AIConfigScreen]).
+/// RBAC: The FAB that opens this screen is only shown to users with
+/// `use_ai_advisor` (Owner only). The underlying [AIAdvisorService] also
+/// enforces this permission at the service layer.
 ///
-/// Usage is capped at [AppConstants.maxDailyAIQueries] (10) queries per day
-/// per user. The service is authoritative for both permission and the
-/// daily limit — the UI only reflects the remaining count and cannot
-/// bypass the service check.
+/// The screen provides:
+/// - A status indicator (Connected / Offline / Not Configured)
+/// - A model name indicator
+/// - A query limit badge (N / 10 today)
+/// - A welcome state with suggested prompts
+/// - A chat area with user and AI message bubbles
+/// - An input bar with send button
+/// - Loading state (assistant thinking) without freezing the screen
+/// - Offline detection with a clear dialog
+/// - Error handling via centralized dialogs
 class AIAdvisorScreen extends ConsumerStatefulWidget {
   const AIAdvisorScreen({super.key});
 
@@ -30,290 +30,516 @@ class AIAdvisorScreen extends ConsumerStatefulWidget {
 }
 
 class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
-  final TextEditingController _queryController = TextEditingController();
-
-  bool _isLoading = false;
-  bool _hasResult = false;
-  String _resultContent = '';
-  int _remainingToday = AppConstants.maxDailyAIQueries;
+  final TextEditingController _inputController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  bool _configChecked = false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _refreshUsage());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkConfig();
+    });
   }
 
   @override
   void dispose() {
-    _queryController.dispose();
+    _inputController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  Future<void> _refreshUsage() async {
-    final aiUsageService = ref.read(aiUsageServiceProvider);
-    final used = await aiUsageService.getTodayUsageCount();
+  Future<void> _checkConfig() async {
+    await ref.read(aiAdvisorChatProvider.notifier).checkConfig();
     if (mounted) {
-      setState(() {
-        _remainingToday =
-            (AppConstants.maxDailyAIQueries - used).clamp(0, AppConstants.maxDailyAIQueries);
+      setState(() => _configChecked = true);
+    }
+  }
+
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
       });
     }
   }
 
-  // ── Preset queries ───────────────────────────────────────────────────
+  Future<void> _sendQuery() async {
+    final text = _inputController.text.trim();
+    if (text.isEmpty) return;
 
-  static const _presets = <_Preset>[
-    _Preset(
-      label: 'Business Insights',
-      icon: Icons.insights,
-      query: 'Give me an overview of my business performance.',
-    ),
-    _Preset(
-      label: 'Sales Analysis',
-      icon: Icons.trending_up,
-      query: 'Analyze my recent sales performance and suggest improvements.',
-    ),
-    _Preset(
-      label: 'Inventory Recommendations',
-      icon: Icons.inventory_2,
-      query: 'What inventory actions should I take based on current stock levels?',
-    ),
-  ];
-
-  // ── Analyze ──────────────────────────────────────────────────────────
-
-  Future<void> _analyze({String? query}) async {
-    final q = (query ?? _queryController.text).trim();
-    if (q.isEmpty) {
-      AppDialogService.warning(context,
-          title: 'Empty Query', message: 'Please enter a question for the advisor.');
-      return;
-    }
-
-    // Permission re-check at the UI layer (service also enforces).
-    final authNotifier = ref.read(authStateProvider.notifier);
-    if (!authNotifier.hasPermission('view_ai_advisor')) {
-      AppDialogService.accessDenied(context);
-      return;
-    }
-
-    // Daily limit pre-check (service is authoritative; this is UX only).
-    if (_remainingToday <= 0) {
-      AppDialogService.warning(context,
-          title: 'Daily Limit Reached',
-          message:
-              'You have used all ${AppConstants.maxDailyAIQueries} AI queries for today. Please try again tomorrow.');
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    try {
-      final aiAdvisorService = ref.read(aiAdvisorServiceProvider);
-      final result = await aiAdvisorService.query(q);
-
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-
-      if (result.success) {
-        if (mounted) {
-          setState(() {
-            _hasResult = true;
-            _resultContent = result.content ?? 'No response from the advisor.';
-          });
-        }
-      } else {
-        // All error types are shown via the centralized dialog system.
-        // The error message from the service is safe — it never contains
-        // the API key, headers, or stack traces.
-        if (mounted) {
-          AppDialogService.error(context,
-              title: _errorTitle(result), message: result.errorMessage);
-        }
-      }
-
-      await _refreshUsage();
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        AppDialogService.error(context,
-            title: 'Analysis Failed',
-            message: 'The advisor could not complete the analysis. Please try again.');
-      }
-    }
+    _inputController.clear();
+    await ref.read(aiAdvisorChatProvider.notifier).sendQuery(text);
+    _scrollToBottom();
   }
 
-  String _errorTitle(AIAdvisorResult result) {
-    if (result.isNotConfigured) return 'Not Configured';
-    if (result.isNetworkError) return 'No Internet';
-    if (result.isAuthError) return 'Authentication Failed';
-    if (result.limitReached) return 'Daily Limit Reached';
-    return 'Analysis Failed';
+  Future<void> _sendSuggestion(String query) async {
+    await ref.read(aiAdvisorChatProvider.notifier).sendQuery(query);
+    _scrollToBottom();
   }
 
-  // ── Build ────────────────────────────────────────────────────────────
+  // ── Build ─────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final chatState = ref.watch(aiAdvisorChatProvider);
+
+    _scrollToBottom();
 
     return Scaffold(
       appBar: AppHeader(
         title: 'AI Business Advisor',
         showBackButton: true,
         actions: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Center(
-              child: Chip(
-                avatar: Icon(Icons.auto_awesome, size: 18, color: colorScheme.primary),
-                label: Text('$_remainingToday left today'),
-                visualDensity: VisualDensity.compact,
+          _buildStatusChip(context, chatState),
+        ],
+      ),
+      body: Column(
+        children: [
+          // Config warning banner (if not active).
+          if (_configChecked &&
+              chatState.configStatus != AIConfigStatus.active &&
+              chatState.configStatus != AIConfigStatus.checking)
+            _buildConfigWarning(context, chatState.configStatus),
+          // Query limit bar.
+          _buildQueryLimitBar(context, chatState),
+          // Chat area.
+          Expanded(
+            child: chatState.messages.isEmpty
+                ? _buildWelcomeState(context, chatState)
+                : _buildChatList(context, chatState),
+          ),
+          // Input bar.
+          _buildInputBar(context, chatState),
+        ],
+      ),
+    );
+  }
+
+  // ── Status Chip ───────────────────────────────────────────────────────
+
+  Widget _buildStatusChip(BuildContext context, AIAdvisorChatState chatState) {
+    final cs = Theme.of(context).colorScheme;
+    final status = chatState.configStatus;
+
+    final color = switch (status) {
+      AIConfigStatus.active => Colors.green,
+      AIConfigStatus.notConfigured => Colors.orange,
+      AIConfigStatus.invalid => cs.error,
+      AIConfigStatus.unavailable => cs.error,
+      AIConfigStatus.checking => cs.secondary,
+    };
+
+    final label = switch (status) {
+      AIConfigStatus.active => 'Connected',
+      AIConfigStatus.notConfigured => 'Not Configured',
+      AIConfigStatus.invalid => 'Invalid Key',
+      AIConfigStatus.unavailable => 'Offline',
+      AIConfigStatus.checking => 'Checking...',
+    };
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Center(
+        child: Chip(
+          avatar: Icon(Icons.circle, size: 10, color: color),
+          label: Text(label, style: const TextStyle(fontSize: 12)),
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+        ),
+      ),
+    );
+  }
+
+  // ── Config Warning Banner ─────────────────────────────────────────────
+
+  Widget _buildConfigWarning(BuildContext context, AIConfigStatus status) {
+    final cs = Theme.of(context).colorScheme;
+    final isNotConfigured = status == AIConfigStatus.notConfigured;
+    final isInvalid = status == AIConfigStatus.invalid;
+
+    final warningColor =
+        isInvalid ? cs.error : (isNotConfigured ? Colors.orange : cs.error);
+    final icon = isNotConfigured
+        ? Icons.key_off
+        : (isInvalid ? Icons.error_outline : Icons.wifi_off);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      color: warningColor.withValues(alpha: 0.1),
+      child: Row(
+        children: [
+          Icon(icon, color: warningColor, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              status.label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: warningColor,
+                  ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Query Limit Bar ───────────────────────────────────────────────────
+
+  Widget _buildQueryLimitBar(
+      BuildContext context, AIAdvisorChatState chatState) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final used = AppConstants.maxDailyAIQueries - chatState.remainingQueries;
+    final isLimitReached = chatState.remainingQueries <= 0;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.3),
+        border: Border(
+          bottom: BorderSide(color: cs.outlineVariant, width: 0.5),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.auto_awesome, size: 18, color: cs.primary),
+          const SizedBox(width: 8),
+          Text(
+            'AI Queries Today',
+            style: theme.textTheme.bodySmall,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: AppConstants.maxDailyAIQueries > 0
+                    ? used / AppConstants.maxDailyAIQueries
+                    : 0,
+                backgroundColor: cs.surfaceContainerHighest,
+                color: isLimitReached ? cs.error : cs.primary,
+                minHeight: 6,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '$used / ${AppConstants.maxDailyAIQueries} used',
+            style: theme.textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: isLimitReached ? cs.error : cs.onSurface,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Welcome State ─────────────────────────────────────────────────────
+
+  Widget _buildWelcomeState(
+      BuildContext context, AIAdvisorChatState chatState) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    final canChat = chatState.configStatus == AIConfigStatus.active &&
+        chatState.remainingQueries > 0;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(Spacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Column(
+              children: [
+                Icon(Icons.auto_awesome, size: 48,
+                    color: cs.primary.withValues(alpha: 0.5)),
+                const SizedBox(height: Spacing.sm),
+                Text(
+                  'Ask me about your business',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                const SizedBox(height: Spacing.xs),
+                Text(
+                  'I analyze your real sales, products, and inventory data to give you actionable insights.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: Spacing.xl),
+          if (canChat && chatState.suggestions.isNotEmpty) ...[
+            Text(
+              'Suggested Questions',
+              style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: cs.onSurfaceVariant,
+                  ),
+            ),
+            const SizedBox(height: Spacing.sm),
+            Wrap(
+              spacing: Spacing.sm,
+              runSpacing: Spacing.sm,
+              children: chatState.suggestions
+                  .map((q) => _buildSuggestionChip(cs, q))
+                  .toList(),
+            ),
+          ] else if (canChat) ...[
+            // Fallback suggestions if contextual ones haven't loaded.
+            Text(
+              'Try asking',
+              style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: cs.onSurfaceVariant,
+                  ),
+            ),
+            const SizedBox(height: Spacing.sm),
+            Wrap(
+              spacing: Spacing.sm,
+              runSpacing: Spacing.sm,
+              children: [
+                'How are my sales today?',
+                'What should I restock?',
+                'What are my best-selling products?',
+                'Give me a business summary.',
+              ].map((q) => _buildSuggestionChip(cs, q)).toList(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSuggestionChip(ColorScheme cs, String label) {
+    return ActionChip(
+      label: Text(label, maxLines: 2, overflow: TextOverflow.ellipsis),
+      avatar: Icon(Icons.lightbulb_outline, size: 16, color: cs.primary),
+      onPressed: () => _sendSuggestion(label),
+    );
+  }
+
+  // ── Chat List ─────────────────────────────────────────────────────────
+
+  Widget _buildChatList(BuildContext context, AIAdvisorChatState chatState) {
+    return ListView.builder(
+      controller: _scrollController,
+      padding: const EdgeInsets.symmetric(
+          horizontal: Spacing.md, vertical: Spacing.sm),
+      itemCount: chatState.messages.length + (chatState.isSending ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (index == chatState.messages.length && chatState.isSending) {
+          return _buildTypingIndicator(context);
+        }
+        final msg = chatState.messages[index];
+        return _buildMessageBubble(context, msg);
+      },
+    );
+  }
+
+  Widget _buildMessageBubble(BuildContext context, AIChatMessage msg) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isUser = msg.isUser;
+    final isError = msg.isError;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Spacing.sm),
+      child: Row(
+        mainAxisAlignment:
+            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (!isUser) ...[
+            CircleAvatar(
+              radius: 14,
+              backgroundColor: cs.primary,
+              child:
+                  Icon(Icons.auto_awesome, color: cs.onPrimary, size: 16),
+            ),
+            const SizedBox(width: Spacing.xs),
+          ],
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: Spacing.md, vertical: Spacing.sm + 2),
+              decoration: BoxDecoration(
+                color: isError
+                    ? cs.errorContainer
+                    : isUser
+                        ? cs.primary
+                        : cs.surfaceContainerHighest,
+                borderRadius: BorderRadius.only(
+                  topLeft: const Radius.circular(16),
+                  topRight: const Radius.circular(16),
+                  bottomLeft: Radius.circular(isUser ? 16 : 4),
+                  bottomRight: Radius.circular(isUser ? 4 : 16),
+                ),
+              ),
+              child: SelectableText(
+                msg.text,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: isError
+                      ? cs.onErrorContainer
+                      : isUser
+                          ? cs.onPrimary
+                          : cs.onSurface,
+                ),
               ),
             ),
           ),
         ],
       ),
-      body: _isLoading
-          ? const LoadingState()
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Header card.
-                  AppCard(
-                    child: Row(
-                      children: [
-                        Icon(Icons.psychology, size: 40, color: colorScheme.primary),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Business Insights',
-                                  style: AppTypography.titleMediumBold(context)),
-                              const SizedBox(height: 4),
-                              Text(
-                                'The advisor analyzes your store\'s real sales, inventory, and product data to provide actionable recommendations. Requires internet access.',
-                                style: theme.textTheme.bodySmall,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Preset query chips.
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: _presets
-                        .map((p) => ActionChip(
-                              label: Text(p.label),
-                              avatar: Icon(p.icon, size: 18),
-                              onPressed: _isLoading
-                                  ? null
-                                  : () {
-                                      _queryController.text = p.query;
-                                      _analyze(query: p.query);
-                                    },
-                            ))
-                        .toList(),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Free-text query input.
-                  TextField(
-                    controller: _queryController,
-                    maxLines: 3,
-                    decoration: const InputDecoration(
-                      labelText: 'What would you like to know about your business?',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.question_answer),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Analyze button.
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: LoadingButton(
-                      isLoading: _isLoading,
-                      onPressed: _remainingToday <= 0
-                          ? null
-                          : () => _analyze(),
-                      label: 'Ask Advisor',
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Icon(Icons.auto_awesome, size: 18),
-                          SizedBox(width: 8),
-                          Text('Ask Advisor'),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Result area.
-                  if (_hasResult) ...[
-                    AppCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.insights, color: colorScheme.primary),
-                              const SizedBox(width: 8),
-                              Text('Advisor Response',
-                                  style: AppTypography.titleMediumBold(context)),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          const Divider(),
-                          const SizedBox(height: 12),
-                          SelectableText(
-                            _resultContent,
-                            style: theme.textTheme.bodyMedium,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    OutlinedButton.icon(
-                      onPressed: () {
-                        setState(() {
-                          _hasResult = false;
-                          _resultContent = '';
-                          _queryController.clear();
-                        });
-                      },
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('New Question'),
-                    ),
-                  ] else if (!_isLoading) ...[
-                    const EmptyState(
-                      icon: Icons.auto_awesome,
-                      title: 'Ask a Question',
-                      message:
-                          'Choose a preset above or type your own question, then tap "Ask Advisor".',
-                    ),
-                  ],
-                ],
-              ),
-            ),
     );
   }
-}
 
-class _Preset {
-  final String label;
-  final IconData icon;
-  final String query;
-  const _Preset({required this.label, required this.icon, required this.query});
+  Widget _buildTypingIndicator(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Spacing.sm),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 14,
+            backgroundColor: cs.primary,
+            child: Icon(Icons.auto_awesome, color: cs.onPrimary, size: 16),
+          ),
+          const SizedBox(width: Spacing.xs),
+          Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: Spacing.md, vertical: Spacing.sm + 2),
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerHighest,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+                bottomLeft: Radius.circular(4),
+                bottomRight: Radius.circular(16),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildDot(cs, 0),
+                const SizedBox(width: 4),
+                _buildDot(cs, 150),
+                const SizedBox(width: 4),
+                _buildDot(cs, 300),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDot(ColorScheme cs, int delay) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.3, end: 1.0),
+      duration: const Duration(milliseconds: 600),
+      curve: Curves.easeInOut,
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: cs.primary,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // ── Input Bar ─────────────────────────────────────────────────────────
+
+  Widget _buildInputBar(BuildContext context, AIAdvisorChatState chatState) {
+    final cs = Theme.of(context).colorScheme;
+
+    final canSend = !chatState.isSending &&
+        chatState.configStatus == AIConfigStatus.active &&
+        chatState.remainingQueries > 0;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+          horizontal: Spacing.md, vertical: Spacing.sm),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+        border: Border(
+          top: BorderSide(color: cs.outlineVariant, width: 0.5),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _inputController,
+                enabled: canSend,
+                maxLines: null,
+                textInputAction: TextInputAction.send,
+                onSubmitted: canSend ? (_) => _sendQuery() : null,
+                decoration: InputDecoration(
+                  hintText: canSend
+                      ? 'Ask about your business...'
+                      : 'AI unavailable',
+                  hintStyle: TextStyle(
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.6)),
+                  filled: true,
+                  fillColor: cs.surface,
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: Spacing.md, vertical: Spacing.sm + 2),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    borderSide:
+                        BorderSide(color: cs.outlineVariant, width: 0.5),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    borderSide: BorderSide(color: cs.primary, width: 1.5),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: Spacing.xs),
+            IconButton.filled(
+              icon: chatState.isSending
+                  ? SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: cs.onPrimary,
+                      ),
+                    )
+                  : const Icon(Icons.send, size: 20),
+              onPressed: canSend ? _sendQuery : null,
+              tooltip: 'Send',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

@@ -2,18 +2,25 @@ import 'package:pinoy_pos/core/authorization_exception.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
 import 'package:pinoy_pos/data/repositories/settings_repository.dart';
+import 'package:pinoy_pos/services/groq_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsService {
   final SettingsRepository _settingsRepository = SettingsRepository();
   final SessionManager _sessionManager = SessionManager();
+  final GroqService _groqService = GroqService();
   Settings? _currentSettings;
+
+  /// Cached list of available Groq models (refreshed by Admin).
+  List<GroqModel> _cachedModels = [];
+  bool _modelsFetched = false;
 
   Settings? get currentSettings => _currentSettings;
 
   Future<Settings> getSettings() async {
     if (!_sessionManager.hasPermission('view_settings') &&
-        !_sessionManager.hasPermission('view_ai_advisor')) {
+        !_sessionManager.hasPermission('use_ai_advisor') &&
+        !_sessionManager.hasPermission('manage_ai_config')) {
       throw AuthorizationException('view_settings');
     }
     if (_currentSettings != null) {
@@ -64,9 +71,12 @@ class SettingsService {
   // and used only for the HTTP Authorization header.
 
   /// Returns the configured Groq API key, or null if not configured.
-  /// Requires `view_ai_advisor` (all roles) or `manage_ai_config` (Admin).
+  /// Requires `use_ai_advisor` (all roles — used to send AI requests) or
+  /// `manage_ai_config` (Admin — used to test/save the key). The key is
+  /// never returned to the UI; it is consumed inside the service layer
+  /// for the HTTP Authorization header only.
   Future<String?> getGroqApiKey() async {
-    if (!_sessionManager.hasPermission('view_ai_advisor') &&
+    if (!_sessionManager.hasPermission('use_ai_advisor') &&
         !_sessionManager.hasPermission('manage_ai_config')) {
       return null;
     }
@@ -117,6 +127,104 @@ class SettingsService {
       groqModel: null,
       updatedAt: DateTime.now(),
     );
+    _cachedModels = [];
+    _modelsFetched = false;
     return updateSettings(updated);
+  }
+
+  // ── Test Connection & Model Management ───────────────────────────────
+
+  /// Tests the Groq API connection by fetching the models list.
+  ///
+  /// This is the authoritative Test Connection — it only reports success
+  /// when a real HTTP 200 response with valid model data is received.
+  /// Requires `manage_ai_config` (Admin only).
+  Future<GroqTestResult> testGroqConnection(String apiKey) async {
+    if (!_sessionManager.hasPermission('manage_ai_config')) {
+      throw AuthorizationException('manage_ai_config');
+    }
+    final result = await _groqService.testConnection(apiKey: apiKey);
+    if (result.success) {
+      _cachedModels = result.models;
+      _modelsFetched = true;
+    }
+    return result;
+  }
+
+  /// Fetches the latest available models from Groq and caches them.
+  ///
+  /// Uses the currently saved API key. Requires `manage_ai_config`.
+  Future<GroqModelsResult> refreshModels() async {
+    if (!_sessionManager.hasPermission('manage_ai_config')) {
+      throw AuthorizationException('manage_ai_config');
+    }
+    final apiKey = await getGroqApiKey();
+    if (apiKey == null || apiKey.isEmpty) {
+      return GroqModelsResult(
+        success: false,
+        errorMessage: 'No API key configured. Please enter an API key first.',
+      );
+    }
+    final result = await _groqService.listModels(apiKey: apiKey);
+    if (result.success) {
+      _cachedModels = result.models;
+      _modelsFetched = true;
+    }
+    return result;
+  }
+
+  /// Returns the cached available models, or an empty list if not fetched.
+  List<GroqModel> getCachedModels() {
+    return _cachedModels;
+  }
+
+  /// Returns true if models have been fetched at least once.
+  bool get modelsFetched => _modelsFetched;
+
+  /// Validates that the saved model exists in the available model list.
+  ///
+  /// If models haven't been fetched yet, fetches them first.
+  /// Returns true if the model exists and is active.
+  Future<bool> validateSavedModel() async {
+    final model = await getGroqModel();
+    if (!_modelsFetched) {
+      await refreshModels();
+    }
+    return _cachedModels.any((m) => m.id == model && m.active);
+  }
+
+  /// Returns a recommended default model from the available models.
+  ///
+  /// Evaluates models based on:
+  /// - Business analysis quality (larger context preferred for analysis)
+  /// - Response speed (instant models for quick answers)
+  /// - Current availability
+  ///
+  /// Does not hardcode a model that may be deprecated. Picks from the
+  /// actually available models returned by the Groq Models API.
+  String getRecommendedModel(List<GroqModel> models) {
+    if (models.isEmpty) return 'llama-3.3-70b-versatile';
+
+    // Preferred models in priority order (by capability for business analysis).
+    // These are evaluated against the ACTUAL available list — if a model
+    // has been deprecated, it won't be in the list and we skip it.
+    const preferred = [
+      'llama-3.3-70b-versatile',
+      'openai/gpt-oss-120b',
+      'meta-llama/llama-4-scout-17b-16e-instruct',
+      'qwen/qwen3-32b',
+      'openai/gpt-oss-20b',
+      'llama-3.1-8b-instant',
+    ];
+
+    final activeIds = models.where((m) => m.active).map((m) => m.id).toSet();
+
+    for (final id in preferred) {
+      if (activeIds.contains(id)) return id;
+    }
+
+    // Fallback: first active model.
+    final firstActive = models.where((m) => m.active).firstOrNull;
+    return firstActive?.id ?? 'llama-3.3-70b-versatile';
   }
 }

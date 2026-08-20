@@ -641,11 +641,124 @@ class AppDialogService {
 
   // ── Backup: Export Failed ────────────────────────────────────────────
 
-  static Future<void> backupExportFailed(BuildContext context) {
+  static Future<void> backupExportFailed(
+    BuildContext context, {
+    String? reason,
+    VoidCallback? onTryAgain,
+    VoidCallback? onChangeLocation,
+  }) {
+    final actions = <AppDialogAction>[];
+    if (onChangeLocation != null) {
+      actions.add(AppDialogAction(
+        label: 'Change Location',
+        onPressed: onChangeLocation,
+      ));
+    }
+    actions.add(AppDialogAction(
+      label: 'Close',
+      onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
+    ));
+    actions.add(AppDialogAction(
+      label: 'Try Again',
+      isPrimary: true,
+      onPressed: onTryAgain ??
+          () => Navigator.of(context, rootNavigator: true).pop(),
+    ));
+    return _show(
+      context: context,
+      type: AppDialogType.error,
+      title: 'Backup Failed',
+      message: 'We couldn\'t create the backup.',
+      details: reason,
+      actions: actions,
+    );
+  }
+
+  // ── Backup: Location Required ────────────────────────────────────────
+
+  /// Shown when the Admin tries to export a backup but no backup location
+  /// has been configured yet.
+  ///
+  /// Returns true if the user chooses to pick a location, false on cancel.
+  static Future<bool> backupLocationRequired(BuildContext context) {
+    return _show<bool>(
+      context: context,
+      type: AppDialogType.info,
+      title: 'Backup Location Required',
+      message:
+          'Choose where you want future Pinoy POS backups to be saved.',
+      actions: [
+        AppDialogAction(
+          label: 'Cancel',
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
+        ),
+        AppDialogAction(
+          label: 'Choose Location',
+          isPrimary: true,
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
+        ),
+      ],
+    ).then((v) => v ?? false);
+  }
+
+  // ── Backup: Location Unavailable ─────────────────────────────────────
+
+  /// Shown when the previously saved backup location can no longer be
+  /// accessed (permission revoked, folder moved/deleted, etc.).
+  ///
+  /// Returns true if the user chooses to pick a new location, false on
+  /// cancel.
+  static Future<bool> backupLocationUnavailable(BuildContext context) {
+    return _show<bool>(
+      context: context,
+      type: AppDialogType.warning,
+      title: 'Backup Location Unavailable',
+      message:
+          'The previously selected backup location can no longer be '
+          'accessed. Please choose a new location.',
+      actions: [
+        AppDialogAction(
+          label: 'Cancel',
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
+        ),
+        AppDialogAction(
+          label: 'Choose New Location',
+          isPrimary: true,
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
+        ),
+      ],
+    ).then((v) => v ?? false);
+  }
+
+  // ── Backup: Location Selection Failed ────────────────────────────────
+
+  static Future<void> backupLocationSelectionFailed(
+    BuildContext context, {
+    String? reason,
+    VoidCallback? onRetry,
+  }) {
     return error(
       context,
-      title: 'Backup Failed',
-      message: 'Failed to create the backup. Please try again.',
+      title: 'Location Selection Failed',
+      message: 'We couldn\'t set the backup location.',
+      details: reason,
+      primaryLabel: 'Try Again',
+      onPrimary: onRetry,
+    );
+  }
+
+  // ── Backup: Location Changed ─────────────────────────────────────────
+
+  static Future<void> backupLocationChanged(
+    BuildContext context, {
+    required String location,
+  }) {
+    return success(
+      context,
+      title: 'Backup Location Updated',
+      message: 'Future backups will be saved to the new location.',
+      details: location,
+      primaryLabel: 'Done',
     );
   }
 
@@ -807,6 +920,145 @@ class AppDialogService {
           onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
         ),
       ],
+    );
+  }
+
+  // ── AI: Not Configured (Owner sees this) ──────────────────────────────
+
+  static Future<void> aiNotConfigured(BuildContext context) {
+    return _show(
+      context: context,
+      type: AppDialogType.info,
+      title: 'AI Advisor Not Configured',
+      message:
+          'The AI service has not been configured yet. Please ask your administrator to configure the Groq AI integration.',
+      actions: [
+        AppDialogAction(
+          label: 'Done',
+          isPrimary: true,
+          onPressed: () =>
+              Navigator.of(context, rootNavigator: true).pop(),
+        ),
+      ],
+    );
+  }
+
+  // ── AI: Needs Internet ────────────────────────────────────────────────
+
+  static Future<void> aiNeedsInternet(BuildContext context) {
+    return _show(
+      context: context,
+      type: AppDialogType.warning,
+      title: 'AI Advisor Needs Internet',
+      message:
+          'Your business data is available locally, but an internet connection is required to generate AI insights.',
+      actions: [
+        AppDialogAction(
+          label: 'Close',
+          isPrimary: true,
+          onPressed: () =>
+              Navigator.of(context, rootNavigator: true).pop(),
+        ),
+      ],
+    );
+  }
+
+  // ── AI: Daily Limit Reached ───────────────────────────────────────────
+
+  static Future<void> aiDailyLimitReached(BuildContext context) {
+    return _show(
+      context: context,
+      type: AppDialogType.info,
+      title: 'Daily AI Limit Reached',
+      message:
+          'You have used all 10 AI Advisor queries for today. Your limit will reset tomorrow.',
+      actions: [
+        AppDialogAction(
+          label: 'Done',
+          isPrimary: true,
+          onPressed: () =>
+              Navigator.of(context, rootNavigator: true).pop(),
+        ),
+      ],
+    );
+  }
+
+  // ── AI: Model Unavailable (Owner sees this) ───────────────────────────
+
+  static Future<void> aiModelUnavailable(BuildContext context) {
+    return _show(
+      context: context,
+      type: AppDialogType.warning,
+      title: 'AI Advisor Temporarily Unavailable',
+      message:
+          'The configured AI model needs to be updated by an administrator.',
+      actions: [
+        AppDialogAction(
+          label: 'Close',
+          isPrimary: true,
+          onPressed: () =>
+              Navigator.of(context, rootNavigator: true).pop(),
+        ),
+      ],
+    );
+  }
+
+  // ── AI: Model Unavailable (Admin sees this) ───────────────────────────
+
+  static Future<void> aiModelUnavailableAdmin(BuildContext context) {
+    return _show(
+      context: context,
+      type: AppDialogType.warning,
+      title: 'Selected Model Unavailable',
+      message:
+          'The currently selected AI model is no longer available on Groq. Please choose another available model.',
+      actions: [
+        AppDialogAction(
+          label: 'Close',
+          onPressed: () =>
+              Navigator.of(context, rootNavigator: true).pop(),
+        ),
+      ],
+    );
+  }
+
+  // ── AI: Test Connection Result ────────────────────────────────────────
+
+  static Future<void> aiTestConnectionResult(
+    BuildContext context, {
+    required bool isConnected,
+    String? message,
+  }) {
+    if (isConnected) {
+      return success(
+        context,
+        title: 'Connection Successful',
+        message: message ?? 'Connected to Groq.',
+        primaryLabel: 'Done',
+      );
+    }
+    return error(
+      context,
+      title: 'Connection Failed',
+      message: message ?? 'Could not connect to Groq.',
+      primaryLabel: 'Done',
+    );
+  }
+
+  // ── AI: Refresh Models Failed ─────────────────────────────────────────
+
+  static Future<void> aiRefreshModelsFailed(
+    BuildContext context, {
+    String? reason,
+    VoidCallback? onRetry,
+  }) {
+    return error(
+      context,
+      title: 'Refresh Failed',
+      message: 'Could not fetch the latest models from Groq.',
+      details: reason,
+      primaryLabel: 'Try Again',
+      onPrimary: onRetry,
     );
   }
 }

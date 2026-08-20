@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:pinoy_pos/core/authorization_exception.dart';
@@ -10,6 +11,7 @@ import 'package:pinoy_pos/data/dao/backup_history_dao.dart';
 import 'package:pinoy_pos/data/models/backup_history.dart';
 import 'package:pinoy_pos/services/activity_log_service.dart';
 import 'package:pinoy_pos/services/notification_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
 /// Result of a backup export operation.
@@ -28,13 +30,21 @@ enum BackupImportResult {
   failed,
 }
 
+/// Result of a backup location selection operation.
+enum BackupLocationResult {
+  selected,
+  canceled,
+  failed,
+}
+
 /// Backup & Restore service.
 ///
 /// Architecture: UI → Provider → BackupService → DAO → SQLite
 ///
 /// All methods enforce the `backup_restore` permission (Admin only).
 /// The service handles:
-/// - Export (create backup to user-selected destination)
+/// - Backup location selection, persistence, and validation
+/// - Export (create backup to the saved destination)
 /// - Import (restore from user-selected file with validation)
 /// - Backup history CRUD
 /// - Safety backup before destructive restore
@@ -46,6 +56,9 @@ class BackupService {
   final BackupHistoryDao _backupHistoryDao = BackupHistoryDao();
   final ActivityLogService _activityLogService = ActivityLogService();
   final NotificationService _notificationService = NotificationService();
+
+  /// SharedPreferences key for the persisted backup destination directory.
+  static const _backupLocationKey = 'backup_location';
 
   /// Required Pinoy POS tables that must exist in a valid backup file.
   static const _requiredTables = [
@@ -66,111 +79,274 @@ class BackupService {
     'backup_metadata',
   ];
 
+  // ── Backup Location Management ──────────────────────────────────────
+
+  /// Returns the saved backup destination directory path, or null if no
+  /// location has been configured by the Admin.
+  Future<String?> getSavedBackupLocation() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_backupLocationKey);
+  }
+
+  /// Persists the chosen backup destination directory path.
+  Future<void> _setBackupLocation(String path) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_backupLocationKey, path);
+  }
+
+  /// Clears the saved backup destination.
+  Future<void> clearBackupLocation() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_backupLocationKey);
+  }
+
+  /// Validates that the saved backup location is still accessible:
+  /// the directory exists and the app can write to it.
+  Future<bool> isLocationValid(String path) async {
+    try {
+      final dir = Directory(path);
+      if (!await dir.exists()) return false;
+      // Verify writability by creating and removing a tiny temp file.
+      final probe = File(p.join(path, '.pinoy_pos_probe'));
+      await probe.writeAsString('probe', flush: true);
+      await probe.delete();
+      return true;
+    } catch (e) {
+      _log('Backup location validation failed for "$path": $e');
+      return false;
+    }
+  }
+
+  /// Opens the platform directory picker so the Admin can choose where
+  /// future backups will be saved.
+  ///
+  /// Returns a [BackupLocationResult] record. On success, [path] holds the
+  /// chosen directory and it is persisted for future backups.
+  Future<({BackupLocationResult result, String? path, String? error})>
+      pickBackupLocation() async {
+    if (!_sessionManager.hasPermission('backup_restore')) {
+      throw AuthorizationException('backup_restore');
+    }
+
+    String? selectedPath;
+    try {
+      selectedPath = await FilePicker.platform.getDirectoryPath(
+        dialogTitle: 'Choose Backup Location',
+      );
+    } catch (e) {
+      _log('Directory picker failed: $e');
+      return (
+        result: BackupLocationResult.failed,
+        path: null,
+        error: 'The location picker could not be opened. $e',
+      );
+    }
+
+    if (selectedPath == null || selectedPath.isEmpty) {
+      return (
+        result: BackupLocationResult.canceled,
+        path: null,
+        error: null,
+      );
+    }
+
+    // Validate the chosen directory is usable before persisting.
+    if (!await isLocationValid(selectedPath)) {
+      return (
+        result: BackupLocationResult.failed,
+        path: null,
+        error: 'The selected location cannot be written to. '
+            'Please choose a different folder.',
+      );
+    }
+
+    await _setBackupLocation(selectedPath);
+
+    try {
+      await _activityLogService.logActivity(
+        action: 'BACKUP_LOCATION_SET',
+        entity: 'backup',
+        details: 'Backup location set to: $selectedPath',
+      );
+    } catch (e) {
+      _log('Failed to log backup location change: $e');
+    }
+
+    return (
+      result: BackupLocationResult.selected,
+      path: selectedPath,
+      error: null,
+    );
+  }
+
+  /// Returns a short, user-readable label for a saved backup location
+  /// (the last 2-3 path segments), suitable for display in the status card.
+  String getDisplayLocation(String path) {
+    final parts = p.split(path);
+    if (parts.isEmpty) return path;
+    if (parts.length <= 3) return parts.join(' › ');
+    return '... › ${parts.sublist(parts.length - 3).join(' › ')}';
+  }
+
   // ── Export / Create Backup ───────────────────────────────────────────
 
-  /// Creates a backup and saves it to a user-selected destination.
+  /// Creates a backup and saves it to the configured destination.
   ///
-  /// On desktop (Windows/macOS/Linux), opens a save-file dialog.
-  /// On mobile (Android/iOS), uses the system file picker save dialog
-  /// (SAF / document picker). On web, triggers a browser download.
+  /// When [destinationDirectory] is provided, the backup is written
+  /// directly to that directory using an auto-generated filename. This is
+  /// the normal flow once the Admin has chosen a backup location.
   ///
-  /// If [onConfirm] is provided, it is called after the user selects a
-  /// destination but before the backup is written.  If it returns false,
-  /// the export is canceled and the temp file is cleaned up.  This lets
-  /// the UI show a confirmation dialog with the selected location.
+  /// When [destinationDirectory] is null, the platform save-file dialog
+  /// is used as a fallback (primarily for desktop platforms).
+  ///
+  /// If [onConfirm] is provided, it is called after the destination is
+  /// resolved but before the backup is written. If it returns false, the
+  /// export is canceled and the temp file is cleaned up.
   ///
   /// Returns [BackupExportResult.success] with the saved path, or
-  /// [BackupExportResult.canceled] / [BackupExportResult.failed].
-  Future<({BackupExportResult result, String? path, String? displayName})>
-      exportBackup({
+  /// [BackupExportResult.canceled] / [BackupExportResult.failed] (with an
+  /// [error] message on failure).
+  Future<({
+    BackupExportResult result,
+    String? path,
+    String? displayName,
+    String? error,
+  })> exportBackup({
+    String? destinationDirectory,
     Future<bool> Function(String selectedPath, String displayName)? onConfirm,
   }) async {
     if (!_sessionManager.hasPermission('backup_restore')) {
       throw AuthorizationException('backup_restore');
     }
 
-    // 1. Create the backup in a temporary location first
+    // 1. Create the backup in a temporary location first.
     final db = await _dbHelper.database;
     final dbPath = db.path;
     final tempDir = await getTemporaryDirectory();
     final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
-    final tempBackupPath = p.join(tempDir.path, 'pinoy_pos_backup_$timestamp.db');
+    final tempBackupPath =
+        p.join(tempDir.path, 'pinoy_pos_backup_$timestamp.db');
 
     try {
       await File(dbPath).copy(tempBackupPath);
     } catch (e) {
-      return (result: BackupExportResult.failed, path: null, displayName: null);
+      _log('Failed to copy database to temp file: $e');
+      return (
+        result: BackupExportResult.failed,
+        path: null,
+        displayName: null,
+        error: 'Could not read the local database. $e',
+      );
     }
 
     // Write backup metadata into the temp copy so import can verify
     // this is a genuine Pinoy POS backup.
     await _writeBackupMetadata(tempBackupPath);
 
-    // Validate the temp backup is non-empty
+    // Validate the temp backup is non-empty.
     final tempFile = File(tempBackupPath);
     final tempStat = await tempFile.stat();
     if (tempStat.size == 0) {
       await _safeDelete(tempFile);
-      return (result: BackupExportResult.failed, path: null, displayName: null);
+      return (
+        result: BackupExportResult.failed,
+        path: null,
+        displayName: null,
+        error: 'The backup file was empty. Please try again.',
+      );
     }
 
-    // 2. Ask user for destination
+    // 2. Resolve the destination path.
     final defaultName = 'pinoy_pos_backup_$timestamp.db';
-    String? savedPath;
-    String? displayName;
+    String savedPath;
+    String displayName;
 
-    try {
-      final result = await FilePicker.platform.saveFile(
-        dialogTitle: 'Export Backup',
-        fileName: defaultName,
-        type: FileType.custom,
-        allowedExtensions: ['db'],
-      );
-
-      if (result == null || result.isEmpty) {
-        // User canceled the save dialog
+    if (destinationDirectory != null) {
+      // Location-based export: write directly to the saved directory.
+      savedPath = p.join(destinationDirectory, defaultName);
+      displayName = defaultName;
+    } else {
+      // Fallback: ask the user for a save destination via the save dialog.
+      String? pickedPath;
+      try {
+        pickedPath = await FilePicker.platform.saveFile(
+          dialogTitle: 'Export Backup',
+          fileName: defaultName,
+          type: FileType.custom,
+          allowedExtensions: ['db'],
+        );
+      } catch (e) {
+        _log('Save file picker failed: $e');
         await _safeDelete(tempFile);
-        return (result: BackupExportResult.canceled, path: null, displayName: null);
+        return (
+          result: BackupExportResult.failed,
+          path: null,
+          displayName: null,
+          error: 'The save dialog could not be opened. $e',
+        );
       }
 
-      savedPath = result;
-    } catch (e) {
-      // Picker failed — do NOT silently fall back to a default directory.
-      // The admin must explicitly choose where to save the backup.
-      await _safeDelete(tempFile);
-      return (result: BackupExportResult.failed, path: null, displayName: null);
+      if (pickedPath == null || pickedPath.isEmpty) {
+        await _safeDelete(tempFile);
+        return (
+          result: BackupExportResult.canceled,
+          path: null,
+          displayName: null,
+          error: null,
+        );
+      }
+
+      savedPath = pickedPath;
+      displayName = p.basename(savedPath);
     }
 
-    // Show confirmation dialog if callback is provided
-    final prospectiveName = p.basename(savedPath);
+    // Show confirmation dialog if callback is provided.
     if (onConfirm != null) {
-      final confirmed = await onConfirm(savedPath, prospectiveName);
+      final confirmed = await onConfirm(savedPath, displayName);
       if (!confirmed) {
         await _safeDelete(tempFile);
-        return (result: BackupExportResult.canceled, path: null, displayName: null);
+        return (
+          result: BackupExportResult.canceled,
+          path: null,
+          displayName: null,
+          error: null,
+        );
       }
     }
 
-    // 3. Copy temp backup to the chosen destination
+    // 3. Copy temp backup to the chosen destination.
     try {
       await tempFile.copy(savedPath);
     } catch (e) {
+      _log('Failed to copy backup to destination "$savedPath": $e');
       await _safeDelete(tempFile);
-      return (result: BackupExportResult.failed, path: null, displayName: null);
+      return (
+        result: BackupExportResult.failed,
+        path: null,
+        displayName: null,
+        error: destinationDirectory != null
+            ? 'Could not write to the backup location. The folder may no '
+                'longer be accessible. $e'
+            : 'Could not save the backup to the chosen destination. $e',
+      );
     }
 
-    // Clean up temp file
+    // Clean up temp file.
     await _safeDelete(tempFile);
 
-    // 4. Verify the saved file
+    // 4. Verify the saved file.
     final savedFile = File(savedPath);
     final savedStat = await savedFile.stat();
     if (savedStat.size == 0) {
-      return (result: BackupExportResult.failed, path: null, displayName: null);
+      return (
+        result: BackupExportResult.failed,
+        path: null,
+        displayName: null,
+        error: 'The saved backup file is empty. Please try again.',
+      );
     }
 
-    // 5. Record in backup_history
-    displayName = p.basename(savedPath);
+    // 5. Record in backup_history.
     await _backupHistoryDao.insert(BackupHistory(
       filePath: savedPath,
       fileSize: savedStat.size,
@@ -178,25 +354,36 @@ class BackupService {
       createdAt: DateTime.now(),
     ));
 
-    // 6. Log activity
+    // 6. Log activity.
     try {
       await _activityLogService.logActivity(
         action: 'BACKUP_CREATED',
         entity: 'backup',
-        details: 'Backup exported to: $displayName (${_formatFileSize(savedStat.size)})',
+        details:
+            'Backup exported to: $displayName (${_formatFileSize(savedStat.size)})',
       );
-    } catch (_) {}
+    } catch (e) {
+      _log('Failed to log backup creation: $e');
+    }
 
-    // 7. Notification
+    // 7. Notification.
     try {
       await _notificationService.createNotification(
         title: 'Backup Created',
-        message: 'Your Pinoy POS backup ($displayName) was saved successfully.',
+        message:
+            'Your Pinoy POS backup ($displayName) was saved successfully.',
         type: 'backup',
       );
-    } catch (_) {}
+    } catch (e) {
+      _log('Failed to create backup notification: $e');
+    }
 
-    return (result: BackupExportResult.success, path: savedPath, displayName: displayName);
+    return (
+      result: BackupExportResult.success,
+      path: savedPath,
+      displayName: displayName,
+      error: null,
+    );
   }
 
   // ── Import / Restore Backup ──────────────────────────────────────────
@@ -211,7 +398,7 @@ class BackupService {
       throw AuthorizationException('backup_restore');
     }
 
-    // 1. Open file picker
+    // 1. Open file picker.
     FilePickerResult? pickerResult;
     try {
       pickerResult = await FilePicker.platform.pickFiles(
@@ -220,18 +407,28 @@ class BackupService {
         allowedExtensions: ['db'],
       );
     } catch (e) {
-      // Fallback: try any file type
+      _log('File picker failed: $e');
+      // Fallback: try any file type.
       try {
         pickerResult = await FilePicker.platform.pickFiles(
           dialogTitle: 'Import Backup',
         );
-      } catch (_) {
-        return (result: BackupImportResult.failed, displayName: null, fileSize: null);
+      } catch (e2) {
+        _log('File picker fallback also failed: $e2');
+        return (
+          result: BackupImportResult.failed,
+          displayName: null,
+          fileSize: null,
+        );
       }
     }
 
     if (pickerResult == null || pickerResult.files.isEmpty) {
-      return (result: BackupImportResult.canceled, displayName: null, fileSize: null);
+      return (
+        result: BackupImportResult.canceled,
+        displayName: null,
+        fileSize: null,
+      );
     }
 
     final pickedFile = pickerResult.files.first;
@@ -239,44 +436,56 @@ class BackupService {
     final displayName = pickedFile.name;
 
     if (selectedPath == null) {
-      // Web or platform where path is unavailable
-      return (result: BackupImportResult.invalidFile, displayName: displayName, fileSize: null);
+      // Web or platform where path is unavailable.
+      return (
+        result: BackupImportResult.invalidFile,
+        displayName: displayName,
+        fileSize: null,
+      );
     }
 
-    // 2. Validate the selected file
+    // 2. Validate the selected file.
     final validationResult = await _validateBackupFile(selectedPath);
     if (validationResult != BackupImportResult.success) {
-      // Log failed import attempt
       try {
         await _activityLogService.logActivity(
           action: 'BACKUP_RESTORE_FAILED',
           entity: 'backup',
           details: 'Import validation failed for: $displayName',
         );
-      } catch (_) {}
+      } catch (e) {
+        _log('Failed to log import validation failure: $e');
+      }
 
-      return (result: validationResult, displayName: displayName, fileSize: null);
+      return (
+        result: validationResult,
+        displayName: displayName,
+        fileSize: null,
+      );
     }
 
     final fileSize = await File(selectedPath).length();
 
-    // 3. Create safety backup before destructive restore
+    // 3. Create safety backup before destructive restore.
     final safetyPath = await _createSafetyBackup();
 
-    // 4. Log restore started
+    // 4. Log restore started.
     try {
       await _activityLogService.logActivity(
         action: 'BACKUP_RESTORE_STARTED',
         entity: 'backup',
-        details: 'Restoring from: $displayName (${_formatFileSize(fileSize)})',
+        details:
+            'Restoring from: $displayName (${_formatFileSize(fileSize)})',
       );
-    } catch (_) {}
+    } catch (e) {
+      _log('Failed to log restore start: $e');
+    }
 
-    // 5. Perform the restore
+    // 5. Perform the restore.
     final success = await _performRestore(selectedPath);
 
     if (!success) {
-      // Restore failed — attempt to recover from safety backup
+      // Restore failed — attempt to recover from safety backup.
       if (safetyPath != null) {
         await _performRestore(safetyPath);
       }
@@ -287,40 +496,54 @@ class BackupService {
           entity: 'backup',
           details: 'Restore failed for: $displayName',
         );
-      } catch (_) {}
+      } catch (e) {
+        _log('Failed to log restore failure: $e');
+      }
 
-      // Clean up safety backup
+      // Clean up safety backup.
       if (safetyPath != null) {
         await _safeDelete(File(safetyPath));
       }
 
-      return (result: BackupImportResult.failed, displayName: displayName, fileSize: fileSize);
+      return (
+        result: BackupImportResult.failed,
+        displayName: displayName,
+        fileSize: fileSize,
+      );
     }
 
-    // 6. Log success
+    // 6. Log success.
     try {
       await _activityLogService.logActivity(
         action: 'BACKUP_RESTORED',
         entity: 'backup',
         details: 'Successfully restored from: $displayName',
       );
-    } catch (_) {}
+    } catch (e) {
+      _log('Failed to log restore success: $e');
+    }
 
-    // 7. Notification
+    // 7. Notification.
     try {
       await _notificationService.createNotification(
         title: 'Backup Restored',
         message: 'Your Pinoy POS data has been restored successfully.',
         type: 'backup',
       );
-    } catch (_) {}
+    } catch (e) {
+      _log('Failed to create restore notification: $e');
+    }
 
-    // 8. Clean up safety backup
+    // 8. Clean up safety backup.
     if (safetyPath != null) {
       await _safeDelete(File(safetyPath));
     }
 
-    return (result: BackupImportResult.success, displayName: displayName, fileSize: fileSize);
+    return (
+      result: BackupImportResult.success,
+      displayName: displayName,
+      fileSize: fileSize,
+    );
   }
 
   // ── Restore from History Path ────────────────────────────────────────
@@ -336,7 +559,7 @@ class BackupService {
       throw AuthorizationException('backup_restore');
     }
 
-    // 1. Validate
+    // 1. Validate.
     final validationResult = await _validateBackupFile(backupPath);
     if (validationResult != BackupImportResult.success) {
       try {
@@ -345,23 +568,27 @@ class BackupService {
           entity: 'backup',
           details: 'Restore validation failed for: ${p.basename(backupPath)}',
         );
-      } catch (_) {}
+      } catch (e) {
+        _log('Failed to log restore validation failure: $e');
+      }
       return validationResult;
     }
 
-    // 2. Safety backup
+    // 2. Safety backup.
     final safetyPath = await _createSafetyBackup();
 
-    // 3. Log started
+    // 3. Log started.
     try {
       await _activityLogService.logActivity(
         action: 'BACKUP_RESTORE_STARTED',
         entity: 'backup',
         details: 'Restoring from: ${p.basename(backupPath)}',
       );
-    } catch (_) {}
+    } catch (e) {
+      _log('Failed to log restore start: $e');
+    }
 
-    // 4. Perform restore
+    // 4. Perform restore.
     final success = await _performRestore(backupPath);
 
     if (!success) {
@@ -374,32 +601,38 @@ class BackupService {
           entity: 'backup',
           details: 'Restore failed for: ${p.basename(backupPath)}',
         );
-      } catch (_) {}
+      } catch (e) {
+        _log('Failed to log restore failure: $e');
+      }
       if (safetyPath != null) {
         await _safeDelete(File(safetyPath));
       }
       return BackupImportResult.failed;
     }
 
-    // 5. Log success
+    // 5. Log success.
     try {
       await _activityLogService.logActivity(
         action: 'BACKUP_RESTORED',
         entity: 'backup',
         details: 'Successfully restored from: ${p.basename(backupPath)}',
       );
-    } catch (_) {}
+    } catch (e) {
+      _log('Failed to log restore success: $e');
+    }
 
-    // 6. Notification
+    // 6. Notification.
     try {
       await _notificationService.createNotification(
         title: 'Backup Restored',
         message: 'Your Pinoy POS data has been restored successfully.',
         type: 'backup',
       );
-    } catch (_) {}
+    } catch (e) {
+      _log('Failed to create restore notification: $e');
+    }
 
-    // 7. Clean up safety backup
+    // 7. Clean up safety backup.
     if (safetyPath != null) {
       await _safeDelete(File(safetyPath));
     }
@@ -425,8 +658,9 @@ class BackupService {
       if (await file.exists()) {
         await file.delete();
       }
-    } catch (_) {
-      // Best-effort file cleanup
+    } catch (e) {
+      // Best-effort file cleanup — the history record is still removed.
+      _log('Could not delete backup file "$filePath": $e');
     }
     await _backupHistoryDao.delete(id);
     return true;
@@ -454,18 +688,18 @@ class BackupService {
   Future<BackupImportResult> _validateBackupFile(String path) async {
     final file = File(path);
 
-    // Check file exists
+    // Check file exists.
     if (!await file.exists()) {
       return BackupImportResult.invalidFile;
     }
 
-    // Check non-empty
+    // Check non-empty.
     final stat = await file.stat();
     if (stat.size == 0) {
       return BackupImportResult.invalidFile;
     }
 
-    // Check SQLite header (first 16 bytes should contain "SQLite format 3")
+    // Check SQLite header (first 16 bytes should contain "SQLite format 3").
     try {
       final raf = await file.open();
       final header = await raf.read(16);
@@ -474,11 +708,12 @@ class BackupService {
       if (!headerStr.startsWith('SQLite format 3')) {
         return BackupImportResult.invalidFile;
       }
-    } catch (_) {
+    } catch (e) {
+      _log('Could not read backup file header "$path": $e');
       return BackupImportResult.invalidFile;
     }
 
-    // Open as SQLite database and verify required tables
+    // Open as SQLite database and verify required tables.
     Database? testDb;
     try {
       testDb = await openDatabase(path, readOnly: true);
@@ -511,11 +746,13 @@ class BackupService {
           await testDb.close();
           return BackupImportResult.incompatible;
         }
-      } catch (_) {
+      } catch (e) {
+        _log('Backup metadata validation failed: $e');
         await testDb.close();
         return BackupImportResult.incompatible;
       }
-    } catch (_) {
+    } catch (e) {
+      _log('Could not open backup file as SQLite database: $e');
       await _safeClose(testDb);
       return BackupImportResult.invalidFile;
     } finally {
@@ -536,11 +773,13 @@ class BackupService {
       final dbPath = db.path;
       final tempDir = await getTemporaryDirectory();
       final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
-      final safetyPath = p.join(tempDir.path, 'pinoy_pos_safety_$timestamp.db');
+      final safetyPath =
+          p.join(tempDir.path, 'pinoy_pos_safety_$timestamp.db');
       await File(dbPath).copy(safetyPath);
       await _writeBackupMetadata(safetyPath);
       return safetyPath;
-    } catch (_) {
+    } catch (e) {
+      _log('Could not create safety backup: $e');
       return null;
     }
   }
@@ -562,7 +801,8 @@ class BackupService {
     try {
       await backupFile.copy(dbPath);
       return true;
-    } catch (_) {
+    } catch (e) {
+      _log('Restore copy failed from "$backupPath" to "$dbPath": $e');
       return false;
     }
   }
@@ -587,9 +827,10 @@ class BackupService {
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
-    } catch (_) {
+    } catch (e) {
       // Best-effort: old backups created before this feature won't have
       // the table, and that's fine — they'll fail validation on import.
+      _log('Could not write backup metadata: $e');
     } finally {
       await _safeClose(metaDb);
     }
@@ -605,14 +846,28 @@ class BackupService {
   Future<void> _safeDelete(File file) async {
     try {
       await file.delete();
-    } catch (_) {}
+    } catch (e) {
+      _log('Could not delete temp file: $e');
+    }
   }
 
   /// Safely closes a database, ignoring any errors.
   Future<void> _safeClose(Database? db) async {
     try {
       await db?.close();
-    } catch (_) {}
+    } catch (e) {
+      _log('Could not close database: $e');
+    }
+  }
+
+  /// Logs a debug message with the full exception. In debug/development
+  /// mode this prints to the console so the actual failure is visible
+  /// during development. In release builds it is a no-op so users never
+  /// see raw stack traces.
+  void _log(String message) {
+    if (kDebugMode) {
+      debugPrint('[BackupService] $message');
+    }
   }
 
   /// Returns a user-readable display name for a backup file path.
@@ -620,15 +875,5 @@ class BackupService {
   /// the basename. On Android SAF URIs, returns the document name.
   String getDisplayName(String filePath) {
     return p.basename(filePath);
-  }
-
-  /// Returns a user-readable location for a backup file path.
-  /// Shows the parent directory name(s) instead of the full raw path.
-  String getDisplayLocation(String filePath) {
-    final dir = p.dirname(filePath);
-    final parts = p.split(dir);
-    // Show last 2-3 path segments for readability
-    if (parts.length <= 3) return parts.join(' › ');
-    return '... › ${parts.sublist(parts.length - 3).join(' › ')}';
   }
 }

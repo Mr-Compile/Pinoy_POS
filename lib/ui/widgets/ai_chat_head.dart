@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pinoy_pos/core/ai_config_status.dart';
 import 'package:pinoy_pos/providers/ai_advisor_provider.dart';
+import 'package:pinoy_pos/ui/screens/ai_advisor_screen.dart';
 
 /// Floating, draggable AI chat head inspired by modern messaging apps.
 ///
@@ -147,8 +148,12 @@ class _AIChatHeadState extends ConsumerState<AIChatHead> {
       });
       _savePosition(snapped);
     } else {
-      // It was a tap, not a drag — open the panel.
-      ref.read(aiAdvisorChatProvider.notifier).openPanel();
+      // It was a tap, not a drag — open the full AI Advisor screen.
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const AIAdvisorScreen(),
+        ),
+      );
     }
     _isDragging = false;
     _totalDragDistance = 0;

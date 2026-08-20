@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -21,6 +22,14 @@ import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 ///
 /// The screen never touches DAOs or SQLite directly. All operations go
 /// through [BackupService] which enforces the `backup_restore` permission.
+///
+/// State is separated into independent concerns so one failing operation
+/// never blocks the rest of the screen:
+///   - backup history loading  (_isLoading / _loadError)
+///   - backup location loading  (_locationLoading / _locationError)
+///   - selecting a location      (_isSelectingLocation)
+///   - creating a backup         (_isExporting)
+///   - importing / restoring     (_isImporting)
 class BackupRestoreScreen extends ConsumerStatefulWidget {
   const BackupRestoreScreen({super.key});
 
@@ -30,11 +39,30 @@ class BackupRestoreScreen extends ConsumerStatefulWidget {
 }
 
 class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
+  // ── Backup history state ──
   List<BackupHistory> _backups = [];
   bool _isLoading = true;
+  String? _loadError;
+
+  // ── Backup location state (independent of history loading) ──
+  String? _backupLocation;
+  bool _locationLoading = true;
+
+  // ── Action loading flags (independent of each other) ──
   bool _isExporting = false;
   bool _isImporting = false;
-  String? _loadError;
+  bool _isSelectingLocation = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Kick off both loads immediately. They are independent so a failure
+    // in one never blocks the other.
+    _loadBackups();
+    _loadBackupLocation();
+  }
+
+  // ── Load Backup History ──────────────────────────────────────────────
 
   Future<void> _loadBackups() async {
     setState(() {
@@ -51,12 +79,95 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
           _isLoading = false;
         });
       }
-    } catch (_) {
+    } catch (e, st) {
+      _log('Failed to load backup history', e, st);
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _loadError = 'Failed to load backup history. Please try again.';
+          _loadError =
+              'We couldn\'t load your backup information. Please try again.';
         });
+      }
+    }
+  }
+
+  // ── Load Saved Backup Location ───────────────────────────────────────
+
+  Future<void> _loadBackupLocation() async {
+    setState(() {
+      _locationLoading = true;
+    });
+
+    try {
+      final backupService = ref.read(backupServiceProvider);
+      final location = await backupService.getSavedBackupLocation();
+      if (mounted) {
+        setState(() {
+          _backupLocation = location;
+          _locationLoading = false;
+        });
+      }
+    } catch (e, st) {
+      _log('Failed to load backup location', e, st);
+      if (mounted) {
+        setState(() {
+          _locationLoading = false;
+          // "No saved location" is NOT an error — it is a valid
+          // not-configured state. Only set an error for genuine failures.
+          _backupLocation = null;
+        });
+      }
+    }
+  }
+
+  // ── Choose / Change Backup Location ──────────────────────────────────
+
+  Future<void> _chooseBackupLocation() async {
+    if (_isSelectingLocation) return;
+
+    setState(() => _isSelectingLocation = true);
+
+    try {
+      final backupService = ref.read(backupServiceProvider);
+      final result = await backupService.pickBackupLocation();
+
+      if (!mounted) return;
+
+      switch (result.result) {
+        case BackupLocationResult.selected:
+          setState(() => _backupLocation = result.path);
+          await AppDialogService.backupLocationChanged(
+            context,
+            location: backupService.getDisplayLocation(result.path!),
+          );
+        case BackupLocationResult.canceled:
+          // User canceled — no dialog needed.
+          break;
+        case BackupLocationResult.failed:
+          await AppDialogService.backupLocationSelectionFailed(
+            context,
+            reason: result.error,
+            onRetry: () {
+              Navigator.of(context, rootNavigator: true).pop();
+              _chooseBackupLocation();
+            },
+          );
+      }
+    } catch (e, st) {
+      _log('Backup location selection failed', e, st);
+      if (mounted) {
+        await AppDialogService.backupLocationSelectionFailed(
+          context,
+          reason: 'An unexpected error occurred while choosing a location.',
+          onRetry: () {
+            Navigator.of(context, rootNavigator: true).pop();
+            _chooseBackupLocation();
+          },
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSelectingLocation = false);
       }
     }
   }
@@ -66,18 +177,54 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
   Future<void> _exportBackup() async {
     if (_isExporting) return;
 
+    final backupService = ref.read(backupServiceProvider);
+
+    // If no backup location is configured, require one before exporting.
+    if (_backupLocation == null || _backupLocation!.isEmpty) {
+      final choose = await AppDialogService.backupLocationRequired(context);
+      if (!choose || !mounted) return;
+      await _chooseBackupLocation();
+      // If the user canceled location selection, abort the export.
+      if (_backupLocation == null || _backupLocation!.isEmpty) return;
+    }
+
+    // Validate the saved location is still accessible.
+    final location = _backupLocation!;
+    bool valid;
+    try {
+      valid = await backupService.isLocationValid(location);
+    } catch (e, st) {
+      _log('Backup location validation failed', e, st);
+      valid = false;
+    }
+
+    if (!valid) {
+      if (!mounted) return;
+      // Clear the invalid saved location and prompt for a new one.
+      await backupService.clearBackupLocation();
+      if (!mounted) return;
+      setState(() => _backupLocation = null);
+      final choose = await AppDialogService.backupLocationUnavailable(context);
+      if (!choose || !mounted) return;
+      await _chooseBackupLocation();
+      if (_backupLocation == null || _backupLocation!.isEmpty) return;
+    }
+
+    final destinationDirectory = _backupLocation!;
+
     setState(() => _isExporting = true);
 
     try {
-      final backupService = ref.read(backupServiceProvider);
       final result = await backupService.exportBackup(
+        destinationDirectory: destinationDirectory,
         onConfirm: (selectedPath, displayName) async {
           if (!mounted) return false;
-          final location = backupService.getDisplayLocation(selectedPath);
+          final locationLabel =
+              backupService.getDisplayLocation(destinationDirectory);
           return AppDialogService.backupDestinationConfirm(
             context,
             displayName: displayName,
-            location: location,
+            location: locationLabel,
           );
         },
       );
@@ -86,22 +233,46 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
 
       switch (result.result) {
         case BackupExportResult.success:
-          final location = backupService.getDisplayLocation(result.path!);
+          final locationLabel =
+              backupService.getDisplayLocation(result.path!);
           await AppDialogService.backupExportSuccess(
             context,
             displayName: result.displayName!,
-            location: location,
+            location: locationLabel,
           );
           await _loadBackups();
         case BackupExportResult.canceled:
-          // User canceled — no dialog needed
+          // User canceled — no dialog needed.
           break;
         case BackupExportResult.failed:
-          await AppDialogService.backupExportFailed(context);
+          await AppDialogService.backupExportFailed(
+            context,
+            reason: result.error,
+            onTryAgain: () {
+              Navigator.of(context, rootNavigator: true).pop();
+              _exportBackup();
+            },
+            onChangeLocation: () {
+              Navigator.of(context, rootNavigator: true).pop();
+              _chooseBackupLocation();
+            },
+          );
       }
-    } catch (_) {
+    } catch (e, st) {
+      _log('Backup export failed', e, st);
       if (mounted) {
-        await AppDialogService.backupExportFailed(context);
+        await AppDialogService.backupExportFailed(
+          context,
+          reason: 'An unexpected error occurred while creating the backup.',
+          onTryAgain: () {
+            Navigator.of(context, rootNavigator: true).pop();
+            _exportBackup();
+          },
+          onChangeLocation: () {
+            Navigator.of(context, rootNavigator: true).pop();
+            _chooseBackupLocation();
+          },
+        );
       }
     } finally {
       if (mounted) {
@@ -125,12 +296,12 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
 
       switch (result.result) {
         case BackupImportResult.success:
-          // Invalidate all service providers so cached state is discarded
+          // Invalidate all service providers so cached state is discarded.
           _invalidateAllProviders();
           await AppDialogService.backupRestoreSuccess(context);
           await _loadBackups();
         case BackupImportResult.canceled:
-          // User canceled — no dialog
+          // User canceled — no dialog.
           break;
         case BackupImportResult.invalidFile:
           await AppDialogService.invalidBackupFile(context);
@@ -139,7 +310,8 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
         case BackupImportResult.failed:
           await AppDialogService.backupRestoreFailed(context);
       }
-    } catch (_) {
+    } catch (e, st) {
+      _log('Backup import failed', e, st);
       if (mounted) {
         await AppDialogService.backupRestoreFailed(context);
       }
@@ -187,7 +359,8 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
         case BackupImportResult.canceled:
           break;
       }
-    } catch (_) {
+    } catch (e, st) {
+      _log('Restore from history failed', e, st);
       if (mounted) {
         await AppDialogService.backupRestoreFailed(context);
       }
@@ -212,7 +385,8 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
     if (confirmed != true || !mounted) return;
 
     try {
-      final success = await backupService.deleteBackup(backup.id!, backup.filePath);
+      final success =
+          await backupService.deleteBackup(backup.id!, backup.filePath);
       if (!mounted) return;
       if (success) {
         await AppDialogService.success(
@@ -228,7 +402,8 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
           message: 'Failed to delete the backup record.',
         );
       }
-    } catch (_) {
+    } catch (e, st) {
+      _log('Delete backup failed', e, st);
       if (mounted) {
         await AppDialogService.error(
           context,
@@ -274,6 +449,16 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
     return DateFormat('MMM d, y · h:mm a').format(date.toLocal());
   }
 
+  /// Logs a debug message with the full exception and stack trace. In
+  /// debug/development mode this prints to the console so the actual
+  /// failure is visible during development. In release builds it is a
+  /// no-op so users never see raw stack traces.
+  void _log(String message, Object error, StackTrace stackTrace) {
+    if (kDebugMode) {
+      debugPrint('[BackupRestoreScreen] $message: $error\n$stackTrace');
+    }
+  }
+
   // ── Build ────────────────────────────────────────────────────────────
 
   @override
@@ -296,10 +481,10 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
         ],
       ),
       body: _isLoading
-          ? const LoadingState()
+          ? const LoadingState(message: 'Loading backup history...')
           : _loadError != null
               ? ErrorState(
-                  title: 'Failed to Load Backups',
+                  title: 'Unable to Load Backup Data',
                   message: _loadError,
                   onRetry: _loadBackups,
                 )
@@ -314,17 +499,22 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // ── Page subtitle ──
+                          // ── Page header ──
                           Text(
-                            'Protect and recover your Pinoy POS data.',
+                            'Backup & Restore',
+                            style: AppTypography.headlineSmallSemibold(context),
+                          ),
+                          const SizedBox(height: Spacing.xs),
+                          Text(
+                            'Protect your business data and recover it when needed.',
                             style: theme.textTheme.bodyMedium?.copyWith(
                                   color: cs.onSurfaceVariant,
                                 ),
                           ),
                           const SizedBox(height: Spacing.xxl),
 
-                          // ── Data Protection status card ──
-                          _buildStatusCard(context),
+                          // ── Backup destination status card ──
+                          _buildLocationCard(context),
                           const SizedBox(height: Spacing.xxl),
 
                           // ── Quick Actions ──
@@ -340,9 +530,11 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                             EmptyState(
                               icon: Icons.cloud_off_outlined,
                               title: 'No Backups Yet',
-                              message: 'Create your first backup to protect your Pinoy POS data.',
+                              message:
+                                  'Create your first backup to protect your Pinoy POS data.',
                               action: FilledButton.icon(
-                                onPressed: _isExporting ? null : _exportBackup,
+                                onPressed:
+                                    _isExporting ? null : _exportBackup,
                                 icon: const Icon(Icons.upload_outlined),
                                 label: const Text('Export Backup'),
                               ),
@@ -359,91 +551,131 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
     );
   }
 
-  // ── Status Card ──────────────────────────────────────────────────────
+  // ── Location / Destination Status Card ───────────────────────────────
 
-  Widget _buildStatusCard(BuildContext context) {
+  Widget _buildLocationCard(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final backupService = ref.read(backupServiceProvider);
 
-    final sortedBackups = List<BackupHistory>.from(_backups)
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    final actualLatest = sortedBackups.isNotEmpty ? sortedBackups.first : null;
-    final hasBackup = actualLatest != null;
+    // While the saved location is still loading, show a lightweight
+    // inline placeholder — NOT a full-screen spinner. The rest of the
+    // screen is already usable.
+    if (_locationLoading) {
+      return AppCard(
+        padding: const EdgeInsets.all(Spacing.xl),
+        child: Row(
+          children: [
+            Icon(Icons.folder_outlined, size: 24, color: cs.primary),
+            const SizedBox(width: Spacing.sm),
+            Expanded(
+              child: Text(
+                'Checking backup location...',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
+              ),
+            ),
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: cs.primary,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final hasLocation = _backupLocation != null && _backupLocation!.isNotEmpty;
 
     return AppCard(
       padding: const EdgeInsets.all(Spacing.xl),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Section title
           Row(
             children: [
-              Icon(
-                Icons.shield_outlined,
-                size: 24,
-                color: cs.primary,
-              ),
+              Icon(Icons.folder_outlined, size: 24, color: cs.primary),
               const SizedBox(width: Spacing.sm),
               Text(
-                'Data Protection',
+                'Backup Destination',
                 style: AppTypography.titleMediumBold(context),
               ),
             ],
           ),
           const SizedBox(height: Spacing.lg),
-          if (hasBackup) ...[
+
+          if (hasLocation) ...[
+            // Configured location
             Row(
               children: [
-                Icon(
-                  Icons.check_circle,
-                  size: 20,
-                  color: AppSemanticColors.success,
-                ),
+                Icon(Icons.check_circle, size: 20, color: AppSemanticColors.success),
                 const SizedBox(width: Spacing.sm),
                 Expanded(
                   child: Text(
-                    'Last backup: ${_formatDate(actualLatest.createdAt)}',
+                    'Backups will be saved here automatically.',
                     style: theme.textTheme.bodyMedium,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: Spacing.xs),
-            Row(
-              children: [
-                Icon(Icons.folder_outlined, size: 16, color: cs.onSurfaceVariant),
-                const SizedBox(width: Spacing.xs),
-                Expanded(
-                  child: Text(
-                    backupService.getDisplayLocation(actualLatest.filePath),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                          color: cs.onSurfaceVariant,
-                        ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+            const SizedBox(height: Spacing.sm),
+            Container(
+              padding: const EdgeInsets.all(Spacing.md),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.folder_open, size: 18, color: cs.onSurfaceVariant),
+                  const SizedBox(width: Spacing.xs),
+                  Expanded(
+                    child: Text(
+                      backupService.getDisplayLocation(_backupLocation!),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
+                ],
+              ),
+            ),
+            const SizedBox(height: Spacing.lg),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _isSelectingLocation ? null : _chooseBackupLocation,
+                icon: _isSelectingLocation
+                    ? SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: cs.primary,
+                        ),
+                      )
+                    : const Icon(Icons.edit_location_alt_outlined),
+                label: Text(
+                  _isSelectingLocation ? 'Opening picker...' : 'Change Location',
                 ),
-                const SizedBox(width: Spacing.sm),
-                Text(
-                  _formatFileSize(actualLatest.fileSize),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                        color: cs.onSurfaceVariant,
-                      ),
-                ),
-              ],
+              ),
             ),
           ] else ...[
+            // Not configured
             Row(
               children: [
-                Icon(
-                  Icons.info_outline,
-                  size: 20,
-                  color: cs.onSurfaceVariant,
-                ),
+                Icon(Icons.info_outline, size: 20, color: cs.onSurfaceVariant),
                 const SizedBox(width: Spacing.sm),
                 Expanded(
                   child: Text(
-                    'No backup has been created yet.',
+                    'No backup location selected.',
                     style: theme.textTheme.bodyMedium?.copyWith(
                           color: cs.onSurfaceVariant,
                         ),
@@ -451,25 +683,36 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                 ),
               ],
             ),
-          ],
-          const SizedBox(height: Spacing.lg),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: _isExporting ? null : _exportBackup,
-              icon: _isExporting
-                  ? SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: cs.onPrimary,
-                      ),
-                    )
-                  : const Icon(Icons.upload_outlined),
-              label: Text(_isExporting ? 'Creating Backup...' : 'Export Backup'),
+            const SizedBox(height: Spacing.xs),
+            Text(
+              'Choose a location before creating your first backup.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
             ),
-          ),
+            const SizedBox(height: Spacing.lg),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _isSelectingLocation ? null : _chooseBackupLocation,
+                icon: _isSelectingLocation
+                    ? SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: cs.onPrimary,
+                        ),
+                      )
+                    : const Icon(Icons.folder_open),
+                label: Text(
+                  _isSelectingLocation
+                      ? 'Opening picker...'
+                      : 'Choose Backup Location',
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

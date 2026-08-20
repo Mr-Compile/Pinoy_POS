@@ -2,35 +2,41 @@ import 'package:pinoy_pos/data/models/user.dart';
 
 /// Centralized role-aware AI Advisor configuration.
 ///
-/// Provides suggested questions, FAQ entries, and contextual recommendations
-/// based on the current user's role. This ensures suggestions never lead
-/// users toward unauthorized features.
+/// The AI Business Advisor is available ONLY to the Owner. Admin manages
+/// AI configuration (API key, model) but does not use business analysis.
+/// Staff has no AI access at all.
+///
+/// This config provides suggested questions and contextual recommendations
+/// for the Owner's Business Advisor.
 class AIRoleConfig {
   final UserRole role;
 
   AIRoleConfig(this.role);
 
-  /// Returns the welcome message for the AI chat panel.
+  /// Returns the welcome message for the AI chat screen.
   String get welcomeMessage {
     switch (role) {
       case UserRole.owner:
         return 'I can help you with business performance, sales analysis, '
-            'inventory recommendations, reports, and business insights.';
+            'inventory recommendations, restock priorities, product '
+            'performance, category performance, trends, and business insights.';
       case UserRole.admin:
-        return 'I can help you with user management, backup and restore, '
-            'system settings, and system activity logs.';
+        return 'AI configuration is managed in Settings → AI Integration. '
+            'The Business Advisor is available to the Owner only.';
       case UserRole.staff:
-        return 'I can help you with POS guidance, product information, '
-            'your own sales, and operational tips.';
+        return 'The AI Business Advisor is not available for your role.';
     }
   }
 
-  /// Returns the list of suggested questions for the current role.
+  /// Returns the list of suggested questions for the Owner.
+  /// These are fallback suggestions; the actual suggestions shown in the
+  /// UI are generated dynamically by [BusinessIntelligenceService] based
+  /// on real database conditions.
   List<String> get suggestedQuestions {
     switch (role) {
       case UserRole.owner:
         return [
-          'How are my sales performing today?',
+          'How are my sales today?',
           'What products are selling the most?',
           'Which products are low in stock?',
           'Give me a summary of my business performance.',
@@ -40,31 +46,13 @@ class AIRoleConfig {
           'Show me important business insights.',
         ];
       case UserRole.admin:
-        return [
-          'How do I manage user accounts?',
-          'Which users are currently inactive?',
-          'How do I create a backup?',
-          'How do I restore a backup safely?',
-          'Explain the recent system activity.',
-          'How can I manage deleted records?',
-          'Help me review system settings.',
-          'Show me what I can manage in my role.',
-        ];
+        return [];
       case UserRole.staff:
-        return [
-          'How do I process a sale?',
-          'How do I add stock?',
-          'Show me how to check my sales.',
-          'How do I find a product quickly?',
-          'How do I manage my profile?',
-          'What does this notification mean?',
-          'Help me understand my authorized reports.',
-          'How can I use the POS faster?',
-        ];
+        return [];
     }
   }
 
-  /// Returns the list of FAQ questions for the current role.
+  /// Returns the list of FAQ questions for the Owner.
   List<String> get faqQuestions {
     switch (role) {
       case UserRole.owner:
@@ -74,73 +62,33 @@ class AIRoleConfig {
           'Can the AI restock products for me?',
         ];
       case UserRole.admin:
-        return [
-          'What can the AI Advisor help me with?',
-          'Can the AI manage users for me?',
-          'How do I check backup status?',
-        ];
+        return [];
       case UserRole.staff:
-        return [
-          'What can the AI Advisor help me with?',
-          'Can the AI see other people\'s sales?',
-          'How do I check my own sales?',
-        ];
+        return [];
     }
   }
 
   /// Returns a contextual recommendation based on the current screen
   /// and the user's role. Returns null if no recommendation is available.
   static String? getContextualRecommendation(UserRole role, String screenLabel) {
+    if (role != UserRole.owner) return null;
+
     final key = screenLabel.toLowerCase();
-    switch (role) {
-      case UserRole.owner:
-        if (key.contains('dashboard')) {
-          return 'Want a quick summary of today\'s business performance?';
-        }
-        if (key.contains('stock') || key.contains('inventory')) {
-          return 'I can help identify low-stock products.';
-        }
-        if (key.contains('sales')) {
-          return 'I can analyze your sales trends and patterns.';
-        }
-        if (key.contains('product')) {
-          return 'I can help with product performance insights.';
-        }
-        if (key.contains('report')) {
-          return 'I can help interpret your business reports.';
-        }
-        return null;
-      case UserRole.admin:
-        if (key.contains('user')) {
-          return 'Need help managing user accounts?';
-        }
-        if (key.contains('backup') || key.contains('restore')) {
-          return 'I can guide you through creating or restoring a backup.';
-        }
-        if (key.contains('setting')) {
-          return 'I can help you review system settings.';
-        }
-        if (key.contains('trash')) {
-          return 'I can help with trash management guidance.';
-        }
-        return null;
-      case UserRole.staff:
-        if (key.contains('pos')) {
-          return 'Need help processing a sale?';
-        }
-        if (key.contains('sale') && key.contains('my')) {
-          return 'I can help explain your own sales summary.';
-        }
-        if (key.contains('notification')) {
-          return 'I can help explain this notification.';
-        }
-        if (key.contains('product')) {
-          return 'I can help you find product information quickly.';
-        }
-        if (key.contains('stock')) {
-          return 'I can guide you through adding stock.';
-        }
-        return null;
+    if (key.contains('dashboard')) {
+      return 'Want a quick summary of today\'s business performance?';
     }
+    if (key.contains('stock') || key.contains('inventory')) {
+      return 'I can help identify low-stock products and restock priorities.';
+    }
+    if (key.contains('sales')) {
+      return 'I can analyze your sales trends and patterns.';
+    }
+    if (key.contains('product')) {
+      return 'I can help with product performance insights.';
+    }
+    if (key.contains('report')) {
+      return 'I can help interpret your business reports.';
+    }
+    return null;
   }
 }

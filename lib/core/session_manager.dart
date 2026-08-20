@@ -67,7 +67,8 @@ class SessionManager {
 
   /// Owner (Business Superuser) — manages store operations and business
   /// decisions. Does NOT have user management, backup/restore, or system
-  /// maintenance access.
+  /// maintenance access. The Owner uses the AI Business Advisor for
+  /// business-wide analytics (sales, products, inventory, trends).
   static const List<String> _ownerPermissions = [
     'view_dashboard',
     'view_pos',
@@ -92,6 +93,7 @@ class SessionManager {
     'restore_trash',
     'view_activity_logs',
     'view_ai_advisor',
+    'use_ai_advisor',
     'view_settings',
     'edit_settings',
     'view_notifications',
@@ -101,8 +103,14 @@ class SessionManager {
 
   /// System Admin (Technical Administrator) — maintains the application,
   /// accounts, backups, and system configuration. Does NOT have access to
-  /// POS, products, categories, stock, sales, reports, announcements, or AI
-  /// advisor.
+  /// POS, products, categories, stock, sales, reports, or announcements.
+  ///
+  /// AI access: Admin can ONLY CONFIGURE the Groq AI integration
+  /// (`manage_ai_config`) — add/edit/replace the API key, test the
+  /// connection, refresh models, and select the default model. Admin does
+  /// NOT use the Business Advisor and has no `use_ai_advisor` or
+  /// `view_ai_advisor` permission, so the AI FAB, the dashboard AI card,
+  /// and the AI Advisor screen are hidden from Admin.
   static const List<String> _systemAdminPermissions = [
     'view_dashboard',
     'manage_users',
@@ -117,7 +125,6 @@ class SessionManager {
     'view_trash',
     'restore_trash',
     'view_activity_logs',
-    'view_ai_advisor',
     'view_notifications',
     'view_profile',
     'view_more',
@@ -126,6 +133,10 @@ class SessionManager {
   /// Staff (Operational User) — daily cashier and inventory operations.
   /// Can view products/categories, add stock, create sales, view own
   /// sales/reports, and manage their own profile.
+  ///
+  /// AI access: Staff has NO AI access at all — no `use_ai_advisor` and no
+  /// `view_ai_advisor`. The AI Advisor FAB, dashboard AI card, and AI
+  /// Advisor screen are completely hidden from Staff.
   static const List<String> _staffPermissions = [
     'view_dashboard',
     'view_pos',
@@ -140,7 +151,6 @@ class SessionManager {
     'export_reports',
     'view_notifications',
     'view_activity_logs',
-    'view_ai_advisor',
     'view_profile',
     'view_more',
   ];

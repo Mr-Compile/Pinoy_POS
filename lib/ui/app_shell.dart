@@ -102,13 +102,29 @@ class _AppShellState extends ConsumerState<AppShell> {
     final role = authState.user!.role;
     final tabs = _getTabsForRole(role);
 
-    final selectedIndex =
-        _selectedIndex < tabs.length ? _selectedIndex : 0;
+    // Clamp the selected index to the valid range. When the destination
+    // set shrinks (e.g. the More tab disappears because its entries became
+    // inaccessible), the old index can fall out of bounds. Reset to 0 and
+    // persist the correction so _selectedIndex stays consistent for the
+    // next navigation event. The reset is deferred to a post-frame
+    // callback to avoid calling setState during build.
+    int selectedIndex;
+    if (_selectedIndex >= 0 && _selectedIndex < tabs.length) {
+      selectedIndex = _selectedIndex;
+    } else {
+      selectedIndex = 0;
+      if (_selectedIndex != 0) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() => _selectedIndex = 0);
+        });
+      }
+    }
 
-    // AI Advisor floating chat head -- available to all roles with
-    // view_ai_advisor permission (Owner, Admin, Staff).
-    final canViewAIAdvisor =
-        ref.read(authStateProvider.notifier).hasPermission('view_ai_advisor');
+    // AI Advisor floating chat head — available ONLY to users with
+    // use_ai_advisor permission (Owner only). Admin and Staff do not see
+    // the FAB. Tapping it opens the full AIAdvisorScreen route.
+    final canUseAIAdvisor =
+        ref.read(authStateProvider.notifier).hasPermission('use_ai_advisor');
     final aiChatState = ref.watch(aiAdvisorChatProvider);
 
     if (isTablet) {
@@ -124,9 +140,9 @@ class _AppShellState extends ConsumerState<AppShell> {
                 ),
               ],
             ),
-            if (canViewAIAdvisor && !aiChatState.isPanelOpen)
+            if (canUseAIAdvisor && !aiChatState.isPanelOpen)
               AIChatHead(userId: authState.user!.id!),
-            if (canViewAIAdvisor && aiChatState.isPanelOpen)
+            if (canUseAIAdvisor && aiChatState.isPanelOpen)
               const AIChatPanel(),
           ],
         ),
@@ -138,9 +154,9 @@ class _AppShellState extends ConsumerState<AppShell> {
       body: Stack(
         children: [
           _getScreen(tabs[selectedIndex].screen),
-          if (canViewAIAdvisor && !aiChatState.isPanelOpen)
+          if (canUseAIAdvisor && !aiChatState.isPanelOpen)
             AIChatHead(userId: authState.user!.id!),
-          if (canViewAIAdvisor && aiChatState.isPanelOpen)
+          if (canUseAIAdvisor && aiChatState.isPanelOpen)
             const AIChatPanel(),
         ],
       ),
@@ -238,17 +254,13 @@ class _AppShellState extends ConsumerState<AppShell> {
   List<AppTab> _getTabsForRole(UserRole role) {
     final authNotifier = ref.read(authStateProvider.notifier);
 
-    // Determine whether the More screen would have any accessible entries
-    // for the current user.  More is only shown if at least one More
-    // screen permission is granted.
-    final morePermissions = [
-      'view_categories',
-      'add_stock',
-      'view_reports',
-      'view_announcements',
-    ];
-    final hasMoreEntries =
-        morePermissions.any((p) => authNotifier.hasPermission(p));
+    // More is only shown if at least one More entry is accessible for the
+    // current user. The entry list is the SINGLE SOURCE OF TRUTH shared
+    // with MoreScreen, so the two can never drift apart and More is never
+    // created when it would be empty.
+    final moreEntries =
+        MoreEntry.accessibleFor(authNotifier.hasPermission);
+    final hasMoreEntries = moreEntries.isNotEmpty;
 
     final moreTab = AppTab(
       label: 'More',
