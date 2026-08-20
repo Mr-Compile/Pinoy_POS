@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/ui/screens/activity_logs_screen.dart';
 import 'package:pinoy_pos/ui/screens/ai_config_screen.dart';
 import 'package:pinoy_pos/ui/screens/backup_restore_screen.dart';
 import 'package:pinoy_pos/ui/screens/profile_screen.dart';
@@ -22,6 +23,9 @@ import 'package:pinoy_pos/ui/widgets/app_header.dart';
 ///   - Store Info:     Owner only (edit_settings without backup_restore)
 ///   - Backup & Restore: Admin only (backup_restore)
 ///   - AI Config:      Admin only (manage_ai_config)
+///   - Activity Logs:  all roles with view_activity_logs permission
+///     (Owner sees authorized scope, Admin sees system scope,
+///      Staff sees own logs only — enforced at DAO level)
 ///
 /// This screen does NOT contain any settings logic itself — each
 /// sub-page owns its own state and persistence.
@@ -37,29 +41,31 @@ class SettingsScreen extends ConsumerWidget {
         !authNotifier.hasPermission('backup_restore');
     final canBackup = authNotifier.hasPermission('backup_restore');
     final canManageAi = authNotifier.hasPermission('manage_ai_config');
+    final canViewActivityLogs = authNotifier.hasPermission('view_activity_logs');
 
-    final entries = <_SettingsEntry>[];
+    final personalEntries = <_SettingsEntry>[];
+    final systemEntries = <_SettingsEntry>[];
 
     // ── Personal (all roles) ──
-    entries.add(_SettingsEntry(
+    personalEntries.add(_SettingsEntry(
       icon: Icons.person_outline,
       title: 'Profile',
       subtitle: 'View and edit your profile information',
       screen: const ProfileScreen(),
     ));
-    entries.add(_SettingsEntry(
+    personalEntries.add(_SettingsEntry(
       icon: Icons.lock_outline,
       title: 'Security',
       subtitle: 'Change your password',
       screen: const SecuritySettingsPage(),
     ));
-    entries.add(_SettingsEntry(
+    personalEntries.add(_SettingsEntry(
       icon: Icons.pin_outlined,
       title: 'PIN',
       subtitle: 'Manage your login PIN',
       screen: const PinSettingsPage(),
     ));
-    entries.add(_SettingsEntry(
+    personalEntries.add(_SettingsEntry(
       icon: Icons.palette_outlined,
       title: 'Appearance',
       subtitle: 'Theme mode and display preferences',
@@ -68,7 +74,7 @@ class SettingsScreen extends ConsumerWidget {
 
     // ── Business (Owner only) ──
     if (canEditBusiness) {
-      entries.add(_SettingsEntry(
+      systemEntries.add(_SettingsEntry(
         icon: Icons.store_outlined,
         title: 'Store Information',
         subtitle: 'Store name, address, contact, receipt footer, currency',
@@ -78,7 +84,7 @@ class SettingsScreen extends ConsumerWidget {
 
     // ── System (Admin only) ──
     if (canBackup) {
-      entries.add(_SettingsEntry(
+      systemEntries.add(_SettingsEntry(
         icon: Icons.backup_outlined,
         title: 'Backup & Restore',
         subtitle: 'Create, restore, and manage database backups',
@@ -86,11 +92,21 @@ class SettingsScreen extends ConsumerWidget {
       ));
     }
     if (canManageAi) {
-      entries.add(_SettingsEntry(
+      systemEntries.add(_SettingsEntry(
         icon: Icons.smart_toy_outlined,
         title: 'AI Configuration',
         subtitle: 'Configure Groq API key and model',
         screen: const AIConfigScreen(),
+      ));
+    }
+
+    // ── Activity Logs (all roles with permission) ──
+    if (canViewActivityLogs) {
+      systemEntries.add(_SettingsEntry(
+        icon: Icons.history_rounded,
+        title: 'Activity Logs',
+        subtitle: 'View system and account activity history',
+        screen: const ActivityLogsScreen(),
       ));
     }
 
@@ -99,14 +115,27 @@ class SettingsScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          if (canEditBusiness) _SectionLabel(label: 'Personal'),
-          AppCard(
-            child: Column(
-              children: entries
-                  .map((entry) => _SettingsTile(entry: entry))
-                  .toList(),
+          if (personalEntries.isNotEmpty) ...[
+            const _SectionLabel(label: 'Personal'),
+            AppCard(
+              child: Column(
+                children: personalEntries
+                    .map((entry) => _SettingsTile(entry: entry))
+                    .toList(),
+              ),
             ),
-          ),
+            const SizedBox(height: 24),
+          ],
+          if (systemEntries.isNotEmpty) ...[
+            const _SectionLabel(label: 'System / Management'),
+            AppCard(
+              child: Column(
+                children: systemEntries
+                    .map((entry) => _SettingsTile(entry: entry))
+                    .toList(),
+              ),
+            ),
+          ],
         ],
       ),
     );

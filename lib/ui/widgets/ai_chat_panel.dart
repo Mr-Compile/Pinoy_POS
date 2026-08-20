@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/ai_config_status.dart';
+import 'package:pinoy_pos/core/ai_role_config.dart';
 import 'package:pinoy_pos/core/constants.dart';
 import 'package:pinoy_pos/core/spacing.dart';
+import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/ai_advisor_provider.dart';
+import 'package:pinoy_pos/providers/auth_provider.dart';
 
 /// Floating, Messenger-style AI chat panel.
 ///
@@ -280,51 +283,89 @@ class _AIChatPanelState extends ConsumerState<AIChatPanel> {
   }
 
   Widget _buildEmptyConversation(BuildContext context, ColorScheme cs) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(Spacing.xl),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.auto_awesome, size: 48, color: cs.primary.withValues(alpha: 0.5)),
-            const SizedBox(height: Spacing.md),
-            Text(
-              'Ask about your business',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
-            ),
-            const SizedBox(height: Spacing.xs),
-            Text(
-              'Get AI-powered insights on sales, inventory, and more.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: Spacing.lg),
-            Wrap(
-              spacing: Spacing.sm,
-              runSpacing: Spacing.sm,
-              alignment: WrapAlignment.center,
+    final authState = ref.watch(authStateProvider);
+    final user = authState.user;
+    final role = user?.role ?? UserRole.staff;
+    final roleConfig = AIRoleConfig(role);
+    final userName = user?.fullName ?? 'there';
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(Spacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Column(
               children: [
-                _buildSuggestionChip(cs, 'Business overview',
-                    'Give me an overview of my business performance.'),
-                _buildSuggestionChip(cs, 'Sales analysis',
-                    'Analyze my recent sales and suggest improvements.'),
-                _buildSuggestionChip(cs, 'Inventory check',
-                    'What inventory actions should I take?'),
+                Icon(Icons.auto_awesome, size: 40,
+                    color: cs.primary.withValues(alpha: 0.5)),
+                const SizedBox(height: Spacing.sm),
+                Text(
+                  'Hello, $userName',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                const SizedBox(height: Spacing.xs),
+                Text(
+                  'I\'m your Pinoy POS AI Advisor.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                ),
+                const SizedBox(height: Spacing.xs),
+                Text(
+                  roleConfig.welcomeMessage,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                  textAlign: TextAlign.center,
+                ),
               ],
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: Spacing.xl),
+          // FAQ section
+          Text(
+            'Frequently Asked Questions',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: cs.onSurfaceVariant,
+                ),
+          ),
+          const SizedBox(height: Spacing.sm),
+          Wrap(
+            spacing: Spacing.sm,
+            runSpacing: Spacing.sm,
+            children: roleConfig.faqQuestions
+                .map((q) => _buildSuggestionChip(cs, q, q))
+                .toList(),
+          ),
+          const SizedBox(height: Spacing.lg),
+          // Suggested questions section
+          Text(
+            'Suggested Questions',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: cs.onSurfaceVariant,
+                ),
+          ),
+          const SizedBox(height: Spacing.sm),
+          Wrap(
+            spacing: Spacing.sm,
+            runSpacing: Spacing.sm,
+            children: roleConfig.suggestedQuestions
+                .map((q) => _buildSuggestionChip(cs, q, q))
+                .toList(),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildSuggestionChip(ColorScheme cs, String label, String query) {
     return ActionChip(
-      label: Text(label),
+      label: Text(label, maxLines: 2, overflow: TextOverflow.ellipsis),
       avatar: Icon(Icons.lightbulb_outline, size: 16, color: cs.primary),
       onPressed: () {
         ref.read(aiAdvisorChatProvider.notifier).sendQuery(query);

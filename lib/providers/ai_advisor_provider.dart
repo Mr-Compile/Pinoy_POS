@@ -63,7 +63,7 @@ class AIAdvisorChatState {
 /// - Track panel open/close state for the floating chat head.
 ///
 /// RBAC: The underlying [AIAdvisorService] enforces `view_ai_advisor`
-/// (Owner-only) at the service layer. This notifier also checks the
+/// (all roles) at the service layer. This notifier also checks the
 /// permission before any operation to fail fast.
 class AIAdvisorChatNotifier extends StateNotifier<AIAdvisorChatState> {
   final Ref _ref;

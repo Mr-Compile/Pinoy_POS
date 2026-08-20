@@ -117,6 +117,7 @@ class SessionManager {
     'view_trash',
     'restore_trash',
     'view_activity_logs',
+    'view_ai_advisor',
     'view_notifications',
     'view_profile',
     'view_more',
@@ -139,6 +140,7 @@ class SessionManager {
     'export_reports',
     'view_notifications',
     'view_activity_logs',
+    'view_ai_advisor',
     'view_profile',
     'view_more',
   ];

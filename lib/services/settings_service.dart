@@ -12,7 +12,8 @@ class SettingsService {
   Settings? get currentSettings => _currentSettings;
 
   Future<Settings> getSettings() async {
-    if (!_sessionManager.hasPermission('view_settings')) {
+    if (!_sessionManager.hasPermission('view_settings') &&
+        !_sessionManager.hasPermission('view_ai_advisor')) {
       throw AuthorizationException('view_settings');
     }
     if (_currentSettings != null) {
@@ -63,7 +64,7 @@ class SettingsService {
   // and used only for the HTTP Authorization header.
 
   /// Returns the configured Groq API key, or null if not configured.
-  /// Requires `view_ai_advisor` (Owner) or `manage_ai_config` (Admin).
+  /// Requires `view_ai_advisor` (all roles) or `manage_ai_config` (Admin).
   Future<String?> getGroqApiKey() async {
     if (!_sessionManager.hasPermission('view_ai_advisor') &&
         !_sessionManager.hasPermission('manage_ai_config')) {

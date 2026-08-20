@@ -7,11 +7,12 @@ import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/ui/screens/dashboard_screen.dart';
 import 'package:pinoy_pos/ui/screens/pos_screen.dart';
 import 'package:pinoy_pos/ui/screens/products_screen.dart';
-import 'package:pinoy_pos/ui/screens/reports_screen.dart';
 import 'package:pinoy_pos/ui/screens/sales_screen.dart';
 import 'package:pinoy_pos/ui/screens/force_change_password_screen.dart';
 import 'package:pinoy_pos/ui/screens/login_screen.dart';
 import 'package:pinoy_pos/ui/screens/pin_lock_screen.dart';
+import 'package:pinoy_pos/ui/screens/backup_restore_screen.dart';
+import 'package:pinoy_pos/ui/screens/settings_screen.dart';
 import 'package:pinoy_pos/ui/screens/users_screen.dart';
 import 'package:pinoy_pos/ui/screens/more_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_logo.dart';
@@ -104,7 +105,8 @@ class _AppShellState extends ConsumerState<AppShell> {
     final selectedIndex =
         _selectedIndex < tabs.length ? _selectedIndex : 0;
 
-    // AI Advisor floating chat head is Owner-only.
+    // AI Advisor floating chat head -- available to all roles with
+    // view_ai_advisor permission (Owner, Admin, Staff).
     final canViewAIAdvisor =
         ref.read(authStateProvider.notifier).hasPermission('view_ai_advisor');
     final aiChatState = ref.watch(aiAdvisorChatProvider);
@@ -234,57 +236,6 @@ class _AppShellState extends ConsumerState<AppShell> {
   }
 
   List<AppTab> _getTabsForRole(UserRole role) {
-    final authNotifier = ref.read(authStateProvider.notifier);
-
-    // Primary destinations in priority order. The bottom navigation bar
-    // is capped at 5 items (4 primary + "More") to avoid crowding on
-    // mobile. Any destination beyond the first 4 is reachable via the
-    // "More" screen, which already lists every secondary destination.
-    final primaryTabs = [
-      AppTab(
-        label: 'Dashboard',
-        icon: Icons.dashboard_outlined,
-        selectedIcon: Icons.dashboard,
-        screen: const DashboardScreen(),
-        permission: 'view_dashboard',
-      ),
-      AppTab(
-        label: 'POS',
-        icon: Icons.shopping_cart_outlined,
-        selectedIcon: Icons.shopping_cart,
-        screen: const POSScreen(),
-        permission: 'view_pos',
-      ),
-      AppTab(
-        label: 'Sales',
-        icon: Icons.receipt_long_outlined,
-        selectedIcon: Icons.receipt_long,
-        screen: const SalesScreen(),
-        permission: 'view_sales',
-      ),
-      AppTab(
-        label: 'Products',
-        icon: Icons.inventory_2_outlined,
-        selectedIcon: Icons.inventory_2,
-        screen: const ProductsScreen(),
-        permission: 'view_products',
-      ),
-      AppTab(
-        label: 'Reports',
-        icon: Icons.analytics_outlined,
-        selectedIcon: Icons.analytics,
-        screen: const ReportsScreen(),
-        permission: 'view_reports',
-      ),
-      AppTab(
-        label: 'Users',
-        icon: Icons.people_outline,
-        selectedIcon: Icons.people,
-        screen: const UsersScreen(),
-        permission: 'manage_users',
-      ),
-    ];
-
     final moreTab = AppTab(
       label: 'More',
       icon: Icons.more_horiz,
@@ -292,18 +243,108 @@ class _AppShellState extends ConsumerState<AppShell> {
       permission: 'view_more',
     );
 
-    final visiblePrimary = primaryTabs
-        .where((tab) => authNotifier.hasPermission(tab.permission!))
-        .toList();
+    switch (role) {
+      case UserRole.owner:
+        return [
+          AppTab(
+            label: 'Dashboard',
+            icon: Icons.dashboard_outlined,
+            selectedIcon: Icons.dashboard,
+            screen: const DashboardScreen(),
+            permission: 'view_dashboard',
+          ),
+          AppTab(
+            label: 'POS',
+            icon: Icons.shopping_cart_outlined,
+            selectedIcon: Icons.shopping_cart,
+            screen: const POSScreen(),
+            permission: 'view_pos',
+          ),
+          AppTab(
+            label: 'Products',
+            icon: Icons.inventory_2_outlined,
+            selectedIcon: Icons.inventory_2,
+            screen: const ProductsScreen(),
+            permission: 'view_products',
+          ),
+          AppTab(
+            label: 'Sales',
+            icon: Icons.receipt_long_outlined,
+            selectedIcon: Icons.receipt_long,
+            screen: const SalesScreen(),
+            permission: 'view_sales',
+          ),
+          moreTab,
+        ];
 
-    // Cap at 4 primary tabs + "More" = 5 total in the bottom nav.
-    // Excess primary destinations remain reachable from the More screen.
-    if (visiblePrimary.length > 4) {
-      return [...visiblePrimary.sublist(0, 4), moreTab];
+      case UserRole.admin:
+        return [
+          AppTab(
+            label: 'Dashboard',
+            icon: Icons.dashboard_outlined,
+            selectedIcon: Icons.dashboard,
+            screen: const DashboardScreen(),
+            permission: 'view_dashboard',
+          ),
+          AppTab(
+            label: 'Users',
+            icon: Icons.people_outline,
+            selectedIcon: Icons.people,
+            screen: const UsersScreen(),
+            permission: 'manage_users',
+          ),
+          AppTab(
+            label: 'Backup',
+            icon: Icons.backup_outlined,
+            selectedIcon: Icons.backup,
+            screen: const BackupRestoreScreen(),
+            permission: 'backup_restore',
+          ),
+          AppTab(
+            label: 'Settings',
+            icon: Icons.settings_outlined,
+            selectedIcon: Icons.settings,
+            screen: const SettingsScreen(),
+            permission: 'view_settings',
+          ),
+          moreTab,
+        ];
+
+      case UserRole.staff:
+        return [
+          AppTab(
+            label: 'Dashboard',
+            icon: Icons.dashboard_outlined,
+            selectedIcon: Icons.dashboard,
+            screen: const DashboardScreen(),
+            permission: 'view_dashboard',
+          ),
+          AppTab(
+            label: 'POS',
+            icon: Icons.shopping_cart_outlined,
+            selectedIcon: Icons.shopping_cart,
+            screen: const POSScreen(),
+            permission: 'view_pos',
+          ),
+          AppTab(
+            label: 'Products',
+            icon: Icons.inventory_2_outlined,
+            selectedIcon: Icons.inventory_2,
+            screen: const ProductsScreen(),
+            permission: 'view_products',
+          ),
+          AppTab(
+            label: 'My Sales',
+            icon: Icons.receipt_long_outlined,
+            selectedIcon: Icons.receipt_long,
+            screen: const SalesScreen(),
+            permission: 'view_sales',
+          ),
+          moreTab,
+        ];
     }
-
-    return [...visiblePrimary, moreTab];
   }
+
 }
 
 class AppTab {

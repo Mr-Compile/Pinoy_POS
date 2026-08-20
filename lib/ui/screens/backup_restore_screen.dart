@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/backup_history.dart';
@@ -34,11 +36,37 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
   bool _isExporting = false;
   bool _isImporting = false;
   String? _loadError;
+  String _defaultLocation = '';
 
   @override
   void initState() {
     super.initState();
     _loadBackups();
+    _loadDefaultLocation();
+  }
+
+  Future<void> _loadDefaultLocation() async {
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      if (mounted) {
+        setState(() {
+          _defaultLocation = appDir.path;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _defaultLocation = 'App Documents';
+        });
+      }
+    }
+  }
+
+  String _getDisplayLocation(String path) {
+    final dir = p.dirname(path);
+    final parts = p.split(dir);
+    if (parts.length <= 3) return parts.join(' › ');
+    return '... › ${parts.sublist(parts.length - 3).join(' › ')}';
   }
 
   Future<void> _loadBackups() async {
@@ -426,6 +454,48 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
               ],
             ),
           ],
+          const SizedBox(height: Spacing.lg),
+          // Default backup location info
+          Row(
+            children: [
+              Icon(
+                Icons.folder_outlined,
+                size: 20,
+                color: cs.onSurfaceVariant,
+              ),
+              const SizedBox(width: Spacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Default backup location:',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
+                    ),
+                    if (_defaultLocation.isNotEmpty)
+                      Text(
+                        _getDisplayLocation(_defaultLocation),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.w500,
+                            ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: Spacing.sm),
+          Text(
+            'You can choose a different location each time you export.',
+            style: theme.textTheme.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+                  fontStyle: FontStyle.italic,
+                ),
+          ),
           const SizedBox(height: Spacing.lg),
           SizedBox(
             width: double.infinity,

@@ -2,29 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/route_guard.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
-import 'package:pinoy_pos/ui/screens/activity_logs_screen.dart';
-import 'package:pinoy_pos/ui/screens/ai_advisor_screen.dart';
 import 'package:pinoy_pos/ui/screens/announcements_screen.dart';
 import 'package:pinoy_pos/ui/screens/categories_screen.dart';
 import 'package:pinoy_pos/ui/screens/reports_screen.dart';
 import 'package:pinoy_pos/ui/screens/stock_screen.dart';
 import 'package:pinoy_pos/ui/screens/trash_screen.dart';
-import 'package:pinoy_pos/ui/screens/users_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 
 /// "More" screen — lists secondary feature screens that don't fit in the
 /// main bottom navigation.
 ///
-/// NOTE: Settings, Profile, Notifications, Backup & Restore, and AI
-/// Configuration have been moved OUT of this screen:
-///   - Profile      → profile dropdown (header avatar)
-///   - Settings     → profile dropdown (header avatar)
-///   - Notifications → notification bell (header)
-///   - Backup & Restore → Settings hub (Admin only)
-///   - AI Configuration  → Settings hub (Admin only)
+/// AI Advisor is accessed via the floating chat bubble (not here).
+/// Activity Logs is accessed via Settings → Activity Logs.
 ///
 /// Only feature screens remain here: Categories, Stock, Reports,
-/// Announcements, AI Advisor, Users, Trash, Activity Logs.
+/// Announcements, Trash.
 class MoreScreen extends ConsumerWidget {
   const MoreScreen({super.key});
 
@@ -71,27 +63,6 @@ class MoreScreen extends ConsumerWidget {
         screen: const AnnouncementsScreen(),
       ));
     }
-    if (authNotifier.hasPermission('view_ai_advisor')) {
-      entries.add(_MoreEntry(
-        icon: Icons.smart_toy_outlined,
-        title: 'AI Advisor',
-        permission: 'view_ai_advisor',
-        routeName: 'ai_advisor',
-        screen: const AIAdvisorScreen(),
-      ));
-    }
-
-    // --- System modules (Admin) ---
-    if (authNotifier.hasPermission('manage_users')) {
-      entries.add(_MoreEntry(
-        icon: Icons.people_outline,
-        title: 'Users',
-        permission: 'manage_users',
-        routeName: 'users',
-        screen: const UsersScreen(),
-      ));
-    }
-
     // --- Shared modules ---
     if (authNotifier.hasPermission('view_trash')) {
       entries.add(_MoreEntry(
@@ -100,15 +71,6 @@ class MoreScreen extends ConsumerWidget {
         permission: 'view_trash',
         routeName: 'trash',
         screen: const TrashScreen(),
-      ));
-    }
-    if (authNotifier.hasPermission('view_activity_logs')) {
-      entries.add(_MoreEntry(
-        icon: Icons.history_rounded,
-        title: 'Activity Logs',
-        permission: 'view_activity_logs',
-        routeName: 'activity_logs',
-        screen: const ActivityLogsScreen(),
       ));
     }
 
