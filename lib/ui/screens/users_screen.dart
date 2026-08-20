@@ -1,5 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/constants.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/user_provider.dart';
@@ -20,6 +21,10 @@ class UsersScreen extends ConsumerStatefulWidget {
 }
 
 class _UsersScreenState extends ConsumerState<UsersScreen> {
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+  UserRole? _roleFilter;
+
   @override
   void initState() {
     super.initState();
@@ -27,6 +32,35 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(userControllerProvider.notifier).loadUsers();
     });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<User> _filterUsers(List<User> users) {
+    var filtered = users;
+    if (_roleFilter != null) {
+      filtered = filtered.where((u) => u.role == _roleFilter).toList();
+    }
+    if (_searchQuery.isNotEmpty) {
+      final query = _searchQuery.toLowerCase();
+      filtered = filtered.where((u) {
+        return u.username.toLowerCase().contains(query) ||
+            u.fullName.toLowerCase().contains(query);
+      }).toList();
+    }
+    return filtered;
+  }
+
+  Color _roleColor(UserRole role, ColorScheme colorScheme) {
+    return switch (role) {
+      UserRole.owner => colorScheme.tertiary,
+      UserRole.admin => colorScheme.primary,
+      UserRole.staff => colorScheme.secondary,
+    };
   }
 
   Future<void> _refresh() async {
@@ -151,78 +185,75 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
       return;
     }
 
-    final formKey = GlobalKey<FormState>();
-    final passwordController = TextEditingController();
-    final confirmPasswordController = TextEditingController();
-    bool isSaving = false;
-
-    final result = await showDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: Text('Reset Password for ${user.username}'),
-          content: SingleChildScrollView(
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+      builder: (context) => AlertDialog(
+        title: const Text('Reset Password?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'This will reset the password for ${user.fullName} (@${user.username}) to the default temporary password.',
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
                 children: [
-                  TextFormField(
-                    controller: passwordController,
-                    decoration: const InputDecoration(
-                      labelText: 'New Password',
-                      border: OutlineInputBorder(),
-                    ),
-                    obscureText: true,
-                    autofocus: true,
-                    validator: (value) => Validators.password(value),
+                  Icon(
+                    Icons.info_outline,
+                    size: 20,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: confirmPasswordController,
-                    decoration: const InputDecoration(
-                      labelText: 'Confirm Password',
-                      border: OutlineInputBorder(),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'The user will be required to change it on next login.',
+                      style: Theme.of(context).textTheme.bodySmall,
                     ),
-                    obscureText: true,
-                    validator: (value) =>
-                        Validators.confirmPassword(value, passwordController.text),
                   ),
                 ],
               ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            LoadingButton(
-              isLoading: isSaving,
-              onPressed: () async {
-                if (!formKey.currentState!.validate()) return;
-                setState(() => isSaving = true);
-                final res = await ref
-                    .read(userControllerProvider.notifier)
-                    .resetPassword(
-                  userId: user.id!,
-                  newPassword: passwordController.text,
-                );
-                if (context.mounted) {
-                  Navigator.pop(context, res.success);
-                }
-              },
-              label: 'Reset',
-            ),
           ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Reset'),
+          ),
+        ],
       ),
     );
 
-    if (result == true && mounted) {
-      await AppDialogService.success(context, title: 'Password Reset', message: 'Password reset successfully.');
-    } else if (result == false && mounted) {
-      AppDialogService.error(context, title: 'Reset Failed', message: 'Failed to reset password.');
+    if (confirmed == true && mounted) {
+      final result = await ref
+          .read(userControllerProvider.notifier)
+          .resetPassword(user.id!);
+      if (mounted) {
+        if (result.success) {
+          await AppDialogService.success(
+            context,
+            title: 'Password Reset',
+            message: result.message,
+          );
+        } else {
+          AppDialogService.error(
+            context,
+            title: 'Reset Failed',
+            message: result.message,
+          );
+        }
+      }
     }
   }
 
@@ -238,7 +269,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     final formKey = GlobalKey<FormState>();
     final usernameController = TextEditingController(text: user.username);
     final fullNameController = TextEditingController(text: user.fullName);
-    final pinController = TextEditingController(text: user.pin ?? '');
+    final pinController = TextEditingController();
     UserRole selectedRole = user.role;
     bool hasChanges = false;
     bool isSaving = false;
@@ -281,10 +312,12 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: pinController,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'PIN (optional)',
-                      border: OutlineInputBorder(),
-                      hintText: '4-6 digits',
+                      border: const OutlineInputBorder(),
+                      hintText: user.hasPin
+                          ? 'Enter new PIN to replace (${user.configuredPinLength} digits)'
+                          : '4-6 digits',
                     ),
                     keyboardType: TextInputType.number,
                     validator: (value) {
@@ -383,8 +416,6 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     final formKey = GlobalKey<FormState>();
     final usernameController = TextEditingController();
     final fullNameController = TextEditingController();
-    final passwordController = TextEditingController();
-    final confirmPasswordController = TextEditingController();
     final pinController = TextEditingController();
     UserRole? selectedRole = UserRole.staff;
     bool hasChanges = false;
@@ -401,6 +432,33 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // ── Temp password info card ──
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          size: 20,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'A temporary password will be assigned. The user must change it on first login.',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   TextFormField(
                     controller: usernameController,
                     decoration: const InputDecoration(
@@ -409,11 +467,13 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                     ),
                     autofocus: true,
                     textInputAction: TextInputAction.next,
-                    validator: (value) => Validators.required(value, 'Username'),
+                    validator: (value) =>
+                        Validators.required(value, 'Username'),
                     onChanged: (_) {
                       if (!hasChanges) setState(() => hasChanges = true);
                     },
-                    onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
+                    onFieldSubmitted: (_) =>
+                        FocusScope.of(context).nextFocus(),
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
@@ -423,42 +483,13 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                       border: OutlineInputBorder(),
                     ),
                     textInputAction: TextInputAction.next,
-                    validator: (value) => Validators.required(value, 'Full Name'),
+                    validator: (value) =>
+                        Validators.required(value, 'Full Name'),
                     onChanged: (_) {
                       if (!hasChanges) setState(() => hasChanges = true);
                     },
-                    onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: passwordController,
-                    decoration: const InputDecoration(
-                      labelText: 'Password',
-                      border: OutlineInputBorder(),
-                    ),
-                    obscureText: true,
-                    textInputAction: TextInputAction.next,
-                    validator: (value) => Validators.password(value),
-                    onChanged: (_) {
-                      if (!hasChanges) setState(() => hasChanges = true);
-                    },
-                    onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: confirmPasswordController,
-                    decoration: const InputDecoration(
-                      labelText: 'Confirm Password',
-                      border: OutlineInputBorder(),
-                    ),
-                    obscureText: true,
-                    textInputAction: TextInputAction.next,
-                    validator: (value) => Validators.confirmPassword(
-                        value, passwordController.text),
-                    onChanged: (_) {
-                      if (!hasChanges) setState(() => hasChanges = true);
-                    },
-                    onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
+                    onFieldSubmitted: (_) =>
+                        FocusScope.of(context).nextFocus(),
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
@@ -477,7 +508,8 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                     onChanged: (_) {
                       if (!hasChanges) setState(() => hasChanges = true);
                     },
-                    onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
+                    onFieldSubmitted: (_) =>
+                        FocusScope.of(context).nextFocus(),
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<UserRole>(
@@ -515,7 +547,8 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
             TextButton(
               onPressed: () async {
                 if (hasChanges) {
-                  final discard = await AppDialogService.unsavedChanges(context);
+                  final discard =
+                      await AppDialogService.unsavedChanges(context);
                   if (discard == true && context.mounted) {
                     Navigator.pop(context);
                   }
@@ -535,7 +568,6 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                     .read(userControllerProvider.notifier)
                     .createUser(
                   username: usernameController.text.trim(),
-                  password: passwordController.text,
                   fullName: fullNameController.text.trim(),
                   role: selectedRole ?? UserRole.staff,
                   pin: pinValue.isEmpty ? null : pinValue,
@@ -545,12 +577,20 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                 }
                 if (res.success) {
                   if (context.mounted) {
-                    await AppDialogService.success(context, title: 'Created', message: res.message);
+                    await AppDialogService.success(
+                      context,
+                      title: 'User Created',
+                      message: '${res.message} The temporary password is ${AppConstants.defaultTemporaryPassword}.',
+                    );
                   }
                   if (context.mounted) Navigator.pop(context);
                 } else {
                   if (context.mounted) {
-                    AppDialogService.error(context, title: 'Create Failed', message: res.message);
+                    AppDialogService.error(
+                      context,
+                      title: 'Create Failed',
+                      message: res.message,
+                    );
                   }
                 }
               },
@@ -576,12 +616,9 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     final currentUser = ref.read(authStateProvider).user;
     final screenWidth = MediaQuery.of(context).size.width;
     final isTablet = screenWidth >= 600;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
-    // Primary create action widget. On tablet/desktop a visible labeled
-    // FilledButton.icon is placed in the AppBar so it is clearly readable;
-    // on mobile a FloatingActionButton.extended is used so the action is
-    // always reachable and clearly labeled (a bare + IconButton tooltip is
-    // not visible on touch devices).
     final Widget? createAction = canManage
         ? (isTablet
             ? Padding(
@@ -614,14 +651,92 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
               onPressed: () => _showAddUserDialog(),
             )
           : null,
-      body: _buildBody(
-        userState,
-        canManage,
-        canEdit,
-        canDelete,
-        canResetPassword,
-        canToggleActive,
-        currentUser,
+      body: Column(
+        children: [
+          // ── Search bar ──
+          if (userState.users.isNotEmpty || _searchQuery.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search by name or username...',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                          },
+                        )
+                      : null,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                ),
+                onChanged: (value) => setState(() => _searchQuery = value),
+              ),
+            ),
+          // ── Role filter chips ──
+          if (userState.users.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: SizedBox(
+                height: 40,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    _FilterChip(
+                      label: 'All',
+                      selected: _roleFilter == null,
+                      onSelected: () =>
+                          setState(() => _roleFilter = null),
+                    ),
+                    const SizedBox(width: 8),
+                    _FilterChip(
+                      label: UserRole.owner.displayName,
+                      selected: _roleFilter == UserRole.owner,
+                      onSelected: () =>
+                          setState(() => _roleFilter = UserRole.owner),
+                    ),
+                    const SizedBox(width: 8),
+                    _FilterChip(
+                      label: UserRole.admin.displayName,
+                      selected: _roleFilter == UserRole.admin,
+                      onSelected: () =>
+                          setState(() => _roleFilter = UserRole.admin),
+                    ),
+                    const SizedBox(width: 8),
+                    _FilterChip(
+                      label: UserRole.staff.displayName,
+                      selected: _roleFilter == UserRole.staff,
+                      onSelected: () =>
+                          setState(() => _roleFilter = UserRole.staff),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          // ── User list ──
+          Expanded(
+            child: _buildBody(
+              userState,
+              canManage,
+              canEdit,
+              canDelete,
+              canResetPassword,
+              canToggleActive,
+              currentUser,
+              theme,
+              colorScheme,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -634,6 +749,8 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     bool canResetPassword,
     bool canToggleActive,
     User? currentUser,
+    ThemeData theme,
+    ColorScheme colorScheme,
   ) {
     if (userState.isLoading) {
       return const LoadingState();
@@ -652,52 +769,137 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
         icon: Icons.people,
         title: 'No Users Yet',
         message: 'Create a user account to get started.',
-        // No create button here — the FAB (mobile) / AppBar
-        // action (tablet) is the single primary create action.
+      );
+    }
+
+    final filteredUsers = _filterUsers(userState.users);
+
+    if (filteredUsers.isEmpty) {
+      return EmptyState(
+        icon: Icons.search_off,
+        title: 'No Results',
+        message: 'No users match your search.',
       );
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: userState.users.length,
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+      itemCount: filteredUsers.length,
       itemBuilder: (context, index) {
-        final user = userState.users[index];
+        final user = filteredUsers[index];
         final isSelf = currentUser?.id == user.id;
+        final roleColor = _roleColor(user.role, colorScheme);
 
         return AppCard(
           margin: const EdgeInsets.only(bottom: 12),
-          child: Column(
-            children: [
-              ListTile(
-                leading: CircleAvatar(
-                  child: Text(
-                    user.fullName.isNotEmpty
-                        ? user.fullName[0].toUpperCase()
-                        : '?',
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: (canEdit || canDelete) && !isSelf
+                ? () => _showUserActionsSheet(
+                      user,
+                      canEdit,
+                      canDelete,
+                      canResetPassword,
+                      canToggleActive,
+                      isSelf,
+                    )
+                : null,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  // ── Avatar ──
+                  CircleAvatar(
+                    backgroundColor: roleColor.withValues(alpha: 0.15),
+                    foregroundColor: roleColor,
+                    child: Text(
+                      user.fullName.isNotEmpty
+                          ? user.fullName[0].toUpperCase()
+                          : '?',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
-                ),
-                title: Text(user.fullName),
-                subtitle: Text(
-                  '${user.username} • ${user.role.displayName}'
-                  '${user.isActive ? '' : ' (Inactive)'}',
-                ),
-                trailing: (canEdit || canDelete) && !isSelf
-                    ? PopupMenuButton<String>(
+                  const SizedBox(width: 12),
+                  // ── User info ──
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                user.fullName,
+                                style: theme.textTheme.titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.w600),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (isSelf) ...[
+                              const SizedBox(width: 6),
+                              Icon(
+                                Icons.person_pin,
+                                size: 16,
+                                color: colorScheme.primary,
+                                semanticLabel: 'This is you',
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '@${user.username}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        // ── Badges row ──
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: [
+                            _RoleBadge(
+                              role: user.role,
+                              color: roleColor,
+                            ),
+                            if (!user.isActive)
+                              _StatusBadge(
+                                label: 'Inactive',
+                                color: colorScheme.error,
+                                icon: Icons.pause_circle,
+                              ),
+                            if (user.mustChangePassword)
+                              _StatusBadge(
+                                label: 'Temp Password',
+                                color: colorScheme.tertiary,
+                                icon: Icons.key,
+                              ),
+                            if (user.hasPin)
+                              _StatusBadge(
+                                label: 'PIN',
+                                color: colorScheme.secondary,
+                                icon: Icons.lock,
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  // ── Actions menu ──
+                  if ((canEdit || canDelete) && !isSelf)
+                    PopupMenuButton<String>(
                         tooltip: 'Actions',
                         onSelected: (action) {
                           switch (action) {
                             case 'edit':
                               _editUser(user);
-                              break;
                             case 'reset_password':
                               _resetPassword(user);
-                              break;
                             case 'toggle_active':
                               _toggleUserActive(user);
-                              break;
                             case 'delete':
                               _deleteUser(user);
-                              break;
                           }
                         },
                         itemBuilder: (context) => [
@@ -742,13 +944,173 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                               ),
                             ),
                         ],
-                      )
-                    : null,
+                      ),
+                ],
               ),
-            ],
+            ),
           ),
         );
       },
+    );
+  }
+
+  void _showUserActionsSheet(
+    User user,
+    bool canEdit,
+    bool canDelete,
+    bool canResetPassword,
+    bool canToggleActive,
+    bool isSelf,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: CircleAvatar(
+                child: Text(
+                  user.fullName.isNotEmpty
+                      ? user.fullName[0].toUpperCase()
+                      : '?',
+                ),
+              ),
+              title: Text(user.fullName),
+              subtitle: Text('@${user.username}'),
+            ),
+            const Divider(),
+            if (canEdit)
+              ListTile(
+                leading: const Icon(Icons.edit),
+                title: const Text('Edit User'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _editUser(user);
+                },
+              ),
+            if (canResetPassword)
+              ListTile(
+                leading: const Icon(Icons.lock_reset),
+                title: const Text('Reset Password'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _resetPassword(user);
+                },
+              ),
+            if (canToggleActive && !isSelf)
+              ListTile(
+                leading: Icon(user.isActive
+                    ? Icons.person_off
+                    : Icons.person),
+                title: Text(user.isActive ? 'Deactivate' : 'Activate'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _toggleUserActive(user);
+                },
+              ),
+            if (canDelete)
+              ListTile(
+                leading: Icon(Icons.delete,
+                    color: Theme.of(context).colorScheme.error),
+                title: Text('Delete',
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.error)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _deleteUser(user);
+                },
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FilterChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onSelected;
+
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FilterChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onSelected(),
+      showCheckmark: false,
+    );
+  }
+}
+
+class _RoleBadge extends StatelessWidget {
+  final UserRole role;
+  final Color color;
+
+  const _RoleBadge({required this.role, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        role.displayName,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+      ),
+    );
+  }
+}
+
+class _StatusBadge extends StatelessWidget {
+  final String label;
+  final Color color;
+  final IconData icon;
+
+  const _StatusBadge({
+    required this.label,
+    required this.color,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w500,
+                ),
+          ),
+        ],
+      ),
     );
   }
 }

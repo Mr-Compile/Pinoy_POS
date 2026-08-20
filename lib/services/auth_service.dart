@@ -4,6 +4,17 @@ import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/data/repositories/user_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// Result of a post-login PIN verification attempt.
+enum PinVerifyResult {
+  success,
+  incorrect,
+  inactive,
+  userDeleted,
+  userNotFound,
+  noPin,
+  noSession,
+}
+
 /// Result of a login attempt.
 ///
 /// Allows the UI to show differentiated error messages instead of a
@@ -66,11 +77,11 @@ class AuthService {
       return false;
     }
 
-    if (!user.isActive) {
+    if (!user.isActive || user.isDeleted) {
       return false;
     }
 
-    if (user.pin != pin) {
+    if (!SecurityHelper.verifyPin(pin, user.pin!)) {
       return false;
     }
 
@@ -127,10 +138,66 @@ class AuthService {
     return _sessionManager.hasPermission(permission);
   }
 
+  /// Verifies a PIN for the post-login PIN lock flow.
+  /// The user must already be authenticated via password and set in
+  /// the SessionManager.  Returns a [PinVerifyResult] indicating
+  /// success, incorrect PIN, inactive account, deleted account, or
+  /// configuration error.
+  Future<PinVerifyResult> verifyPin(String pin) async {
+    final current = _sessionManager.currentUser;
+    if (current == null) {
+      return PinVerifyResult.noSession;
+    }
+
+    // Re-fetch the user to get the latest state from the database.
+    final user = await _userRepository.getById(current.id!);
+    if (user == null) {
+      return PinVerifyResult.userNotFound;
+    }
+
+    if (user.isDeleted) {
+      return PinVerifyResult.userDeleted;
+    }
+
+    if (!user.isActive) {
+      return PinVerifyResult.inactive;
+    }
+
+    if (user.pin == null || user.pin!.isEmpty) {
+      return PinVerifyResult.noPin;
+    }
+
+    if (!SecurityHelper.verifyPin(pin, user.pin!)) {
+      return PinVerifyResult.incorrect;
+    }
+
+    // PIN is correct — update the session with the fresh user data.
+    _sessionManager.setCurrentUser(user);
+    return PinVerifyResult.success;
+  }
+
+  /// Returns the configured PIN length for the current user, or 0
+  /// if no PIN is set.
+  int get currentPinLength {
+    final user = _sessionManager.currentUser;
+    if (user == null || !user.hasPin) return 0;
+    return user.configuredPinLength;
+  }
+
+  /// Whether the current authenticated user has a PIN configured.
+  bool get currentUserHasPin {
+    final user = _sessionManager.currentUser;
+    return user != null && user.hasPin;
+  }
+
   /// Updates the current user's own profile (full name, PIN, profile
   /// image). No special permission is required - users can always edit
   /// their own profile. Restricted fields (role, username, isActive) are
   /// never modified here.
+  ///
+  /// If [pin] is null, the existing PIN is preserved.  If [pin] is an
+  /// empty string, the PIN is cleared.  Otherwise the PIN is hashed
+  /// before storage.
   ///
   /// Returns true on success, false on failure.
   Future<bool> updateProfile({
@@ -144,9 +211,26 @@ class AuthService {
       return false;
     }
 
+    // Determine the new PIN value and length.
+    // If pin is null, keep the existing PIN.  If pin is an empty
+    // string, clear the PIN.  Otherwise, hash the new PIN.
+    String? newPin;
+    int? newPinLength;
+    if (pin == null) {
+      newPin = current.pin;
+      newPinLength = current.pinLength;
+    } else if (pin.isEmpty) {
+      newPin = null;
+      newPinLength = null;
+    } else {
+      newPin = SecurityHelper.hashPin(pin);
+      newPinLength = pin.length;
+    }
+
     final updated = current.copyWith(
       fullName: fullName,
-      pin: pin ?? current.pin,
+      pin: newPin,
+      pinLength: newPinLength,
       profileImagePath: profileImagePath ?? current.profileImagePath,
       updatedAt: DateTime.now(),
     );

@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/constants.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/ui/app_shell.dart';
+import 'package:pinoy_pos/ui/screens/force_change_password_screen.dart';
 import 'package:pinoy_pos/ui/screens/login_screen.dart';
+import 'package:pinoy_pos/ui/screens/pin_lock_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_logo.dart';
 
 /// Splash screen shown during application initialization.
@@ -32,16 +34,23 @@ class SplashScreen extends ConsumerWidget {
     // navigation during build.
     if (!authState.isLoading) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (authState.user != null) {
-          // Authenticated — go to AppShell
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const AppShell()),
-          );
-        } else {
-          // Unauthenticated — go to Login
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const LoginScreen()),
-          );
+        switch (authState.phase) {
+          case AuthSessionPhase.fullyAuthenticated:
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => const AppShell()),
+            );
+          case AuthSessionPhase.passwordAuthenticatedPendingPasswordChange:
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => const ForceChangePasswordScreen()),
+            );
+          case AuthSessionPhase.passwordAuthenticatedPendingPin:
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => const PinLockScreen()),
+            );
+          case AuthSessionPhase.unauthenticated:
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => const LoginScreen()),
+            );
         }
       });
     }

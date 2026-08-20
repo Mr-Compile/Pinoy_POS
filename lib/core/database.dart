@@ -3,6 +3,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart';
 import 'package:pinoy_pos/core/constants.dart';
+import 'package:pinoy_pos/core/security.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -166,6 +167,48 @@ class DatabaseHelper {
       await db.execute('ALTER TABLE settings ADD COLUMN groq_api_key TEXT');
       await db.execute('ALTER TABLE settings ADD COLUMN groq_model TEXT');
     }
+
+    // Migration from v5 → v6: hash all existing plaintext PINs in the
+    // users table and add a pin_length column to record the original
+    // PIN length (needed for dynamic auto-submit since the hash does
+    // not reveal the original length).
+    if (oldVersion < 6) {
+      await db.execute('ALTER TABLE users ADD COLUMN pin_length INTEGER');
+
+      final rows = await db.query('users', columns: ['id', 'pin']);
+      for (final row in rows) {
+        final pin = row['pin'] as String?;
+        if (pin != null && pin.isNotEmpty && pin.length < 64) {
+          // Plaintext PIN — record its length, then hash it.
+          await db.update(
+            'users',
+            {
+              'pin': SecurityHelper.hashPin(pin),
+              'pin_length': pin.length,
+            },
+            where: 'id = ?',
+            whereArgs: [row['id']],
+          );
+        } else if (pin != null && pin.isNotEmpty) {
+          // Already hashed (64 chars) — we don't know the original
+          // length, so default to 4 (the minimum).
+          await db.update(
+            'users',
+            {'pin_length': 4},
+            where: 'id = ?',
+            whereArgs: [row['id']],
+          );
+        }
+      }
+    }
+
+    // Migration from v6 → v7: add must_change_password column to users
+    // table for first-login forced password change tracking.
+    if (oldVersion < 7) {
+      await db.execute(
+        'ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0',
+      );
+    }
   }
 
   Future<void> _createTables(Database db) async {
@@ -183,6 +226,7 @@ class DatabaseHelper {
         username TEXT NOT NULL,
         password_hash TEXT NOT NULL,
         pin TEXT,
+        pin_length INTEGER,
         role TEXT NOT NULL,
         full_name TEXT NOT NULL,
         is_active INTEGER NOT NULL DEFAULT 1,
@@ -191,7 +235,8 @@ class DatabaseHelper {
         last_login TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT,
-        deleted_at TEXT
+        deleted_at TEXT,
+        must_change_password INTEGER NOT NULL DEFAULT 0
       )
     ''');
 

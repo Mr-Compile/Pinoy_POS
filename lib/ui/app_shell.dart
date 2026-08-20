@@ -8,6 +8,9 @@ import 'package:pinoy_pos/ui/screens/pos_screen.dart';
 import 'package:pinoy_pos/ui/screens/products_screen.dart';
 import 'package:pinoy_pos/ui/screens/reports_screen.dart';
 import 'package:pinoy_pos/ui/screens/sales_screen.dart';
+import 'package:pinoy_pos/ui/screens/force_change_password_screen.dart';
+import 'package:pinoy_pos/ui/screens/login_screen.dart';
+import 'package:pinoy_pos/ui/screens/pin_lock_screen.dart';
 import 'package:pinoy_pos/ui/screens/users_screen.dart';
 import 'package:pinoy_pos/ui/screens/more_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_logo.dart';
@@ -56,10 +59,33 @@ class _AppShellState extends ConsumerState<AppShell> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isTablet = screenWidth >= 600;
 
-    // If not authenticated, show a loading indicator while the
-    // SplashScreen or login flow handles navigation. AppShell should
-    // only be visible when authenticated.
-    if (authState.user == null) {
+    // AppShell should only be visible when fully authenticated.
+    // If the phase changes (e.g. forced password change, PIN lock,
+    // or logout), navigate to the appropriate screen.
+    if (authState.user == null ||
+        authState.phase != AuthSessionPhase.fullyAuthenticated) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        switch (authState.phase) {
+          case AuthSessionPhase.fullyAuthenticated:
+            break;
+          case AuthSessionPhase.passwordAuthenticatedPendingPasswordChange:
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const ForceChangePasswordScreen()),
+              (_) => false,
+            );
+          case AuthSessionPhase.passwordAuthenticatedPendingPin:
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const PinLockScreen()),
+              (_) => false,
+            );
+          case AuthSessionPhase.unauthenticated:
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const LoginScreen()),
+              (_) => false,
+            );
+        }
+      });
       return Scaffold(
         body: Center(
           child: CircularProgressIndicator(

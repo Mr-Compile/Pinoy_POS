@@ -4,6 +4,33 @@ import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/dashboard_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/providers/user_provider.dart';
+import 'package:pinoy_pos/services/user_service.dart';
+
+/// The phase of the authentication/session lifecycle.
+///
+/// This is the single source of truth for whether protected routes
+/// are accessible.  Only [fullyAuthenticated] grants access to the
+/// application shell and protected screens.
+enum AuthSessionPhase {
+  /// No user is authenticated.
+  unauthenticated,
+
+  /// Password login succeeded but the user's temporary password must
+  /// be changed before any further access is granted.
+  passwordAuthenticatedPendingPasswordChange,
+
+  /// Password login succeeded and the password is not temporary, but
+  /// the user has a PIN configured.  The PIN lock screen must be shown
+  /// and protected routes must remain inaccessible until the PIN is
+  /// verified.
+  passwordAuthenticatedPendingPin,
+
+  /// Password (and PIN, if configured) are both verified, and the
+  /// password is not a temporary one.  The user may access protected
+  /// routes.
+  fullyAuthenticated,
+}
+
 final authServiceProvider = Provider<AuthService>((ref) {
   return AuthService();
 });
@@ -17,22 +44,26 @@ class AuthState {
   final User? user;
   final bool isLoading;
   final String? error;
+  final AuthSessionPhase phase;
 
   AuthState({
     this.user,
     this.isLoading = false,
     this.error,
+    this.phase = AuthSessionPhase.unauthenticated,
   });
 
   AuthState copyWith({
     User? user,
     bool? isLoading,
     String? error,
+    AuthSessionPhase? phase,
   }) {
     return AuthState(
       user: user ?? this.user,
       isLoading: isLoading ?? this.isLoading,
       error: error,
+      phase: phase ?? this.phase,
     );
   }
 }
@@ -49,7 +80,15 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true);
     final restored = await _authService.restoreSession();
     if (restored) {
-      state = state.copyWith(user: _authService.currentUser, isLoading: false);
+      final user = _authService.currentUser!;
+      final phase = user.mustChangePassword
+          ? AuthSessionPhase.passwordAuthenticatedPendingPasswordChange
+          : AuthSessionPhase.fullyAuthenticated;
+      state = state.copyWith(
+        user: user,
+        isLoading: false,
+        phase: phase,
+      );
     } else {
       state = state.copyWith(isLoading: false);
     }
@@ -60,7 +99,20 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
     final result = await _authService.login(username, password);
     switch (result) {
       case LoginResult.success:
-        state = state.copyWith(user: _authService.currentUser, isLoading: false);
+        final user = _authService.currentUser!;
+        final AuthSessionPhase phase;
+        if (user.mustChangePassword) {
+          phase = AuthSessionPhase.passwordAuthenticatedPendingPasswordChange;
+        } else if (_authService.currentUserHasPin) {
+          phase = AuthSessionPhase.passwordAuthenticatedPendingPin;
+        } else {
+          phase = AuthSessionPhase.fullyAuthenticated;
+        }
+        state = state.copyWith(
+          user: user,
+          isLoading: false,
+          phase: phase,
+        );
       case LoginResult.invalidCredentials:
         state = state.copyWith(isLoading: false, error: 'Username or password is incorrect.');
       case LoginResult.inactiveAccount:
@@ -76,7 +128,11 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
     try {
       final success = await _authService.loginWithPin(username, pin);
       if (success) {
-        state = state.copyWith(user: _authService.currentUser, isLoading: false);
+        state = state.copyWith(
+          user: _authService.currentUser,
+          isLoading: false,
+          phase: AuthSessionPhase.fullyAuthenticated,
+        );
       } else {
         state = state.copyWith(isLoading: false, error: 'Incorrect username or PIN.');
       }
@@ -112,7 +168,91 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
     state = AuthState();
   }
 
-  /// Reloads the current user from the database and updates the auth state.
+  /// Changes the current user's password during the forced first-login
+  /// flow.  Does not require the old password.  On success, transitions
+  /// to the PIN phase (if configured) or fully authenticated.
+  ///
+  /// Returns a [UserOperationResult] from the user service.
+  Future<UserOperationResult> changePassword({
+    required String newPassword,
+  }) async {
+    final user = _authService.currentUser;
+    if (user == null) {
+      return UserOperationResult(
+        success: false,
+        message: 'No active session',
+      );
+    }
+
+    final result = await _ref
+        .read(userControllerProvider.notifier)
+        .forceChangePassword(
+      userId: user.id!,
+      newPassword: newPassword,
+    );
+
+    if (result.success) {
+      // Refresh the current user from DB to get updated state.
+      await _authService.refreshCurrentUser();
+      final updatedUser = _authService.currentUser!;
+
+      final AuthSessionPhase phase;
+      if (updatedUser.mustChangePassword) {
+        phase = AuthSessionPhase.passwordAuthenticatedPendingPasswordChange;
+      } else if (updatedUser.hasPin) {
+        phase = AuthSessionPhase.passwordAuthenticatedPendingPin;
+      } else {
+        phase = AuthSessionPhase.fullyAuthenticated;
+      }
+
+      state = state.copyWith(
+        user: updatedUser,
+        phase: phase,
+        error: null,
+      );
+    }
+    return result;
+  }
+
+  /// Verifies the PIN for the post-login PIN lock flow.
+  /// Returns a [PinVerifyResult] from the auth service.
+  /// On success, transitions to [AuthSessionPhase.fullyAuthenticated].
+  Future<PinVerifyResult> verifyPin(String pin) async {
+    final result = await _authService.verifyPin(pin);
+    if (result == PinVerifyResult.success) {
+      state = state.copyWith(
+        user: _authService.currentUser,
+        phase: AuthSessionPhase.fullyAuthenticated,
+        error: null,
+      );
+    }
+    return result;
+  }
+
+  /// Cancels the PIN lock flow and returns to the login screen.
+  /// Clears all temporary authentication/session state.
+  Future<void> cancelPinFlow() async {
+    await _authService.logout();
+    _ref.invalidate(productServiceProvider);
+    _ref.invalidate(categoryServiceProvider);
+    _ref.invalidate(salesServiceProvider);
+    _ref.invalidate(stockServiceProvider);
+    _ref.invalidate(activityLogServiceProvider);
+    _ref.invalidate(notificationServiceProvider);
+    _ref.invalidate(settingsServiceProvider);
+    _ref.invalidate(reportServiceProvider);
+    _ref.invalidate(backupServiceProvider);
+    _ref.invalidate(aiUsageServiceProvider);
+    _ref.invalidate(aiAdvisorServiceProvider);
+    _ref.invalidate(groqServiceProvider);
+    _ref.invalidate(trashServiceProvider);
+    _ref.invalidate(announcementServiceProvider);
+    _ref.invalidate(userServiceProvider);
+    _ref.invalidate(userControllerProvider);
+    _ref.invalidate(dashboardProvider);
+    state = AuthState();
+  }
+
   /// Called after the current user's own record is edited (e.g. by
   /// UserController.updateUser) so that the session reflects the latest
   /// database state without causing a circular dependency.

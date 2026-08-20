@@ -16,11 +16,13 @@ class User {
   final String username;
   final String passwordHash;
   final String? pin;
+  final int? pinLength;
   final UserRole role;
   final String fullName;
   final String colorPreference;
   final String? profileImagePath;
   final bool isActive;
+  final bool mustChangePassword;
   final DateTime? lastLogin;
   final DateTime createdAt;
   final DateTime? updatedAt;
@@ -31,11 +33,13 @@ class User {
     required this.username,
     required this.passwordHash,
     this.pin,
+    this.pinLength,
     required this.role,
     required this.fullName,
     this.colorPreference = 'green',
     this.profileImagePath,
     this.isActive = true,
+    this.mustChangePassword = false,
     this.lastLogin,
     required this.createdAt,
     this.updatedAt,
@@ -48,11 +52,13 @@ class User {
       'username': username,
       'password_hash': passwordHash,
       'pin': pin,
+      'pin_length': pinLength,
       'role': role.name,
       'full_name': fullName,
       'color_preference': colorPreference,
       'profile_image_path': profileImagePath,
       'is_active': isActive ? 1 : 0,
+      'must_change_password': mustChangePassword ? 1 : 0,
       'last_login': lastLogin?.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
@@ -66,6 +72,7 @@ class User {
       username: map['username'] as String,
       passwordHash: map['password_hash'] as String,
       pin: map['pin'] as String?,
+      pinLength: map['pin_length'] as int?,
       role: UserRole.values.firstWhere(
         (e) => e.name == map['role'],
         orElse: () => UserRole.staff,
@@ -74,6 +81,7 @@ class User {
       colorPreference: (map['color_preference'] as String?) ?? 'green',
       profileImagePath: map['profile_image_path'] as String?,
       isActive: (map['is_active'] as int) == 1,
+      mustChangePassword: (map['must_change_password'] as int?) == 1,
       lastLogin: map['last_login'] != null
           ? DateTime.parse(map['last_login'] as String)
           : null,
@@ -92,11 +100,13 @@ class User {
     String? username,
     String? passwordHash,
     String? pin,
+    int? pinLength,
     UserRole? role,
     String? fullName,
     String? colorPreference,
     String? profileImagePath,
     bool? isActive,
+    bool? mustChangePassword,
     DateTime? lastLogin,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -107,11 +117,13 @@ class User {
       username: username ?? this.username,
       passwordHash: passwordHash ?? this.passwordHash,
       pin: pin ?? this.pin,
+      pinLength: pinLength ?? this.pinLength,
       role: role ?? this.role,
       fullName: fullName ?? this.fullName,
       colorPreference: colorPreference ?? this.colorPreference,
       profileImagePath: profileImagePath ?? this.profileImagePath,
       isActive: isActive ?? this.isActive,
+      mustChangePassword: mustChangePassword ?? this.mustChangePassword,
       lastLogin: lastLogin ?? this.lastLogin,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -120,4 +132,11 @@ class User {
   }
 
   bool get isDeleted => deletedAt != null;
+
+  /// Whether this user has a PIN configured.
+  bool get hasPin => pin != null && pin!.isNotEmpty;
+
+  /// The number of digits in this user's configured PIN.
+  /// Returns 0 if no PIN is set or pinLength is null.
+  int get configuredPinLength => pinLength ?? 0;
 }

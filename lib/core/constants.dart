@@ -4,7 +4,7 @@ class AppConstants {
 
   // Database
   static const String databaseName = 'pinoy_pos.db';
-  static const int databaseVersion = 5;
+  static const int databaseVersion = 7;
 
   // App Info
   static const String appName = 'Pinoy POS';
@@ -18,7 +18,9 @@ class AppConstants {
 
   // Security
   static const int minPasswordLength = 8;
+  static const int maxPasswordLength = 128;
   static const int pinLength = 4;
+  static const String defaultTemporaryPassword = '@Password123';
 
   // Stock
   static const int defaultLowStockThreshold = 10;

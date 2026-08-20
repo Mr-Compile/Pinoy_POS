@@ -105,7 +105,6 @@ class UserController extends StateNotifier<UserListState> {
 
   Future<UserOperationResult> createUser({
     required String username,
-    required String password,
     required String fullName,
     required UserRole role,
     String? pin,
@@ -114,7 +113,6 @@ class UserController extends StateNotifier<UserListState> {
     try {
       final result = await _userService.createUser(
         username: username,
-        password: password,
         fullName: fullName,
         role: role,
         pin: pin,
@@ -163,6 +161,24 @@ class UserController extends StateNotifier<UserListState> {
 
   // ── PASSWORD ─────────────────────────────────────────
 
+  Future<UserOperationResult> forceChangePassword({
+    required int userId,
+    required String newPassword,
+  }) async {
+    state = state.copyWith(isSubmitting: true, error: null);
+    try {
+      final result = await _userService.forceChangePassword(
+        userId: userId,
+        newPassword: newPassword,
+      );
+      state = state.copyWith(isSubmitting: false);
+      return result;
+    } catch (e) {
+      state = state.copyWith(isSubmitting: false, error: _friendlyError(e));
+      return UserOperationResult(success: false, message: _friendlyError(e));
+    }
+  }
+
   Future<UserOperationResult> changePassword({
     required int userId,
     required String oldPassword,
@@ -183,16 +199,10 @@ class UserController extends StateNotifier<UserListState> {
     }
   }
 
-  Future<UserOperationResult> resetPassword({
-    required int userId,
-    required String newPassword,
-  }) async {
+  Future<UserOperationResult> resetPassword(int userId) async {
     state = state.copyWith(isSubmitting: true, error: null);
     try {
-      final result = await _userService.resetPassword(
-        userId: userId,
-        newPassword: newPassword,
-      );
+      final result = await _userService.resetPassword(userId);
       state = state.copyWith(isSubmitting: false);
       return result;
     } catch (e) {

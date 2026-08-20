@@ -5,6 +5,7 @@ import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/data/repositories/user_repository.dart';
 import 'package:pinoy_pos/services/activity_log_service.dart';
+import 'package:pinoy_pos/services/password_strength_service.dart';
 
 /// Result of a user operation.  Carries a human-readable message and a
 /// success flag so the UI layer never needs to interpret raw exceptions.
@@ -51,23 +52,19 @@ class UserService {
 
   User? get currentUser => _sessionManager.currentUser;
 
-  /// Validates password complexity.  Mirrors the rules enforced by the UI
-  /// [Validators.password] so that business-layer validation does not rely
-  /// on the UI alone.  Returns null when valid, or an error message.
-  String? _validatePasswordComplexity(String password) {
-    if (password.length < AppConstants.minPasswordLength) {
-      return 'Password must be at least ${AppConstants.minPasswordLength} characters';
-    }
-    if (!password.contains(RegExp(r'[A-Z]'))) {
-      return 'Password must contain at least one uppercase letter';
-    }
-    if (!password.contains(RegExp(r'[a-z]'))) {
-      return 'Password must contain at least one lowercase letter';
-    }
-    if (!password.contains(RegExp(r'[0-9]'))) {
-      return 'Password must contain at least one number';
-    }
-    return null;
+  /// Validates password complexity using the centralized
+  /// [PasswordStrengthService].  Returns null when valid, or an error
+  /// message.
+  String? _validatePasswordComplexity(
+    String password, {
+    String? username,
+    String? currentPassword,
+  }) {
+    return PasswordStrengthService.validate(
+      password: password,
+      username: username,
+      currentPassword: currentPassword,
+    );
   }
 
   // ───────────────────────────────────────────────
@@ -104,16 +101,19 @@ class UserService {
 
   /// Creates a new user.
   ///
+  /// The user is created with the approved default temporary password
+  /// (@Password123) which is hashed before storage.  The new account
+  /// is marked [mustChangePassword = true] so the user is forced to
+  /// change it on first login.
+  ///
   /// Validates:
   ///   - Caller has `manage_users` permission
   ///   - Username is non-empty and unique among non-deleted users
   ///   - Full name is non-empty
-  ///   - Password meets complexity requirements
   ///   - Role is valid
   ///   - PIN (if provided) is 4-6 digits
   Future<UserOperationResult> createUser({
     required String username,
-    required String password,
     required String fullName,
     required UserRole role,
     String? pin,
@@ -131,10 +131,6 @@ class UserService {
     if (trimmedFullName.isEmpty) {
       return UserOperationResult(success: false, message: 'Full name is required');
     }
-    final passwordError = _validatePasswordComplexity(password);
-    if (passwordError != null) {
-      return UserOperationResult(success: false, message: passwordError);
-    }
     if (pin != null && pin.isNotEmpty) {
       final pinRegex = RegExp(r'^\d{4,6}$');
       if (!pinRegex.hasMatch(pin)) {
@@ -151,15 +147,19 @@ class UserService {
       return UserOperationResult(success: false, message: 'Username already exists');
     }
 
-    final passwordHash = SecurityHelper.hashPassword(password);
+    // Use the approved default temporary password, hashed before storage.
+    final passwordHash =
+        SecurityHelper.hashPassword(AppConstants.defaultTemporaryPassword);
     final now = DateTime.now();
 
     final user = User(
       username: trimmedUsername,
       passwordHash: passwordHash,
-      pin: (pin != null && pin.isNotEmpty) ? pin : null,
+      pin: (pin != null && pin.isNotEmpty) ? SecurityHelper.hashPin(pin) : null,
+      pinLength: (pin != null && pin.isNotEmpty) ? pin.length : null,
       role: role,
       fullName: trimmedFullName,
+      mustChangePassword: true,
       createdAt: now,
       updatedAt: now,
     );
@@ -237,11 +237,26 @@ class UserService {
       }
     }
 
+    // Determine the new PIN value and length.
+    String? newPin;
+    int? newPinLength;
+    if (pin == null) {
+      newPin = user.pin;
+      newPinLength = user.pinLength;
+    } else if (pin.isEmpty) {
+      newPin = null;
+      newPinLength = null;
+    } else {
+      newPin = SecurityHelper.hashPin(pin);
+      newPinLength = pin.length;
+    }
+
     final updatedUser = user.copyWith(
       username: trimmedUsername ?? user.username,
       fullName: trimmedFullName ?? user.fullName,
       role: role ?? user.role,
-      pin: (pin != null && pin.isNotEmpty) ? pin : user.pin,
+      pin: newPin,
+      pinLength: newPinLength,
       profileImagePath: profileImagePath ?? user.profileImagePath,
       updatedAt: DateTime.now(),
     );
@@ -300,7 +315,11 @@ class UserService {
       }
     }
 
-    final complexityError = _validatePasswordComplexity(newPassword);
+    final complexityError = _validatePasswordComplexity(
+      newPassword,
+      username: user.username,
+      currentPassword: oldPassword,
+    );
     if (complexityError != null) {
       return UserOperationResult(success: false, message: complexityError);
     }
@@ -308,9 +327,15 @@ class UserService {
     final newPasswordHash = SecurityHelper.hashPassword(newPassword);
     final updatedUser = user.copyWith(
       passwordHash: newPasswordHash,
+      mustChangePassword: false,
       updatedAt: DateTime.now(),
     );
     await _userRepository.update(updatedUser);
+
+    // If the current user changed their own password, update the session.
+    if (_sessionManager.currentUser?.id == userId) {
+      _sessionManager.setCurrentUser(updatedUser);
+    }
 
     await _activityLogService.logActivity(
       action: 'PASSWORD_CHANGED',
@@ -322,11 +347,63 @@ class UserService {
     return UserOperationResult(success: true, message: 'Password changed successfully');
   }
 
-  /// Resets a user's password (admin operation, no old password needed).
-  Future<UserOperationResult> resetPassword({
+  /// Forces a password change for the current user during first-login
+  /// flow.  Does NOT require the old password — the user has already
+  /// authenticated with the temporary password and the session is
+  /// verified.  The new password is validated using the centralized
+  /// [PasswordStrengthService].
+  ///
+  /// On success, [mustChangePassword] is set to false.
+  Future<UserOperationResult> forceChangePassword({
     required int userId,
     required String newPassword,
   }) async {
+    final user = await _userRepository.getById(userId);
+    if (user == null) {
+      return UserOperationResult(success: false, message: 'User not found');
+    }
+
+    // Only the current user can force-change their own password.
+    if (_sessionManager.currentUser?.id != userId) {
+      throw AuthorizationException('reset_password');
+    }
+
+    final complexityError = _validatePasswordComplexity(
+      newPassword,
+      username: user.username,
+    );
+    if (complexityError != null) {
+      return UserOperationResult(success: false, message: complexityError);
+    }
+
+    final newPasswordHash = SecurityHelper.hashPassword(newPassword);
+    final updatedUser = user.copyWith(
+      passwordHash: newPasswordHash,
+      mustChangePassword: false,
+      updatedAt: DateTime.now(),
+    );
+    await _userRepository.update(updatedUser);
+
+    // Update the session with the fresh user data.
+    _sessionManager.setCurrentUser(updatedUser);
+
+    await _activityLogService.logActivity(
+      action: 'PASSWORD_CHANGED',
+      entity: 'user',
+      entityId: userId,
+      details: 'Password changed for user: ${user.username}',
+    );
+
+    return UserOperationResult(success: true, message: 'Password changed successfully');
+  }
+
+  /// Resets a user's password to the approved default temporary password
+  /// (@Password123).  The password is hashed before storage and the account
+  /// is marked [mustChangePassword = true] so the user must change it on
+  /// next login.
+  ///
+  /// Admin operation — requires `reset_password` permission.
+  Future<UserOperationResult> resetPassword(int userId) async {
     if (!_sessionManager.hasPermission('reset_password')) {
       throw AuthorizationException('reset_password');
     }
@@ -336,14 +413,11 @@ class UserService {
       return UserOperationResult(success: false, message: 'User not found');
     }
 
-    final resetComplexityError = _validatePasswordComplexity(newPassword);
-    if (resetComplexityError != null) {
-      return UserOperationResult(success: false, message: resetComplexityError);
-    }
-
-    final newPasswordHash = SecurityHelper.hashPassword(newPassword);
+    final newPasswordHash =
+        SecurityHelper.hashPassword(AppConstants.defaultTemporaryPassword);
     final updatedUser = user.copyWith(
       passwordHash: newPasswordHash,
+      mustChangePassword: true,
       updatedAt: DateTime.now(),
     );
     await _userRepository.update(updatedUser);
@@ -355,7 +429,10 @@ class UserService {
       details: 'Password reset for user: ${user.username}',
     );
 
-    return UserOperationResult(success: true, message: 'Password reset successfully');
+    return UserOperationResult(
+      success: true,
+      message: 'Password reset successfully. The user will need to change it on next login.',
+    );
   }
 
   // ───────────────────────────────────────────────

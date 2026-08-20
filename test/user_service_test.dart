@@ -69,6 +69,7 @@ void main() {
       'created_at': now.toIso8601String(),
       'updated_at': now.toIso8601String(),
       'deleted_at': null,
+      'must_change_password': 0,
     });
 
     // Fetch the created admin and set as current user in SessionManager.
@@ -84,7 +85,6 @@ void main() {
 
     final result = await userService.createUser(
       username: 'newadmin',
-      password: 'Password1',
       fullName: 'New Admin',
       role: UserRole.admin,
     );
@@ -93,6 +93,7 @@ void main() {
     expect(result.user, isNotNull);
     expect(result.user!.username, 'newadmin');
     expect(result.user!.id, isNotNull);
+    expect(result.user!.mustChangePassword, isTrue);
 
     // Verify it appears in the list.
     final users = await userService.getAllUsers();
@@ -106,7 +107,6 @@ void main() {
     // First create succeeds.
     final r1 = await userService.createUser(
       username: 'dupuser',
-      password: 'Password1',
       fullName: 'Dup User',
       role: UserRole.staff,
     );
@@ -115,7 +115,6 @@ void main() {
     // Second create with same username fails.
     final r2 = await userService.createUser(
       username: 'dupuser',
-      password: 'Password2',
       fullName: 'Another Dup',
       role: UserRole.staff,
     );
@@ -123,19 +122,25 @@ void main() {
     expect(r2.message, contains('Username already exists'));
   });
 
-  test('CREATE: short password is rejected', () async {
+  test('CREATE: new user is assigned default temp password and mustChangePassword', () async {
     await authenticateAsAdmin();
     final userService = UserService();
 
     final result = await userService.createUser(
-      username: 'shortpw',
-      password: 'Ab1',
-      fullName: 'Short PW',
+      username: 'tempcheck',
+      fullName: 'Temp Check',
       role: UserRole.staff,
     );
 
-    expect(result.success, isFalse);
-    expect(result.message, contains('Password must be at least'));
+    expect(result.success, isTrue);
+    expect(result.user!.mustChangePassword, isTrue);
+
+    // Verify the default temporary password works.
+    final user = await userService.getUserById(result.user!.id!);
+    expect(
+      SecurityHelper.verifyPassword('@Password123', user!.passwordHash),
+      isTrue,
+    );
   });
 
   test('READ: getAllUsers returns only non-deleted users', () async {
@@ -144,13 +149,11 @@ void main() {
 
     await userService.createUser(
       username: 'readuser1',
-      password: 'Password1',
       fullName: 'Read User 1',
       role: UserRole.staff,
     );
     await userService.createUser(
       username: 'readuser2',
-      password: 'Password1',
       fullName: 'Read User 2',
       role: UserRole.staff,
     );
@@ -166,7 +169,6 @@ void main() {
 
     final createResult = await userService.createUser(
       username: 'editme',
-      password: 'Password1',
       fullName: 'Original Name',
       role: UserRole.staff,
     );
@@ -192,13 +194,11 @@ void main() {
 
     final r1 = await userService.createUser(
       username: 'user_a',
-      password: 'Password1',
       fullName: 'User A',
       role: UserRole.staff,
     );
     await userService.createUser(
       username: 'user_b',
-      password: 'Password1',
       fullName: 'User B',
       role: UserRole.staff,
     );
@@ -219,7 +219,6 @@ void main() {
 
     final createResult = await userService.createUser(
       username: 'keepname',
-      password: 'Password1',
       fullName: 'Keep Name',
       role: UserRole.staff,
     );
@@ -242,7 +241,6 @@ void main() {
 
     final createResult = await userService.createUser(
       username: 'toggleme',
-      password: 'Password1',
       fullName: 'Toggle Me',
       role: UserRole.staff,
     );
@@ -279,7 +277,6 @@ void main() {
 
     final createResult = await userService.createUser(
       username: 'deleteme',
-      password: 'Password1',
       fullName: 'Delete Me',
       role: UserRole.staff,
     );
@@ -312,7 +309,6 @@ void main() {
 
     final createResult = await userService.createUser(
       username: 'restoreme',
-      password: 'Password1',
       fullName: 'Restore Me',
       role: UserRole.staff,
     );
@@ -339,7 +335,6 @@ void main() {
     // Create user, soft delete, then create a new user with same username.
     final r1 = await userService.createUser(
       username: 'conflictname',
-      password: 'Password1',
       fullName: 'Original',
       role: UserRole.staff,
     );
@@ -349,7 +344,6 @@ void main() {
     // soft-deleted and the partial unique index only covers non-deleted).
     await userService.createUser(
       username: 'conflictname',
-      password: 'Password2',
       fullName: 'Replacement',
       role: UserRole.staff,
     );
@@ -366,7 +360,6 @@ void main() {
 
     final createResult = await userService.createUser(
       username: 'permdelete',
-      password: 'Password1',
       fullName: 'Perm Delete',
       role: UserRole.staff,
     );
@@ -391,7 +384,6 @@ void main() {
 
     final createResult = await userService.createUser(
       username: 'notdeleted',
-      password: 'Password1',
       fullName: 'Not Deleted',
       role: UserRole.staff,
     );
@@ -402,31 +394,28 @@ void main() {
     expect(result.message, contains('trash'));
   });
 
-  test('PASSWORD RESET: admin can reset another user\'s password', () async {
+  test('PASSWORD RESET: admin can reset another user\'s password to default', () async {
     await authenticateAsAdmin();
     final userService = UserService();
 
     final createResult = await userService.createUser(
       username: 'pwreset',
-      password: 'Password1',
       fullName: 'PW Reset',
       role: UserRole.staff,
     );
     final userId = createResult.user!.id!;
 
-    final result = await userService.resetPassword(
-      userId: userId,
-      newPassword: 'NewPassword1',
-    );
+    final result = await userService.resetPassword(userId);
 
     expect(result.success, isTrue);
 
-    // Verify the new password works by checking the hash.
+    // Verify the password was reset to the default temporary password.
     final user = await userService.getUserById(userId);
     expect(
-      SecurityHelper.verifyPassword('NewPassword1', user!.passwordHash),
+      SecurityHelper.verifyPassword('@Password123', user!.passwordHash),
       isTrue,
     );
+    expect(user.mustChangePassword, isTrue);
   });
 
   test('RBAC: unauthenticated user cannot create users', () async {
@@ -436,7 +425,6 @@ void main() {
     expect(
       () => userService.createUser(
         username: 'shouldfail',
-        password: 'Password1',
         fullName: 'Should Fail',
         role: UserRole.staff,
       ),
@@ -457,7 +445,6 @@ void main() {
     expect(
       () => userService.createUser(
         username: 'shouldfail',
-        password: 'Password1',
         fullName: 'Should Fail',
         role: UserRole.staff,
       ),
@@ -471,7 +458,6 @@ void main() {
 
     await userService.createUser(
       username: 'logtest',
-      password: 'Password1',
       fullName: 'Log Test',
       role: UserRole.staff,
     );
