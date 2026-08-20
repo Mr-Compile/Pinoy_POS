@@ -56,10 +56,32 @@ class _NotificationBellState extends ConsumerState<NotificationBell> {
     if (screenWidth >= 600) {
       _showDropdown();
     } else {
+      _safePush(const NotificationsScreen());
+    }
+  }
+
+  void _safePush(Widget screen) {
+    if (!mounted) return;
+    final navigator = Navigator.of(context);
+    bool isAlreadyOnScreen = false;
+
+    navigator.popUntil((route) {
+      if (route.settings.name == screen.runtimeType.toString()) {
+        isAlreadyOnScreen = true;
+      }
+      return true;
+    });
+
+    if (!isAlreadyOnScreen) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+        MaterialPageRoute(
+          builder: (_) => screen,
+          settings: RouteSettings(name: screen.runtimeType.toString()),
+        ),
       ).then((_) => refreshNotificationCount(ref));
+    } else {
+      refreshNotificationCount(ref);
     }
   }
 
@@ -89,10 +111,7 @@ class _NotificationBellState extends ConsumerState<NotificationBell> {
             onClosed: () => Navigator.of(context, rootNavigator: true).pop(),
             onViewAll: () {
               Navigator.of(context, rootNavigator: true).pop();
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-              ).then((_) => refreshNotificationCount(ref));
+              _safePush(const NotificationsScreen());
             },
             onNotificationTapped: (notification) {
               Navigator.of(context, rootNavigator: true).pop();

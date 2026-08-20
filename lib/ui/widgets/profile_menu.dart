@@ -48,6 +48,29 @@ class _ProfileMenuState extends ConsumerState<ProfileMenu> {
     );
   }
 
+  void _safePush(Widget screen) {
+    if (!mounted) return;
+    final navigator = Navigator.of(context);
+    bool isAlreadyOnScreen = false;
+
+    navigator.popUntil((route) {
+      if (route.settings.name == screen.runtimeType.toString()) {
+        isAlreadyOnScreen = true;
+      }
+      return true;
+    });
+
+    if (!isAlreadyOnScreen) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => screen,
+          settings: RouteSettings(name: screen.runtimeType.toString()),
+        ),
+      );
+    }
+  }
+
   String _initials(User user) {
     final parts = user.fullName.trim().split(' ');
     if (parts.length >= 2) {
@@ -82,17 +105,11 @@ class _ProfileMenuState extends ConsumerState<ProfileMenu> {
             user: user,
             onProfile: () {
               Navigator.of(context, rootNavigator: true).pop();
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ProfileScreen()),
-              );
+              _safePush(const ProfileScreen());
             },
             onSettings: () {
               Navigator.of(context, rootNavigator: true).pop();
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SettingsScreen()),
-              );
+              _safePush(const SettingsScreen());
             },
             onLogout: () async {
               Navigator.of(context, rootNavigator: true).pop();

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
 import 'package:pinoy_pos/data/models/user.dart';
+import 'package:pinoy_pos/providers/ai_advisor_provider.dart';
 import 'package:pinoy_pos/providers/dashboard_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/providers/user_provider.dart';
@@ -159,6 +160,7 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
     _ref.invalidate(backupServiceProvider);
     _ref.invalidate(aiUsageServiceProvider);
     _ref.invalidate(aiAdvisorServiceProvider);
+    _ref.invalidate(aiAdvisorChatProvider);
     _ref.invalidate(groqServiceProvider);
     _ref.invalidate(trashServiceProvider);
     _ref.invalidate(announcementServiceProvider);
@@ -244,6 +246,7 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
     _ref.invalidate(backupServiceProvider);
     _ref.invalidate(aiUsageServiceProvider);
     _ref.invalidate(aiAdvisorServiceProvider);
+    _ref.invalidate(aiAdvisorChatProvider);
     _ref.invalidate(groqServiceProvider);
     _ref.invalidate(trashServiceProvider);
     _ref.invalidate(announcementServiceProvider);

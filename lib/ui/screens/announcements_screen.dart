@@ -11,6 +11,7 @@ import 'package:pinoy_pos/ui/widgets/validators.dart';
 import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
+import 'package:pinoy_pos/providers/notification_provider.dart';
 
 class AnnouncementsScreen extends ConsumerStatefulWidget {
   const AnnouncementsScreen({super.key});
@@ -307,6 +308,7 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
                   if (context.mounted) {
                     Navigator.pop(context);
                     if (success) {
+                      refreshNotificationCount(ref);
                       await AppDialogService.success(context, title: 'Saved', message: 'Announcement saved successfully.');
                       _loadAnnouncements();
                     } else {

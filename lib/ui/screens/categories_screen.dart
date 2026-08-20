@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/data/models/category.dart';
@@ -10,6 +11,7 @@ import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/validators.dart';
 import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
+import 'package:pinoy_pos/core/spacing.dart';
 
 class CategoriesScreen extends ConsumerStatefulWidget {
   const CategoriesScreen({super.key});
@@ -18,14 +20,28 @@ class CategoriesScreen extends ConsumerStatefulWidget {
   ConsumerState<CategoriesScreen> createState() => _CategoriesScreenState();
 }
 
+enum CategoryFilter { all, active, inactive }
+
 class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
   List<Category> _categories = [];
   bool _isLoading = true;
+
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+  CategoryFilter _categoryFilter = CategoryFilter.all;
+  Timer? _debounce;
 
   @override
   void initState() {
     super.initState();
     _loadCategories();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _debounce?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadCategories() async {
@@ -42,6 +58,57 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  List<Category> get _filteredCategories {
+    var result = _categories;
+
+    switch (_categoryFilter) {
+      case CategoryFilter.active:
+        result = result.where((c) => c.isActive).toList();
+        break;
+      case CategoryFilter.inactive:
+        result = result.where((c) => !c.isActive).toList();
+        break;
+      case CategoryFilter.all:
+        break;
+    }
+
+    if (_searchQuery.isNotEmpty) {
+      final query = _searchQuery.toLowerCase();
+      result = result.where((c) {
+        if (c.name.toLowerCase().contains(query)) return true;
+        return false;
+      }).toList();
+    }
+
+    return result;
+  }
+
+  void _onSearchChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        setState(() {
+          _searchQuery = value.trim();
+        });
+      }
+    });
+  }
+
+  void _clearSearch() {
+    _searchController.clear();
+    setState(() {
+      _searchQuery = '';
+    });
+  }
+
+  void _clearFilters() {
+    setState(() {
+      _categoryFilter = CategoryFilter.all;
+      _searchQuery = '';
+    });
+    _searchController.clear();
   }
 
   Future<void> _toggleCategoryStatus(Category category) async {
@@ -167,49 +234,147 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
               icon: Icons.category,
               title: 'No Categories Yet',
               message: 'Create a category to organize your products.',
-              // No create button here — the FAB (mobile) / AppBar
-              // action (tablet) is the single primary create action.
             )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _categories.length,
-              itemBuilder: (context, index) {
-                final category = _categories[index];
-                return AppCard(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: ListTile(
-                    title: Text(category.name),
-                    subtitle: Text(category.isActive ? 'Active' : 'Inactive'),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (canToggleStatus)
-                          IconButton(
-                            icon: Icon(
-                              category.isActive ? Icons.toggle_on : Icons.toggle_off,
-                              color: category.isActive
-                                  ? Theme.of(context).colorScheme.primary
-                                  : Theme.of(context).colorScheme.outline,
-                            ),
-                            tooltip: category.isActive ? 'Deactivate' : 'Activate',
-                            onPressed: () => _toggleCategoryStatus(category),
-                          ),
-                        if (canEdit)
-                          IconButton(
-                            icon: const Icon(Icons.edit),
-                            onPressed: () => _showCategoryDialog(category: category),
-                          ),
-                        if (canDelete)
-                          IconButton(
-                            icon: const Icon(Icons.delete),
-                            onPressed: () => _deleteCategory(category),
-                          ),
-                      ],
-                    ),
-                  ),
-                );
-              },
+          : Column(
+              children: [
+                _buildSearchAndFilters(),
+                Expanded(
+                  child: _filteredCategories.isEmpty
+                      ? _buildEmptyFilterState()
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: _filteredCategories.length,
+                          itemBuilder: (context, index) {
+                            final category = _filteredCategories[index];
+                            return AppCard(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              child: ListTile(
+                                title: Text(category.name),
+                                subtitle: Text(category.isActive ? 'Active' : 'Inactive'),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (canToggleStatus)
+                                      IconButton(
+                                        icon: Icon(
+                                          category.isActive ? Icons.toggle_on : Icons.toggle_off,
+                                          color: category.isActive
+                                              ? Theme.of(context).colorScheme.primary
+                                              : Theme.of(context).colorScheme.outline,
+                                        ),
+                                        tooltip: category.isActive ? 'Deactivate' : 'Activate',
+                                        onPressed: () => _toggleCategoryStatus(category),
+                                      ),
+                                    if (canEdit)
+                                      IconButton(
+                                        icon: const Icon(Icons.edit),
+                                        onPressed: () => _showCategoryDialog(category: category),
+                                      ),
+                                    if (canDelete)
+                                      IconButton(
+                                        icon: const Icon(Icons.delete),
+                                        onPressed: () => _deleteCategory(category),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
             ),
+    );
+  }
+
+  Widget _buildSearchAndFilters() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(Spacing.lg, Spacing.md, Spacing.lg, Spacing.sm),
+      child: Column(
+        children: [
+          TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Search categories...',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _searchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: _clearSearch,
+                      tooltip: 'Clear search',
+                    )
+                  : null,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              isDense: true,
+            ),
+            onChanged: _onSearchChanged,
+          ),
+          const SizedBox(height: Spacing.sm),
+          SizedBox(
+            height: 40,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: [
+                _buildFilterChip(CategoryFilter.all, 'All'),
+                _buildFilterChip(CategoryFilter.active, 'Active'),
+                _buildFilterChip(CategoryFilter.inactive, 'Inactive'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(CategoryFilter filter, String label) {
+    final isSelected = _categoryFilter == filter;
+    return Padding(
+      padding: const EdgeInsets.only(right: Spacing.sm),
+      child: FilterChip(
+        label: Text(label),
+        selected: isSelected,
+        onSelected: (_) {
+          setState(() {
+            _categoryFilter = filter;
+          });
+        },
+      ),
+    );
+  }
+
+  Widget _buildEmptyFilterState() {
+    final hasFilters = _searchQuery.isNotEmpty ||
+        _categoryFilter != CategoryFilter.all;
+
+    String title;
+    String message;
+    if (!hasFilters) {
+      title = 'No Categories Available';
+      message = 'Categories will appear here once created.';
+    } else if (_searchQuery.isNotEmpty) {
+      title = 'No Results Found';
+      message = "No categories match '$_searchQuery'. Try a different search term.";
+    } else if (_categoryFilter == CategoryFilter.active) {
+      title = 'No Active Categories';
+      message = 'All categories are currently inactive.';
+    } else {
+      title = 'No Inactive Categories';
+      message = 'All categories are currently active.';
+    }
+
+    return EmptyState(
+      icon: Icons.search_off,
+      title: title,
+      message: message,
+      action: hasFilters
+          ? TextButton.icon(
+              icon: const Icon(Icons.filter_alt_off),
+              label: const Text('Clear Filters'),
+              onPressed: _clearFilters,
+            )
+          : null,
     );
   }
 

@@ -104,21 +104,49 @@ class _ActivityLogsScreenState extends ConsumerState<ActivityLogsScreen> {
               itemCount: _activities.length,
               itemBuilder: (context, index) {
                 final activity = _activities[index];
+                final timeStr = activity.createdAt.toLocal().toString().split('.')[0];
                 return AppCard(
                   margin: const EdgeInsets.only(bottom: 8),
-                  child: ListTile(
-                    leading: Icon(_getActionIcon(activity.action)),
-                    title: Text(activity.action),
-                    subtitle: Text(
-                      '${activity.entity ?? 'N/A'} • ${activity.createdAt.toLocal().toString().split('.')[0]}',
-                    ),
-                    trailing: activity.details != null
-                        ? Text(
-                            activity.details!,
-                            style: Theme.of(context).textTheme.bodySmall,
-                            overflow: TextOverflow.ellipsis,
-                          )
-                        : null,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Icon(
+                          _getActionIcon(activity.action),
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              activity.action,
+                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
+                            if (activity.details != null) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                activity.details!,
+                                style: Theme.of(context).textTheme.bodyMedium,
+                                softWrap: true,
+                              ),
+                            ],
+                            const SizedBox(height: 4),
+                            Text(
+                              '${activity.entity ?? 'N/A'} • $timeStr',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 );
               },

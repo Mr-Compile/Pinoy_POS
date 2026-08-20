@@ -12,6 +12,7 @@ import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/validators.dart';
 import 'package:pinoy_pos/ui/widgets/loading_button.dart';
+import 'package:pinoy_pos/ui/widgets/app_image.dart';
 
 class UsersScreen extends ConsumerStatefulWidget {
   const UsersScreen({super.key});
@@ -809,15 +810,12 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
               child: Row(
                 children: [
                   // ── Avatar ──
-                  CircleAvatar(
-                    backgroundColor: roleColor.withValues(alpha: 0.15),
-                    foregroundColor: roleColor,
-                    child: Text(
-                      user.fullName.isNotEmpty
-                          ? user.fullName[0].toUpperCase()
-                          : '?',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
+                  AppAvatar(
+                    imagePath: user.profileImagePath,
+                    initials: user.fullName.isNotEmpty
+                        ? user.fullName[0].toUpperCase()
+                        : '?',
+                    radius: 22,
                   ),
                   const SizedBox(width: 12),
                   // ── User info ──
@@ -970,12 +968,12 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: CircleAvatar(
-                child: Text(
-                  user.fullName.isNotEmpty
-                      ? user.fullName[0].toUpperCase()
-                      : '?',
-                ),
+              leading: AppAvatar(
+                imagePath: user.profileImagePath,
+                initials: user.fullName.isNotEmpty
+                    ? user.fullName[0].toUpperCase()
+                    : '?',
+                radius: 24,
               ),
               title: Text(user.fullName),
               subtitle: Text('@${user.username}'),
