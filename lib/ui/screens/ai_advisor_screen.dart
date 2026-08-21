@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/ai_config_status.dart';
+import 'package:pinoy_pos/core/ai_role_config.dart';
 import 'package:pinoy_pos/core/constants.dart';
+import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/providers/ai_advisor_provider.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 
-/// Owner-only AI Business Advisor screen.
+/// Role-aware AI Advisor screen.
 ///
-/// RBAC: The FAB that opens this screen is only shown to users with
-/// `use_ai_advisor` (Owner only). The underlying [AIAdvisorService] also
-/// enforces this permission at the service layer.
+/// RBAC: The FAB that opens this screen is shown to users with
+/// `use_ai_advisor` (Owner, Admin, Staff). The underlying [AIAdvisorService]
+/// enforces this permission at the service layer and restricts data access
+/// via [AICapabilityPolicy] based on the authenticated role.
 ///
 /// The screen provides:
 /// - A status indicator (Connected / Offline / Not Configured)
@@ -89,12 +92,14 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
   @override
   Widget build(BuildContext context) {
     final chatState = ref.watch(aiAdvisorChatProvider);
+    final role = SessionManager().currentUser?.role;
+    final roleConfig = role != null ? AIRoleConfig(role) : null;
 
     _scrollToBottom();
 
     return Scaffold(
       appBar: AppHeader(
-        title: 'AI Business Advisor',
+        title: roleConfig?.title ?? 'AI Advisor',
         showBackButton: true,
         actions: [
           _buildStatusChip(context, chatState),
@@ -249,6 +254,8 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
       BuildContext context, AIAdvisorChatState chatState) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final role = SessionManager().currentUser?.role;
+    final roleConfig = role != null ? AIRoleConfig(role) : null;
 
     final canChat = chatState.configStatus == AIConfigStatus.active &&
         chatState.remainingQueries > 0;
@@ -265,14 +272,15 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
                     color: cs.primary.withValues(alpha: 0.5)),
                 const SizedBox(height: Spacing.sm),
                 Text(
-                  'Ask me about your business',
+                  roleConfig?.title ?? 'AI Advisor',
                   style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
                 ),
                 const SizedBox(height: Spacing.xs),
                 Text(
-                  'I analyze your real sales, products, and inventory data to give you actionable insights.',
+                  roleConfig?.welcomeMessage ??
+                      'I can help you with your business data.',
                   style: theme.textTheme.bodySmall?.copyWith(
                         color: cs.onSurfaceVariant,
                       ),
@@ -311,12 +319,11 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
             Wrap(
               spacing: Spacing.sm,
               runSpacing: Spacing.sm,
-              children: [
-                'How are my sales today?',
-                'What should I restock?',
-                'What are my best-selling products?',
-                'Give me a business summary.',
-              ].map((q) => _buildSuggestionChip(cs, q)).toList(),
+              children: (roleConfig?.suggestedQuestions ??
+                  [
+                    'How are my sales today?',
+                    'Give me a summary.',
+                  ]).map((q) => _buildSuggestionChip(cs, q)).toList(),
             ),
           ],
         ],

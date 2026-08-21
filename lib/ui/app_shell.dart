@@ -120,9 +120,10 @@ class _AppShellState extends ConsumerState<AppShell> {
       }
     }
 
-    // AI Advisor floating chat head — available ONLY to users with
-    // use_ai_advisor permission (Owner only). Admin and Staff do not see
-    // the FAB. Tapping it opens the full AIAdvisorScreen route.
+    // AI Advisor floating chat head — available to users with
+    // use_ai_advisor permission (Owner, Admin, Staff). Each role gets a
+    // role-appropriate AI assistant (Business Advisor, System Assistant,
+    // or Work Assistant). Tapping it opens the full AIAdvisorScreen route.
     final canUseAIAdvisor =
         ref.read(authStateProvider.notifier).hasPermission('use_ai_advisor');
     final aiChatState = ref.watch(aiAdvisorChatProvider);

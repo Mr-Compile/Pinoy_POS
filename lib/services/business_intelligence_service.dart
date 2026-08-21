@@ -1,8 +1,14 @@
 import 'package:flutter/foundation.dart';
+import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/dao/sale_item_dao.dart';
+import 'package:pinoy_pos/data/models/user.dart';
+import 'package:pinoy_pos/data/repositories/activity_log_repository.dart';
+import 'package:pinoy_pos/data/repositories/backup_history_repository.dart';
 import 'package:pinoy_pos/data/repositories/category_repository.dart';
+import 'package:pinoy_pos/data/repositories/export_history_repository.dart';
 import 'package:pinoy_pos/data/repositories/product_repository.dart';
 import 'package:pinoy_pos/data/repositories/sale_repository.dart';
+import 'package:pinoy_pos/data/repositories/user_repository.dart';
 
 /// Supported analytical intents the AI Business Advisor can handle.
 ///
@@ -10,6 +16,7 @@ import 'package:pinoy_pos/data/repositories/sale_repository.dart';
 /// through the approved Repository → DAO → SQLite architecture. The AI
 /// never writes or executes arbitrary SQL.
 enum BusinessIntent {
+  // ── Owner / business-wide intents ──
   todaySales,
   yesterdaySales,
   dateRangeSales,
@@ -26,6 +33,25 @@ enum BusinessIntent {
   inventoryStatus,
   businessSummary,
   trendAnalysis,
+  // ── Admin / system-administrative intents ──
+  activeUserSummary,
+  userStatusSummary,
+  systemActivitySummary,
+  recentActivity,
+  backupSummary,
+  exportSummary,
+  systemStatusSummary,
+  adminSummary,
+  // ── Staff / own-data intents (filtered by currentUserId) ──
+  myTodaySales,
+  myDateRangeSales,
+  myRecentSales,
+  myTopSoldProducts,
+  productInformation,
+  categoryInformation,
+  myActivitySummary,
+  myWorkSummary,
+  // ── Shared ──
   general,
 }
 
@@ -91,16 +117,29 @@ class BusinessIntelligenceService {
   final ProductRepository _productRepository = ProductRepository();
   final CategoryRepository _categoryRepository = CategoryRepository();
   final SaleItemDao _saleItemDao = SaleItemDao();
+  // Admin-domain repositories (used only for Admin AI intents).
+  final UserRepository _userRepository = UserRepository();
+  final ActivityLogRepository _activityLogRepository = ActivityLogRepository();
+  final BackupHistoryRepository _backupHistoryRepository =
+      BackupHistoryRepository();
+  final ExportHistoryRepository _exportHistoryRepository =
+      ExportHistoryRepository();
+  final SessionManager _sessionManager = SessionManager();
 
   /// Detects the analytical intent from a user's natural-language query.
+  ///
+  /// When [role] is provided, role-specific intent patterns are checked
+  /// first so the same question maps to the correct role-scoped intent
+  /// (e.g. "how much did I sell today?" → [BusinessIntent.myTodaySales]
+  /// for Staff but [BusinessIntent.todaySales] for Owner).
   ///
   /// Uses keyword matching against known intent patterns. Returns
   /// [BusinessIntent.general] if no specific intent is detected (the AI
   /// can still answer generally but must not invent database facts).
-  DetectedIntent detectIntent(String query) {
+  DetectedIntent detectIntent(String query, {UserRole? role}) {
     final q = query.toLowerCase();
 
-    // ── Date range detection ──
+    // ── Date range detection (shared by all roles) ──
     DateTime? startDate;
     DateTime? endDate;
     String? periodDesc;
@@ -137,7 +176,19 @@ class BusinessIntelligenceService {
       periodDesc = 'last month';
     }
 
-    // ── Intent detection ──
+    // ── Role-specific intent detection ──
+    //
+    // Admin and Staff get their own intent sets first, so a question like
+    // "how much did we make today?" maps to myTodaySales for Staff (own
+    // sales only) rather than todaySales (business-wide).
+    if (role == UserRole.admin) {
+      return _detectAdminIntent(q, startDate, endDate, periodDesc);
+    }
+    if (role == UserRole.staff) {
+      return _detectStaffIntent(q, startDate, endDate, periodDesc);
+    }
+
+    // ── Owner / business-wide intent detection ──
 
     // Sales queries
     if (_matches(q, ['how were my sales', 'how are my sales', 'sales today',
@@ -323,9 +374,18 @@ class BusinessIntelligenceService {
   /// Only fetches data from the approved business domains needed for the
   /// specific intent. Does NOT fetch unrelated data. Does NOT expose
   /// sensitive fields.
-  Future<BusinessFacts> gatherFacts(DetectedIntent detected) async {
+  ///
+  /// [role] and [userId] are used for Staff queries which are filtered by
+  /// the authenticated user ID at the database query layer
+  /// (`sales.user_id = currentUserId`).
+  Future<BusinessFacts> gatherFacts(
+    DetectedIntent detected, {
+    UserRole? role,
+    int? userId,
+  }) async {
     try {
       switch (detected.intent) {
+        // ── Owner / business-wide ──
         case BusinessIntent.todaySales:
           return await _gatherTodaySales(detected);
         case BusinessIntent.yesterdaySales:
@@ -358,8 +418,43 @@ class BusinessIntelligenceService {
           return await _gatherBusinessSummary(detected);
         case BusinessIntent.trendAnalysis:
           return await _gatherTrendAnalysis(detected);
+        // ── Admin / system-administrative ──
+        case BusinessIntent.activeUserSummary:
+          return await _gatherActiveUserSummary(detected);
+        case BusinessIntent.userStatusSummary:
+          return await _gatherUserStatusSummary(detected);
+        case BusinessIntent.systemActivitySummary:
+          return await _gatherSystemActivitySummary(detected);
+        case BusinessIntent.recentActivity:
+          return await _gatherRecentActivity(detected);
+        case BusinessIntent.backupSummary:
+          return await _gatherBackupSummary(detected);
+        case BusinessIntent.exportSummary:
+          return await _gatherExportSummary(detected);
+        case BusinessIntent.systemStatusSummary:
+          return await _gatherSystemStatusSummary(detected);
+        case BusinessIntent.adminSummary:
+          return await _gatherAdminSummary(detected);
+        // ── Staff / own-data (filtered by currentUserId) ──
+        case BusinessIntent.myTodaySales:
+          return await _gatherMyTodaySales(detected, userId);
+        case BusinessIntent.myDateRangeSales:
+          return await _gatherMyDateRangeSales(detected, userId);
+        case BusinessIntent.myRecentSales:
+          return await _gatherMyRecentSales(detected, userId);
+        case BusinessIntent.myTopSoldProducts:
+          return await _gatherMyTopSoldProducts(detected, userId);
+        case BusinessIntent.productInformation:
+          return await _gatherProductInformation(detected);
+        case BusinessIntent.categoryInformation:
+          return await _gatherCategoryInformation(detected);
+        case BusinessIntent.myActivitySummary:
+          return await _gatherMyActivitySummary(detected, userId);
+        case BusinessIntent.myWorkSummary:
+          return await _gatherMyWorkSummary(detected, userId);
+        // ── Shared ──
         case BusinessIntent.general:
-          return await _gatherGeneralContext(detected);
+          return await _gatherGeneralContext(detected, role: role);
       }
     } catch (e, st) {
       _log('gatherFacts failed for intent ${detected.intent}: $e\n$st');
@@ -1051,27 +1146,82 @@ class BusinessIntelligenceService {
     );
   }
 
-  Future<BusinessFacts> _gatherGeneralContext(DetectedIntent d) async {
-    // For general questions, provide a minimal business overview.
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final todaySales = await _saleRepository.getByDateRange(
-      today, today.add(const Duration(days: 1)));
-    final todayActive = todaySales.where((s) => !s.isDeleted).toList();
-    final todayTotal =
-        todayActive.fold<double>(0, (sum, s) => sum + s.totalAmount);
-    final products = await _productRepository.getActiveProducts();
-    final lowStock = await _productRepository.getLowStockProducts();
-
+  Future<BusinessFacts> _gatherGeneralContext(
+    DetectedIntent d, {
+    UserRole? role,
+  }) async {
     final buf = StringBuffer();
-    buf.writeln('--- GENERAL BUSINESS CONTEXT ---');
-    buf.writeln('Today\'s sales: PHP ${_formatMoney(todayTotal)} (${todayActive.length} transactions)');
-    buf.writeln('Active products: ${products.length}');
-    buf.writeln('Low stock items: ${lowStock.length}');
-    buf.writeln('');
-    buf.writeln('NOTE: This is general context only. For specific analysis, '
-        'ask about sales, products, inventory, or request a business summary.');
-    buf.writeln('--- END CONTEXT ---');
+
+    if (role == UserRole.admin) {
+      // Admin general context: system overview only.
+      final users = await _userRepository.getAllActive();
+      final activeUsers = users.where((u) => u.isActive).length;
+      final inactiveUsers = users.length - activeUsers;
+      final recentActivity =
+          await _activityLogRepository.getRecentActivities(limit: 5);
+      final backups = await _backupHistoryRepository.getAllActive();
+
+      buf.writeln('--- GENERAL SYSTEM CONTEXT ---');
+      buf.writeln('Total active users: ${users.length}');
+      buf.writeln('Active: $activeUsers, Inactive: $inactiveUsers');
+      buf.writeln('Recent activities: ${recentActivity.length}');
+      buf.writeln('Total backups: ${backups.length}');
+      buf.writeln('');
+      buf.writeln('NOTE: This is general system context only. For specific '
+          'analysis, ask about users, system activity, backups, or request '
+          'a system summary.');
+      buf.writeln('--- END CONTEXT ---');
+    } else if (role == UserRole.staff) {
+      // Staff general context: own data only, filtered by currentUserId.
+      final userId = _sessionManager.currentUser?.id;
+      if (userId == null) {
+        buf.writeln('--- GENERAL WORK CONTEXT ---');
+        buf.writeln('Unable to identify current user. Please try again.');
+        buf.writeln('--- END CONTEXT ---');
+      } else {
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
+        final mySales = await _saleRepository.getByDateRangeAndUser(
+          today, today.add(const Duration(days: 1)), userId);
+        final myActive = mySales.where((s) => !s.isDeleted).toList();
+        final myTotal =
+            myActive.fold<double>(0, (sum, s) => sum + s.totalAmount);
+        final products = await _productRepository.getActiveProducts();
+        final lowStock = await _productRepository.getLowStockProducts();
+
+        buf.writeln('--- GENERAL WORK CONTEXT (your data) ---');
+        buf.writeln('Your sales today: PHP ${_formatMoney(myTotal)} '
+            '(${myActive.length} transactions)');
+        buf.writeln('Active products: ${products.length}');
+        buf.writeln('Low stock items: ${lowStock.length}');
+        buf.writeln('');
+        buf.writeln('NOTE: This is your own work context. For specific '
+            'analysis, ask about your sales, low stock, or products.');
+        buf.writeln('--- END CONTEXT ---');
+      }
+    } else {
+      // Owner general context: business overview.
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final todaySales = await _saleRepository.getByDateRange(
+        today, today.add(const Duration(days: 1)));
+      final todayActive = todaySales.where((s) => !s.isDeleted).toList();
+      final todayTotal =
+          todayActive.fold<double>(0, (sum, s) => sum + s.totalAmount);
+      final products = await _productRepository.getActiveProducts();
+      final lowStock = await _productRepository.getLowStockProducts();
+
+      buf.writeln('--- GENERAL BUSINESS CONTEXT ---');
+      buf.writeln('Today\'s sales: PHP ${_formatMoney(todayTotal)} '
+          '(${todayActive.length} transactions)');
+      buf.writeln('Active products: ${products.length}');
+      buf.writeln('Low stock items: ${lowStock.length}');
+      buf.writeln('');
+      buf.writeln('NOTE: This is general context only. For specific '
+          'analysis, ask about sales, products, inventory, or request a '
+          'business summary.');
+      buf.writeln('--- END CONTEXT ---');
+    }
 
     return BusinessFacts(
       context: buf.toString(),
@@ -1081,9 +1231,21 @@ class BusinessIntelligenceService {
   }
 
   /// Generates contextual suggested questions based on real database
-  /// conditions. Returns only suggestions relevant to the current state
-  /// of the business.
+  /// conditions and the current user's role. Returns only suggestions
+  /// relevant to the current state of the business/system and the role's
+  /// allowed capabilities.
   Future<List<String>> generateContextualSuggestions() async {
+    final role = _sessionManager.currentUser?.role;
+    if (role == UserRole.admin) {
+      return await _generateAdminSuggestions();
+    }
+    if (role == UserRole.staff) {
+      return await _generateStaffSuggestions();
+    }
+    return await _generateOwnerSuggestions();
+  }
+
+  Future<List<String>> _generateOwnerSuggestions() async {
     final suggestions = <String>[];
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -1151,6 +1313,933 @@ class BusinessIntelligenceService {
     return suggestions;
   }
 
+  Future<List<String>> _generateAdminSuggestions() async {
+    final suggestions = <String>[];
+    try {
+      final users = await _userRepository.getAllActive();
+      if (users.isNotEmpty) {
+        suggestions.add('How many active users do we have?');
+      }
+
+      final recentActivity =
+          await _activityLogRepository.getRecentActivities(limit: 1);
+      if (recentActivity.isNotEmpty) {
+        suggestions.add('Show recent system activity.');
+      }
+
+      final backups = await _backupHistoryRepository.getAllActive();
+      if (backups.isNotEmpty) {
+        suggestions.add('When was the latest backup?');
+      } else {
+        suggestions.add('Have any backups been created yet?');
+      }
+
+      suggestions.add('Give me a system summary.');
+    } catch (e) {
+      _log('generateAdminSuggestions failed: $e');
+      suggestions.addAll([
+        'How many active users do we have?',
+        'Show recent system activity.',
+        'Give me a system summary.',
+      ]);
+    }
+    return suggestions;
+  }
+
+  Future<List<String>> _generateStaffSuggestions() async {
+    final suggestions = <String>[];
+    final userId = _sessionManager.currentUser?.id;
+    if (userId == null) return suggestions;
+
+    try {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final mySales = await _saleRepository.getByDateRangeAndUser(
+        today, today.add(const Duration(days: 1)), userId);
+      final myActive = mySales.where((s) => !s.isDeleted).toList();
+
+      if (myActive.isEmpty) {
+        suggestions.add('Have I made any sales today?');
+      } else {
+        suggestions.add('How much did I sell today?');
+      }
+
+      final lowStock = await _productRepository.getLowStockProducts();
+      if (lowStock.isNotEmpty) {
+        suggestions.add('What products are low in stock?');
+      }
+
+      suggestions.add('Show my recent sales.');
+      suggestions.add('Which products sell best in my transactions?');
+    } catch (e) {
+      _log('generateStaffSuggestions failed: $e');
+      suggestions.addAll([
+        'How much did I sell today?',
+        'What products are low in stock?',
+        'Show my recent sales.',
+      ]);
+    }
+    return suggestions;
+  }
+
+  // ── Admin intent detection ───────────────────────────────────────────
+
+  DetectedIntent _detectAdminIntent(
+    String q,
+    DateTime? startDate,
+    DateTime? endDate,
+    String? periodDesc,
+  ) {
+    // User account summaries
+    if (_matches(q, ['active user', 'how many user', 'user count',
+        'number of user', 'user summary', 'users do we have'])) {
+      return DetectedIntent(
+        intent: BusinessIntent.activeUserSummary,
+        startDate: startDate,
+        endDate: endDate,
+        periodDescription: periodDesc,
+      );
+    }
+
+    // User status (active/inactive)
+    if (_matches(q, ['user status', 'inactive user', 'disabled user',
+        'enabled user', 'who is active', 'who is inactive'])) {
+      return DetectedIntent(
+        intent: BusinessIntent.userStatusSummary,
+        startDate: startDate,
+        endDate: endDate,
+        periodDescription: periodDesc,
+      );
+    }
+
+    // System activity summary
+    if (_matches(q, ['system activity', 'activity summary',
+        'today\'s activity', 'administrative activity',
+        'summarize activity', 'activity today'])) {
+      return DetectedIntent(
+        intent: BusinessIntent.systemActivitySummary,
+        startDate: startDate,
+        endDate: endDate,
+        periodDescription: periodDesc,
+      );
+    }
+
+    // Recent activity
+    if (_matches(q, ['recent activity', 'show activity',
+        'latest activity', 'what happened', 'failed activity',
+        'critical activity', 'unusual activity', 'error activity'])) {
+      return DetectedIntent(
+        intent: BusinessIntent.recentActivity,
+        startDate: startDate,
+        endDate: endDate,
+        periodDescription: periodDesc,
+      );
+    }
+
+    // Backup summary
+    if (_matches(q, ['backup', 'latest backup', 'last backup',
+        'when was the backup', 'backup history', 'backup status'])) {
+      return DetectedIntent(
+        intent: BusinessIntent.backupSummary,
+        startDate: startDate,
+        endDate: endDate,
+        periodDescription: periodDesc,
+      );
+    }
+
+    // Export summary
+    if (_matches(q, ['export', 'export history', 'exported report',
+        'what was exported', 'export status'])) {
+      return DetectedIntent(
+        intent: BusinessIntent.exportSummary,
+        startDate: startDate,
+        endDate: endDate,
+        periodDescription: periodDesc,
+      );
+    }
+
+    // System status summary
+    if (_matches(q, ['system status', 'system health',
+        'system overview', 'is the system', 'system configuration'])) {
+      return DetectedIntent(
+        intent: BusinessIntent.systemStatusSummary,
+        startDate: startDate,
+        endDate: endDate,
+        periodDescription: periodDesc,
+      );
+    }
+
+    // Admin summary / overview
+    if (_matches(q, ['admin summary', 'system summary',
+        'give me a summary', 'overview', 'summarize today',
+        'what should i focus', 'recommendations', 'what should i do'])) {
+      return DetectedIntent(
+        intent: BusinessIntent.adminSummary,
+        startDate: startDate,
+        endDate: endDate,
+        periodDescription: periodDesc,
+      );
+    }
+
+    return DetectedIntent(
+      intent: BusinessIntent.general,
+      startDate: startDate,
+      endDate: endDate,
+      periodDescription: periodDesc,
+    );
+  }
+
+  // ── Staff intent detection ───────────────────────────────────────────
+
+  DetectedIntent _detectStaffIntent(
+    String q,
+    DateTime? startDate,
+    DateTime? endDate,
+    String? periodDesc,
+  ) {
+    // My sales (own sales only, filtered by currentUserId)
+    if (_matches(q, ['my sales', 'how much did i sell', 'how much did i make',
+        'i sell today', 'i make today', 'my transactions',
+        'how am i doing', 'how did i do']) ||
+        (q.contains('i sell') && (q.contains('today') ||
+            q.contains('week') || q.contains('month')))) {
+      if (periodDesc == 'today' || q.contains('today')) {
+        return DetectedIntent(
+          intent: BusinessIntent.myTodaySales,
+          startDate: startDate,
+          endDate: endDate,
+          periodDescription: periodDesc,
+        );
+      }
+      return DetectedIntent(
+        intent: BusinessIntent.myDateRangeSales,
+        startDate: startDate,
+        endDate: endDate,
+        periodDescription: periodDesc,
+      );
+    }
+
+    // My recent sales
+    if (_matches(q, ['recent sales', 'show my sales',
+        'my recent sales', 'latest sales', 'recent transactions'])) {
+      return DetectedIntent(
+        intent: BusinessIntent.myRecentSales,
+        startDate: startDate,
+        endDate: endDate,
+        periodDescription: periodDesc,
+      );
+    }
+
+    // My top sold products (in my transactions)
+    if (_matches(q, ['best in my', 'my top', 'my best selling',
+        'sell best in my', 'selling best in my',
+        'what products sell best in my', 'my transactions'])) {
+      return DetectedIntent(
+        intent: BusinessIntent.myTopSoldProducts,
+        startDate: startDate,
+        endDate: endDate,
+        periodDescription: periodDesc,
+      );
+    }
+
+    // Low stock (shared intent — Staff can view stock)
+    if (_matches(q, ['low stock', 'low on stock', 'running low',
+        'out of stock', 'stock level', 'below minimum'])) {
+      return DetectedIntent(
+        intent: BusinessIntent.lowStock,
+        startDate: startDate,
+        endDate: endDate,
+        periodDescription: periodDesc,
+      );
+    }
+
+    // Product information
+    if (_matches(q, ['product information', 'tell me about product',
+        'what products', 'product list', 'show products',
+        'how many products'])) {
+      return DetectedIntent(
+        intent: BusinessIntent.productInformation,
+        startDate: startDate,
+        endDate: endDate,
+        periodDescription: periodDesc,
+      );
+    }
+
+    // Category information
+    if (_matches(q, ['category information', 'tell me about category',
+        'what categories', 'category list', 'show categories',
+        'how many categories'])) {
+      return DetectedIntent(
+        intent: BusinessIntent.categoryInformation,
+        startDate: startDate,
+        endDate: endDate,
+        periodDescription: periodDesc,
+      );
+    }
+
+    // My activity summary
+    if (_matches(q, ['my activity', 'what have i done',
+        'my work activity', 'my actions'])) {
+      return DetectedIntent(
+        intent: BusinessIntent.myActivitySummary,
+        startDate: startDate,
+        endDate: endDate,
+        periodDescription: periodDesc,
+      );
+    }
+
+    // My work summary / overview
+    if (_matches(q, ['my work summary', 'my summary', 'give me a summary',
+        'overview', 'how is my work', 'what should i do',
+        'help me with', 'advice'])) {
+      return DetectedIntent(
+        intent: BusinessIntent.myWorkSummary,
+        startDate: startDate,
+        endDate: endDate,
+        periodDescription: periodDesc,
+      );
+    }
+
+    return DetectedIntent(
+      intent: BusinessIntent.general,
+      startDate: startDate,
+      endDate: endDate,
+      periodDescription: periodDesc,
+    );
+  }
+
+  // ── Admin data gathering ─────────────────────────────────────────────
+  //
+  // Each method queries ONLY the approved Admin data domains (users,
+  // activity_logs, backup_history, export_history). Never exposes
+  // password_hash, pin, API keys, or business sales/products/inventory.
+
+  Future<BusinessFacts> _gatherActiveUserSummary(DetectedIntent d) async {
+    final users = await _userRepository.getAllActive();
+    final activeCount = users.where((u) => u.isActive).length;
+    final inactiveCount = users.length - activeCount;
+
+    // Count by role.
+    final owners = users.where((u) => u.role == UserRole.owner).length;
+    final admins = users.where((u) => u.role == UserRole.admin).length;
+    final staff = users.where((u) => u.role == UserRole.staff).length;
+
+    final buf = StringBuffer();
+    buf.writeln('--- ACTIVE USER SUMMARY ---');
+    buf.writeln('Total users (not soft-deleted): ${users.length}');
+    buf.writeln('Active: $activeCount');
+    buf.writeln('Inactive: $inactiveCount');
+    buf.writeln('');
+    buf.writeln('By role:');
+    buf.writeln('  Owners: $owners');
+    buf.writeln('  Admins: $admins');
+    buf.writeln('  Staff: $staff');
+    buf.writeln('--- END DATA ---');
+
+    return BusinessFacts(
+      context: buf.toString(),
+      intent: d.intent,
+      hasData: true,
+    );
+  }
+
+  Future<BusinessFacts> _gatherUserStatusSummary(DetectedIntent d) async {
+    final users = await _userRepository.getAllActive();
+    final active = users.where((u) => u.isActive).toList();
+    final inactive = users.where((u) => !u.isActive).toList();
+
+    final buf = StringBuffer();
+    buf.writeln('--- USER STATUS SUMMARY ---');
+    buf.writeln('Active users (${active.length}):');
+    for (final u in active.take(20)) {
+      buf.writeln('  - ${u.fullName} (${u.role.displayName}) — '
+          'last login: ${u.lastLogin != null ? _formatDateTime(u.lastLogin!) : 'never'}');
+    }
+    if (inactive.isNotEmpty) {
+      buf.writeln('');
+      buf.writeln('Inactive users (${inactive.length}):');
+      for (final u in inactive.take(10)) {
+        buf.writeln('  - ${u.fullName} (${u.role.displayName})');
+      }
+    }
+    buf.writeln('--- END DATA ---');
+
+    return BusinessFacts(
+      context: buf.toString(),
+      intent: d.intent,
+      hasData: true,
+    );
+  }
+
+  Future<BusinessFacts> _gatherSystemActivitySummary(DetectedIntent d) async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final activities = await _activityLogRepository.getByDateRange(
+      today, today.add(const Duration(days: 1)), limit: 100);
+
+    // Group by action type.
+    final actionCounts = <String, int>{};
+    for (final a in activities) {
+      actionCounts[a.action] = (actionCounts[a.action] ?? 0) + 1;
+    }
+
+    final buf = StringBuffer();
+    buf.writeln('--- SYSTEM ACTIVITY SUMMARY (today) ---');
+    buf.writeln('Total activities today: ${activities.length}');
+    if (actionCounts.isNotEmpty) {
+      buf.writeln('');
+      buf.writeln('By action type:');
+      final sorted = actionCounts.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+      for (final e in sorted) {
+        buf.writeln('  - ${e.key}: ${e.value}');
+      }
+    }
+    // Check for failed/unusual activities.
+    final failed = activities.where((a) =>
+        a.action.contains('fail') ||
+        a.action.contains('error') ||
+        a.action.contains('unauthorized') ||
+        a.action.contains('denied')).toList();
+    if (failed.isNotEmpty) {
+      buf.writeln('');
+      buf.writeln('Failed/unusual activities: ${failed.length}');
+      for (final f in failed.take(10)) {
+        buf.writeln('  - ${f.action}: ${f.details ?? 'no details'} '
+            '(${_formatDateTime(f.createdAt)})');
+      }
+    }
+    buf.writeln('--- END DATA ---');
+
+    return BusinessFacts(
+      context: buf.toString(),
+      intent: d.intent,
+      hasData: true,
+    );
+  }
+
+  Future<BusinessFacts> _gatherRecentActivity(DetectedIntent d) async {
+    final activities =
+        await _activityLogRepository.getRecentActivities(limit: 20);
+
+    final buf = StringBuffer();
+    buf.writeln('--- RECENT SYSTEM ACTIVITY ---');
+    if (activities.isEmpty) {
+      buf.writeln('No recent activities recorded.');
+    } else {
+      for (final a in activities) {
+        buf.writeln('  - ${_formatDateTime(a.createdAt)}: ${a.action}'
+            '${a.entity != null ? ' on ${a.entity}' : ''}'
+            '${a.details != null ? ' — ${a.details}' : ''}');
+      }
+    }
+    buf.writeln('--- END DATA ---');
+
+    return BusinessFacts(
+      context: buf.toString(),
+      intent: d.intent,
+      hasData: activities.isNotEmpty,
+    );
+  }
+
+  Future<BusinessFacts> _gatherBackupSummary(DetectedIntent d) async {
+    final backups = await _backupHistoryRepository.getAllActive();
+
+    final buf = StringBuffer();
+    buf.writeln('--- BACKUP SUMMARY ---');
+    buf.writeln('Total backups: ${backups.length}');
+    if (backups.isNotEmpty) {
+      final latest = backups.first;
+      buf.writeln('Latest backup: ${_formatDateTime(latest.createdAt)}');
+      if (latest.fileSize != null) {
+        buf.writeln('Latest backup size: ${_formatFileSize(latest.fileSize!)}');
+      }
+      // Backups in last 7 days.
+      final now = DateTime.now();
+      final weekAgo = now.subtract(const Duration(days: 7));
+      final recentBackups =
+          backups.where((b) => b.createdAt.isAfter(weekAgo)).length;
+      buf.writeln('Backups in last 7 days: $recentBackups');
+      // List recent backups.
+      buf.writeln('');
+      buf.writeln('Recent backups:');
+      for (final b in backups.take(5)) {
+        buf.writeln('  - ${_formatDateTime(b.createdAt)}'
+            '${b.fileSize != null ? ' (${_formatFileSize(b.fileSize!)})' : ''}');
+      }
+    } else {
+      buf.writeln('No backups have been created yet.');
+    }
+    buf.writeln('--- END DATA ---');
+
+    return BusinessFacts(
+      context: buf.toString(),
+      intent: d.intent,
+      hasData: backups.isNotEmpty,
+    );
+  }
+
+  Future<BusinessFacts> _gatherExportSummary(DetectedIntent d) async {
+    final exports = await _exportHistoryRepository.getAllActive();
+
+    final buf = StringBuffer();
+    buf.writeln('--- EXPORT SUMMARY ---');
+    buf.writeln('Total exports: ${exports.length}');
+    if (exports.isNotEmpty) {
+      final latest = exports.first;
+      buf.writeln('Latest export: ${_formatDateTime(latest.createdAt)}');
+      buf.writeln('Latest export type: ${latest.reportType}'
+          ' (${latest.fileFormat})');
+      // Exports in last 7 days.
+      final now = DateTime.now();
+      final weekAgo = now.subtract(const Duration(days: 7));
+      final recentExports =
+          exports.where((e) => e.createdAt.isAfter(weekAgo)).length;
+      buf.writeln('Exports in last 7 days: $recentExports');
+      // Group by report type.
+      final typeCounts = <String, int>{};
+      for (final e in exports) {
+        typeCounts[e.reportType] = (typeCounts[e.reportType] ?? 0) + 1;
+      }
+      buf.writeln('');
+      buf.writeln('By report type:');
+      for (final entry in typeCounts.entries) {
+        buf.writeln('  - ${entry.key}: ${entry.value}');
+      }
+    } else {
+      buf.writeln('No exports have been created yet.');
+    }
+    buf.writeln('--- END DATA ---');
+
+    return BusinessFacts(
+      context: buf.toString(),
+      intent: d.intent,
+      hasData: exports.isNotEmpty,
+    );
+  }
+
+  Future<BusinessFacts> _gatherSystemStatusSummary(DetectedIntent d) async {
+    final users = await _userRepository.getAllActive();
+    final backups = await _backupHistoryRepository.getAllActive();
+    final exports = await _exportHistoryRepository.getAllActive();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final todayActivities = await _activityLogRepository.getByDateRange(
+      today, today.add(const Duration(days: 1)), limit: 500);
+
+    final buf = StringBuffer();
+    buf.writeln('--- SYSTEM STATUS SUMMARY ---');
+    buf.writeln('Date: ${_formatDate(today)}');
+    buf.writeln('');
+    buf.writeln('USERS:');
+    buf.writeln('  Total: ${users.length}');
+    buf.writeln('  Active: ${users.where((u) => u.isActive).length}');
+    buf.writeln('  Inactive: ${users.where((u) => !u.isActive).length}');
+    buf.writeln('');
+    buf.writeln('ACTIVITY TODAY:');
+    buf.writeln('  Total activities: ${todayActivities.length}');
+    final failed = todayActivities.where((a) =>
+        a.action.contains('fail') ||
+        a.action.contains('error') ||
+        a.action.contains('unauthorized') ||
+        a.action.contains('denied')).length;
+    buf.writeln('  Failed/unusual: $failed');
+    buf.writeln('');
+    buf.writeln('BACKUPS:');
+    buf.writeln('  Total: ${backups.length}');
+    if (backups.isNotEmpty) {
+      buf.writeln('  Latest: ${_formatDateTime(backups.first.createdAt)}');
+    }
+    buf.writeln('');
+    buf.writeln('EXPORTS:');
+    buf.writeln('  Total: ${exports.length}');
+    if (exports.isNotEmpty) {
+      buf.writeln('  Latest: ${_formatDateTime(exports.first.createdAt)}');
+    }
+    buf.writeln('--- END DATA ---');
+
+    return BusinessFacts(
+      context: buf.toString(),
+      intent: d.intent,
+      hasData: true,
+    );
+  }
+
+  Future<BusinessFacts> _gatherAdminSummary(DetectedIntent d) async {
+    // Comprehensive admin overview.
+    final users = await _userRepository.getAllActive();
+    final backups = await _backupHistoryRepository.getAllActive();
+    final exports = await _exportHistoryRepository.getAllActive();
+    final recentActivity =
+        await _activityLogRepository.getRecentActivities(limit: 10);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final todayActivities = await _activityLogRepository.getByDateRange(
+      today, today.add(const Duration(days: 1)), limit: 200);
+
+    final buf = StringBuffer();
+    buf.writeln('--- ADMIN SUMMARY ---');
+    buf.writeln('Date: ${_formatDate(today)}');
+    buf.writeln('');
+    buf.writeln('USERS:');
+    buf.writeln('  Total: ${users.length}');
+    buf.writeln('  Active: ${users.where((u) => u.isActive).length}');
+    buf.writeln('');
+    buf.writeln('ACTIVITY TODAY: ${todayActivities.length} activities');
+    final failed = todayActivities.where((a) =>
+        a.action.contains('fail') ||
+        a.action.contains('error') ||
+        a.action.contains('unauthorized') ||
+        a.action.contains('denied')).toList();
+    if (failed.isNotEmpty) {
+      buf.writeln('  Failed/unusual: ${failed.length}');
+      for (final f in failed.take(5)) {
+        buf.writeln('    - ${f.action}: ${f.details ?? 'no details'}');
+      }
+    }
+    buf.writeln('');
+    buf.writeln('RECENT ACTIVITY:');
+    for (final a in recentActivity.take(5)) {
+      buf.writeln('  - ${a.action}'
+          '${a.entity != null ? ' on ${a.entity}' : ''}');
+    }
+    buf.writeln('');
+    buf.writeln('BACKUPS: ${backups.length} total');
+    if (backups.isNotEmpty) {
+      buf.writeln('  Latest: ${_formatDateTime(backups.first.createdAt)}');
+    }
+    buf.writeln('EXPORTS: ${exports.length} total');
+    buf.writeln('--- END SUMMARY ---');
+
+    return BusinessFacts(
+      context: buf.toString(),
+      intent: d.intent,
+      hasData: true,
+    );
+  }
+
+  // ── Staff data gathering (filtered by currentUserId) ─────────────────
+  //
+  // All Staff sales queries use getByDateRangeAndUser / getByUserId which
+  // enforce sales.user_id = currentUserId at the SQL level. The AI never
+  // chooses the user ID — it comes from the authenticated session.
+
+  Future<BusinessFacts> _gatherMyTodaySales(
+      DetectedIntent d, int? userId) async {
+    if (userId == null) {
+      return _noUserData(d);
+    }
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    // SQL-level filter: sales.user_id = userId
+    final sales = await _saleRepository.getByDateRangeAndUser(
+      today, today.add(const Duration(days: 1)), userId);
+    final activeSales = sales.where((s) => !s.isDeleted).toList();
+
+    final total =
+        activeSales.fold<double>(0, (sum, s) => sum + s.totalAmount);
+    final count = activeSales.length;
+    final avg = count > 0 ? total / count : 0.0;
+
+    // Yesterday comparison (own sales).
+    final yesterday = today.subtract(const Duration(days: 1));
+    final yesterdaySales = await _saleRepository.getByDateRangeAndUser(
+      yesterday, today, userId);
+    final yesterdayActive =
+        yesterdaySales.where((s) => !s.isDeleted).toList();
+    final yesterdayTotal =
+        yesterdayActive.fold<double>(0, (sum, s) => sum + s.totalAmount);
+
+    final change = yesterdayTotal > 0
+        ? ((total - yesterdayTotal) / yesterdayTotal) * 100
+        : null;
+
+    final buf = StringBuffer();
+    buf.writeln('--- YOUR SALES TODAY ---');
+    buf.writeln('Date: ${_formatDate(today)}');
+    buf.writeln('Your total sales today: PHP ${_formatMoney(total)}');
+    buf.writeln('Your transactions today: $count');
+    buf.writeln('Your average transaction: PHP ${_formatMoney(avg)}');
+    buf.writeln('');
+    buf.writeln('Your sales yesterday (${_formatDate(yesterday)}):');
+    buf.writeln('  Total: PHP ${_formatMoney(yesterdayTotal)}');
+    buf.writeln('  Transactions: ${yesterdayActive.length}');
+    if (change != null) {
+      buf.writeln('  Change: ${change >= 0 ? '+' : ''}'
+          '${change.toStringAsFixed(1)}%');
+    }
+    if (count == 0) {
+      buf.writeln('');
+      buf.writeln('NOTE: You have not made any sales today yet.');
+    }
+    buf.writeln('--- END DATA ---');
+
+    return BusinessFacts(
+      context: buf.toString(),
+      intent: d.intent,
+      hasData: true,
+    );
+  }
+
+  Future<BusinessFacts> _gatherMyDateRangeSales(
+      DetectedIntent d, int? userId) async {
+    if (userId == null) {
+      return _noUserData(d);
+    }
+    final start =
+        d.startDate ?? DateTime.now().subtract(const Duration(days: 7));
+    final end = d.endDate ?? DateTime.now().add(const Duration(days: 1));
+    // SQL-level filter: sales.user_id = userId
+    final sales =
+        await _saleRepository.getByDateRangeAndUser(start, end, userId);
+    final activeSales = sales.where((s) => !s.isDeleted).toList();
+
+    final total =
+        activeSales.fold<double>(0, (sum, s) => sum + s.totalAmount);
+    final count = activeSales.length;
+    final avg = count > 0 ? total / count : 0.0;
+
+    final buf = StringBuffer();
+    buf.writeln('--- YOUR SALES (${d.periodDescription ?? 'custom range'}) ---');
+    buf.writeln('Period: ${_formatDate(start)} to ${_formatDate(end)}');
+    buf.writeln('Your total sales: PHP ${_formatMoney(total)}');
+    buf.writeln('Your transactions: $count');
+    buf.writeln('Your average transaction: PHP ${_formatMoney(avg)}');
+    if (count == 0) {
+      buf.writeln('NOTE: You did not make any sales in this period.');
+    }
+    buf.writeln('--- END DATA ---');
+
+    return BusinessFacts(
+      context: buf.toString(),
+      intent: d.intent,
+      hasData: count > 0,
+    );
+  }
+
+  Future<BusinessFacts> _gatherMyRecentSales(
+      DetectedIntent d, int? userId) async {
+    if (userId == null) {
+      return _noUserData(d);
+    }
+    // SQL-level filter: sales.user_id = userId
+    final sales = await _saleRepository.getByUserId(userId, limit: 10);
+    final activeSales = sales.where((s) => !s.isDeleted).toList();
+
+    final buf = StringBuffer();
+    buf.writeln('--- YOUR RECENT SALES ---');
+    if (activeSales.isEmpty) {
+      buf.writeln('You have not made any sales yet.');
+    } else {
+      for (final s in activeSales) {
+        buf.writeln('  - ${_formatDateTime(s.createdAt)}: '
+            'PHP ${_formatMoney(s.totalAmount)}');
+      }
+      buf.writeln('');
+      buf.writeln('Total recent transactions: ${activeSales.length}');
+      final total =
+          activeSales.fold<double>(0, (sum, s) => sum + s.totalAmount);
+      buf.writeln('Total value: PHP ${_formatMoney(total)}');
+    }
+    buf.writeln('--- END DATA ---');
+
+    return BusinessFacts(
+      context: buf.toString(),
+      intent: d.intent,
+      hasData: activeSales.isNotEmpty,
+    );
+  }
+
+  Future<BusinessFacts> _gatherMyTopSoldProducts(
+      DetectedIntent d, int? userId) async {
+    if (userId == null) {
+      return _noUserData(d);
+    }
+    // SQL-level filter: s.user_id = userId (passed to DAO)
+    final topProducts = await _saleItemDao.getTopProductsByQuantity(
+      limit: 10,
+      since: d.startDate,
+      userId: userId,
+    );
+
+    final buf = StringBuffer();
+    buf.writeln('--- YOUR TOP-SELLING PRODUCTS '
+        '(${d.periodDescription ?? 'all time'}) ---');
+    if (topProducts.isEmpty) {
+      buf.writeln('No sales data available for your transactions.');
+    } else {
+      for (var i = 0; i < topProducts.length; i++) {
+        final p = topProducts[i];
+        buf.writeln('${i + 1}. ${p['product_name']} — '
+            '${p['total_quantity']} units sold by you');
+      }
+    }
+    buf.writeln('--- END DATA ---');
+
+    return BusinessFacts(
+      context: buf.toString(),
+      intent: d.intent,
+      hasData: topProducts.isNotEmpty,
+    );
+  }
+
+  Future<BusinessFacts> _gatherProductInformation(DetectedIntent d) async {
+    final products = await _productRepository.getActiveProducts();
+
+    final buf = StringBuffer();
+    buf.writeln('--- PRODUCT INFORMATION ---');
+    buf.writeln('Total active products: ${products.length}');
+    if (products.isNotEmpty) {
+      buf.writeln('');
+      buf.writeln('Products:');
+      for (final p in products.take(20)) {
+        buf.writeln('  - ${p.name}: PHP ${_formatMoney(p.price)}, '
+            'stock: ${p.stock} units');
+      }
+      if (products.length > 20) {
+        buf.writeln('  ... and ${products.length - 20} more.');
+      }
+    }
+    buf.writeln('--- END DATA ---');
+
+    return BusinessFacts(
+      context: buf.toString(),
+      intent: d.intent,
+      hasData: products.isNotEmpty,
+    );
+  }
+
+  Future<BusinessFacts> _gatherCategoryInformation(DetectedIntent d) async {
+    final categories = await _categoryRepository.getActiveCategories();
+
+    final buf = StringBuffer();
+    buf.writeln('--- CATEGORY INFORMATION ---');
+    buf.writeln('Total active categories: ${categories.length}');
+    if (categories.isNotEmpty) {
+      buf.writeln('');
+      buf.writeln('Categories:');
+      for (final c in categories) {
+        buf.writeln('  - ${c.name}'
+            '${c.description.isNotEmpty
+                ? ': ${c.description}' : ''}');
+      }
+    }
+    buf.writeln('--- END DATA ---');
+
+    return BusinessFacts(
+      context: buf.toString(),
+      intent: d.intent,
+      hasData: categories.isNotEmpty,
+    );
+  }
+
+  Future<BusinessFacts> _gatherMyActivitySummary(
+      DetectedIntent d, int? userId) async {
+    if (userId == null) {
+      return _noUserData(d);
+    }
+    final activities =
+        await _activityLogRepository.getByUserId(userId);
+    final recent = activities.take(15).toList();
+
+    final buf = StringBuffer();
+    buf.writeln('--- YOUR ACTIVITY SUMMARY ---');
+    buf.writeln('Total your activities: ${activities.length}');
+    if (recent.isNotEmpty) {
+      buf.writeln('');
+      buf.writeln('Your recent activities:');
+      for (final a in recent) {
+        buf.writeln('  - ${_formatDateTime(a.createdAt)}: ${a.action}'
+            '${a.entity != null ? ' on ${a.entity}' : ''}');
+      }
+    } else {
+      buf.writeln('No activities recorded for your account.');
+    }
+    buf.writeln('--- END DATA ---');
+
+    return BusinessFacts(
+      context: buf.toString(),
+      intent: d.intent,
+      hasData: activities.isNotEmpty,
+    );
+  }
+
+  Future<BusinessFacts> _gatherMyWorkSummary(
+      DetectedIntent d, int? userId) async {
+    if (userId == null) {
+      return _noUserData(d);
+    }
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    // SQL-level filter: sales.user_id = userId
+    final todaySales = await _saleRepository.getByDateRangeAndUser(
+      today, today.add(const Duration(days: 1)), userId);
+    final todayActive = todaySales.where((s) => !s.isDeleted).toList();
+    final todayTotal =
+        todayActive.fold<double>(0, (sum, s) => sum + s.totalAmount);
+
+    // My top products (last 7 days).
+    final myTopProducts = await _saleItemDao.getTopProductsByQuantity(
+      limit: 5,
+      since: now.subtract(const Duration(days: 7)),
+      userId: userId,
+    );
+
+    // Low stock.
+    final lowStock = await _productRepository.getLowStockProducts();
+
+    // My recent activity.
+    final myActivities =
+        await _activityLogRepository.getByUserId(userId);
+    final todayActivities = myActivities
+        .where((a) => a.createdAt.isAfter(today))
+        .length;
+
+    final buf = StringBuffer();
+    buf.writeln('--- YOUR WORK SUMMARY ---');
+    buf.writeln('Date: ${_formatDate(today)}');
+    buf.writeln('');
+    buf.writeln('YOUR SALES TODAY:');
+    buf.writeln('  Total: PHP ${_formatMoney(todayTotal)}'
+        ' (${todayActive.length} transactions)');
+    buf.writeln('');
+    buf.writeln('YOUR TOP PRODUCTS (last 7 days):');
+    if (myTopProducts.isEmpty) {
+      buf.writeln('  No sales in the last 7 days.');
+    } else {
+      for (var i = 0; i < myTopProducts.length; i++) {
+        final p = myTopProducts[i];
+        buf.writeln('  ${i + 1}. ${p['product_name']} — '
+            '${p['total_quantity']} units');
+      }
+    }
+    buf.writeln('');
+    buf.writeln('LOW STOCK ITEMS: ${lowStock.length}');
+    if (lowStock.isNotEmpty) {
+      for (final p in lowStock.take(5)) {
+        buf.writeln('  - ${p.name}: ${p.stock} units (min: ${p.minStock})');
+      }
+    }
+    buf.writeln('');
+    buf.writeln('YOUR ACTIVITIES TODAY: $todayActivities');
+    buf.writeln('--- END SUMMARY ---');
+
+    return BusinessFacts(
+      context: buf.toString(),
+      intent: d.intent,
+      hasData: true,
+    );
+  }
+
+  /// Returns a "no user data" fact when the current user ID is missing.
+  BusinessFacts _noUserData(DetectedIntent d) {
+    return BusinessFacts(
+      context: 'Unable to identify the current user. Please try again.',
+      intent: d.intent,
+      hasData: false,
+    );
+  }
+
   // ── Helpers ──────────────────────────────────────────────────────────
 
   bool _matches(String query, List<String> patterns) {
@@ -1176,6 +2265,15 @@ class BusinessIntelligenceService {
   String _formatDateTime(DateTime dt) {
     return '${_formatDate(dt)} ${dt.hour.toString().padLeft(2, '0')}:'
         '${dt.minute.toString().padLeft(2, '0')}';
+  }
+
+  String _formatFileSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
 
   void _log(String message) {
