@@ -52,6 +52,7 @@ dependencies:
   intl: ^0.19.0
   shared_preferences: ^2.3.2
   uuid: ^4.4.2
+  web: ^1.1.0
   
   # Image Handling
   image_picker: ^1.1.2

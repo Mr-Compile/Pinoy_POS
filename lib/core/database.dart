@@ -223,6 +223,15 @@ class DatabaseHelper {
         )
       ''');
     }
+
+    // Migration from v8 → v9: add storage metadata to backup_history so
+    // backups can be stored as Android SAF content URIs in addition to
+    // traditional file paths.
+    if (oldVersion < 9) {
+      await db.execute('ALTER TABLE backup_history ADD COLUMN storage_type TEXT');
+      await db.execute('ALTER TABLE backup_history ADD COLUMN display_name TEXT');
+      await db.execute('ALTER TABLE backup_history ADD COLUMN location_json TEXT');
+    }
   }
 
   Future<void> _createTables(Database db) async {
@@ -421,10 +430,16 @@ class DatabaseHelper {
     ''');
 
     // Backup history table
+    // file_path now stores a storage reference (filesystem path or URI).
+    // storage_type distinguishes fileSystem / androidSaf / webDownload.
+    // display_name is the human-readable filename shown in the UI.
     await db.execute('''
       CREATE TABLE IF NOT EXISTS backup_history (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         file_path TEXT NOT NULL,
+        storage_type TEXT,
+        display_name TEXT,
+        location_json TEXT,
         file_size INTEGER,
         created_by INTEGER,
         created_at TEXT NOT NULL,

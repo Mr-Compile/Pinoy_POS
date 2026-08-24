@@ -6,6 +6,8 @@ import 'package:pinoy_pos/ui/widgets/app_messages.dart';
 /// Possible user choices from the "Backup Export Failed" dialog.
 enum BackupExportFailedResult { close, tryAgain, changeLocation }
 
+enum BackupDestinationConfirmResult { save, changeLocation, cancel }
+
 class AppDialogService {
   AppDialogService._();
 
@@ -604,30 +606,47 @@ class AppDialogService {
   /// Shows a confirmation dialog with the selected backup destination
   /// before the backup file is actually written.
   ///
-  /// Returns true if the user confirms, false if they cancel.
-  static Future<bool> backupDestinationConfirm(
+  /// Returns [BackupDestinationConfirmResult.save] if the user wants to save
+  /// to the current location, [changeLocation] if they want to pick a
+  /// different destination for this backup, or [cancel] if they abort.
+  static Future<BackupDestinationConfirmResult> backupDestinationConfirm(
     BuildContext context, {
     required String displayName,
     required String location,
+    bool canChangeLocation = true,
   }) {
-    return _show<bool>(
+    return _show<BackupDestinationConfirmResult>(
       context: context,
       type: AppDialogType.info,
-      title: 'Save Backup To',
+      title: 'Create Backup',
       message: 'Please confirm the backup destination.',
       details: 'File: $displayName\nLocation: $location',
       actions: [
         AppDialogAction(
           label: 'Cancel',
-          onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(false),
+          onPressed: (context) => Navigator.of(
+            context,
+            rootNavigator: true,
+          ).pop(BackupDestinationConfirmResult.cancel),
         ),
+        if (canChangeLocation)
+          AppDialogAction(
+            label: 'Change Location',
+            onPressed: (context) => Navigator.of(
+              context,
+              rootNavigator: true,
+            ).pop(BackupDestinationConfirmResult.changeLocation),
+          ),
         AppDialogAction(
-          label: 'Save Backup',
+          label: 'Create Backup',
           isPrimary: true,
-          onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(true),
+          onPressed: (context) => Navigator.of(
+            context,
+            rootNavigator: true,
+          ).pop(BackupDestinationConfirmResult.save),
         ),
       ],
-    ).then((v) => v ?? false);
+    ).then((v) => v ?? BackupDestinationConfirmResult.cancel);
   }
 
   // ── Backup: Export Success ───────────────────────────────────────────
