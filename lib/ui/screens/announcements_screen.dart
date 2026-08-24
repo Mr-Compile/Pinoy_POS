@@ -235,6 +235,7 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
     final contentController = TextEditingController(text: announcement?.content ?? '');
     bool isPinned = announcement?.isPinned ?? false;
     bool isSaving = false;
+    final screenContext = context;
 
     showDialog(
       context: context,
@@ -306,27 +307,24 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
                         await announcementService.updateAnnouncement(data);
                   }
                   if (context.mounted) {
-                    // Capture the parent context before popping the dialog,
-                    // so the success/error dialog is shown on a valid
-                    // navigator context. Using the dialog's own context
-                    // after Navigator.pop can result in the button being
-                    // unresponsive or the dialog not appearing.
-                    final parentContext = context;
-                    Navigator.of(parentContext, rootNavigator: true).pop();
                     if (success) {
-                      refreshNotificationCount(ref);
                       await AppDialogService.success(
-                        parentContext,
+                        screenContext,
                         title: 'Saved',
                         message: 'Announcement saved successfully.',
                       );
+                      if (!context.mounted) return;
+                      Navigator.of(context, rootNavigator: true).pop();
+                      refreshNotificationCount(ref);
                       _loadAnnouncements();
                     } else {
-                      AppDialogService.error(
-                        parentContext,
+                      await AppDialogService.error(
+                        screenContext,
                         title: 'Save Failed',
                         message: 'Failed to save announcement.',
                       );
+                      if (!context.mounted) return;
+                      Navigator.of(context, rootNavigator: true).pop();
                     }
                   }
                 } catch (e) {

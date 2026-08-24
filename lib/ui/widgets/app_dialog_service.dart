@@ -3,6 +3,9 @@ import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_messages.dart';
 
+/// Possible user choices from the "Backup Export Failed" dialog.
+enum BackupExportFailedResult { close, tryAgain, changeLocation }
+
 class AppDialogService {
   AppDialogService._();
 
@@ -43,9 +46,9 @@ class AppDialogService {
     String? message,
     String? details,
     String primaryLabel = 'Done',
-    VoidCallback? onPrimary,
+    void Function(BuildContext)? onPrimary,
     String? secondaryLabel,
-    VoidCallback? onSecondary,
+    void Function(BuildContext)? onSecondary,
   }) {
     return _show(
       context: context,
@@ -59,7 +62,7 @@ class AppDialogService {
         AppDialogAction(
           label: primaryLabel,
           isPrimary: true,
-          onPressed: onPrimary ?? () => Navigator.of(context, rootNavigator: true).pop(),
+          onPressed: onPrimary ?? (context) => Navigator.of(context, rootNavigator: true).pop(),
         ),
       ],
     );
@@ -73,9 +76,9 @@ class AppDialogService {
     String? message,
     String? details,
     String primaryLabel = 'Try Again',
-    VoidCallback? onPrimary,
+    void Function(BuildContext)? onPrimary,
     String secondaryLabel = 'Close',
-    VoidCallback? onSecondary,
+    void Function(BuildContext)? onSecondary,
   }) {
     return _show(
       context: context,
@@ -84,11 +87,11 @@ class AppDialogService {
       message: message,
       details: details,
       actions: [
-        AppDialogAction(label: secondaryLabel, onPressed: onSecondary ?? () => Navigator.of(context, rootNavigator: true).pop()),
+        AppDialogAction(label: secondaryLabel, onPressed: onSecondary ?? (context) => Navigator.of(context, rootNavigator: true).pop()),
         AppDialogAction(
           label: primaryLabel,
           isPrimary: true,
-          onPressed: onPrimary ?? () => Navigator.of(context, rootNavigator: true).pop(),
+          onPressed: onPrimary ?? (context) => Navigator.of(context, rootNavigator: true).pop(),
         ),
       ],
     );
@@ -102,9 +105,9 @@ class AppDialogService {
     String? message,
     String? details,
     String primaryLabel = 'OK',
-    VoidCallback? onPrimary,
+    void Function(BuildContext)? onPrimary,
     String? secondaryLabel,
-    VoidCallback? onSecondary,
+    void Function(BuildContext)? onSecondary,
   }) {
     return _show(
       context: context,
@@ -118,7 +121,7 @@ class AppDialogService {
         AppDialogAction(
           label: primaryLabel,
           isPrimary: true,
-          onPressed: onPrimary ?? () => Navigator.of(context, rootNavigator: true).pop(),
+          onPressed: onPrimary ?? (context) => Navigator.of(context, rootNavigator: true).pop(),
         ),
       ],
     );
@@ -132,9 +135,9 @@ class AppDialogService {
     String? message,
     String? details,
     String primaryLabel = 'OK',
-    VoidCallback? onPrimary,
+    void Function(BuildContext)? onPrimary,
     String? secondaryLabel,
-    VoidCallback? onSecondary,
+    void Function(BuildContext)? onSecondary,
   }) {
     return _show(
       context: context,
@@ -148,7 +151,7 @@ class AppDialogService {
         AppDialogAction(
           label: primaryLabel,
           isPrimary: true,
-          onPressed: onPrimary ?? () => Navigator.of(context, rootNavigator: true).pop(),
+          onPressed: onPrimary ?? (context) => Navigator.of(context, rootNavigator: true).pop(),
         ),
       ],
     );
@@ -162,7 +165,7 @@ class AppDialogService {
     String message = AppMessages.accessDenied,
     String? details,
     String primaryLabel = 'Close',
-    VoidCallback? onPrimary,
+    void Function(BuildContext)? onPrimary,
   }) {
     return _show(
       context: context,
@@ -174,7 +177,7 @@ class AppDialogService {
         AppDialogAction(
           label: primaryLabel,
           isPrimary: true,
-          onPressed: onPrimary ?? () => Navigator.of(context, rootNavigator: true).pop(),
+          onPressed: onPrimary ?? (context) => Navigator.of(context, rootNavigator: true).pop(),
         ),
       ],
     );
@@ -182,7 +185,7 @@ class AppDialogService {
 
   static Future<void> accessDenied(
     BuildContext context, {
-    VoidCallback? onPrimary,
+    void Function(BuildContext)? onPrimary,
   }) {
     return _show(
       context: context,
@@ -194,7 +197,7 @@ class AppDialogService {
         AppDialogAction(
           label: 'Close',
           isPrimary: true,
-          onPressed: onPrimary ?? () => Navigator.of(context, rootNavigator: true).pop(),
+          onPressed: onPrimary ?? (context) => Navigator.of(context, rootNavigator: true).pop(),
         ),
       ],
     );
@@ -220,13 +223,13 @@ class AppDialogService {
       actions: [
         AppDialogAction(
           label: cancelLabel,
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
+          onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(false),
         ),
         AppDialogAction(
           label: confirmLabel,
           isPrimary: true,
           isDestructive: destructive,
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
+          onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(true),
         ),
       ],
     );
@@ -251,13 +254,13 @@ class AppDialogService {
       actions: [
         AppDialogAction(
           label: 'Cancel',
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
+          onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(false),
         ),
         AppDialogAction(
           label: confirmLabel,
           isPrimary: true,
           isDestructive: true,
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
+          onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(true),
         ),
       ],
     );
@@ -275,13 +278,13 @@ class AppDialogService {
       actions: [
         AppDialogAction(
           label: 'Cancel',
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
+          onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(false),
         ),
         AppDialogAction(
           label: 'Delete Permanently',
           isPrimary: true,
           isDestructive: true,
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
+          onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(true),
         ),
       ],
     );
@@ -299,12 +302,12 @@ class AppDialogService {
       actions: [
         AppDialogAction(
           label: 'Cancel',
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
+          onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(false),
         ),
         AppDialogAction(
           label: 'Restore',
           isPrimary: true,
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
+          onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(true),
         ),
       ],
     );
@@ -319,12 +322,12 @@ class AppDialogService {
       actions: [
         AppDialogAction(
           label: 'Cancel',
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
+          onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(false),
         ),
         AppDialogAction(
           label: 'Log Out',
           isPrimary: true,
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
+          onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(true),
         ),
       ],
     );
@@ -339,13 +342,13 @@ class AppDialogService {
       actions: [
         AppDialogAction(
           label: 'Keep Editing',
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
+          onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(false),
         ),
         AppDialogAction(
           label: 'Discard',
           isPrimary: true,
           isDestructive: true,
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
+          onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(true),
         ),
       ],
     );
@@ -361,7 +364,7 @@ class AppDialogService {
         AppDialogAction(
           label: 'OK',
           isPrimary: true,
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
+          onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(true),
         ),
       ],
     );
@@ -493,7 +496,7 @@ class AppDialogService {
 
   static Future<void> sessionExpired(
     BuildContext context, {
-    VoidCallback? onLogin,
+    void Function(BuildContext)? onLogin,
   }) {
     return _show(
       context: context,
@@ -505,7 +508,7 @@ class AppDialogService {
         AppDialogAction(
           label: 'Sign In Again',
           isPrimary: true,
-          onPressed: onLogin ?? () => Navigator.of(context, rootNavigator: true).pop(),
+          onPressed: onLogin ?? (context) => Navigator.of(context, rootNavigator: true).pop(),
         ),
       ],
     );
@@ -529,7 +532,7 @@ class AppDialogService {
         AppDialogAction(
           label: 'Fix',
           isPrimary: true,
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
+          onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(),
         ),
       ],
     );
@@ -547,12 +550,12 @@ class AppDialogService {
       actions: [
         AppDialogAction(
           label: 'Close',
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
+          onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(),
         ),
         AppDialogAction(
           label: 'Continue Offline',
           isPrimary: true,
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
+          onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(),
         ),
       ],
     );
@@ -580,14 +583,19 @@ class AppDialogService {
     BuildContext context, {
     String title = 'Unable to load your data',
     String message = 'We couldn\'t access the local database right now.',
-    VoidCallback? onRetry,
+    void Function(BuildContext)? onRetry,
   }) {
     return error(
       context,
       title: title,
       message: message,
       primaryLabel: 'Try Again',
-      onPrimary: onRetry,
+      onPrimary: onRetry == null
+          ? null
+          : (context) {
+              Navigator.of(context, rootNavigator: true).pop();
+              onRetry(context);
+            },
     );
   }
 
@@ -611,12 +619,12 @@ class AppDialogService {
       actions: [
         AppDialogAction(
           label: 'Cancel',
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
+          onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(false),
         ),
         AppDialogAction(
           label: 'Save Backup',
           isPrimary: true,
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
+          onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(true),
         ),
       ],
     ).then((v) => v ?? false);
@@ -641,37 +649,35 @@ class AppDialogService {
 
   // ── Backup: Export Failed ────────────────────────────────────────────
 
-  static Future<void> backupExportFailed(
+  static Future<BackupExportFailedResult> backupExportFailed(
     BuildContext context, {
     String? reason,
-    VoidCallback? onTryAgain,
-    VoidCallback? onChangeLocation,
   }) {
-    final actions = <AppDialogAction>[];
-    if (onChangeLocation != null) {
-      actions.add(AppDialogAction(
-        label: 'Change Location',
-        onPressed: onChangeLocation,
-      ));
-    }
-    actions.add(AppDialogAction(
-      label: 'Close',
-      onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
-    ));
-    actions.add(AppDialogAction(
-      label: 'Try Again',
-      isPrimary: true,
-      onPressed: onTryAgain ??
-          () => Navigator.of(context, rootNavigator: true).pop(),
-    ));
-    return _show(
+    return _show<BackupExportFailedResult>(
       context: context,
       type: AppDialogType.error,
       title: 'Backup Failed',
       message: 'We couldn\'t create the backup.',
       details: reason,
-      actions: actions,
-    );
+      actions: [
+        AppDialogAction(
+          label: 'Change Location',
+          onPressed: (context) => Navigator.of(context, rootNavigator: true)
+              .pop(BackupExportFailedResult.changeLocation),
+        ),
+        AppDialogAction(
+          label: 'Close',
+          onPressed: (context) => Navigator.of(context, rootNavigator: true)
+              .pop(BackupExportFailedResult.close),
+        ),
+        AppDialogAction(
+          label: 'Try Again',
+          isPrimary: true,
+          onPressed: (context) => Navigator.of(context, rootNavigator: true)
+              .pop(BackupExportFailedResult.tryAgain),
+        ),
+      ],
+    ).then((v) => v ?? BackupExportFailedResult.close);
   }
 
   // ── Backup: Location Required ────────────────────────────────────────
@@ -690,12 +696,12 @@ class AppDialogService {
       actions: [
         AppDialogAction(
           label: 'Cancel',
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
+          onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(false),
         ),
         AppDialogAction(
           label: 'Choose Location',
           isPrimary: true,
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
+          onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(true),
         ),
       ],
     ).then((v) => v ?? false);
@@ -719,12 +725,12 @@ class AppDialogService {
       actions: [
         AppDialogAction(
           label: 'Cancel',
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
+          onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(false),
         ),
         AppDialogAction(
           label: 'Choose New Location',
           isPrimary: true,
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
+          onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(true),
         ),
       ],
     ).then((v) => v ?? false);
@@ -732,19 +738,30 @@ class AppDialogService {
 
   // ── Backup: Location Selection Failed ────────────────────────────────
 
-  static Future<void> backupLocationSelectionFailed(
+  static Future<bool> backupLocationSelectionFailed(
     BuildContext context, {
     String? reason,
-    VoidCallback? onRetry,
   }) {
-    return error(
-      context,
+    return _show<bool>(
+      context: context,
+      type: AppDialogType.error,
       title: 'Location Selection Failed',
       message: 'We couldn\'t set the backup location.',
       details: reason,
-      primaryLabel: 'Try Again',
-      onPrimary: onRetry,
-    );
+      actions: [
+        AppDialogAction(
+          label: 'Close',
+          onPressed: (context) =>
+              Navigator.of(context, rootNavigator: true).pop(false),
+        ),
+        AppDialogAction(
+          label: 'Try Again',
+          isPrimary: true,
+          onPressed: (context) =>
+              Navigator.of(context, rootNavigator: true).pop(true),
+        ),
+      ],
+    ).then((v) => v ?? false);
   }
 
   // ── Backup: Location Changed ─────────────────────────────────────────
@@ -786,13 +803,13 @@ class AppDialogService {
       actions: [
         AppDialogAction(
           label: 'Cancel',
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
+          onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(false),
         ),
         AppDialogAction(
           label: 'Restore',
           isPrimary: true,
           isDestructive: true,
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
+          onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(true),
         ),
       ],
     );
@@ -855,13 +872,13 @@ class AppDialogService {
       actions: [
         AppDialogAction(
           label: 'Cancel',
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
+          onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(false),
         ),
         AppDialogAction(
           label: 'Deactivate',
           isPrimary: true,
           isDestructive: true,
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
+          onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(true),
         ),
       ],
     );
@@ -886,12 +903,12 @@ class AppDialogService {
       actions: [
         AppDialogAction(
           label: 'Cancel',
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
+          onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(false),
         ),
         AppDialogAction(
           label: 'Confirm',
           isPrimary: true,
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
+          onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(true),
         ),
       ],
     );
@@ -912,12 +929,12 @@ class AppDialogService {
       actions: [
         AppDialogAction(
           label: 'Cancel',
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
+          onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(false),
         ),
         AppDialogAction(
           label: 'Confirm',
           isPrimary: true,
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
+          onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(true),
         ),
       ],
     );
@@ -936,7 +953,7 @@ class AppDialogService {
         AppDialogAction(
           label: 'Done',
           isPrimary: true,
-          onPressed: () =>
+          onPressed: (context) =>
               Navigator.of(context, rootNavigator: true).pop(),
         ),
       ],
@@ -956,7 +973,7 @@ class AppDialogService {
         AppDialogAction(
           label: 'Close',
           isPrimary: true,
-          onPressed: () =>
+          onPressed: (context) =>
               Navigator.of(context, rootNavigator: true).pop(),
         ),
       ],
@@ -976,7 +993,7 @@ class AppDialogService {
         AppDialogAction(
           label: 'Done',
           isPrimary: true,
-          onPressed: () =>
+          onPressed: (context) =>
               Navigator.of(context, rootNavigator: true).pop(),
         ),
       ],
@@ -996,7 +1013,7 @@ class AppDialogService {
         AppDialogAction(
           label: 'Close',
           isPrimary: true,
-          onPressed: () =>
+          onPressed: (context) =>
               Navigator.of(context, rootNavigator: true).pop(),
         ),
       ],
@@ -1015,7 +1032,7 @@ class AppDialogService {
       actions: [
         AppDialogAction(
           label: 'Close',
-          onPressed: () =>
+          onPressed: (context) =>
               Navigator.of(context, rootNavigator: true).pop(),
         ),
       ],
@@ -1047,18 +1064,29 @@ class AppDialogService {
 
   // ── AI: Refresh Models Failed ─────────────────────────────────────────
 
-  static Future<void> aiRefreshModelsFailed(
+  static Future<bool> aiRefreshModelsFailed(
     BuildContext context, {
     String? reason,
-    VoidCallback? onRetry,
   }) {
-    return error(
-      context,
+    return _show<bool>(
+      context: context,
+      type: AppDialogType.error,
       title: 'Refresh Failed',
       message: 'Could not fetch the latest models from Groq.',
       details: reason,
-      primaryLabel: 'Try Again',
-      onPrimary: onRetry,
-    );
+      actions: [
+        AppDialogAction(
+          label: 'Close',
+          onPressed: (context) =>
+              Navigator.of(context, rootNavigator: true).pop(false),
+        ),
+        AppDialogAction(
+          label: 'Try Again',
+          isPrimary: true,
+          onPressed: (context) =>
+              Navigator.of(context, rootNavigator: true).pop(true),
+        ),
+      ],
+    ).then((v) => v ?? false);
   }
 }

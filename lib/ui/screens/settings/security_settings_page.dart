@@ -74,6 +74,7 @@ class SecuritySettingsPage extends ConsumerWidget {
     bool obscureConfirm = true;
     bool newPasswordTouched = false;
     bool confirmPasswordTouched = false;
+    final screenContext = context;
 
     showDialog(
       context: context,
@@ -214,18 +215,25 @@ class SecuritySettingsPage extends ConsumerWidget {
                       );
                   if (context.mounted) {
                     setState(() => isSaving = false);
-                    Navigator.of(context, rootNavigator: true).pop();
                     if (result.success) {
                       oldPasswordController.clear();
                       newPasswordController.clear();
                       confirmPasswordController.clear();
-                      await AppDialogService.success(context,
-                          title: 'Password Changed',
-                          message: result.message);
+                      await AppDialogService.success(
+                        screenContext,
+                        title: 'Password Changed',
+                        message: result.message,
+                      );
+                      if (!context.mounted) return;
+                      Navigator.of(context, rootNavigator: true).pop();
                     } else {
-                      AppDialogService.error(context,
-                          title: 'Change Failed',
-                          message: result.message);
+                      await AppDialogService.error(
+                        screenContext,
+                        title: 'Change Failed',
+                        message: result.message,
+                      );
+                      if (!context.mounted) return;
+                      Navigator.of(context, rootNavigator: true).pop();
                     }
                   }
                 },

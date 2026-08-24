@@ -93,11 +93,12 @@ class UserController extends StateNotifier<UserListState> {
 
   /// Loads only deleted users (for Trash).
   Future<void> loadDeletedUsers() async {
+    state = state.copyWith(isLoading: true, error: null);
     try {
       final deletedUsers = await _userService.getDeletedUsers();
-      state = state.copyWith(deletedUsers: deletedUsers);
+      state = state.copyWith(deletedUsers: deletedUsers, isLoading: false);
     } catch (e) {
-      state = state.copyWith(error: _friendlyError(e));
+      state = state.copyWith(isLoading: false, error: _friendlyError(e));
     }
   }
 

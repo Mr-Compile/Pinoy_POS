@@ -37,9 +37,38 @@ class _ForceChangePasswordScreenState
   bool _isSubmitting = false;
   bool _newPasswordTouched = false;
   bool _confirmPasswordTouched = false;
+  ProviderSubscription<AuthState>? _authSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _authSubscription = ref.listenManual(
+      authStateProvider,
+      (previous, next) {
+        if (next.phase == AuthSessionPhase.fullyAuthenticated) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const AppShell()),
+            (_) => false,
+          );
+        } else if (next.phase ==
+            AuthSessionPhase.passwordAuthenticatedPendingPin) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const PinLockScreen()),
+            (_) => false,
+          );
+        } else if (next.phase == AuthSessionPhase.unauthenticated) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const LoginScreen()),
+            (_) => false,
+          );
+        }
+      },
+    );
+  }
 
   @override
   void dispose() {
+    _authSubscription?.close();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
@@ -114,28 +143,6 @@ class _ForceChangePasswordScreenState
     final screenWidth = MediaQuery.of(context).size.width;
     final isTablet = screenWidth >= 600;
     final maxWidth = isTablet ? 480.0 : double.infinity;
-
-    ref.listenManual(
-      authStateProvider,
-      (previous, next) {
-        if (next.phase == AuthSessionPhase.fullyAuthenticated) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const AppShell()),
-            (_) => false,
-          );
-        } else if (next.phase == AuthSessionPhase.passwordAuthenticatedPendingPin) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const PinLockScreen()),
-            (_) => false,
-          );
-        } else if (next.phase == AuthSessionPhase.unauthenticated) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const LoginScreen()),
-            (_) => false,
-          );
-        }
-      },
-    );
 
     final password = _newPasswordController.text;
     final strengthResult = PasswordStrengthService.evaluate(

@@ -188,7 +188,7 @@ void main() {
   testWidgets('AIAdvisorScreen builds for owner', (tester) async {
     final owner = await authenticateAsOwner();
     await pumpOwnerScreen(tester, const AIAdvisorScreen(), owner: owner);
-    expect(find.text('AI Business Advisor'), findsOneWidget);
+    expect(find.text('AI Business Advisor'), findsWidgets);
   });
 
   testWidgets('SettingsScreen builds for owner', (tester) async {

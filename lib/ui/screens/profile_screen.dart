@@ -211,6 +211,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final formKey = GlobalKey<FormState>();
     final fullNameController = TextEditingController(text: user.fullName);
     bool isSaving = false;
+    final screenContext = context;
 
     showDialog(
       context: context,
@@ -257,15 +258,22 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     );
                 if (context.mounted) {
                   setState(() => isSaving = false);
-                  Navigator.of(context, rootNavigator: true).pop();
                   if (success) {
-                    await AppDialogService.success(context,
-                        title: 'Profile Updated',
-                        message: 'Profile updated successfully.');
+                    await AppDialogService.success(
+                      screenContext,
+                      title: 'Profile Updated',
+                      message: 'Profile updated successfully.',
+                    );
+                    if (!context.mounted) return;
+                    Navigator.of(context, rootNavigator: true).pop();
                   } else {
-                    AppDialogService.error(context,
-                        title: 'Update Failed',
-                        message: 'Failed to update profile.');
+                    await AppDialogService.error(
+                      screenContext,
+                      title: 'Update Failed',
+                      message: 'Failed to update profile.',
+                    );
+                    if (!context.mounted) return;
+                    Navigator.of(context, rootNavigator: true).pop();
                   }
                 }
               },

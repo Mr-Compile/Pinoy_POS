@@ -129,7 +129,9 @@ class _NotificationBellState extends ConsumerState<NotificationBell> {
       final notificationService = ref.read(notificationServiceProvider);
       await notificationService.markAsRead(notification.id!);
       refreshNotificationCount(ref);
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('[NotificationBell] Failed to mark notification as read: $e\n$st');
+    }
 
     // Navigate based on type
     if (!mounted) return;

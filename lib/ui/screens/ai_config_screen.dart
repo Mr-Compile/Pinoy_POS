@@ -234,28 +234,22 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
             primaryLabel: 'Done',
           );
         } else {
-          await AppDialogService.aiRefreshModelsFailed(
+          final retry = await AppDialogService.aiRefreshModelsFailed(
             context,
             reason: result.errorMessage,
-            onRetry: () {
-              Navigator.of(context, rootNavigator: true).pop();
-              _refreshModels();
-            },
           );
+          if (retry && mounted) _refreshModels();
         }
       }
     } catch (e, st) {
       _log('refreshModels failed', e, st);
       if (mounted) {
         setState(() => _isRefreshingModels = false);
-        await AppDialogService.aiRefreshModelsFailed(
+        final retry = await AppDialogService.aiRefreshModelsFailed(
           context,
           reason: 'An unexpected error occurred.',
-          onRetry: () {
-            Navigator.of(context, rootNavigator: true).pop();
-            _refreshModels();
-          },
         );
+        if (retry && mounted) _refreshModels();
       }
     }
   }

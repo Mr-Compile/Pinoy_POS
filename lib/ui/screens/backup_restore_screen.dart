@@ -129,41 +129,37 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
 
     try {
       final backupService = ref.read(backupServiceProvider);
-      final result = await backupService.pickBackupLocation();
-
-      if (!mounted) return;
-
-      switch (result.result) {
-        case BackupLocationResult.selected:
-          setState(() => _backupLocation = result.path);
-          await AppDialogService.backupLocationChanged(
-            context,
-            location: backupService.getDisplayLocation(result.path!),
+      while (mounted) {
+        ({BackupLocationResult result, String? path, String? error}) result;
+        try {
+          result = await backupService.pickBackupLocation();
+        } catch (e, st) {
+          _log('Backup location selection failed', e, st);
+          result = (
+            result: BackupLocationResult.failed,
+            path: null,
+            error: 'An unexpected error occurred while choosing a location.',
           );
-        case BackupLocationResult.canceled:
-          // User canceled — no dialog needed.
-          break;
-        case BackupLocationResult.failed:
-          await AppDialogService.backupLocationSelectionFailed(
-            context,
-            reason: result.error,
-            onRetry: () {
-              Navigator.of(context, rootNavigator: true).pop();
-              _chooseBackupLocation();
-            },
-          );
-      }
-    } catch (e, st) {
-      _log('Backup location selection failed', e, st);
-      if (mounted) {
-        await AppDialogService.backupLocationSelectionFailed(
-          context,
-          reason: 'An unexpected error occurred while choosing a location.',
-          onRetry: () {
-            Navigator.of(context, rootNavigator: true).pop();
-            _chooseBackupLocation();
-          },
-        );
+        }
+        if (!mounted) return;
+
+        switch (result.result) {
+          case BackupLocationResult.selected:
+            setState(() => _backupLocation = result.path);
+            await AppDialogService.backupLocationChanged(
+              context,
+              location: backupService.getDisplayLocation(result.path!),
+            );
+            return;
+          case BackupLocationResult.canceled:
+            return;
+          case BackupLocationResult.failed:
+            final retry = await AppDialogService.backupLocationSelectionFailed(
+              context,
+              reason: result.error,
+            );
+            if (!retry || !mounted) return;
+        }
       }
     } finally {
       if (mounted) {
@@ -215,64 +211,84 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
     setState(() => _isExporting = true);
 
     try {
-      final result = await backupService.exportBackup(
-        destinationDirectory: destinationDirectory,
-        onConfirm: (selectedPath, displayName) async {
-          if (!mounted) return false;
-          final locationLabel =
-              backupService.getDisplayLocation(destinationDirectory);
-          return AppDialogService.backupDestinationConfirm(
-            context,
-            displayName: displayName,
-            location: locationLabel,
-          );
-        },
-      );
-
-      if (!mounted) return;
-
-      switch (result.result) {
-        case BackupExportResult.success:
-          final locationLabel =
-              backupService.getDisplayLocation(result.path!);
-          await AppDialogService.backupExportSuccess(
-            context,
-            displayName: result.displayName!,
-            location: locationLabel,
-          );
-          await _loadBackups();
-        case BackupExportResult.canceled:
-          // User canceled — no dialog needed.
-          break;
-        case BackupExportResult.failed:
-          await AppDialogService.backupExportFailed(
-            context,
-            reason: result.error,
-            onTryAgain: () {
-              Navigator.of(context, rootNavigator: true).pop();
-              _exportBackup();
-            },
-            onChangeLocation: () {
-              Navigator.of(context, rootNavigator: true).pop();
-              _chooseBackupLocation();
+      while (mounted) {
+        ({BackupExportResult result, String? path, String? displayName, String? error}) result;
+        try {
+          result = await backupService.exportBackup(
+            destinationDirectory: destinationDirectory,
+            onConfirm: (selectedPath, displayName) async {
+              if (!mounted) return false;
+              final locationLabel =
+                  backupService.getDisplayLocation(destinationDirectory);
+              return AppDialogService.backupDestinationConfirm(
+                context,
+                displayName: displayName,
+                location: locationLabel,
+              );
             },
           );
-      }
-    } catch (e, st) {
-      _log('Backup export failed', e, st);
-      if (mounted) {
-        await AppDialogService.backupExportFailed(
-          context,
-          reason: 'An unexpected error occurred while creating the backup.',
-          onTryAgain: () {
-            Navigator.of(context, rootNavigator: true).pop();
-            _exportBackup();
-          },
-          onChangeLocation: () {
-            Navigator.of(context, rootNavigator: true).pop();
-            _chooseBackupLocation();
-          },
-        );
+        } catch (e, st) {
+          _log('Backup export failed', e, st);
+          result = (
+            result: BackupExportResult.failed,
+            path: null,
+            displayName: null,
+            error: 'An unexpected error occurred while creating the backup.',
+          );
+        }
+        if (!mounted) return;
+
+        switch (result.result) {
+          case BackupExportResult.success:
+            final locationLabel =
+                backupService.getDisplayLocation(result.path!);
+            await AppDialogService.backupExportSuccess(
+              context,
+              displayName: result.displayName!,
+              location: locationLabel,
+            );
+            await _loadBackups();
+            return;
+          case BackupExportResult.canceled:
+            return;
+          case BackupExportResult.failed:
+            final action = await AppDialogService.backupExportFailed(
+              context,
+              reason: result.error,
+            );
+            if (!mounted) return;
+            switch (action) {
+              case BackupExportFailedResult.close:
+                return;
+              case BackupExportFailedResult.tryAgain:
+                continue;
+              case BackupExportFailedResult.changeLocation:
+                if (!mounted) return;
+                setState(() => _isExporting = false);
+                await _chooseBackupLocation();
+                if (!mounted) return;
+                if (_backupLocation == null || _backupLocation!.isEmpty) return;
+                // Re-validate the new location before trying again.
+                try {
+                  final valid = await backupService.isLocationValid(_backupLocation!);
+                  if (!valid) {
+                    await backupService.clearBackupLocation();
+                    if (mounted) {
+                      setState(() => _backupLocation = null);
+                    }
+                    return;
+                  }
+                } catch (e, st) {
+                  _log('Backup location re-validation failed', e, st);
+                  if (mounted) {
+                    setState(() => _backupLocation = null);
+                  }
+                  return;
+                }
+                if (mounted) setState(() => _isExporting = true);
+                continue;
+            }
+        }
       }
     } finally {
       if (mounted) {

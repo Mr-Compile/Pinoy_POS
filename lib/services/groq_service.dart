@@ -340,8 +340,9 @@ class GroqService {
       errorType = error?['type'] as String?;
       // Also check for "code" field
       errorType ??= error?['code'] as String?;
-    } catch (_) {
-      // Body wasn't JSON — ignore.
+    } catch (e, st) {
+      // Body wasn't JSON or didn't match the expected shape — ignore.
+      debugPrint('[GroqService] Could not parse error response body: $e\n$st');
     }
 
     if (status == 401 || status == 403) {

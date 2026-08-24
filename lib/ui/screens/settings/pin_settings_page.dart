@@ -80,6 +80,7 @@ class PinSettingsPage extends ConsumerWidget {
     final pinController = TextEditingController();
     final confirmController = TextEditingController();
     bool isSaving = false;
+    final screenContext = context;
 
     showDialog(
       context: context,
@@ -150,15 +151,22 @@ class PinSettingsPage extends ConsumerWidget {
                     );
                 if (context.mounted) {
                   setState(() => isSaving = false);
-                  Navigator.of(context, rootNavigator: true).pop();
                   if (success) {
-                    await AppDialogService.success(context,
-                        title: 'PIN Updated',
-                        message: 'Your PIN has been set successfully.');
+                    await AppDialogService.success(
+                      screenContext,
+                      title: 'PIN Updated',
+                      message: 'Your PIN has been set successfully.',
+                    );
+                    if (!context.mounted) return;
+                    Navigator.of(context, rootNavigator: true).pop();
                   } else {
-                    AppDialogService.error(context,
-                        title: 'Update Failed',
-                        message: 'Failed to update PIN.');
+                    await AppDialogService.error(
+                      screenContext,
+                      title: 'Update Failed',
+                      message: 'Failed to update PIN.',
+                    );
+                    if (!context.mounted) return;
+                    Navigator.of(context, rootNavigator: true).pop();
                   }
                 }
               },
@@ -172,6 +180,7 @@ class PinSettingsPage extends ConsumerWidget {
 
   void _showRemovePinDialog(BuildContext context, WidgetRef ref, User user) {
     bool isSaving = false;
+    final screenContext = context;
 
     showDialog(
       context: context,
@@ -203,15 +212,22 @@ class PinSettingsPage extends ConsumerWidget {
                     );
                 if (context.mounted) {
                   setState(() => isSaving = false);
-                  Navigator.of(context, rootNavigator: true).pop();
                   if (success) {
-                    await AppDialogService.success(context,
-                        title: 'PIN Removed',
-                        message: 'Your PIN has been removed.');
+                    await AppDialogService.success(
+                      screenContext,
+                      title: 'PIN Removed',
+                      message: 'Your PIN has been removed.',
+                    );
+                    if (!context.mounted) return;
+                    Navigator.of(context, rootNavigator: true).pop();
                   } else {
-                    AppDialogService.error(context,
-                        title: 'Update Failed',
-                        message: 'Failed to remove PIN.');
+                    await AppDialogService.error(
+                      screenContext,
+                      title: 'Update Failed',
+                      message: 'Failed to remove PIN.',
+                    );
+                    if (!context.mounted) return;
+                    Navigator.of(context, rootNavigator: true).pop();
                   }
                 }
               },

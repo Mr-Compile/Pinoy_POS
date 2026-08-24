@@ -110,9 +110,14 @@ extension AppDialogTypeX on AppDialogType {
   }
 }
 
+/// Action displayed inside an [AppDialog].
+///
+/// The [onPressed] callback receives the dialog's own [BuildContext] so
+/// dismissal can always target the same [Navigator] that owns the dialog,
+/// regardless of which caller opened it.
 class AppDialogAction {
   final String label;
-  final VoidCallback? onPressed;
+  final void Function(BuildContext dialogContext)? onPressed;
   final bool isPrimary;
   final bool isDestructive;
 
@@ -261,9 +266,13 @@ class AppDialog extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
 
     Widget buildAction(AppDialogAction action) {
+      final handler = action.onPressed == null
+          ? null
+          : () => action.onPressed!(context);
+
       return action.isPrimary
           ? FilledButton(
-              onPressed: action.onPressed,
+              onPressed: handler,
               style: action.isDestructive
                   ? FilledButton.styleFrom(
                       backgroundColor: cs.error,
@@ -276,7 +285,7 @@ class AppDialog extends StatelessWidget {
               child: Text(action.label),
             )
           : TextButton(
-              onPressed: action.onPressed,
+              onPressed: handler,
               style: action.isDestructive
                   ? TextButton.styleFrom(
                       foregroundColor: cs.error,
@@ -292,10 +301,13 @@ class AppDialog extends StatelessWidget {
     if (actions.length > 2 || !isTablet) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: actions.reversed.map((action) {
-          final isFirst = action == actions.first;
+        children: actions.asMap().entries.map((entry) {
+          final i = entry.key;
+          final action = entry.value;
+          final isLast = i == actions.length - 1;
+
           return Padding(
-            padding: EdgeInsets.only(top: isFirst ? 0 : Spacing.sm),
+            padding: EdgeInsets.only(top: isLast ? 0 : Spacing.sm),
             child: buildAction(action),
           );
         }).toList(),
