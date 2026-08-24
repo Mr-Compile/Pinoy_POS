@@ -304,10 +304,10 @@ class AppDialog extends StatelessWidget {
         children: actions.asMap().entries.map((entry) {
           final i = entry.key;
           final action = entry.value;
-          final isLast = i == actions.length - 1;
+          final isFirst = i == 0;
 
           return Padding(
-            padding: EdgeInsets.only(top: isLast ? 0 : Spacing.sm),
+            padding: EdgeInsets.only(top: isFirst ? 0 : Spacing.sm),
             child: buildAction(action),
           );
         }).toList(),
