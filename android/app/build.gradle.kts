@@ -40,6 +40,12 @@ kotlin {
     }
 }
 
+dependencies {
+    // Required for FlutterFragmentActivity and ActivityResultContracts
+    implementation("androidx.activity:activity-ktx:1.9.3")
+    implementation("androidx.fragment:fragment-ktx:1.8.9")
+}
+
 flutter {
     source = "../.."
 }

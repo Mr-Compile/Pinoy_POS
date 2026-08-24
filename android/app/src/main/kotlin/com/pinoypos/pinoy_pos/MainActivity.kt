@@ -10,7 +10,7 @@ import android.provider.OpenableColumns
 import android.util.Log
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -21,7 +21,7 @@ import java.io.File
 private const val CHANNEL = "com.pinoypos.pinoy_pos/backup_storage"
 private const val TAG = "BackupStorage"
 
-class MainActivity : FlutterActivity() {
+class MainActivity : FlutterFragmentActivity() {
 
     private lateinit var openDocumentTreeLauncher: ActivityResultLauncher<Uri?>
     private var pendingOpenTreeResult: Result? = null
@@ -174,12 +174,17 @@ class MainActivity : FlutterActivity() {
                     return@Thread
                 }
 
-                contentResolver.openOutputStream(docUri, "rwt")?.use { output ->
-                    output.write(bytes)
-                    output.flush()
-                } ?: runOnUiThread {
-                    result.error("WRITE_FAILED", "Could not open output stream", null)
+                val output = contentResolver.openOutputStream(docUri, "rwt")
+                if (output == null) {
+                    runOnUiThread {
+                        result.error("WRITE_FAILED", "Could not open output stream", null)
+                    }
                     return@Thread
+                }
+
+                output.use {
+                    it.write(bytes)
+                    it.flush()
                 }
 
                 val finalName = getDisplayName(docUri) ?: displayName
