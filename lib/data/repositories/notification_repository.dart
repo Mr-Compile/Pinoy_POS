@@ -15,4 +15,21 @@ class NotificationRepository {
   Future<int> getUnreadCount(int userId) => _notificationDao.getUnreadCount(userId);
   Future<void> markAsRead(int id, int userId) => _notificationDao.markAsRead(id, userId);
   Future<void> markAllAsRead(int userId) => _notificationDao.markAllAsRead(userId);
+
+  /// Checks whether an unread notification matching [type], [title] and
+  /// [message] already exists for [userId].
+  Future<bool> hasUnreadNotification({
+    required int userId,
+    required String type,
+    required String title,
+    required String message,
+    DatabaseExecutor? txn,
+  }) =>
+      _notificationDao.hasUnreadNotification(
+        userId: userId,
+        type: type,
+        title: title,
+        message: message,
+        txn: txn,
+      );
 }

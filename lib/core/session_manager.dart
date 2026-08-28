@@ -94,8 +94,6 @@ class SessionManager {
     'view_trash',
     'restore_trash',
     'view_activity_logs',
-    'view_payment_evidence',
-    'verify_payments',
     'view_ai_advisor',
     'use_ai_advisor',
     'view_settings',

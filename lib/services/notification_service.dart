@@ -1,12 +1,10 @@
 import 'package:pinoy_pos/core/session_manager.dart';
-import 'package:pinoy_pos/data/dao/notification_dao.dart';
 import 'package:pinoy_pos/data/models/notification.dart';
 import 'package:pinoy_pos/data/repositories/notification_repository.dart';
 import 'package:sqflite/sqflite.dart';
 
 class NotificationService {
   final NotificationRepository _notificationRepository = NotificationRepository();
-  final NotificationDao _notificationDao = NotificationDao();
   final SessionManager _sessionManager = SessionManager();
 
   Future<List<Notification>> getNotifications() async {
@@ -89,7 +87,7 @@ class NotificationService {
     required String message,
     DatabaseExecutor? txn,
   }) async {
-    return _notificationDao.hasUnreadNotification(
+    return _notificationRepository.hasUnreadNotification(
       userId: userId,
       type: type,
       title: title,
