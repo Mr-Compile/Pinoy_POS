@@ -213,6 +213,9 @@ The cycles are currently used for cross-provider invalidation but increase coupl
 3. **`lib/data/repositories/notification_repository.dart`** — Added `hasUnreadNotification(...)` and `DatabaseExecutor? txn` wrapper.
 4. **`lib/services/notification_service.dart`** — Stopped instantiating `NotificationDao` directly; now uses `NotificationRepository.hasUnreadNotification(...)`.
 5. **`lib/data/dao/trash_dao.dart`** — Refactored `TrashDao` to extend `BaseDao<TrashItem>` while keeping trash-specific `deleteByEntity`, `getByEntityType`, and `getByEntity` helpers.
+6. **`lib/services/settings_service.dart`** — Added `getStoreInfo()`, `isStoreInfoIncomplete()`, and `refreshStoreInfo()` as the canonical source for store metadata used by receipts, reports and exports.
+7. **`lib/services/sales_service.dart`** — Replaced `ReportService.getStoreInfo()` call with `SettingsService.getStoreInfo()` and removed the `SalesService -> ReportService` dependency.
+8. **`lib/services/report_service.dart`** — Delegated `getTodaySales()`, `getMonthSales()` and `getSalesByDateRange()` to `SalesService`; removed the duplicate `getAllSales()` path. This eliminates a circular service dependency and the duplicated date-range sales queries.
 
 ## Verification
 

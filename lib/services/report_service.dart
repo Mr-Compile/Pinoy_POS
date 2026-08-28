@@ -9,7 +9,8 @@ import 'package:pinoy_pos/data/repositories/export_history_repository.dart';
 import 'package:pinoy_pos/data/repositories/product_repository.dart';
 import 'package:pinoy_pos/data/repositories/sale_item_repository.dart';
 import 'package:pinoy_pos/data/repositories/sale_repository.dart';
-import 'package:pinoy_pos/data/repositories/settings_repository.dart';
+import 'package:pinoy_pos/services/sales_service.dart';
+import 'package:pinoy_pos/services/settings_service.dart';
 import 'package:pinoy_pos/data/repositories/user_repository.dart';
 
 /// Payment method totals used in reports and analytics.
@@ -49,41 +50,22 @@ class ReportService {
   final UserRepository _userRepository = UserRepository();
   final ExportHistoryRepository _exportHistoryRepository =
       ExportHistoryRepository();
-  final SettingsRepository _settingsRepository = SettingsRepository();
+  final SalesService _salesService = SalesService();
+  final SettingsService _settingsService = SettingsService();
   final SessionManager _sessionManager = SessionManager();
-
-  Settings? _cachedSettings;
 
   // ── Business metrics (Owner / Staff) ──
 
+  /// Today’s confirmed sales total.  Delegated to [SalesService].
   Future<double> getTodaySales() async {
-    if (!_sessionManager.hasPermission('view_reports')) {
-      return 0.0;
-    }
-    final now = DateTime.now();
-    // Staff: only own sales
-    if (_sessionManager.currentUser?.role == UserRole.staff) {
-      return _saleRepository.getTotalSalesForDateForUser(
-        now,
-        _sessionManager.currentUser!.id!,
-      );
-    }
-    return _saleRepository.getTotalSalesForDate(now);
+    if (!_sessionManager.hasPermission('view_reports')) return 0.0;
+    return _salesService.getTodaySales();
   }
 
+  /// This month’s confirmed sales total.  Delegated to [SalesService].
   Future<double> getMonthSales() async {
-    if (!_sessionManager.hasPermission('view_reports')) {
-      return 0.0;
-    }
-    final now = DateTime.now();
-    if (_sessionManager.currentUser?.role == UserRole.staff) {
-      return _saleRepository.getTotalSalesForMonthForUser(
-        now.year,
-        now.month,
-        _sessionManager.currentUser!.id!,
-      );
-    }
-    return _saleRepository.getTotalSalesForMonth(now.year, now.month);
+    if (!_sessionManager.hasPermission('view_reports')) return 0.0;
+    return _salesService.getMonthSales();
   }
 
   Future<int> getLowStockCount() async {
@@ -121,34 +103,10 @@ class ReportService {
     return sales.length;
   }
 
-  /// Returns the sales for a date range.  For Staff the results are
-  /// filtered to the current user's own sales. Cancelled/refunded sales
-  /// are excluded from reporting views.
+  /// Returns the sales for a date range.  Delegated to [SalesService].
   Future<List<Sale>> getSalesByDateRange(DateTime start, DateTime end) async {
     if (!_sessionManager.hasPermission('view_reports')) return [];
-
-    final userId = _sessionManager.currentUser?.role == UserRole.staff
-        ? _sessionManager.currentUser!.id
-        : null;
-
-    return _saleRepository.getFilteredSales(
-      start: start,
-      end: end,
-      userId: userId,
-      limit: 500,
-    );
-  }
-
-  /// Returns all non-voided sales for the authenticated role.
-  Future<List<Sale>> getAllSales() async {
-    if (!_sessionManager.hasPermission('view_reports')) return [];
-
-    if (_sessionManager.currentUser?.role == UserRole.staff) {
-      return _saleRepository
-          .getByUserId(_sessionManager.currentUser!.id!, limit: 500);
-    }
-
-    return _saleRepository.getAllActive(limit: 500);
+    return _salesService.getSalesByDateRange(start, end);
   }
 
   /// Returns the aggregated total per payment method for the given date
@@ -244,26 +202,12 @@ class ReportService {
   }
 
   /// Returns the store information (name, address, contact, currency) to use
-  /// in reports and exports.  If none is configured, a default is returned.
-  Future<Settings> getStoreInfo() async {
-    _cachedSettings ??= await _settingsRepository.getSettings();
-    return _cachedSettings ??
-        Settings(
-          storeName: 'Pinoy POS',
-          currency: 'PHP',
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        );
-  }
+  /// in reports and exports.  Delegated to [SettingsService].
+  Future<Settings> getStoreInfo() => _settingsService.getStoreInfo();
 
   /// Returns true when store information is missing or has the default name.
-  /// Used to show setup guidance on the reports screen.
-  Future<bool> isStoreInfoIncomplete() async {
-    final info = await getStoreInfo();
-    return info.storeName.trim().isEmpty ||
-        info.storeName.trim().toLowerCase() == 'my store' ||
-        info.storeName.trim().toLowerCase() == 'pinoy pos';
-  }
+  /// Delegated to [SettingsService].
+  Future<bool> isStoreInfoIncomplete() => _settingsService.isStoreInfoIncomplete();
 
   // ── System metrics (System Admin) ──
 
@@ -345,10 +289,8 @@ class ReportService {
   }
 
   /// Refreshes the cached store info, used after settings are updated.
-  Future<void> refreshStoreInfo() async {
-    _cachedSettings = null;
-    await getStoreInfo();
-  }
+  /// Delegated to [SettingsService].
+  Future<void> refreshStoreInfo() => _settingsService.refreshStoreInfo();
 }
 
 /// A top-selling product result returned by [ReportService.getTopProducts].

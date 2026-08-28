@@ -11,6 +11,7 @@ class SettingsService {
   final SessionManager _sessionManager = SessionManager();
   final GroqService _groqService = GroqService();
   Settings? _currentSettings;
+  Settings? _storeInfo;
 
   /// Cached list of available Groq models (refreshed by Admin).
   List<GroqModel> _cachedModels = [];
@@ -79,7 +80,42 @@ class SettingsService {
     final updated = settings.copyWith(updatedAt: DateTime.now());
     await _settingsRepository.update(updated);
     _currentSettings = updated;
+    _storeInfo = null;
     return true;
+  }
+
+  /// Returns the store information (name, address, contact, currency) to use
+  /// in reports, receipts and exports.  If none is configured, a default is
+  /// returned.  This does not require `view_settings` because it is needed by
+  /// all roles (e.g., printing a receipt).
+  Future<Settings> getStoreInfo() async {
+    if (_storeInfo != null) return _storeInfo!;
+
+    final settings = await _settingsRepository.getSettings();
+    _storeInfo = settings ??
+        Settings(
+          storeName: 'Pinoy POS',
+          currency: 'PHP',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+    return _storeInfo!;
+  }
+
+  /// Returns true when store information is missing or still has the default
+  /// placeholder name.  Used to show setup guidance on the reports screen.
+  Future<bool> isStoreInfoIncomplete() async {
+    final info = await getStoreInfo();
+    return info.storeName.trim().isEmpty ||
+        info.storeName.trim().toLowerCase() == 'my store' ||
+        info.storeName.trim().toLowerCase() == 'pinoy pos';
+  }
+
+  /// Refreshes the cached store info, used after settings are updated.
+  Future<void> refreshStoreInfo() async {
+    _storeInfo = null;
+    _currentSettings = null;
+    await getStoreInfo();
   }
 
   Future<String> getTheme() async {

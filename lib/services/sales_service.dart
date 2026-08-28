@@ -16,7 +16,6 @@ import 'package:pinoy_pos/data/repositories/user_repository.dart';
 import 'package:pinoy_pos/data/models/stock_history.dart';
 import 'package:pinoy_pos/services/activity_log_service.dart';
 import 'package:pinoy_pos/services/image_service.dart';
-import 'package:pinoy_pos/services/report_service.dart';
 import 'package:pinoy_pos/services/settings_service.dart';
 import 'package:pinoy_pos/services/stock_service.dart';
 import 'package:sqflite/sqflite.dart';
@@ -32,7 +31,6 @@ class SalesService {
   final DatabaseHelper _dbHelper = DatabaseHelper();
   final SettingsService _settingsService = SettingsService();
   final ImageService _imageService = ImageService();
-  final ReportService _reportService = ReportService();
   final UserRepository _userRepository = UserRepository();
 
   Future<List<Sale>> getSales() async {
@@ -163,7 +161,7 @@ class SalesService {
     }
 
     final items = await _saleItemRepository.getBySaleId(saleId);
-    final store = await _reportService.getStoreInfo();
+    final store = await _settingsService.getStoreInfo();
     final cashier = await _userRepository.getById(sale.userId);
 
     final receiptItems = <ReceiptItem>[];
