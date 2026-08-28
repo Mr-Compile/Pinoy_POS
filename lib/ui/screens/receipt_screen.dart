@@ -1,105 +1,82 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/data/models/receipt_view_data.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
-import 'package:pinoy_pos/data/models/sale_item.dart';
-import 'package:pinoy_pos/data/models/settings.dart';
+import 'package:pinoy_pos/providers/receipt_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/services/image_service.dart';
 import 'package:pinoy_pos/ui/screens/payment_proof_viewer_screen.dart';
+import 'package:pinoy_pos/ui/screens/sale_detail_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
+import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 
 class ReceiptScreen extends ConsumerStatefulWidget {
-  final Sale sale;
-  final List<SaleItem>? items;
-  final Map<int, String>? productNames;
+  final Sale? sale;
+  final int? saleId;
 
   const ReceiptScreen({
     super.key,
-    required this.sale,
-    this.items,
-    this.productNames,
-  });
+    this.sale,
+    this.saleId,
+  }) : assert(sale != null || saleId != null);
 
   @override
   ConsumerState<ReceiptScreen> createState() => _ReceiptScreenState();
 }
 
 class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
-  List<SaleItem> _items = [];
-  Map<int, String> _productNames = {};
-  Settings? _storeInfo;
-  bool _isLoading = true;
   bool _isExporting = false;
+  bool _isLoading = false;
+  bool _notFound = false;
+  Sale? _loadedSale;
+
+  Sale get _sale => widget.sale ?? _loadedSale!;
+  int get _saleId => _sale.id!;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    if (widget.sale == null && widget.saleId != null) {
+      _loadSale(widget.saleId!);
+    }
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _isLoading = true;
-    });
-
+  Future<void> _loadSale(int id) async {
+    setState(() => _isLoading = true);
     try {
       final salesService = ref.read(salesServiceProvider);
-      final productService = ref.read(productServiceProvider);
-      final reportService = ref.read(reportServiceProvider);
-
-      final items = widget.items ?? await salesService.getSaleItems(widget.sale.id!);
-      final names = <int, String>{};
-      for (final item in items) {
-        if (names.containsKey(item.productId)) continue;
-        final product = await productService.getProductById(item.productId);
-        names[item.productId] = product?.name ?? 'Product #${item.productId}';
-      }
-
-      final storeInfo = await reportService.getStoreInfo();
-
+      final sale = await salesService.getSaleById(id);
       if (mounted) {
         setState(() {
-          _items = items;
-          _productNames = names;
-          _storeInfo = storeInfo;
+          _loadedSale = sale;
+          _notFound = sale == null;
           _isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
+          _notFound = true;
           _isLoading = false;
         });
-        AppDialogService.error(
-          context,
-          title: 'Error',
-          message: 'Failed to load receipt details.',
-        );
       }
     }
   }
 
-  Future<void> _downloadPdf() async {
-    if (_storeInfo == null) return;
-
+  Future<void> _downloadPdf(ReceiptViewData receipt) async {
     setState(() => _isExporting = true);
 
     try {
       final receiptService = ref.read(receiptServiceProvider);
-      final bytes = await receiptService.generateReceiptPdf(
-        widget.sale,
-        _items,
-        _productNames,
-        _storeInfo!,
-      );
+      final bytes = await receiptService.generateReceiptPdf(receipt);
+      final fileName = receiptService.buildFileName(receipt);
 
-      final fileName = 'receipt_${widget.sale.receiptNumber ?? widget.sale.id}.pdf';
       final savedPath = await receiptService.saveReceiptToFile(
         bytes,
         dialogTitle: 'Save Receipt',
@@ -112,7 +89,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
           await AppDialogService.success(
             context,
             title: 'Receipt Saved',
-            message: 'The receipt was saved successfully.',
+            message: 'PDF saved to $savedPath',
           );
         } else {
           AppDialogService.error(
@@ -134,93 +111,164 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
     }
   }
 
-  Future<void> _viewPaymentProof() async {
-    if (widget.sale.paymentProofPath == null) return;
+  Future<void> _viewPaymentProof(ReceiptViewData receipt) async {
+    if (receipt.paymentProofPath == null) return;
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => PaymentProofViewerScreen(sale: widget.sale),
+        builder: (_) => PaymentProofViewerScreen(sale: _sale),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        appBar: AppHeader(
+          title: 'Receipt',
+          showBackButton: true,
+        ),
+        body: LoadingState(),
+      );
+    }
+
+    if (_notFound || _saleId <= 0) {
+      return Scaffold(
+        appBar: const AppHeader(
+          title: 'Receipt Not Found',
+          showBackButton: true,
+        ),
+        body: ErrorState(
+          title: 'Receipt Not Found',
+          message: 'The requested receipt could not be found.',
+          onPrimaryAction: () => Navigator.of(context).pop(),
+          primaryActionLabel: 'Back',
+        ),
+      );
+    }
+
+    final receiptAsync = ref.watch(receiptViewDataProvider(_saleId));
+
     return Scaffold(
       appBar: AppHeader(
         title: 'Receipt',
         showBackButton: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _isLoading ? null : _load,
-          ),
-        ],
       ),
-      body: _isLoading
-          ? const LoadingState()
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildStoreHeader(),
-                  const SizedBox(height: 16),
-                  _buildItemsCard(),
-                  const SizedBox(height: 16),
-                  _buildPaymentCard(),
-                  if (widget.sale.notes != null && widget.sale.notes!.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    _buildNotesCard(),
-                  ],
-                  const SizedBox(height: 24),
-                  _buildActions(),
-                ],
-              ),
-            ),
+      body: receiptAsync.when(
+        loading: () => const LoadingState(),
+        error: (e, _) => ErrorState(
+          title: 'Error',
+          message: 'Failed to load receipt: $e',
+          onRetry: () => ref.invalidate(receiptViewDataProvider(_saleId)),
+        ),
+        data: (receipt) {
+          if (receipt == null) {
+            return const ErrorState(
+              title: 'Not Found',
+              message: 'The receipt could not be found or you do not have permission to view it.',
+            );
+          }
+          return _buildReceipt(receipt);
+        },
+      ),
     );
   }
 
-  Widget _buildStoreHeader() {
-    final store = _storeInfo;
+  Widget _buildReceipt(ReceiptViewData receipt) {
     final cs = Theme.of(context).colorScheme;
 
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildStoreHeader(receipt, cs),
+              const SizedBox(height: 16),
+              _buildTransactionHeader(receipt, cs),
+              const SizedBox(height: 16),
+              _buildItemsCard(receipt),
+              const SizedBox(height: 16),
+              _buildTotalsCard(receipt),
+              const SizedBox(height: 16),
+              _buildPaymentCard(receipt),
+              if (receipt.notes != null && receipt.notes!.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                _buildNotesCard(receipt),
+              ],
+              const SizedBox(height: 16),
+              _buildFooterCard(receipt, cs),
+              const SizedBox(height: 24),
+              _buildActions(receipt),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStoreHeader(ReceiptViewData receipt, ColorScheme cs) {
     return AppCard(
       color: cs.primaryContainer,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Text(
-              store?.storeName ?? 'Pinoy POS',
+              receipt.storeName,
               style: AppTypography.titleMediumBold(context)
                   .copyWith(color: cs.onPrimaryContainer),
               textAlign: TextAlign.center,
             ),
-            if (store?.storeAddress.isNotEmpty == true) ...[
+            if (receipt.storeAddress.isNotEmpty) ...[
               const SizedBox(height: 4),
               Text(
-                store!.storeAddress,
-                style: TextStyle(color: cs.onPrimaryContainer),
+                receipt.storeAddress,
+                style: TextStyle(color: cs.onPrimaryContainer, fontSize: 13),
                 textAlign: TextAlign.center,
               ),
             ],
-            if (store?.storePhone.isNotEmpty == true) ...[
+            if (receipt.storePhone.isNotEmpty) ...[
               const SizedBox(height: 2),
               Text(
-                'Contact: ${store!.storePhone}',
-                style: TextStyle(color: cs.onPrimaryContainer),
+                'Contact: ${receipt.storePhone}',
+                style: TextStyle(color: cs.onPrimaryContainer, fontSize: 13),
                 textAlign: TextAlign.center,
               ),
             ],
-            const Divider(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTransactionHeader(ReceiptViewData receipt, ColorScheme cs) {
+    return AppCard(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
             Text(
-              'Receipt #${widget.sale.receiptNumber ?? widget.sale.id}',
-              style: AppTypography.titleSmallBold(context)
-                  .copyWith(color: cs.onPrimaryContainer),
+              'OFFICIAL RECEIPT',
+              style: AppTypography.titleSmallBold(context).copyWith(color: cs.primary),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Receipt #${receipt.receiptNumber}',
+              style: AppTypography.titleMediumBold(context),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              receipt.date.toLocal().toString().split('.')[0],
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
             Text(
-              widget.sale.createdAt.toLocal().toString().split('.')[0],
-              style: TextStyle(color: cs.onPrimaryContainer),
+              'Cashier: ${receipt.cashierName}',
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
           ],
         ),
@@ -228,101 +276,189 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
     );
   }
 
-  Widget _buildItemsCard() {
+  Widget _buildItemsCard(ReceiptViewData receipt) {
     return AppCard(
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Item', style: Theme.of(context).textTheme.titleSmall),
-              Text('Qty • Price • Total',
-                  style: Theme.of(context).textTheme.titleSmall),
-            ],
-          ),
-          const Divider(),
-          ..._items.map((item) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _productNames[item.productId] ??
-                            'Product #${item.productId}',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Text(
-                      '${item.quantity} • ₱${item.unitPrice.toStringAsFixed(2)} • ₱${item.totalPrice.toStringAsFixed(2)}',
-                    ),
-                  ],
-                ),
-              )),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPaymentCard() {
-    return AppCard(
-      child: Column(
-        children: [
-          _buildRow('Subtotal',
-              '₱${widget.sale.totalAmount.toStringAsFixed(2)}'),
-          const Divider(),
-          if (widget.sale.paymentMethod == 'Cash') ...[
-            _buildRow('Cash Received',
-                '₱${widget.sale.cashReceived.toStringAsFixed(2)}'),
-            _buildRow('Change', '₱${widget.sale.change.toStringAsFixed(2)}'),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Item', style: Theme.of(context).textTheme.titleSmall),
+                Text('Total', style: Theme.of(context).textTheme.titleSmall),
+              ],
+            ),
             const Divider(),
+            ...receipt.items.map((item) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              item.productName,
+                              style: const TextStyle(fontSize: 15),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            item.formattedTotal(receipt.currency),
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${item.quantity} x ${item.formattedUnitPrice(receipt.currency)}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                )),
           ],
-          _buildRow('Total',
-              '₱${widget.sale.totalAmount.toStringAsFixed(2)}',
-              isTotal: true),
-          const Divider(),
-          _buildRow('Payment Method', widget.sale.paymentMethod),
-          if (widget.sale.referenceNumber != null &&
-              widget.sale.referenceNumber!.isNotEmpty)
-            _buildRow('Reference', widget.sale.referenceNumber!),
-          if (widget.sale.customerName != null &&
-              widget.sale.customerName!.isNotEmpty)
-            _buildRow('Customer', widget.sale.customerName!),
-          _buildRow(
-            'Status',
-            widget.sale.paymentStatus[0].toUpperCase() +
-                widget.sale.paymentStatus.substring(1),
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildNotesCard() {
+  Widget _buildTotalsCard(ReceiptViewData receipt) {
     return AppCard(
-      child: Column(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            _buildValueRow('Subtotal', receipt.formattedSubtotal()),
+            if (receipt.discount > 0)
+              _buildValueRow('Discount', receipt.formattedDiscount()),
+            const Divider(),
+            _buildValueRow('TOTAL', receipt.formattedTotal(), isTotal: true),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPaymentCard(ReceiptViewData receipt) {
+    return AppCard(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            _buildValueRow('Payment Method', receipt.paymentMethod),
+            if (receipt.cashReceived > 0)
+              _buildValueRow('Amount Paid', receipt.formattedCashReceived()),
+            if (receipt.change > 0)
+              _buildValueRow('Change', receipt.formattedChange()),
+            if (receipt.referenceNumber != null &&
+                receipt.referenceNumber!.isNotEmpty)
+              _buildValueRow('Reference', receipt.referenceNumber!),
+            if (receipt.customerName != null &&
+                receipt.customerName!.isNotEmpty)
+              _buildValueRow('Customer', receipt.customerName!),
+            _buildValueRow('Status', receipt.statusLabel),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNotesCard(ReceiptViewData receipt) {
+    return AppCard(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Notes', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            Text(receipt.notes!),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFooterCard(ReceiptViewData receipt, ColorScheme cs) {
+    return AppCard(
+      color: cs.secondaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            if (receipt.receiptFooter != null &&
+                receipt.receiptFooter!.isNotEmpty)
+              Text(
+                receipt.receiptFooter!,
+                style: TextStyle(color: cs.onSecondaryContainer),
+                textAlign: TextAlign.center,
+              ),
+            if (receipt.receiptFooter != null &&
+                receipt.receiptFooter!.isNotEmpty)
+              const SizedBox(height: 8),
+            Text(
+              'Thank you!',
+              style: TextStyle(
+                color: cs.onSecondaryContainer,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildValueRow(String label, String value, {bool isTotal = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Notes', style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: 8),
-          Text(widget.sale.notes!),
+          Expanded(
+            child: Text(
+              label,
+              style: isTotal
+                  ? AppTypography.titleMediumBold(context)
+                  : Theme.of(context).textTheme.bodyMedium,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            value,
+            style: isTotal
+                ? AppTypography.titleMediumBold(context)
+                : Theme.of(context).textTheme.bodyMedium,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildActions() {
+  Widget _buildActions(ReceiptViewData receipt) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (widget.sale.paymentProofPath != null &&
-            widget.sale.paymentProofPath!.isNotEmpty) ...[
+        if (receipt.paymentProofPath != null &&
+            receipt.paymentProofPath!.isNotEmpty) ...[
           FutureBuilder<File?>(
-            future: ImageService().resolveImageFile(widget.sale.paymentProofPath),
+            future: ImageService().resolveImageFile(receipt.paymentProofPath),
             builder: (context, snapshot) {
               final hasFile = snapshot.data != null;
               return OutlinedButton.icon(
-                onPressed: hasFile ? _viewPaymentProof : null,
+                onPressed: hasFile ? () => _viewPaymentProof(receipt) : null,
                 icon: const Icon(Icons.image_outlined),
                 label: const Text('View Payment Proof'),
               );
@@ -332,45 +468,21 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
         ],
         LoadingButton(
           isLoading: _isExporting,
-          onPressed: _downloadPdf,
+          onPressed: _isExporting ? null : () => _downloadPdf(receipt),
           label: 'Download as PDF',
         ),
         const SizedBox(height: 12),
-        OutlinedButton.icon(
-          onPressed: null, // Print not supported without printing package.
-          icon: const Icon(Icons.print_outlined),
-          label: const Text('Print (unavailable)'),
-        ),
-        const SizedBox(height: 12),
-        OutlinedButton.icon(
-          onPressed: null, // Share not supported without share_plus package.
-          icon: const Icon(Icons.share_outlined),
-          label: const Text('Share (unavailable)'),
+        OutlinedButton(
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => SaleDetailScreen(sale: _sale),
+              ),
+            );
+          },
+          child: const Text('View Sale Details'),
         ),
       ],
-    );
-  }
-
-  Widget _buildRow(String label, String value, {bool isTotal = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: isTotal
-                ? AppTypography.titleMediumBold(context)
-                : Theme.of(context).textTheme.bodyMedium,
-          ),
-          Text(
-            value,
-            style: isTotal
-                ? AppTypography.titleMediumBold(context)
-                : Theme.of(context).textTheme.bodyMedium,
-          ),
-        ],
-      ),
     );
   }
 }

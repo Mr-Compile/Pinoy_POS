@@ -1,4 +1,4 @@
-class Settings {
+﻿class Settings {
   final int? id;
   final String storeName;
   final String storeAddress;
@@ -15,6 +15,7 @@ class Settings {
   final String gcashPaymentProofRequirement;
   final String gcashVerificationMode;
   final int gcashReferenceMinLength;
+  final int aiDailyQuota;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -35,6 +36,7 @@ class Settings {
     this.gcashPaymentProofRequirement = 'optional',
     this.gcashVerificationMode = 'immediate',
     this.gcashReferenceMinLength = 6,
+    this.aiDailyQuota = 20,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -57,6 +59,7 @@ class Settings {
       'gcash_payment_proof_requirement': gcashPaymentProofRequirement,
       'gcash_verification_mode': gcashVerificationMode,
       'gcash_reference_min_length': gcashReferenceMinLength,
+      'ai_daily_quota': aiDailyQuota,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -83,6 +86,7 @@ class Settings {
       gcashVerificationMode:
           (map['gcash_verification_mode'] as String?) ?? 'immediate',
       gcashReferenceMinLength: (map['gcash_reference_min_length'] as int?) ?? 6,
+      aiDailyQuota: (map['ai_daily_quota'] as int?) ?? 20,
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
     );
@@ -105,6 +109,7 @@ class Settings {
     String? gcashPaymentProofRequirement,
     String? gcashVerificationMode,
     int? gcashReferenceMinLength,
+    int? aiDailyQuota,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -127,6 +132,7 @@ class Settings {
           gcashPaymentProofRequirement ?? this.gcashPaymentProofRequirement,
       gcashVerificationMode: gcashVerificationMode ?? this.gcashVerificationMode,
       gcashReferenceMinLength: gcashReferenceMinLength ?? this.gcashReferenceMinLength,
+      aiDailyQuota: aiDailyQuota ?? this.aiDailyQuota,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

@@ -1,10 +1,10 @@
-/// Application-wide constants
+﻿/// Application-wide constants
 class AppConstants {
   AppConstants._();
 
   // Database
   static const String databaseName = 'pinoy_pos.db';
-  static const int databaseVersion = 11;
+  static const int databaseVersion = 13;
 
   // App Info
   static const String appName = 'Pinoy POS';
@@ -14,7 +14,9 @@ class AppConstants {
   static const int defaultPageSize = 20;
 
   // AI
-  static const int maxDailyAIQueries = 10;
+  static const int maxDailyAIQueries = 10; // Legacy fallback; prefer aiDailyQuota from Settings.
+  static const int defaultDailyAIQuota = 20;
+  static const int maxDailyAIQuota = 1000;
 
   // Security
   static const int minPasswordLength = 8;

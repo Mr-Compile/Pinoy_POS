@@ -1,10 +1,11 @@
-import 'package:pinoy_pos/core/authorization_exception.dart';
+﻿import 'package:pinoy_pos/core/authorization_exception.dart';
 import 'package:pinoy_pos/core/constants.dart';
 import 'package:pinoy_pos/core/security.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/data/repositories/user_repository.dart';
 import 'package:pinoy_pos/services/activity_log_service.dart';
+import 'package:pinoy_pos/services/ai_quota_service.dart';
 import 'package:pinoy_pos/services/password_strength_service.dart';
 
 /// Result of a user operation.  Carries a human-readable message and a
@@ -166,6 +167,8 @@ class UserService {
 
     final id = await _userRepository.insert(user);
     final createdUser = user.copyWith(id: id);
+
+    await AIQuotaService().ensureQuotaForUser(id);
 
     await _activityLogService.logActivity(
       action: 'USER_CREATED',
@@ -621,3 +624,4 @@ class UserService {
     );
   }
 }
+

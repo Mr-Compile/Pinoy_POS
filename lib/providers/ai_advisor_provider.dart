@@ -2,40 +2,45 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/ai_config_status.dart';
 import 'package:pinoy_pos/core/constants.dart';
+import 'package:pinoy_pos/core/session_manager.dart';
+import 'package:pinoy_pos/data/models/ai_response.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/providers/navigation_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/services/ai_advisor_service.dart';
+import 'package:pinoy_pos/services/ai_navigation_service.dart';
 
 /// A single message in the AI Advisor conversation.
+///
+/// Messages can either be plain text ([text]) for conversational AI
+/// responses, or a structured [AIResponse] that the app renders with
+/// instructions, navigation actions, and follow-up suggestions.
 class AIChatMessage {
   final String text;
+  final AIResponse? response;
   final bool isUser;
   final DateTime timestamp;
   final bool isError;
 
   AIChatMessage({
     required this.text,
+    this.response,
     required this.isUser,
     required this.timestamp,
     this.isError = false,
   });
+
+  /// True when this message should be rendered as a structured card.
+  bool get isStructured => response != null;
 }
 
 /// State for the AI Advisor chat experience.
-///
-/// State is separated into independent concerns so one failing operation
-/// never blocks the rest of the UI:
-/// - [configStatus]: AI configuration state (active/notConfigured/invalid/...)
-/// - [remainingQueries]: daily limit tracking
-/// - [messages]: conversation history
-/// - [isSending]: request processing state
-/// - [isPanelOpen]: panel visibility
-/// - [suggestions]: contextual suggested questions
 class AIAdvisorChatState {
   final List<AIChatMessage> messages;
   final bool isSending;
   final AIConfigStatus configStatus;
   final int remainingQueries;
+  final int dailyQuota;
   final bool isPanelOpen;
   final List<String> suggestions;
   final String? modelName;
@@ -44,7 +49,8 @@ class AIAdvisorChatState {
     this.messages = const [],
     this.isSending = false,
     this.configStatus = AIConfigStatus.checking,
-    this.remainingQueries = AppConstants.maxDailyAIQueries,
+    this.remainingQueries = 0,
+    this.dailyQuota = 0,
     this.isPanelOpen = false,
     this.suggestions = const [],
     this.modelName,
@@ -55,6 +61,7 @@ class AIAdvisorChatState {
     bool? isSending,
     AIConfigStatus? configStatus,
     int? remainingQueries,
+    int? dailyQuota,
     bool? isPanelOpen,
     List<String>? suggestions,
     String? modelName,
@@ -64,6 +71,7 @@ class AIAdvisorChatState {
       isSending: isSending ?? this.isSending,
       configStatus: configStatus ?? this.configStatus,
       remainingQueries: remainingQueries ?? this.remainingQueries,
+      dailyQuota: dailyQuota ?? this.dailyQuota,
       isPanelOpen: isPanelOpen ?? this.isPanelOpen,
       suggestions: suggestions ?? this.suggestions,
       modelName: modelName ?? this.modelName,
@@ -71,33 +79,14 @@ class AIAdvisorChatState {
   }
 }
 
-/// StateNotifier that manages the AI Advisor chat experience.
-///
-/// RBAC: The underlying [AIAdvisorService] enforces `use_ai_advisor`
-/// (Owner only) at the service layer. This notifier also checks the
-/// permission before any operation to fail fast.
-///
-/// Duplicate request prevention: [isSending] is checked before sending.
-/// The notifier does not allow concurrent send operations.
-///
-/// No API calls from build(): All async operations are triggered by
-/// explicit user actions (openPanel, sendQuery) or lifecycle hooks
-/// (initState in the screen), never during provider construction or
-/// widget build.
 class AIAdvisorChatNotifier extends StateNotifier<AIAdvisorChatState> {
   final Ref _ref;
 
   AIAdvisorChatNotifier(this._ref) : super(AIAdvisorChatState());
 
-  /// Checks the AI configuration status, remaining query count, and
-  /// loads contextual suggestions. Called when the chat screen/panel opens.
   Future<void> checkConfig() async {
     final authNotifier = _ref.read(authStateProvider.notifier);
 
-    // AI Advisor is available to users with `use_ai_advisor` (Owner,
-    // Admin, Staff).  The config screen also refreshes this provider
-    // after an Admin saves/clears the Groq configuration, so we also
-    // accept `manage_ai_config` for that refresh-only path.
     if (!authNotifier.hasPermission('use_ai_advisor') &&
         !authNotifier.hasPermission('manage_ai_config')) {
       state = state.copyWith(configStatus: AIConfigStatus.unavailable);
@@ -111,26 +100,24 @@ class AIAdvisorChatNotifier extends StateNotifier<AIAdvisorChatState> {
       final aiUsageService = _ref.read(aiUsageServiceProvider);
 
       final isConfigured = await settingsService.isGroqConfigured();
-      final used = await aiUsageService.getTodayUsageCount();
+      final remaining = await aiUsageService.getRemainingQueries();
+      final dailyQuota = await aiUsageService.getDailyQuota();
       final model = await settingsService.getGroqModel();
-
-      final remaining =
-          (AppConstants.maxDailyAIQueries - used)
-              .clamp(0, AppConstants.maxDailyAIQueries);
 
       if (!isConfigured) {
         state = state.copyWith(
           configStatus: AIConfigStatus.notConfigured,
           remainingQueries: remaining,
+          dailyQuota: dailyQuota,
           modelName: model,
         );
       } else {
         state = state.copyWith(
           configStatus: AIConfigStatus.active,
           remainingQueries: remaining,
+          dailyQuota: dailyQuota,
           modelName: model,
         );
-        // Load contextual suggestions in the background.
         _loadSuggestions();
       }
     } catch (e, st) {
@@ -139,12 +126,10 @@ class AIAdvisorChatNotifier extends StateNotifier<AIAdvisorChatState> {
     }
   }
 
-  /// Loads contextual suggestions based on real database conditions.
   Future<void> _loadSuggestions() async {
     try {
       final aiAdvisorService = _ref.read(aiAdvisorServiceProvider);
-      final suggestions =
-          await aiAdvisorService.getContextualSuggestions();
+      final suggestions = await aiAdvisorService.getContextualSuggestions();
       if (mounted) {
         state = state.copyWith(suggestions: suggestions);
       }
@@ -153,97 +138,79 @@ class AIAdvisorChatNotifier extends StateNotifier<AIAdvisorChatState> {
     }
   }
 
-  /// Sends a user query to the AI Advisor and appends the response.
-  ///
-  /// Duplicate request prevention: if [isSending] is already true, the
-  /// call is ignored. This prevents concurrent API requests from
-  /// bypassing the daily limit or creating duplicate messages.
   Future<void> sendQuery(String query) async {
     final q = query.trim();
     if (q.isEmpty) return;
 
-    // Prevent duplicate/concurrent send requests.
     if (state.isSending) return;
 
     final authNotifier = _ref.read(authStateProvider.notifier);
     if (!authNotifier.hasPermission('use_ai_advisor')) {
-      state = state.copyWith(
-        messages: [
-          ...state.messages,
-          AIChatMessage(
-            text: 'You do not have permission to use the AI Advisor.',
-            isUser: false,
-            timestamp: DateTime.now(),
-            isError: true,
-          ),
-        ],
+      _addBotMessage(
+        text: 'You do not have permission to use the AI Advisor.',
+        isError: true,
       );
       return;
     }
 
-    // Check config status.
+    // First, try to satisfy navigation and how-to queries locally so the
+    // assistant works even when offline or when the AI service is not
+    // configured. The application always validates permissions.
+    final currentDestinationId = _ref.read(currentRouteProvider);
+    final navigationResponse = await AINavigationService.resolveNavigationResponse(
+      q,
+      role: SessionManager().currentUser?.role,
+      hasPermission: authNotifier.hasPermission,
+      currentDestinationId: currentDestinationId,
+    );
+
+    if (navigationResponse != null) {
+      _addUserMessage(q);
+      _addBotMessage(
+        text: navigationResponse.message,
+        response: navigationResponse,
+      );
+      return;
+    }
+
     if (state.configStatus != AIConfigStatus.active) {
       await checkConfig();
       if (state.configStatus != AIConfigStatus.active) {
-        state = state.copyWith(
-          messages: [
-            ...state.messages,
-            AIChatMessage(
-              text: state.configStatus.label,
-              isUser: false,
-              timestamp: DateTime.now(),
-              isError: true,
-            ),
-          ],
+        _addBotMessage(
+          text: state.configStatus.label,
+          isError: true,
         );
         return;
       }
     }
 
-    // Check daily limit.
     if (state.remainingQueries <= 0) {
-      state = state.copyWith(
-        messages: [
-          ...state.messages,
-          AIChatMessage(
-            text:
-                'You have used all ${AppConstants.maxDailyAIQueries} AI queries for today. Your limit will reset tomorrow.',
-            isUser: false,
-            timestamp: DateTime.now(),
-            isError: true,
-          ),
-        ],
+      _addBotMessage(
+        text:
+            'You have used all ${state.dailyQuota} AI queries for today. Your limit will reset tomorrow.',
+        isError: true,
       );
       return;
     }
 
-    // Append user message and set sending state.
-    state = state.copyWith(
-      messages: [
-        ...state.messages,
-        AIChatMessage(text: q, isUser: true, timestamp: DateTime.now()),
-      ],
-      isSending: true,
-    );
+    _addUserMessage(q);
+    state = state.copyWith(isSending: true);
 
     try {
       final aiAdvisorService = _ref.read(aiAdvisorServiceProvider);
 
-      // Build conversation history from existing messages (last 6).
       final history = <ConversationMessage>[];
       final recentMessages = state.messages.length > 6
           ? state.messages.sublist(state.messages.length - 6)
           : state.messages;
       for (final msg in recentMessages) {
-        if (!msg.isError) {
+        if (!msg.isError && !msg.isStructured) {
           history.add(ConversationMessage(
             role: msg.isUser ? 'user' : 'assistant',
             content: msg.text,
           ));
         }
       }
-      // Remove the last entry (it's the current query, which is passed
-      // separately to the service).
       if (history.isNotEmpty) history.removeLast();
 
       final result = await aiAdvisorService.query(q, conversationHistory: history);
@@ -262,11 +229,9 @@ class AIAdvisorChatNotifier extends StateNotifier<AIAdvisorChatState> {
           ],
           isSending: false,
           remainingQueries:
-              (state.remainingQueries - 1)
-                  .clamp(0, AppConstants.maxDailyAIQueries),
+              (state.remainingQueries - 1).clamp(0, AppConstants.maxDailyAIQuota),
         );
       } else {
-        // Determine config status from result.
         AIConfigStatus newStatus = state.configStatus;
         if (result.isNotConfigured) {
           newStatus = AIConfigStatus.notConfigured;
@@ -294,40 +259,61 @@ class AIAdvisorChatNotifier extends StateNotifier<AIAdvisorChatState> {
     } catch (e, st) {
       _log('sendQuery failed', e, st);
       if (mounted) {
-        state = state.copyWith(
-          messages: [
-            ...state.messages,
-            AIChatMessage(
-              text:
-                  'The advisor could not complete the analysis. Please try again.',
-              isUser: false,
-              timestamp: DateTime.now(),
-              isError: true,
-            ),
-          ],
-          isSending: false,
+        _addBotMessage(
+          text:
+              'The advisor could not complete the analysis. Please try again.',
+          isError: true,
         );
       }
     }
   }
 
-  /// Opens the chat panel and triggers config check.
+  void _addUserMessage(String text) {
+    state = state.copyWith(
+      messages: [
+        ...state.messages,
+        AIChatMessage(
+          text: text,
+          isUser: true,
+          timestamp: DateTime.now(),
+        ),
+      ],
+    );
+  }
+
+  void _addBotMessage({
+    required String text,
+    AIResponse? response,
+    bool isError = false,
+  }) {
+    state = state.copyWith(
+      messages: [
+        ...state.messages,
+        AIChatMessage(
+          text: text,
+          response: response,
+          isUser: false,
+          timestamp: DateTime.now(),
+          isError: isError,
+        ),
+      ],
+      isSending: false,
+    );
+  }
+
   void openPanel() {
     state = state.copyWith(isPanelOpen: true);
     checkConfig();
   }
 
-  /// Minimizes the chat panel back to the floating chat head.
   void minimizePanel() {
     state = state.copyWith(isPanelOpen: false);
   }
 
-  /// Closes the chat panel (does not destroy the feature).
   void closePanel() {
     state = state.copyWith(isPanelOpen: false);
   }
 
-  /// Clears the conversation history.
   void clearConversation() {
     state = state.copyWith(messages: []);
   }
@@ -343,3 +329,4 @@ final aiAdvisorChatProvider =
     StateNotifierProvider<AIAdvisorChatNotifier, AIAdvisorChatState>((ref) {
   return AIAdvisorChatNotifier(ref);
 });
+

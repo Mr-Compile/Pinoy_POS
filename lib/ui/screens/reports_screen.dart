@@ -552,19 +552,23 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
       if (sales.isEmpty) {
         if (mounted) {
-          AppDialogService.error(context,
-              title: 'No Data',
-              message: 'No sales data available for the selected period.');
+          AppDialogService.info(context,
+              title: 'No Sales',
+              message:
+                  'No sales were recorded for the selected period. Try adjusting the date filters.');
         }
         return;
       }
 
+      final users = await ref.read(userServiceProvider).getAllUsers();
+      final userNames = {for (final u in users) u.id!: u.fullName};
+
       final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
 
       if (_selectedFormat == ExportFormat.pdf) {
-        await _exportToPdf(state, sales, timestamp);
+        await _exportToPdf(state, sales, userNames, timestamp);
       } else {
-        await _exportToExcel(state, sales, timestamp);
+        await _exportToExcel(state, sales, userNames, timestamp);
       }
     } catch (e, st) {
       debugPrint('[ReportsScreen] export failed: $e\n$st');
@@ -600,6 +604,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   Future<void> _exportToPdf(
     ReportsState state,
     List<Sale> sales,
+    Map<int, String> userNames,
     String timestamp,
   ) async {
     final pdf = pw.Document();
@@ -656,21 +661,37 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           pw.SizedBox(height: 20),
           pw.Header(level: 1, child: pw.Text('Sales Detail')),
           pw.TableHelper.fromTextArray(
-            headers: ['Receipt #', 'Date', 'Method', 'Total', 'Cash', 'Change'],
+            headers: [
+              'Receipt #',
+              'Date',
+              'Method',
+              'Status',
+              'Total',
+              'Cash',
+              'Change',
+              'Reference',
+              'Customer',
+              'Cashier',
+            ],
             data: sales
                 .map((s) => [
                       '${s.receiptNumber ?? s.id}',
                       s.createdAt.toLocal().toString().split('.')[0],
                       s.paymentMethod,
+                      _statusLabel(s.paymentStatus),
                       '$currency ${s.totalAmount.toStringAsFixed(2)}',
                       '$currency ${s.cashReceived.toStringAsFixed(2)}',
                       '$currency ${s.change.toStringAsFixed(2)}',
+                      s.referenceNumber ?? '',
+                      s.customerName ?? '',
+                      userNames[s.userId] ?? 'User ${s.userId}',
                     ])
                 .toList(),
             headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
             headerDecoration: pw.BoxDecoration(color: PdfColors.grey300),
             cellAlignment: pw.Alignment.centerLeft,
-            cellPadding: const pw.EdgeInsets.all(6),
+            cellPadding: const pw.EdgeInsets.all(4),
+            tableWidth: pw.TableWidth.max,
           ),
         ],
       ),
@@ -733,6 +754,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   Future<void> _exportToExcel(
     ReportsState state,
     List<Sale> sales,
+    Map<int, String> userNames,
     String timestamp,
   ) async {
     final excel = Excel.createExcel();
@@ -766,9 +788,13 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       TextCellValue('Receipt #'),
       TextCellValue('Date'),
       TextCellValue('Payment Method'),
+      TextCellValue('Status'),
       TextCellValue('Total'),
       TextCellValue('Cash Received'),
       TextCellValue('Change'),
+      TextCellValue('Reference'),
+      TextCellValue('Customer'),
+      TextCellValue('Cashier'),
       TextCellValue('Notes'),
     ]);
 
@@ -777,9 +803,13 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         TextCellValue('${s.receiptNumber ?? s.id}'),
         TextCellValue(s.createdAt.toLocal().toString().split('.')[0]),
         TextCellValue(s.paymentMethod),
+        TextCellValue(_statusLabel(s.paymentStatus)),
         DoubleCellValue(s.totalAmount),
         DoubleCellValue(s.cashReceived),
         DoubleCellValue(s.change),
+        TextCellValue(s.referenceNumber ?? ''),
+        TextCellValue(s.customerName ?? ''),
+        TextCellValue(userNames[s.userId] ?? 'User ${s.userId}'),
         TextCellValue(s.notes ?? ''),
       ]);
     }
@@ -844,6 +874,11 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           title: 'Export Complete',
           message: 'Excel report saved successfully.');
     }
+  }
+
+  String _statusLabel(String status) {
+    if (status.isEmpty) return 'Unknown';
+    return status[0].toUpperCase() + status.substring(1);
   }
 
   String _formatRange(DateTime? start, DateTime? end) {

@@ -7,13 +7,16 @@ import 'package:pinoy_pos/data/models/payment_settings.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/data/models/sale_item.dart';
 import 'package:pinoy_pos/data/models/user.dart';
+import 'package:pinoy_pos/data/models/receipt_view_data.dart';
 import 'package:pinoy_pos/data/repositories/product_repository.dart';
 import 'package:pinoy_pos/data/repositories/sale_repository.dart';
 import 'package:pinoy_pos/data/repositories/sale_item_repository.dart';
 import 'package:pinoy_pos/data/repositories/stock_history_repository.dart';
+import 'package:pinoy_pos/data/repositories/user_repository.dart';
 import 'package:pinoy_pos/data/models/stock_history.dart';
 import 'package:pinoy_pos/services/activity_log_service.dart';
 import 'package:pinoy_pos/services/image_service.dart';
+import 'package:pinoy_pos/services/report_service.dart';
 import 'package:pinoy_pos/services/settings_service.dart';
 import 'package:pinoy_pos/services/stock_service.dart';
 import 'package:sqflite/sqflite.dart';
@@ -29,6 +32,8 @@ class SalesService {
   final DatabaseHelper _dbHelper = DatabaseHelper();
   final SettingsService _settingsService = SettingsService();
   final ImageService _imageService = ImageService();
+  final ReportService _reportService = ReportService();
+  final UserRepository _userRepository = UserRepository();
 
   Future<List<Sale>> getSales() async {
     if (!_sessionManager.hasPermission('view_sales')) {
@@ -103,6 +108,23 @@ class SalesService {
     return sale;
   }
 
+  Future<Sale?> getLatestSale() async {
+    if (!_sessionManager.hasPermission('view_sales')) {
+      return null;
+    }
+
+    final userId = _sessionManager.currentUser?.role == UserRole.staff
+        ? _sessionManager.currentUser!.id
+        : null;
+
+    final sales = await _saleRepository.getFilteredSales(
+      userId: userId,
+      limit: 1,
+    );
+
+    return sales.isNotEmpty ? sales.first : null;
+  }
+
   Future<List<SaleItem>> getSaleItems(int saleId) async {
     if (!_sessionManager.hasPermission('view_sales')) {
       return [];
@@ -119,6 +141,71 @@ class SalesService {
     }
 
     return _saleItemRepository.getBySaleId(saleId);
+  }
+
+  /// Builds a [ReceiptViewData] for the given sale id.
+  ///
+  /// Returns null if the sale cannot be found or the current user is not
+  /// allowed to view it.  Product names are read from the persisted
+  /// [SaleItem.productName] when available; older records fall back to the
+  /// current product name.
+  Future<ReceiptViewData?> getReceiptViewData(int saleId) async {
+    if (!_sessionManager.hasPermission('view_sales')) {
+      return null;
+    }
+
+    final sale = await _saleRepository.getById(saleId);
+    if (sale == null) return null;
+
+    if (_sessionManager.currentUser?.role == UserRole.staff &&
+        sale.userId != _sessionManager.currentUser!.id) {
+      return null;
+    }
+
+    final items = await _saleItemRepository.getBySaleId(saleId);
+    final store = await _reportService.getStoreInfo();
+    final cashier = await _userRepository.getById(sale.userId);
+
+    final receiptItems = <ReceiptItem>[];
+    for (final item in items) {
+      String name = item.productName ?? '';
+      if (name.isEmpty) {
+        final product = await _productRepository.getById(item.productId);
+        name = product?.name ?? 'Product #${item.productId}';
+      }
+      receiptItems.add(ReceiptItem(
+        productId: item.productId,
+        productName: name,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        totalPrice: item.totalPrice,
+      ));
+    }
+
+    return ReceiptViewData(
+      storeName: store.storeName,
+      storeAddress: store.storeAddress,
+      storePhone: store.storePhone,
+      currency: store.currency,
+      receiptFooter: store.receiptFooter,
+      storeLogoPath: null,
+      saleId: sale.id!,
+      receiptNumber: sale.receiptNumber ?? sale.id!.toString(),
+      date: sale.createdAt,
+      cashierName: cashier?.fullName ?? cashier?.username ?? 'Unknown',
+      paymentMethod: sale.paymentMethod,
+      paymentStatus: sale.paymentStatus,
+      total: sale.totalAmount,
+      subtotal: sale.totalAmount,
+      discount: 0,
+      cashReceived: sale.cashReceived,
+      change: sale.change,
+      referenceNumber: sale.referenceNumber,
+      customerName: sale.customerName,
+      notes: sale.notes,
+      paymentProofPath: sale.paymentProofPath,
+      items: receiptItems,
+    );
   }
 
   /// Create a sale within a single atomic transaction.
@@ -233,7 +320,8 @@ class SalesService {
       }
     }
 
-    // Pre-check stock availability for all items
+    // Pre-check stock availability and snapshot historical product names.
+    final itemsWithNames = <SaleItem>[];
     for (final item in items) {
       final product = await _productRepository.getById(item.productId);
       if (product == null) {
@@ -245,6 +333,7 @@ class SalesService {
           details: 'Available: ${product.stock}, requested: ${item.quantity}.',
         );
       }
+      itemsWithNames.add(item.copyWith(productName: product.name));
     }
 
     String? committedProofPath;
@@ -295,7 +384,7 @@ class SalesService {
 
         final saleId = await _saleRepository.insert(sale, txn: txn);
 
-        for (var item in items) {
+        for (var item in itemsWithNames) {
           final saleItem = item.copyWith(saleId: saleId);
           await _saleItemRepository.insert(saleItem, txn: txn);
 

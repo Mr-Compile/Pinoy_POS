@@ -4,16 +4,24 @@ class ErrorState extends StatelessWidget {
   final String title;
   final String? message;
   final VoidCallback? onRetry;
+  final VoidCallback? onPrimaryAction;
+  final String? primaryActionLabel;
 
   const ErrorState({
     super.key,
     required this.title,
     this.message,
     this.onRetry,
+    this.onPrimaryAction,
+    this.primaryActionLabel,
   });
 
   @override
   Widget build(BuildContext context) {
+    final primary = onPrimaryAction ?? onRetry;
+    final primaryLabel = primaryActionLabel ?? 'Retry';
+    final primaryIcon = onPrimaryAction != null ? null : const Icon(Icons.refresh);
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32.0),
@@ -41,12 +49,12 @@ class ErrorState extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
             ],
-            if (onRetry != null) ...[
+            if (primary != null) ...[
               const SizedBox(height: 24),
               FilledButton.icon(
-                onPressed: onRetry,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Retry'),
+                onPressed: primary,
+                icon: primaryIcon,
+                label: Text(primaryLabel),
               ),
             ],
           ],

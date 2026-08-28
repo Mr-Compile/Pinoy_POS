@@ -1,8 +1,9 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/ui/screens/activity_logs_screen.dart';
 import 'package:pinoy_pos/ui/screens/ai_config_screen.dart';
+import 'package:pinoy_pos/ui/screens/ai_quota_management_page.dart';
 import 'package:pinoy_pos/ui/screens/backup_restore_screen.dart';
 import 'package:pinoy_pos/ui/screens/profile_screen.dart';
 import 'package:pinoy_pos/ui/screens/settings/appearance_settings_page.dart';
@@ -45,6 +46,7 @@ class SettingsScreen extends ConsumerWidget {
         !authNotifier.hasPermission('backup_restore');
     final canBackup = authNotifier.hasPermission('backup_restore');
     final canManageAi = authNotifier.hasPermission('manage_ai_config');
+    final canManageAiQuota = authNotifier.hasPermission('manage_users') && authNotifier.hasPermission('edit_settings');
     final canViewActivityLogs = authNotifier.hasPermission('view_activity_logs');
     final canViewTrash = authNotifier.hasPermission('view_trash');
 
@@ -112,6 +114,14 @@ class SettingsScreen extends ConsumerWidget {
         title: 'AI Configuration',
         subtitle: 'Configure Groq API key and model',
         screen: const AIConfigScreen(),
+      ));
+    }
+    if (canManageAiQuota) {
+      systemEntries.add(_SettingsEntry(
+        icon: Icons.rule_outlined,
+        title: 'AI Quota Management',
+        subtitle: 'Manage default and per-user AI query quotas',
+        screen: const AIQuotaManagementPage(),
       ));
     }
 

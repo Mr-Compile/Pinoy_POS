@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+﻿import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart';
@@ -270,6 +270,46 @@ class DatabaseHelper {
         'AND payment_status NOT IN (\'cancelled\', \'refunded\')',
       );
     }
+
+    // Migration from v11 → v12: add product_name to sale_items so receipts
+    // can display the historical product name even if the product is later
+    // renamed or deleted.
+    if (oldVersion < 12) {
+      await db.execute('ALTER TABLE sale_items ADD COLUMN product_name TEXT');
+    }
+
+    // Migration from v12 -> v13: add AI quota table and default AI quota
+    // column to settings. Seed an ai_quota row for every existing user.
+    if (oldVersion < 13) {
+      await db.execute('ALTER TABLE settings ADD COLUMN ai_daily_quota INTEGER NOT NULL DEFAULT 20');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS ai_quota (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL UNIQUE,
+          daily_quota INTEGER NOT NULL,
+          daily_usage INTEGER NOT NULL DEFAULT 0,
+          quota_date TEXT NOT NULL,
+          last_reset_at TEXT,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+      ''');
+
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_ai_quota_user ON ai_quota(user_id)',
+      );
+
+      final defaultQuota = AppConstants.defaultDailyAIQuota;
+      final now = DateTime.now().toIso8601String();
+      final today = DateTime.now().toIso8601String();
+
+      await db.execute('''
+        INSERT INTO ai_quota (user_id, daily_quota, daily_usage, quota_date, last_reset_at)
+        SELECT id, ?, 0, ?, ?
+        FROM users
+        WHERE deleted_at IS NULL
+      ''', [defaultQuota, today, now]);
+    }
   }
 
   Future<void> _createTables(Database db) async {
@@ -361,6 +401,7 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         sale_id INTEGER NOT NULL,
         product_id INTEGER NOT NULL,
+        product_name TEXT,
         quantity INTEGER NOT NULL,
         unit_price REAL NOT NULL,
         total_price REAL NOT NULL,
@@ -435,6 +476,7 @@ class DatabaseHelper {
         gcash_payment_proof_requirement TEXT NOT NULL DEFAULT 'optional',
         gcash_verification_mode TEXT NOT NULL DEFAULT 'immediate',
         gcash_reference_min_length INTEGER NOT NULL DEFAULT 6,
+        ai_daily_quota INTEGER NOT NULL DEFAULT 20,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       )
@@ -463,10 +505,23 @@ class DatabaseHelper {
         query TEXT NOT NULL,
         response TEXT,
         created_at TEXT NOT NULL,
-        FOREIGN KEY (user_id) REFERENCES users(id)
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       )
     ''');
 
+
+    // AI quota table
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS ai_quota (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL UNIQUE,
+        daily_quota INTEGER NOT NULL,
+        daily_usage INTEGER NOT NULL DEFAULT 0,
+        quota_date TEXT NOT NULL,
+        last_reset_at TEXT,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    ''');
     // Trash table
     await db.execute('''
       CREATE TABLE IF NOT EXISTS trash (
@@ -564,6 +619,8 @@ class DatabaseHelper {
     await db.execute('CREATE INDEX IF NOT EXISTS idx_export_history_date ON export_history(created_at)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_ai_usage_user ON ai_usage(user_id)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_ai_usage_date ON ai_usage(created_at)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_ai_quota_user ON ai_quota(user_id)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_ai_quota_date ON ai_quota(quota_date)');
   }
 
   Future<void> close() async {
@@ -605,6 +662,7 @@ class DatabaseHelper {
       await txn.execute('DROP TABLE IF EXISTS settings');
       await txn.execute('DROP TABLE IF EXISTS activity_logs');
       await txn.execute('DROP TABLE IF EXISTS ai_usage');
+      await txn.execute('DROP TABLE IF EXISTS ai_quota');
       await txn.execute('DROP TABLE IF EXISTS trash');
       await txn.execute('DROP TABLE IF EXISTS backup_history');
       await txn.execute('DROP TABLE IF EXISTS export_history');

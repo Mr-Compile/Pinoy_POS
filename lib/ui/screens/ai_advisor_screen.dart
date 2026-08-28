@@ -1,30 +1,14 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/ai_config_status.dart';
 import 'package:pinoy_pos/core/ai_role_config.dart';
-import 'package:pinoy_pos/core/constants.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/providers/ai_advisor_provider.dart';
+import 'package:pinoy_pos/ui/widgets/ai_assistant_message.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 
 /// Role-aware AI Advisor screen.
-///
-/// RBAC: The FAB that opens this screen is shown to users with
-/// `use_ai_advisor` (Owner, Admin, Staff). The underlying [AIAdvisorService]
-/// enforces this permission at the service layer and restricts data access
-/// via [AICapabilityPolicy] based on the authenticated role.
-///
-/// The screen provides:
-/// - A status indicator (Connected / Offline / Not Configured)
-/// - A model name indicator
-/// - A query limit badge (N / 10 today)
-/// - A welcome state with suggested prompts
-/// - A chat area with user and AI message bubbles
-/// - An input bar with send button
-/// - Loading state (assistant thinking) without freezing the screen
-/// - Offline detection with a clear dialog
-/// - Error handling via centralized dialogs
 class AIAdvisorScreen extends ConsumerStatefulWidget {
   const AIAdvisorScreen({super.key});
 
@@ -87,7 +71,7 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
     _scrollToBottom();
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────
+  // -- Build ---------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -107,27 +91,23 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
       ),
       body: Column(
         children: [
-          // Config warning banner (if not active).
           if (_configChecked &&
               chatState.configStatus != AIConfigStatus.active &&
               chatState.configStatus != AIConfigStatus.checking)
             _buildConfigWarning(context, chatState.configStatus),
-          // Query limit bar.
           _buildQueryLimitBar(context, chatState),
-          // Chat area.
           Expanded(
             child: chatState.messages.isEmpty
                 ? _buildWelcomeState(context, chatState)
                 : _buildChatList(context, chatState),
           ),
-          // Input bar.
           _buildInputBar(context, chatState),
         ],
       ),
     );
   }
 
-  // ── Status Chip ───────────────────────────────────────────────────────
+  // -- Status Chip ---------------------------------------------------------
 
   Widget _buildStatusChip(BuildContext context, AIAdvisorChatState chatState) {
     final cs = Theme.of(context).colorScheme;
@@ -162,7 +142,7 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
     );
   }
 
-  // ── Config Warning Banner ─────────────────────────────────────────────
+  // -- Config Warning Banner -----------------------------------------------
 
   Widget _buildConfigWarning(BuildContext context, AIConfigStatus status) {
     final cs = Theme.of(context).colorScheme;
@@ -196,13 +176,13 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
     );
   }
 
-  // ── Query Limit Bar ───────────────────────────────────────────────────
+  // -- Query Limit Bar -----------------------------------------------------
 
   Widget _buildQueryLimitBar(
       BuildContext context, AIAdvisorChatState chatState) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final used = AppConstants.maxDailyAIQueries - chatState.remainingQueries;
+    final used = chatState.dailyQuota - chatState.remainingQueries;
     final isLimitReached = chatState.remainingQueries <= 0;
 
     return Container(
@@ -226,8 +206,8 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(4),
               child: LinearProgressIndicator(
-                value: AppConstants.maxDailyAIQueries > 0
-                    ? used / AppConstants.maxDailyAIQueries
+                value: chatState.dailyQuota > 0
+                    ? used / chatState.dailyQuota
                     : 0,
                 backgroundColor: cs.surfaceContainerHighest,
                 color: isLimitReached ? cs.error : cs.primary,
@@ -237,7 +217,7 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
           ),
           const SizedBox(width: 8),
           Text(
-            '$used / ${AppConstants.maxDailyAIQueries} used',
+            '$used / ${chatState.dailyQuota} used',
             style: theme.textTheme.bodySmall?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: isLimitReached ? cs.error : cs.onSurface,
@@ -248,7 +228,7 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
     );
   }
 
-  // ── Welcome State ─────────────────────────────────────────────────────
+  // -- Welcome State -------------------------------------------------------
 
   Widget _buildWelcomeState(
       BuildContext context, AIAdvisorChatState chatState) {
@@ -307,7 +287,6 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
                   .toList(),
             ),
           ] else if (canChat) ...[
-            // Fallback suggestions if contextual ones haven't loaded.
             Text(
               'Try asking',
               style: theme.textTheme.titleSmall?.copyWith(
@@ -339,7 +318,7 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
     );
   }
 
-  // ── Chat List ─────────────────────────────────────────────────────────
+  // -- Chat List -----------------------------------------------------------
 
   Widget _buildChatList(BuildContext context, AIAdvisorChatState chatState) {
     return ListView.builder(
@@ -396,16 +375,7 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
                   bottomRight: Radius.circular(isUser ? 4 : 16),
                 ),
               ),
-              child: SelectableText(
-                msg.text,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: isError
-                      ? cs.onErrorContainer
-                      : isUser
-                          ? cs.onPrimary
-                          : cs.onSurface,
-                ),
-              ),
+              child: AIAssistantMessage(message: msg),
             ),
           ),
         ],
@@ -474,7 +444,7 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
     );
   }
 
-  // ── Input Bar ─────────────────────────────────────────────────────────
+  // -- Input Bar -----------------------------------------------------------
 
   Widget _buildInputBar(BuildContext context, AIAdvisorChatState chatState) {
     final cs = Theme.of(context).colorScheme;
@@ -550,3 +520,4 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
     );
   }
 }
+

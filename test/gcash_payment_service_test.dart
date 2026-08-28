@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -13,6 +15,7 @@ import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
 import 'package:pinoy_pos/services/category_service.dart';
 import 'package:pinoy_pos/services/product_service.dart';
+import 'package:pinoy_pos/services/receipt_service.dart';
 import 'package:pinoy_pos/services/sales_service.dart';
 import 'package:pinoy_pos/services/settings_service.dart';
 
@@ -303,6 +306,90 @@ void main() {
       final productAfterReject =
           (await productService.getProductById(productId))!;
       expect(productAfterReject.stock, productBefore.stock);
+    });
+
+    test('receipt view data uses historical product names', () async {
+      await login('owner', 'owner123');
+      final productService = ProductService();
+      final categoryService = CategoryService();
+      final salesService = SalesService();
+
+      final productId = await createProduct(productService, categoryService);
+      final product = (await productService.getProductById(productId))!;
+
+      final items = [
+        SaleItem(
+          productId: productId,
+          quantity: 2,
+          unitPrice: 50.0,
+          totalPrice: 100.0,
+        ),
+      ];
+
+      await salesService.createSale(
+        items: items,
+        totalAmount: 100.0,
+        paymentMethod: 'GCash',
+        referenceNumber: 'GCASH-RECEIPT-001',
+      );
+
+      final sale = (await salesService.getSales()).first;
+      final receipt = await salesService.getReceiptViewData(sale.id!);
+
+      expect(receipt, isNotNull);
+      expect(receipt!.items, hasLength(1));
+      expect(receipt.items.first.productName, product.name);
+      expect(receipt.items.first.quantity, 2);
+      expect(receipt.total, 100.0);
+      expect(receipt.paymentMethod, 'GCash');
+      expect(receipt.referenceNumber, 'GCASH-RECEIPT-001');
+    });
+
+    test('receipt PDF is generated with non-zero bytes', () async {
+      await login('owner', 'owner123');
+      final productService = ProductService();
+      final categoryService = CategoryService();
+      final salesService = SalesService();
+      final receiptService = ReceiptService();
+
+      final productId = await createProduct(productService, categoryService);
+
+      final items = [
+        SaleItem(
+          productId: productId,
+          quantity: 3,
+          unitPrice: 50.0,
+          totalPrice: 150.0,
+        ),
+      ];
+
+      await salesService.createSale(
+        items: items,
+        totalAmount: 150.0,
+        paymentMethod: 'GCash',
+        referenceNumber: 'GCASH-PDF-001',
+      );
+
+      final sale = (await salesService.getSales()).first;
+      final receipt = (await salesService.getReceiptViewData(sale.id!))!;
+      final bytes = await receiptService.generateReceiptPdf(receipt);
+
+      expect(bytes, isNotEmpty);
+      expect(bytes.length, greaterThan(100));
+
+      final fileName = receiptService.buildFileName(receipt);
+      expect(fileName, contains('PinoyPOS_Receipt_'));
+      expect(fileName, contains(sale.receiptNumber ?? sale.id.toString()));
+
+      final savedPath = await receiptService.saveReceiptToAppDocuments(
+        bytes,
+        fileName: fileName,
+      );
+
+      expect(savedPath, isNotNull);
+      final file = File(savedPath!);
+      expect(await file.exists(), isTrue);
+      expect(await file.length(), greaterThan(0));
     });
 
     test('staff cannot confirm or reject pending GCash payments', () async {

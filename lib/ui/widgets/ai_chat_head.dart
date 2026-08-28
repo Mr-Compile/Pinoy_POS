@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pinoy_pos/core/ai_config_status.dart';
@@ -242,3 +242,4 @@ class _AIChatHeadState extends ConsumerState<AIChatHead> {
     }
   }
 }
+

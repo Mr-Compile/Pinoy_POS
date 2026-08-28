@@ -1,10 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/data/models/receipt_view_data.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
-import 'package:pinoy_pos/data/models/sale_item.dart';
-import 'package:pinoy_pos/data/models/settings.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/providers/receipt_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/services/image_service.dart';
 import 'package:pinoy_pos/ui/screens/payment_proof_viewer_screen.dart';
@@ -18,64 +18,54 @@ import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 
 class SaleDetailScreen extends ConsumerStatefulWidget {
-  final Sale sale;
+  final Sale? sale;
+  final int? saleId;
 
-  const SaleDetailScreen({super.key, required this.sale});
+  const SaleDetailScreen({
+    super.key,
+    this.sale,
+    this.saleId,
+  }) : assert(sale != null || saleId != null);
 
   @override
   ConsumerState<SaleDetailScreen> createState() => _SaleDetailScreenState();
 }
 
 class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
-  List<SaleItem> _items = [];
-  Map<int, String> _productNames = {};
-  Settings? _storeInfo;
-  bool _isLoading = true;
-  String? _error;
   bool _isProcessing = false;
+  bool _isExporting = false;
+  bool _isLoading = false;
+  bool _notFound = false;
+  Sale? _loadedSale;
+
+  Sale get _sale => widget.sale ?? _loadedSale!;
+  int get _saleId => _sale.id!;
 
   @override
   void initState() {
     super.initState();
-    _loadItems();
+    if (widget.sale == null && widget.saleId != null) {
+      _loadSale(widget.saleId!);
+    }
   }
 
-  Future<void> _loadItems() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+  Future<void> _loadSale(int id) async {
+    setState(() => _isLoading = true);
     try {
       final salesService = ref.read(salesServiceProvider);
-      final productService = ref.read(productServiceProvider);
-      final reportService = ref.read(reportServiceProvider);
-
-      // getSaleItems enforces ownership for Staff at the service layer.
-      final items = await salesService.getSaleItems(widget.sale.id!);
-
-      final names = <int, String>{};
-      for (final item in items) {
-        final product = await productService.getProductById(item.productId);
-        if (product != null) {
-          names[item.productId] = product.name;
-        }
-      }
-
-      final storeInfo = await reportService.getStoreInfo();
-
+      final sale = await salesService.getSaleById(id);
       if (mounted) {
         setState(() {
-          _items = items;
-          _productNames = names;
-          _storeInfo = storeInfo;
+          _loadedSale = sale;
+          _notFound = sale == null;
           _isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
+          _notFound = true;
           _isLoading = false;
-          _error = 'Failed to load sale items';
         });
       }
     }
@@ -85,8 +75,7 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
     setState(() => _isProcessing = true);
     try {
       final salesService = ref.read(salesServiceProvider);
-      final success =
-          await salesService.confirmGcashPayment(widget.sale.id!);
+      final success = await salesService.confirmGcashPayment(_saleId);
       if (mounted) {
         setState(() => _isProcessing = false);
         if (success) {
@@ -95,7 +84,7 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
             title: 'Payment Confirmed',
             message: 'The GCash payment has been confirmed.',
           );
-          _loadItems();
+          ref.invalidate(receiptViewDataProvider(_saleId));
         } else {
           AppDialogService.error(
             context,
@@ -130,8 +119,7 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
     setState(() => _isProcessing = true);
     try {
       final salesService = ref.read(salesServiceProvider);
-      final success =
-          await salesService.rejectGcashPayment(widget.sale.id!);
+      final success = await salesService.rejectGcashPayment(_saleId);
       if (mounted) {
         setState(() => _isProcessing = false);
         if (success) {
@@ -162,30 +150,91 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
   }
 
   Future<void> _viewReceipt() async {
-    await Navigator.push(
-      context,
+    await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => ReceiptScreen(
-          sale: widget.sale,
-          items: _items,
-          productNames: _productNames,
-        ),
+        builder: (_) => ReceiptScreen(sale: _sale),
       ),
     );
   }
 
-  Future<void> _viewProof() async {
-    if (widget.sale.paymentProofPath == null) return;
-    await Navigator.push(
-      context,
+  Future<void> _downloadPdf(ReceiptViewData receipt) async {
+    setState(() => _isExporting = true);
+    try {
+      final receiptService = ref.read(receiptServiceProvider);
+      final bytes = await receiptService.generateReceiptPdf(receipt);
+      final fileName = receiptService.buildFileName(receipt);
+
+      final savedPath = await receiptService.saveReceiptToFile(
+        bytes,
+        dialogTitle: 'Save Receipt',
+        fileName: fileName,
+      );
+
+      if (mounted) {
+        setState(() => _isExporting = false);
+        if (savedPath != null) {
+          await AppDialogService.success(
+            context,
+            title: 'Receipt Saved',
+            message: 'PDF saved to $savedPath',
+          );
+        } else {
+          AppDialogService.error(
+            context,
+            title: 'Download Cancelled',
+            message: 'No save location selected.',
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isExporting = false);
+        AppDialogService.error(
+          context,
+          title: 'Download Failed',
+          message: 'Unable to save the receipt: $e',
+        );
+      }
+    }
+  }
+
+  Future<void> _viewPaymentProof() async {
+    if (_sale.paymentProofPath == null) return;
+    await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => PaymentProofViewerScreen(sale: widget.sale),
+        builder: (_) => PaymentProofViewerScreen(sale: _sale),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        appBar: AppHeader(
+          title: 'Sale Details',
+          showBackButton: true,
+        ),
+        body: LoadingState(),
+      );
+    }
+
+    if (_notFound || _saleId <= 0) {
+      return Scaffold(
+        appBar: const AppHeader(
+          title: 'Sale Not Found',
+          showBackButton: true,
+        ),
+        body: ErrorState(
+          title: 'Sale Not Found',
+          message: 'The requested sale could not be found.',
+          onPrimaryAction: () => Navigator.of(context).pop(),
+          primaryActionLabel: 'Back',
+        ),
+      );
+    }
+
+    final receiptAsync = ref.watch(receiptViewDataProvider(_saleId));
     final authNotifier = ref.read(authStateProvider.notifier);
     final canVerify = authNotifier.hasPermission('verify_payments');
     final canViewEvidence =
@@ -193,144 +242,117 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
 
     return Scaffold(
       appBar: AppHeader(
-        title: 'Receipt #${widget.sale.receiptNumber ?? widget.sale.id}',
+        title: 'Sale #${_sale.receiptNumber ?? _sale.id}',
         showBackButton: true,
       ),
-      body: _isLoading
-          ? const LoadingState()
-          : _error != null
-              ? ErrorState(
-                  title: 'Error',
-                  message: _error,
-                  onRetry: _loadItems,
-                )
-              : _items.isEmpty
-                  ? const ErrorState(
-                      title: 'Access Denied',
-                      message: 'You do not have permission to view this sale.',
-                    )
-                  : SingleChildScrollView(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildStoreHeader(),
-                          const SizedBox(height: 16),
-                          _buildStatusCard(canVerify),
-                          const SizedBox(height: 16),
-                          _buildItemsCard(),
-                          const SizedBox(height: 16),
-                          _buildPaymentCard(),
-                          if (widget.sale.notes != null &&
-                              widget.sale.notes!.isNotEmpty) ...[
-                            const SizedBox(height: 16),
-                            _buildNotesCard(),
-                          ],
-                          if (canViewEvidence &&
-                              widget.sale.paymentProofPath != null &&
-                              widget.sale.paymentProofPath!.isNotEmpty) ...[
-                            const SizedBox(height: 16),
-                            _buildProofCard(),
-                          ],
-                          const SizedBox(height: 24),
-                          _buildActions(canVerify, canViewEvidence),
-                          const SizedBox(height: 24),
-                          Center(
-                            child: Text(
-                              'Thank you for your purchase!',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodyMedium
-                                  ?.copyWith(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant,
-                                  ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-    );
-  }
-
-  Widget _buildStoreHeader() {
-    final store = _storeInfo;
-
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            store?.storeName ?? 'Pinoy POS',
-            style: AppTypography.titleMediumBold(context),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Receipt #${widget.sale.receiptNumber ?? widget.sale.id}',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          Text(
-            widget.sale.createdAt.toLocal().toString().split('.')[0],
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ],
+      body: receiptAsync.when(
+        loading: () => const LoadingState(),
+        error: (e, _) => ErrorState(
+          title: 'Error',
+          message: 'Failed to load sale details: $e',
+          onRetry: () =>
+              ref.invalidate(receiptViewDataProvider(_saleId)),
+        ),
+        data: (receipt) {
+          if (receipt == null) {
+            return const ErrorState(
+              title: 'Not Found',
+              message: 'The sale could not be found or you do not have permission to view it.',
+            );
+          }
+          return _buildBody(receipt, canVerify, canViewEvidence);
+        },
       ),
     );
   }
 
-  Widget _buildStatusCard(bool canVerify) {
+  Widget _buildBody(
+      ReceiptViewData receipt, bool canVerify, bool canViewEvidence) {
     final cs = Theme.of(context).colorScheme;
-    final status = widget.sale.paymentStatus;
-    Color statusColor;
-    IconData statusIcon;
 
-    switch (status) {
-      case 'confirmed':
-        statusColor = cs.primary;
-        statusIcon = Icons.check_circle;
-        break;
-      case 'pending':
-        statusColor = cs.tertiary;
-        statusIcon = Icons.hourglass_empty;
-        break;
-      case 'cancelled':
-      case 'refunded':
-        statusColor = cs.error;
-        statusIcon = Icons.cancel;
-        break;
-      default:
-        statusColor = cs.outline;
-        statusIcon = Icons.help;
-    }
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildHeaderCard(receipt, cs, canVerify),
+              const SizedBox(height: 16),
+              _buildAmountCard(receipt, cs),
+              const SizedBox(height: 16),
+              _buildItemsCard(receipt),
+              const SizedBox(height: 16),
+              _buildPaymentCard(receipt),
+              if (receipt.notes != null && receipt.notes!.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                _buildNotesCard(receipt),
+              ],
+              if (canViewEvidence &&
+                  receipt.paymentProofPath != null &&
+                  receipt.paymentProofPath!.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                _buildProofCard(receipt),
+              ],
+              const SizedBox(height: 24),
+              _buildActions(receipt, canVerify),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeaderCard(
+      ReceiptViewData receipt, ColorScheme cs, bool canVerify) {
+    final statusColor = _statusColor(receipt.paymentStatus, cs);
+    final statusIcon = _statusIcon(receipt.paymentStatus);
 
     return AppCard(
-      color: cs.surfaceContainerHighest,
+      color: cs.primaryContainer,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(statusIcon, color: statusColor),
-                const SizedBox(width: 12),
-                Text(
-                  'Status: ${status[0].toUpperCase()}${status.substring(1)}',
-                  style: AppTypography.titleSmallBold(context)
-                      .copyWith(color: statusColor),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Sale #${receipt.receiptNumber}',
+                        style: AppTypography.titleMediumBold(context)
+                            .copyWith(color: cs.onPrimaryContainer),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        receipt.date.toLocal().toString().split('.')[0],
+                        style: TextStyle(color: cs.onPrimaryContainer),
+                      ),
+                      Text(
+                        'Cashier: ${receipt.cashierName}',
+                        style: TextStyle(color: cs.onPrimaryContainer),
+                      ),
+                    ],
+                  ),
+                ),
+                Chip(
+                  avatar: Icon(statusIcon, size: 16, color: statusColor),
+                  label: Text(
+                    receipt.statusLabel,
+                    style: TextStyle(color: statusColor, fontSize: 12),
+                  ),
+                  side: BorderSide(color: statusColor),
+                  backgroundColor: statusColor.withValues(alpha: 0.1),
                 ),
               ],
             ),
-            if (widget.sale.verifiedAt != null &&
-                widget.sale.verifiedBy != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Verified at ${widget.sale.verifiedAt!.toLocal().toString().split('.')[0]}',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-            if (status == 'pending' && canVerify) ...[
+            if (receipt.paymentStatus == 'pending' && canVerify) ...[
               const SizedBox(height: 16),
               Row(
                 children: [
@@ -359,126 +381,181 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
     );
   }
 
-  Widget _buildItemsCard() {
+  Widget _buildAmountCard(ReceiptViewData receipt, ColorScheme cs) {
     return AppCard(
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Item', style: Theme.of(context).textTheme.titleSmall),
-              Text('Qty • Price • Total',
-                  style: Theme.of(context).textTheme.titleSmall),
+      color: cs.surfaceContainerHighest,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Total',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              receipt.formattedTotal(),
+              style: AppTypography.headlineSmallSemibold(context)
+                  .copyWith(color: cs.primary),
+            ),
+            if (receipt.cashReceived > 0 || receipt.change > 0) ...[
+              const SizedBox(height: 8),
+              _buildValueRow('Amount Paid', receipt.formattedCashReceived()),
+              _buildValueRow('Change', receipt.formattedChange()),
             ],
-          ),
-          const Divider(),
-          ..._items.map((item) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _productNames[item.productId] ??
-                            'Product #${item.productId}',
-                        overflow: TextOverflow.ellipsis,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildItemsCard(ReceiptViewData receipt) {
+    return AppCard(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Items',
+              style: AppTypography.titleSmallBold(context),
+            ),
+            const SizedBox(height: 8),
+            ...receipt.items.map((item) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              item.productName,
+                              style: const TextStyle(fontSize: 15),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            item.formattedTotal(receipt.currency),
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    Text(
-                      '${item.quantity} • ₱${item.unitPrice.toStringAsFixed(2)} • ₱${item.totalPrice.toStringAsFixed(2)}',
-                    ),
-                  ],
-                ),
-              )),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPaymentCard() {
-    return AppCard(
-      child: Column(
-        children: [
-          _buildRow('Subtotal',
-              '₱${widget.sale.totalAmount.toStringAsFixed(2)}'),
-          const Divider(),
-          _buildRow('Cash Received',
-              '₱${widget.sale.cashReceived.toStringAsFixed(2)}'),
-          const Divider(),
-          _buildRow('Change', '₱${widget.sale.change.toStringAsFixed(2)}'),
-          const Divider(),
-          _buildRow(
-            'Total',
-            '₱${widget.sale.totalAmount.toStringAsFixed(2)}',
-            isTotal: true,
-          ),
-          const Divider(),
-          _buildRow('Payment Method', widget.sale.paymentMethod),
-          if (widget.sale.referenceNumber != null &&
-              widget.sale.referenceNumber!.isNotEmpty)
-            _buildRow('Reference', widget.sale.referenceNumber!),
-          if (widget.sale.customerName != null &&
-              widget.sale.customerName!.isNotEmpty)
-            _buildRow('Customer', widget.sale.customerName!),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNotesCard() {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Notes', style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: 8),
-          Text(widget.sale.notes!),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProofCard() {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Payment Proof',
-              style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: 8),
-          FutureBuilder<File?>(
-            future: ImageService().resolveImageFile(widget.sale.paymentProofPath),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const SizedBox(
-                  height: 120,
-                  child: Center(child: CircularProgressIndicator()),
-                );
-              }
-              final file = snapshot.data;
-              if (file == null) {
-                return const Text('Unable to load payment proof.');
-              }
-              return GestureDetector(
-                onTap: _viewProof,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.file(
-                    file,
-                    height: 120,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
+                      const SizedBox(height: 2),
+                      Text(
+                        '${item.quantity} x ${item.formattedUnitPrice(receipt.currency)}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              );
-            },
-          ),
-        ],
+                )),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildActions(bool canVerify, bool canViewEvidence) {
+  Widget _buildPaymentCard(ReceiptViewData receipt) {
+    return AppCard(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Payment',
+              style: AppTypography.titleSmallBold(context),
+            ),
+            const SizedBox(height: 8),
+            _buildValueRow('Method', receipt.paymentMethod),
+            if (receipt.referenceNumber != null &&
+                receipt.referenceNumber!.isNotEmpty)
+              _buildValueRow('Reference', receipt.referenceNumber!),
+            if (receipt.customerName != null &&
+                receipt.customerName!.isNotEmpty)
+              _buildValueRow('Customer', receipt.customerName!),
+            _buildValueRow('Status', receipt.statusLabel),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNotesCard(ReceiptViewData receipt) {
+    return AppCard(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Notes',
+              style: AppTypography.titleSmallBold(context),
+            ),
+            const SizedBox(height: 8),
+            Text(receipt.notes!),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProofCard(ReceiptViewData receipt) {
+    return AppCard(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Payment Proof',
+              style: AppTypography.titleSmallBold(context),
+            ),
+            const SizedBox(height: 8),
+            FutureBuilder<File?>(
+              future: ImageService().resolveImageFile(receipt.paymentProofPath),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const SizedBox(
+                    height: 120,
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                final file = snapshot.data;
+                if (file == null) {
+                  return const Text('Unable to load payment proof.');
+                }
+                return GestureDetector(
+                  onTap: _viewPaymentProof,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.file(
+                      file,
+                      height: 120,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActions(ReceiptViewData receipt, bool canVerify) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -487,40 +564,62 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
           icon: const Icon(Icons.receipt_long_outlined),
           label: const Text('View Receipt'),
         ),
-        if (canViewEvidence &&
-            widget.sale.paymentProofPath != null &&
-            widget.sale.paymentProofPath!.isNotEmpty) ...[
-          const SizedBox(height: 12),
+        const SizedBox(height: 12),
+        LoadingButton(
+          isLoading: _isExporting,
+          onPressed: _isExporting ? null : () => _downloadPdf(receipt),
+          label: 'Download PDF',
+        ),
+        const SizedBox(height: 12),
+        if (receipt.paymentProofPath != null &&
+            receipt.paymentProofPath!.isNotEmpty)
           OutlinedButton.icon(
-            onPressed: _viewProof,
+            onPressed: _viewPaymentProof,
             icon: const Icon(Icons.image_outlined),
             label: const Text('View Payment Proof'),
           ),
-        ],
       ],
     );
   }
 
-  Widget _buildRow(String label, String value, {bool isTotal = false}) {
+  Widget _buildValueRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: isTotal
-                ? AppTypography.titleMediumBold(context)
-                : Theme.of(context).textTheme.bodyMedium,
+          Expanded(
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
           ),
+          const SizedBox(width: 12),
           Text(
             value,
-            style: isTotal
-                ? AppTypography.titleMediumBold(context)
-                : Theme.of(context).textTheme.bodyMedium,
+            style: Theme.of(context).textTheme.bodyMedium,
           ),
         ],
       ),
     );
+  }
+
+  Color _statusColor(String status, ColorScheme cs) {
+    return switch (status) {
+      'confirmed' => cs.primary,
+      'pending' => cs.tertiary,
+      'cancelled' || 'refunded' => cs.error,
+      _ => cs.outline,
+    };
+  }
+
+  IconData _statusIcon(String status) {
+    return switch (status) {
+      'confirmed' => Icons.check_circle,
+      'pending' => Icons.hourglass_empty,
+      'cancelled' || 'refunded' => Icons.cancel,
+      _ => Icons.help,
+    };
   }
 }

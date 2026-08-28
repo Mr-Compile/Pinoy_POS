@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+﻿import 'package:flutter/foundation.dart';
 import 'package:pinoy_pos/core/ai_capability_policy.dart';
 import 'package:pinoy_pos/core/authorization_exception.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
@@ -417,3 +417,4 @@ Generate a helpful, role-aware, humanized answer based ONLY on the information a
     }
   }
 }
+

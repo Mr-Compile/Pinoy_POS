@@ -216,8 +216,11 @@ class SaleDao extends BaseDao<Sale> {
     }
 
     if (search != null && search.trim().isNotEmpty) {
-      conditions.add('(receipt_number LIKE ? OR reference_number LIKE ?)');
+      conditions.add(
+        '(receipt_number LIKE ? OR reference_number LIKE ? OR customer_name LIKE ?)',
+      );
       final like = '%${search.trim()}%';
+      args.add(like);
       args.add(like);
       args.add(like);
     }

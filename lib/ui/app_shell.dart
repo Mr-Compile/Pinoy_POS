@@ -1,9 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/ai_advisor_provider.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/providers/navigation_provider.dart';
 import 'package:pinoy_pos/ui/screens/dashboard_screen.dart';
 import 'package:pinoy_pos/ui/screens/pos_screen.dart';
 import 'package:pinoy_pos/ui/screens/products_screen.dart';
@@ -177,6 +178,7 @@ class _AppShellState extends ConsumerState<AppShell> {
         setState(() {
           _selectedIndex = index;
         });
+        _updateCurrentDestination();
       },
       extended: screenWidth >= 900,
       minExtendedWidth: 200,
@@ -224,6 +226,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                   _selectedIndex = index;
                 });
                 Navigator.of(context).pop();
+                _updateCurrentDestination();
               },
             );
           }),
@@ -240,6 +243,7 @@ class _AppShellState extends ConsumerState<AppShell> {
         setState(() {
           _selectedIndex = index;
         });
+        _updateCurrentDestination();
       },
       destinations: tabs
           .map((tab) => NavigationDestination(
@@ -372,6 +376,34 @@ class _AppShellState extends ConsumerState<AppShell> {
     }
   }
 
+
+  void _updateCurrentDestination() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final role = ref.read(authStateProvider).user?.role;
+      final tabs = _getTabsForRole(role ?? UserRole.staff);
+      if (_selectedIndex < 0 || _selectedIndex >= tabs.length) return;
+
+      final destinationId = _destinationIdForPermission(tabs[_selectedIndex].permission);
+      if (destinationId != null) {
+        ref.read(currentRouteProvider.notifier).state = destinationId;
+      }
+    });
+  }
+
+  String? _destinationIdForPermission(String? permission) {
+    return switch (permission) {
+      'view_dashboard' => 'dashboard',
+      'view_pos' => 'pos',
+      'view_products' => 'products',
+      'view_sales' => 'sales',
+      'manage_users' => 'users',
+      'backup_restore' => 'backup_restore',
+      'view_settings' => 'settings',
+      'view_more' => 'more',
+      _ => null,
+    };
+  }
 }
 
 class AppTab {

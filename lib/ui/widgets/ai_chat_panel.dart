@@ -1,11 +1,11 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/ai_config_status.dart';
 import 'package:pinoy_pos/core/ai_role_config.dart';
-import 'package:pinoy_pos/core/constants.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/ai_advisor_provider.dart';
+import 'package:pinoy_pos/ui/widgets/ai_assistant_message.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 
 /// Floating, Messenger-style AI chat panel.
@@ -198,7 +198,7 @@ class _AIChatPanelState extends ConsumerState<AIChatPanel> {
                       ),
                 ),
                 Text(
-                  '${chatState.remainingQueries} of ${AppConstants.maxDailyAIQueries} queries left today',
+                  '${chatState.remainingQueries} of ${chatState.dailyQuota} queries left today',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: cs.onPrimaryContainer.withValues(alpha: 0.8),
                       ),
@@ -413,16 +413,7 @@ class _AIChatPanelState extends ConsumerState<AIChatPanel> {
                   bottomRight: Radius.circular(isUser ? 4 : 16),
                 ),
               ),
-              child: SelectableText(
-                msg.text,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: isError
-                      ? cs.onErrorContainer
-                      : isUser
-                          ? cs.onPrimary
-                          : cs.onSurface,
-                ),
-              ),
+              child: AIAssistantMessage(message: msg),
             ),
           ),
         ],
@@ -558,3 +549,5 @@ class _AIChatPanelState extends ConsumerState<AIChatPanel> {
     );
   }
 }
+
+

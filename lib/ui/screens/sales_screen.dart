@@ -5,9 +5,10 @@ import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/screens/sale_detail_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
-import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
+import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
+import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
@@ -22,6 +23,7 @@ class SalesScreen extends ConsumerStatefulWidget {
 class _SalesScreenState extends ConsumerState<SalesScreen> {
   List<Sale> _sales = [];
   bool _isLoading = true;
+  String? _error;
   bool _isProcessing = false;
 
   String? _selectedPaymentMethod;
@@ -45,6 +47,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
   Future<void> _loadSales() async {
     setState(() {
       _isLoading = true;
+      _error = null;
     });
 
     final salesService = ref.read(salesServiceProvider);
@@ -117,7 +120,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
         content: TextField(
           controller: _searchController,
           decoration: const InputDecoration(
-            labelText: 'Receipt or reference number',
+            labelText: 'Receipt, customer, or reference',
             border: OutlineInputBorder(),
           ),
           autofocus: true,
@@ -184,7 +187,8 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                       border: OutlineInputBorder(),
                     ),
                     items: [
-                      const DropdownMenuItem(value: null, child: Text('All active')),
+                      const DropdownMenuItem(
+                          value: null, child: Text('All active')),
                       ...statuses.map((s) => DropdownMenuItem(
                             value: s,
                             child: Text(
@@ -238,18 +242,30 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
   Widget build(BuildContext context) {
     final authNotifier = ref.read(authStateProvider.notifier);
     final canVoid = authNotifier.hasPermission('void_sales');
-    final cs = Theme.of(context).colorScheme;
 
     if (_isLoading) {
+      return const Scaffold(
+        appBar: AppHeader(title: 'My Sales'),
+        body: LoadingState(),
+      );
+    }
+
+    if (_error != null) {
       return Scaffold(
         appBar: const AppHeader(title: 'My Sales'),
-        body: const LoadingState(),
+        body: ErrorState(
+          title: 'Error',
+          message: _error,
+          onRetry: _loadSales,
+        ),
       );
     }
 
     final filtersActive = _selectedPaymentMethod != null ||
         _selectedPaymentStatus != null ||
         _searchQuery.isNotEmpty;
+
+    final grouped = _groupByDate(_sales);
 
     return Scaffold(
       appBar: AppHeader(
@@ -284,93 +300,225 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                     )
                   : null,
             )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _sales.length,
-              itemBuilder: (context, index) {
-                final sale = _sales[index];
-                return AppCard(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: ListTile(
-                    title: Row(
+          : Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 800),
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: grouped.length,
+                  itemBuilder: (context, index) {
+                    final group = grouped[index];
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
+                        Padding(
+                          padding: const EdgeInsets.only(
+                            top: 8,
+                            bottom: 8,
+                            left: 4,
+                          ),
                           child: Text(
-                            'Sale #${sale.receiptNumber ?? sale.id}',
+                            group.label,
+                            style: AppTypography.titleSmallBold(context)
+                                .copyWith(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
                           ),
                         ),
-                        _buildStatusChip(sale, cs),
+                        ...group.sales.map((sale) => _buildSaleCard(
+                              sale,
+                              canVoid,
+                              context,
+                            )),
                       ],
-                    ),
-                    subtitle: Text(
-                      '${sale.createdAt.toLocal().toString().split('.')[0]} · ${sale.paymentMethod}',
-                    ),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => SaleDetailScreen(sale: sale),
-                        ),
-                      );
-                    },
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'PHP ${sale.totalAmount.toStringAsFixed(2)}',
-                          style: AppTypography.titleMediumBold(context),
-                        ),
-                        if (canVoid && sale.paymentStatus == 'confirmed') ...[
-                          const SizedBox(width: 8),
-                          LoadingButton(
-                            isLoading: _isProcessing,
-                            onPressed: () => _voidSale(sale),
-                            label: 'Void',
-                            isDanger: true,
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                );
-              },
+                    );
+                  },
+                ),
+              ),
             ),
     );
   }
 
-  Widget _buildStatusChip(Sale sale, ColorScheme cs) {
-    final status = sale.paymentStatus;
-    Color color;
-    IconData? icon;
-
-    switch (status) {
-      case 'confirmed':
-        color = cs.primary;
-        icon = Icons.check_circle;
-        break;
-      case 'pending':
-        color = cs.tertiary;
-        icon = Icons.hourglass_empty;
-        break;
-      case 'cancelled':
-      case 'refunded':
-        color = cs.error;
-        icon = Icons.cancel;
-        break;
-      default:
-        color = cs.outline;
-        icon = null;
+  List<_SalesGroup> _groupByDate(List<Sale> sales) {
+    final groups = <String, List<Sale>>{};
+    for (final sale in sales) {
+      final key = _dateLabel(sale.createdAt);
+      groups.putIfAbsent(key, () => []).add(sale);
     }
+    return groups.entries
+        .map((e) => _SalesGroup(label: e.key, sales: e.value))
+        .toList();
+  }
 
-    return Chip(
-      avatar: icon != null ? Icon(icon, size: 14, color: color) : null,
-      label: Text(
-        status[0].toUpperCase() + status.substring(1),
-        style: TextStyle(color: color, fontSize: 12),
+  String _dateLabel(DateTime date) {
+    final now = DateTime.now();
+    final local = date.toLocal();
+    final today = DateTime(now.year, now.month, now.day);
+    final saleDate = DateTime(local.year, local.month, local.day);
+
+    final diff = today.difference(saleDate).inDays;
+    if (diff == 0) return 'Today';
+    if (diff == 1) return 'Yesterday';
+    if (diff < 7) {
+      return [
+        'Monday',
+        'Tuesday',
+        'Wednesday',
+        'Thursday',
+        'Friday',
+        'Saturday',
+        'Sunday'
+      ][local.weekday - 1];
+    }
+    return '${local.month}/${local.day}/${local.year}';
+  }
+
+  Widget _buildSaleCard(Sale sale, bool canVoid, BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final statusColor = _statusColor(sale.paymentStatus, cs);
+    final time = _formatTime(sale.createdAt);
+
+    return AppCard(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => SaleDetailScreen(sale: sale),
+            ),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Sale #${sale.receiptNumber ?? sale.id}',
+                          style: AppTypography.titleMediumBold(context),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          time,
+                          style: TextStyle(
+                            color: cs.onSurfaceVariant,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    '₱${sale.totalAmount.toStringAsFixed(2)}',
+                    style: AppTypography.titleMediumBold(context)
+                        .copyWith(color: cs.primary),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  _buildPill(sale.paymentMethod, cs),
+                  if (sale.customerName != null &&
+                      sale.customerName!.isNotEmpty)
+                    _buildPill(sale.customerName!, cs),
+                  if (sale.referenceNumber != null &&
+                      sale.referenceNumber!.isNotEmpty)
+                    _buildPill('Ref: ${sale.referenceNumber}', cs),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Chip(
+                    avatar: Icon(
+                      _statusIcon(sale.paymentStatus),
+                      size: 14,
+                      color: statusColor,
+                    ),
+                    label: Text(
+                      _statusLabel(sale.paymentStatus),
+                      style: TextStyle(color: statusColor, fontSize: 12),
+                    ),
+                    side: BorderSide(color: statusColor),
+                    backgroundColor: statusColor.withValues(alpha: 0.1),
+                  ),
+                  if (canVoid && sale.paymentStatus == 'confirmed')
+                    LoadingButton(
+                      isLoading: _isProcessing,
+                      onPressed: () => _voidSale(sale),
+                      label: 'Void',
+                      isDanger: true,
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
-      side: BorderSide(color: color),
-      backgroundColor: color.withValues(alpha: 0.1),
     );
+  }
+
+  Widget _buildPill(String label, ColorScheme cs) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          color: cs.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+
+  String _formatTime(DateTime date) {
+    final local = date.toLocal();
+    final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
+    final minute = local.minute.toString().padLeft(2, '0');
+    final period = local.hour >= 12 ? 'PM' : 'AM';
+    return '$hour:$minute $period';
+  }
+
+  Color _statusColor(String status, ColorScheme cs) {
+    return switch (status) {
+      'confirmed' => cs.primary,
+      'pending' => cs.tertiary,
+      'cancelled' || 'refunded' => cs.error,
+      _ => cs.outline,
+    };
+  }
+
+  IconData _statusIcon(String status) {
+    return switch (status) {
+      'confirmed' => Icons.check_circle,
+      'pending' => Icons.hourglass_empty,
+      'cancelled' || 'refunded' => Icons.cancel,
+      _ => Icons.help,
+    };
+  }
+
+  String _statusLabel(String status) {
+    if (status.isEmpty) return 'Unknown';
+    return status[0].toUpperCase() + status.substring(1);
   }
 }
 
@@ -379,4 +527,11 @@ class _SalesFilter {
   final String? paymentStatus;
 
   _SalesFilter(this.paymentMethod, this.paymentStatus);
+}
+
+class _SalesGroup {
+  final String label;
+  final List<Sale> sales;
+
+  _SalesGroup({required this.label, required this.sales});
 }
