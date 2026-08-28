@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/auth_navigation.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/services/password_strength_service.dart';
-import 'package:pinoy_pos/ui/screens/login_screen.dart';
-import 'package:pinoy_pos/ui/screens/pin_lock_screen.dart';
-import 'package:pinoy_pos/ui/app_shell.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/password_strength_meter.dart';
 import 'package:pinoy_pos/ui/widgets/password_requirements_checklist.dart';
@@ -45,22 +43,16 @@ class _ForceChangePasswordScreenState
     _authSubscription = ref.listenManual(
       authStateProvider,
       (previous, next) {
-        if (next.phase == AuthSessionPhase.fullyAuthenticated) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const AppShell()),
-            (_) => false,
-          );
-        } else if (next.phase ==
-            AuthSessionPhase.passwordAuthenticatedPendingPin) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const PinLockScreen()),
-            (_) => false,
-          );
-        } else if (next.phase == AuthSessionPhase.unauthenticated) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const LoginScreen()),
-            (_) => false,
-          );
+        // Only react to actual phase transitions. Without this guard a
+        // rebuild of the auth state can re-trigger the same navigation,
+        // which may lead to framework assertion failures when the old
+        // route is removed more than once.
+        if (previous?.phase == next.phase) return;
+
+        if (next.phase == AuthSessionPhase.fullyAuthenticated ||
+            next.phase == AuthSessionPhase.passwordAuthenticatedPendingPin ||
+            next.phase == AuthSessionPhase.unauthenticated) {
+          AuthPhaseNavigator.pushAndRemoveUntil(context, next.phase);
         }
       },
     );

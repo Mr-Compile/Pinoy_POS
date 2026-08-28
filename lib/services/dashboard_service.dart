@@ -1,3 +1,4 @@
+import 'package:pinoy_pos/core/date_utils.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/activity_log.dart';
 import 'package:pinoy_pos/data/models/announcement.dart';
@@ -215,7 +216,7 @@ class DashboardService {
     }
 
     final now = DateTime.now();
-    final trendStart = DateTime(now.year, now.month, now.day)
+    final trendStart = startOfDay(now)
         .subtract(const Duration(days: 6));
     final trendEnd = trendStart.add(const Duration(days: 7));
 
@@ -224,7 +225,7 @@ class DashboardService {
     final trendSales = await _saleRepository.getByDateRange(trendStart, trendEnd);
     final salesTrend = _buildDailySalesTrend(trendSales, trendStart);
 
-    final todayStart = DateTime(now.year, now.month, now.day);
+    final todayStart = startOfDay(now);
     final todayEnd = todayStart.add(const Duration(days: 1));
     final todaySales = trendSales
         .where((s) => !s.createdAt.isBefore(todayStart) && s.createdAt.isBefore(todayEnd))
@@ -338,7 +339,7 @@ class DashboardService {
     final userId = user.id!;
 
     final now = DateTime.now();
-    final trendStart = DateTime(now.year, now.month, now.day)
+    final trendStart = startOfDay(now)
         .subtract(const Duration(days: 6));
     final trendEnd = trendStart.add(const Duration(days: 7));
 
@@ -350,7 +351,7 @@ class DashboardService {
     );
     final salesTrend = _buildDailySalesTrend(trendSales, trendStart);
 
-    final todayStart = DateTime(now.year, now.month, now.day);
+    final todayStart = startOfDay(now);
     final todayEnd = todayStart.add(const Duration(days: 1));
     final myTodaySales = trendSales
         .where((s) => !s.createdAt.isBefore(todayStart) && s.createdAt.isBefore(todayEnd))

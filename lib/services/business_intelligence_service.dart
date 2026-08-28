@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:pinoy_pos/core/date_utils.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/dao/sale_item_dao.dart';
 import 'package:pinoy_pos/data/models/user.dart';
@@ -147,7 +148,7 @@ class BusinessIntelligenceService {
     String? periodDesc;
 
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    final today = startOfDay(now);
 
     if (q.contains('today') || q.contains('right now') || q.contains('day')) {
       startDate = today;
@@ -477,7 +478,7 @@ class BusinessIntelligenceService {
 
   Future<BusinessFacts> _gatherTodaySales(DetectedIntent d) async {
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    final today = startOfDay(now);
     final sales = await _saleRepository.getByDateRange(
       today,
       today.add(const Duration(days: 1)),
@@ -533,7 +534,7 @@ class BusinessIntelligenceService {
 
   Future<BusinessFacts> _gatherYesterdaySales(DetectedIntent d) async {
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    final today = startOfDay(now);
     final yesterday = today.subtract(const Duration(days: 1));
     final sales = await _saleRepository.getByDateRange(yesterday, today);
     final activeSales = sales.where((s) => !s.isDeleted).toList();
@@ -614,7 +615,7 @@ class BusinessIntelligenceService {
 
   Future<BusinessFacts> _gatherSalesComparison(DetectedIntent d) async {
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    final today = startOfDay(now);
 
     // Determine the two periods to compare.
     DateTime period1Start, period1End, period2Start, period2End;
@@ -1003,7 +1004,7 @@ class BusinessIntelligenceService {
 
   Future<BusinessFacts> _gatherBusinessSummary(DetectedIntent d) async {
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    final today = startOfDay(now);
 
     // Today's sales.
     final todaySales = await _saleRepository.getByDateRange(
@@ -1086,7 +1087,7 @@ class BusinessIntelligenceService {
   Future<BusinessFacts> _gatherTrendAnalysis(DetectedIntent d) async {
     // Get last 14 days of sales for trend analysis.
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    final today = startOfDay(now);
     final twoWeeksAgo = today.subtract(const Duration(days: 14));
 
     final sales = await _saleRepository.getByDateRange(
@@ -1208,7 +1209,7 @@ class BusinessIntelligenceService {
         buf.writeln('--- END CONTEXT ---');
       } else {
         final now = DateTime.now();
-        final today = DateTime(now.year, now.month, now.day);
+        final today = startOfDay(now);
         final mySales = await _saleRepository.getByDateRangeAndUser(
           today, today.add(const Duration(days: 1)), userId);
         final myActive = mySales.where((s) => !s.isDeleted).toList();
@@ -1230,7 +1231,7 @@ class BusinessIntelligenceService {
     } else {
       // Owner general context: business overview.
       final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
+      final today = startOfDay(now);
       final todaySales = await _saleRepository.getByDateRange(
         today, today.add(const Duration(days: 1)));
       final todayActive = todaySales.where((s) => !s.isDeleted).toList();
@@ -1276,7 +1277,7 @@ class BusinessIntelligenceService {
   Future<List<String>> _generateOwnerSuggestions() async {
     final suggestions = <String>[];
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    final today = startOfDay(now);
 
     try {
       // Check for low stock.
@@ -1381,7 +1382,7 @@ class BusinessIntelligenceService {
 
     try {
       final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
+      final today = startOfDay(now);
       final mySales = await _saleRepository.getByDateRangeAndUser(
         today, today.add(const Duration(days: 1)), userId);
       final myActive = mySales.where((s) => !s.isDeleted).toList();
@@ -1701,7 +1702,7 @@ class BusinessIntelligenceService {
 
   Future<BusinessFacts> _gatherSystemActivitySummary(DetectedIntent d) async {
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    final today = startOfDay(now);
     final activities = await _activityLogRepository.getByDateRange(
       today, today.add(const Duration(days: 1)), limit: 100);
 
@@ -1851,7 +1852,7 @@ class BusinessIntelligenceService {
     final backups = await _backupHistoryRepository.getAllActive();
     final exports = await _exportHistoryRepository.getAllActive();
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    final today = startOfDay(now);
     final todayActivities = await _activityLogRepository.getByDateRange(
       today, today.add(const Duration(days: 1)), limit: 500);
 
@@ -1901,7 +1902,7 @@ class BusinessIntelligenceService {
     final recentActivity =
         await _activityLogRepository.getRecentActivities(limit: 10);
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    final today = startOfDay(now);
     final todayActivities = await _activityLogRepository.getByDateRange(
       today, today.add(const Duration(days: 1)), limit: 200);
 
@@ -1958,7 +1959,7 @@ class BusinessIntelligenceService {
       return _noUserData(d);
     }
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    final today = startOfDay(now);
     // SQL-level filter: sales.user_id = userId
     final sales = await _saleRepository.getByDateRangeAndUser(
       today, today.add(const Duration(days: 1)), userId);
@@ -2198,7 +2199,7 @@ class BusinessIntelligenceService {
       return _noUserData(d);
     }
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    final today = startOfDay(now);
     // SQL-level filter: sales.user_id = userId
     final todaySales = await _saleRepository.getByDateRangeAndUser(
       today, today.add(const Duration(days: 1)), userId);
@@ -2276,7 +2277,7 @@ class BusinessIntelligenceService {
 
   DateTime _startOfWeek() {
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    final today = startOfDay(now);
     return today.subtract(Duration(days: today.weekday - 1));
   }
 

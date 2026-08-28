@@ -109,24 +109,16 @@ class UserController extends StateNotifier<UserListState> {
     required String fullName,
     required UserRole role,
     String? pin,
-  }) async {
-    state = state.copyWith(isSubmitting: true, error: null);
-    try {
-      final result = await _userService.createUser(
+  }) {
+    return _runMutation(
+      () => _userService.createUser(
         username: username,
         fullName: fullName,
         role: role,
         pin: pin,
-      );
-      if (result.success) {
-        await loadUsers();
-      }
-      state = state.copyWith(isSubmitting: false);
-      return result;
-    } catch (e) {
-      state = state.copyWith(isSubmitting: false, error: _friendlyError(e));
-      return UserOperationResult(success: false, message: _friendlyError(e));
-    }
+      ),
+      onSuccess: loadUsers,
+    );
   }
 
   // ── UPDATE ───────────────────────────────────────────
@@ -137,27 +129,21 @@ class UserController extends StateNotifier<UserListState> {
     String? fullName,
     UserRole? role,
     String? pin,
-  }) async {
-    state = state.copyWith(isSubmitting: true, error: null);
-    try {
-      final result = await _userService.updateUser(
+  }) {
+    return _runMutation(
+      () => _userService.updateUser(
         userId: userId,
         username: username,
         fullName: fullName,
         role: role,
         pin: pin,
-      );
-      if (result.success) {
+      ),
+      onSuccess: () async {
         await loadUsers();
         // Refresh the auth session if the current user edited themselves.
         await _ref.read(authStateProvider.notifier).refreshCurrentUser();
-      }
-      state = state.copyWith(isSubmitting: false);
-      return result;
-    } catch (e) {
-      state = state.copyWith(isSubmitting: false, error: _friendlyError(e));
-      return UserOperationResult(success: false, message: _friendlyError(e));
-    }
+      },
+    );
   }
 
   // ── PASSWORD ─────────────────────────────────────────
@@ -165,127 +151,88 @@ class UserController extends StateNotifier<UserListState> {
   Future<UserOperationResult> forceChangePassword({
     required int userId,
     required String newPassword,
-  }) async {
-    state = state.copyWith(isSubmitting: true, error: null);
-    try {
-      final result = await _userService.forceChangePassword(
+  }) {
+    return _runMutation(
+      () => _userService.forceChangePassword(
         userId: userId,
         newPassword: newPassword,
-      );
-      state = state.copyWith(isSubmitting: false);
-      return result;
-    } catch (e) {
-      state = state.copyWith(isSubmitting: false, error: _friendlyError(e));
-      return UserOperationResult(success: false, message: _friendlyError(e));
-    }
+      ),
+    );
   }
 
   Future<UserOperationResult> changePassword({
     required int userId,
     required String oldPassword,
     required String newPassword,
-  }) async {
-    state = state.copyWith(isSubmitting: true, error: null);
-    try {
-      final result = await _userService.changePassword(
+  }) {
+    return _runMutation(
+      () => _userService.changePassword(
         userId: userId,
         oldPassword: oldPassword,
         newPassword: newPassword,
-      );
-      state = state.copyWith(isSubmitting: false);
-      return result;
-    } catch (e) {
-      state = state.copyWith(isSubmitting: false, error: _friendlyError(e));
-      return UserOperationResult(success: false, message: _friendlyError(e));
-    }
+      ),
+    );
   }
 
-  Future<UserOperationResult> resetPassword(int userId) async {
-    state = state.copyWith(isSubmitting: true, error: null);
-    try {
-      final result = await _userService.resetPassword(userId);
-      state = state.copyWith(isSubmitting: false);
-      return result;
-    } catch (e) {
-      state = state.copyWith(isSubmitting: false, error: _friendlyError(e));
-      return UserOperationResult(success: false, message: _friendlyError(e));
-    }
+  Future<UserOperationResult> resetPassword(int userId) {
+    return _runMutation(() => _userService.resetPassword(userId));
   }
 
   // ── ACTIVATE / DEACTIVATE ────────────────────────────
 
-  Future<UserOperationResult> activateUser(int userId) async {
-    state = state.copyWith(isSubmitting: true, error: null);
-    try {
-      final result = await _userService.activateUser(userId);
-      if (result.success) {
-        await loadUsers();
-      }
-      state = state.copyWith(isSubmitting: false);
-      return result;
-    } catch (e) {
-      state = state.copyWith(isSubmitting: false, error: _friendlyError(e));
-      return UserOperationResult(success: false, message: _friendlyError(e));
-    }
+  Future<UserOperationResult> activateUser(int userId) {
+    return _runMutation(
+      () => _userService.activateUser(userId),
+      onSuccess: loadUsers,
+    );
   }
 
-  Future<UserOperationResult> deactivateUser(int userId) async {
-    state = state.copyWith(isSubmitting: true, error: null);
-    try {
-      final result = await _userService.deactivateUser(userId);
-      if (result.success) {
-        await loadUsers();
-      }
-      state = state.copyWith(isSubmitting: false);
-      return result;
-    } catch (e) {
-      state = state.copyWith(isSubmitting: false, error: _friendlyError(e));
-      return UserOperationResult(success: false, message: _friendlyError(e));
-    }
+  Future<UserOperationResult> deactivateUser(int userId) {
+    return _runMutation(
+      () => _userService.deactivateUser(userId),
+      onSuccess: loadUsers,
+    );
   }
 
   // ── SOFT DELETE ──────────────────────────────────────
 
-  Future<UserOperationResult> softDeleteUser(int userId) async {
-    state = state.copyWith(isSubmitting: true, error: null);
-    try {
-      final result = await _userService.softDeleteUser(userId);
-      if (result.success) {
-        await loadUsers();
-      }
-      state = state.copyWith(isSubmitting: false);
-      return result;
-    } catch (e) {
-      state = state.copyWith(isSubmitting: false, error: _friendlyError(e));
-      return UserOperationResult(success: false, message: _friendlyError(e));
-    }
+  Future<UserOperationResult> softDeleteUser(int userId) {
+    return _runMutation(
+      () => _userService.softDeleteUser(userId),
+      onSuccess: loadUsers,
+    );
   }
 
   // ── RESTORE ──────────────────────────────────────────
 
-  Future<UserOperationResult> restoreUser(int userId) async {
-    state = state.copyWith(isSubmitting: true, error: null);
-    try {
-      final result = await _userService.restoreUser(userId);
-      if (result.success) {
-        await loadUsers();
-      }
-      state = state.copyWith(isSubmitting: false);
-      return result;
-    } catch (e) {
-      state = state.copyWith(isSubmitting: false, error: _friendlyError(e));
-      return UserOperationResult(success: false, message: _friendlyError(e));
-    }
+  Future<UserOperationResult> restoreUser(int userId) {
+    return _runMutation(
+      () => _userService.restoreUser(userId),
+      onSuccess: loadUsers,
+    );
   }
 
   // ── PERMANENT DELETE ─────────────────────────────────
 
-  Future<UserOperationResult> permanentlyDeleteUser(int userId) async {
+  Future<UserOperationResult> permanentlyDeleteUser(int userId) {
+    return _runMutation(
+      () => _userService.permanentlyDeleteUser(userId),
+      onSuccess: loadUsers,
+    );
+  }
+
+  /// Runs a [UserOperationResult] mutation with the standard
+  /// `isSubmitting` / `error` boilerplate. When [onSuccess] is provided
+  /// and the mutation succeeds, it is awaited after the service call.
+  Future<UserOperationResult> _runMutation(
+    Future<UserOperationResult> Function() action, {
+    Future<void> Function()? onSuccess,
+  }) async {
     state = state.copyWith(isSubmitting: true, error: null);
     try {
-      final result = await _userService.permanentlyDeleteUser(userId);
+      final result = await action();
       if (result.success) {
-        await loadUsers();
+        await onSuccess?.call();
       }
       state = state.copyWith(isSubmitting: false);
       return result;

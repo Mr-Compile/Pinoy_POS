@@ -1,5 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/auth_navigation.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/ai_advisor_provider.dart';
@@ -9,9 +10,6 @@ import 'package:pinoy_pos/ui/screens/dashboard_screen.dart';
 import 'package:pinoy_pos/ui/screens/pos_screen.dart';
 import 'package:pinoy_pos/ui/screens/products_screen.dart';
 import 'package:pinoy_pos/ui/screens/sales_screen.dart';
-import 'package:pinoy_pos/ui/screens/force_change_password_screen.dart';
-import 'package:pinoy_pos/ui/screens/login_screen.dart';
-import 'package:pinoy_pos/ui/screens/pin_lock_screen.dart';
 import 'package:pinoy_pos/ui/screens/backup_restore_screen.dart';
 import 'package:pinoy_pos/ui/screens/settings_screen.dart';
 import 'package:pinoy_pos/ui/screens/users_screen.dart';
@@ -29,6 +27,7 @@ class AppShell extends ConsumerStatefulWidget {
 
 class _AppShellState extends ConsumerState<AppShell> {
   int _selectedIndex = 0;
+  bool _hasRedirected = false;
   ProviderSubscription<AuthState>? _authSubscription;
 
   @override
@@ -67,29 +66,17 @@ class _AppShellState extends ConsumerState<AppShell> {
     // AppShell should only be visible when fully authenticated.
     // If the phase changes (e.g. forced password change, PIN lock,
     // or logout), navigate to the appropriate screen.
-    if (authState.user == null ||
-        authState.phase != AuthSessionPhase.fullyAuthenticated) {
+    if ((authState.user == null ||
+            authState.phase != AuthSessionPhase.fullyAuthenticated) &&
+        !_hasRedirected) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        switch (authState.phase) {
-          case AuthSessionPhase.fullyAuthenticated:
-            break;
-          case AuthSessionPhase.passwordAuthenticatedPendingPasswordChange:
-            Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (_) => const ForceChangePasswordScreen()),
-              (_) => false,
-            );
-          case AuthSessionPhase.passwordAuthenticatedPendingPin:
-            Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (_) => const PinLockScreen()),
-              (_) => false,
-            );
-          case AuthSessionPhase.unauthenticated:
-            Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (_) => const LoginScreen()),
-              (_) => false,
-            );
-        }
+        if (_hasRedirected || !mounted) return;
+
+        final current = ref.read(authStateProvider);
+        if (current.phase == AuthSessionPhase.fullyAuthenticated) return;
+
+        _hasRedirected = true;
+        AuthPhaseNavigator.pushAndRemoveUntil(context, current.phase);
       });
       return Scaffold(
         body: Center(

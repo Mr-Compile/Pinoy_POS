@@ -1,3 +1,4 @@
+import 'package:pinoy_pos/core/date_utils.dart';
 import 'package:pinoy_pos/data/dao/base_dao.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:sqflite/sqflite.dart';
@@ -52,7 +53,7 @@ class SaleDao extends BaseDao<Sale> {
 
   Future<double> getTotalSalesForDate(DateTime date) async {
     final database = await db;
-    final start = DateTime(date.year, date.month, date.day);
+    final start = startOfDay(date);
     final end = start.add(const Duration(days: 1));
 
     final result = await database.rawQuery('''
@@ -94,7 +95,7 @@ class SaleDao extends BaseDao<Sale> {
 
   Future<double> getTotalSalesForDateForUser(DateTime date, int userId) async {
     final database = await db;
-    final start = DateTime(date.year, date.month, date.day);
+    final start = startOfDay(date);
     final end = start.add(const Duration(days: 1));
 
     final result = await database.rawQuery('''

@@ -272,7 +272,7 @@ class AppColors {
         space: 1,
       ),
 
-      // ── SnackBar (kept for safety; AppSnackBar is unused) ────────
+      // ── SnackBar ──
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(

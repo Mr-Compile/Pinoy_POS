@@ -1,5 +1,6 @@
 ﻿import 'package:pinoy_pos/core/authorization_exception.dart';
 import 'package:pinoy_pos/core/constants.dart';
+import 'package:pinoy_pos/core/date_utils.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/ai_quota.dart';
 import 'package:pinoy_pos/data/repositories/ai_quota_repository.dart';
@@ -34,8 +35,7 @@ class AIQuotaService {
 
   /// Returns today's start-of-day date.
   DateTime _today() {
-    final now = DateTime.now();
-    return DateTime(now.year, now.month, now.day);
+    return startOfDay(DateTime.now());
   }
 
   /// Returns the current user id, or throws if not authenticated.

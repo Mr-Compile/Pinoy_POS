@@ -27,11 +27,27 @@ Future<void> main() async {
   runApp(const ProviderScope(child: MyApp()));
 }
 
-class MyApp extends ConsumerWidget {
+class MyApp extends ConsumerStatefulWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends ConsumerState<MyApp> {
+  late final NavigationRouteObserver _navigationObserver;
+
+  @override
+  void initState() {
+    super.initState();
+    // Create the observer once. Re-creating it on every rebuild of the
+    // root widget could lead to stale observers being registered during
+    // route transitions.
+    _navigationObserver = NavigationRouteObserver(ref);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final themeState = ref.watch(themeProvider);
 
     final themeMode = switch (themeState.themeMode) {
@@ -50,7 +66,7 @@ class MyApp extends ConsumerWidget {
       theme: lightTheme,
       darkTheme: darkTheme,
       themeMode: themeMode,
-      navigatorObservers: [NavigationRouteObserver(ref)],
+      navigatorObservers: [_navigationObserver],
       home: const SplashScreen(),
     );
   }

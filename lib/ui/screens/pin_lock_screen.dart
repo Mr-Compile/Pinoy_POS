@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/auth_navigation.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
-import 'package:pinoy_pos/ui/app_shell.dart';
-import 'package:pinoy_pos/ui/screens/login_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
 import 'package:pinoy_pos/ui/widgets/pin_indicators.dart';
@@ -42,22 +41,15 @@ class _PinLockScreenState extends ConsumerState<PinLockScreen> {
     _authSubscription = ref.listenManual<AuthState>(
       authStateProvider,
       (previous, next) {
+        // Only react to actual phase transitions.
+        if (previous?.phase == next.phase) return;
+
         // When phase becomes fullyAuthenticated, navigate to AppShell.
-        if (next.phase == AuthSessionPhase.fullyAuthenticated &&
-            previous?.phase != AuthSessionPhase.fullyAuthenticated) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const AppShell()),
-            (_) => false,
-          );
-        }
         // When phase becomes unauthenticated (e.g. cancelPinFlow),
         // navigate to LoginScreen.
-        if (next.phase == AuthSessionPhase.unauthenticated &&
-            previous?.phase != AuthSessionPhase.unauthenticated) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const LoginScreen()),
-            (_) => false,
-          );
+        if (next.phase == AuthSessionPhase.fullyAuthenticated ||
+            next.phase == AuthSessionPhase.unauthenticated) {
+          AuthPhaseNavigator.pushAndRemoveUntil(context, next.phase);
         }
       },
     );

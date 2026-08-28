@@ -1,3 +1,4 @@
+import 'package:pinoy_pos/core/date_utils.dart';
 import 'package:pinoy_pos/data/dao/base_dao.dart';
 import 'package:pinoy_pos/data/models/ai_usage.dart';
 
@@ -22,14 +23,14 @@ class AIUsageDao extends BaseDao<AIUsage> {
   Future<int> getTodayCount(int userId) async {
     final database = await db;
     final now = DateTime.now();
-    final startOfDay = DateTime(now.year, now.month, now.day);
-    final endOfDay = startOfDay.add(const Duration(days: 1));
+    final dayStart = startOfDay(now);
+    final endOfDay = dayStart.add(const Duration(days: 1));
     
     final result = await database.rawQuery('''
       SELECT COUNT(*) as count
       FROM ai_usage
       WHERE user_id = ? AND created_at >= ? AND created_at < ?
-    ''', [userId, startOfDay.toIso8601String(), endOfDay.toIso8601String()]);
+    ''', [userId, dayStart.toIso8601String(), endOfDay.toIso8601String()]);
     
     return result.first['count'] as int? ?? 0;
   }

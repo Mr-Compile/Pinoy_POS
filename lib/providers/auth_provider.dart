@@ -158,30 +158,7 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
 
   Future<void> logout() async {
     await _authService.logout();
-    // Invalidate all service providers so cached state from the previous
-    // user's session is discarded.  The next read will create fresh
-    // service instances that query the database for the new user.
-    _ref.invalidate(productServiceProvider);
-    _ref.invalidate(categoryServiceProvider);
-    _ref.invalidate(salesServiceProvider);
-    _ref.invalidate(stockServiceProvider);
-    _ref.invalidate(activityLogServiceProvider);
-    _ref.invalidate(notificationServiceProvider);
-    _ref.invalidate(notificationCountProvider);
-    _ref.invalidate(settingsServiceProvider);
-    _ref.invalidate(reportServiceProvider);
-    _ref.invalidate(backupServiceProvider);
-    _ref.invalidate(aiUsageServiceProvider);
-    _ref.invalidate(aiAdvisorServiceProvider);
-    _ref.invalidate(aiAdvisorChatProvider);
-    _ref.invalidate(groqServiceProvider);
-    _ref.invalidate(trashServiceProvider);
-    _ref.invalidate(announcementServiceProvider);
-    _ref.invalidate(userServiceProvider);
-    _ref.invalidate(userControllerProvider);
-    _ref.invalidate(dashboardProvider);
-    _ref.invalidate(cartProvider);
-    _ref.invalidate(reportsProvider);
+    _invalidateAllCachedProviders();
     state = AuthState();
   }
 
@@ -256,6 +233,13 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
   /// Clears all temporary authentication/session state.
   Future<void> cancelPinFlow() async {
     await _authService.logout();
+    _invalidateAllCachedProviders();
+    state = AuthState();
+  }
+
+  /// Discards cached state tied to the current user. Called by [logout]
+  /// and [cancelPinFlow] so the next session starts with fresh providers.
+  void _invalidateAllCachedProviders() {
     _ref.invalidate(productServiceProvider);
     _ref.invalidate(categoryServiceProvider);
     _ref.invalidate(salesServiceProvider);
@@ -277,7 +261,6 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
     _ref.invalidate(dashboardProvider);
     _ref.invalidate(cartProvider);
     _ref.invalidate(reportsProvider);
-    state = AuthState();
   }
 
   /// Called after the current user's own record is edited (e.g. by

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/safe_navigation.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/ui/screens/profile_screen.dart';
@@ -49,26 +50,7 @@ class _ProfileMenuState extends ConsumerState<ProfileMenu> {
   }
 
   void _safePush(Widget screen) {
-    if (!mounted) return;
-    final navigator = Navigator.of(context);
-    bool isAlreadyOnScreen = false;
-
-    navigator.popUntil((route) {
-      if (route.settings.name == screen.runtimeType.toString()) {
-        isAlreadyOnScreen = true;
-      }
-      return true;
-    });
-
-    if (!isAlreadyOnScreen) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => screen,
-          settings: RouteSettings(name: screen.runtimeType.toString()),
-        ),
-      );
-    }
+    SafeNavigator.pushUnique<void>(context, screen);
   }
 
   String _initials(User user) {

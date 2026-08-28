@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/auth_navigation.dart';
 import 'package:pinoy_pos/core/constants.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/theme_provider.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
-import 'package:pinoy_pos/ui/app_shell.dart';
-import 'package:pinoy_pos/ui/screens/force_change_password_screen.dart';
-import 'package:pinoy_pos/ui/screens/pin_lock_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_logo.dart';
 
@@ -71,21 +69,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       case LoginResult.success:
         // Navigate based on the session phase.
         final phase = ref.read(authStateProvider).phase;
-        switch (phase) {
-          case AuthSessionPhase.passwordAuthenticatedPendingPasswordChange:
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (_) => const ForceChangePasswordScreen()),
-            );
-          case AuthSessionPhase.passwordAuthenticatedPendingPin:
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (_) => const PinLockScreen()),
-            );
-          case AuthSessionPhase.fullyAuthenticated:
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (_) => const AppShell()),
-            );
-          case AuthSessionPhase.unauthenticated:
-            break;
+        if (phase != AuthSessionPhase.unauthenticated) {
+          await AuthPhaseNavigator.pushReplacement(context, phase);
         }
       case LoginResult.invalidCredentials:
         await AppDialogService.error(

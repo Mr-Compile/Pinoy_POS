@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/date_utils.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
@@ -355,8 +356,8 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
   String _dateLabel(DateTime date) {
     final now = DateTime.now();
     final local = date.toLocal();
-    final today = DateTime(now.year, now.month, now.day);
-    final saleDate = DateTime(local.year, local.month, local.day);
+    final today = startOfDay(now);
+    final saleDate = startOfDay(local);
 
     final diff = today.difference(saleDate).inDays;
     if (diff == 0) return 'Today';
