@@ -1,17 +1,19 @@
 import 'dart:io';
 import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:pinoy_pos/data/models/sale.dart';
+import 'package:pinoy_pos/data/models/settings.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/providers/reports_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
+import 'package:pinoy_pos/ui/screens/settings/store_information_settings_page.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
-import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/spacing.dart';
@@ -27,110 +29,27 @@ class ReportsScreen extends ConsumerStatefulWidget {
 }
 
 class _ReportsScreenState extends ConsumerState<ReportsScreen> {
-  double _todaySales = 0.0;
-  double _monthSales = 0.0;
-  int _lowStockCount = 0;
-  int _totalProducts = 0;
-  bool _isLoading = true;
   bool _isExporting = false;
-
-  DateTime? _filterStart;
-  DateTime? _filterEnd;
   ExportFormat? _selectedFormat;
   String? _lastExportPath;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadStats();
-  }
-
-  Future<void> _loadStats() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    final reportService = ref.read(reportServiceProvider);
-    final todaySales = await reportService.getTodaySales();
-    final monthSales = await reportService.getMonthSales();
-    final lowStockCount = await reportService.getLowStockCount();
-    final totalProducts = await reportService.getTotalProducts();
-
-    if (mounted) {
-      setState(() {
-        _todaySales = todaySales;
-        _monthSales = monthSales;
-        _lowStockCount = lowStockCount;
-        _totalProducts = totalProducts;
-        _isLoading = false;
-      });
-    }
-  }
-
-  Future<void> _pickDateRange() async {
-    final now = DateTime.now();
-    final initial = DateTimeRange(
-      start: _filterStart ?? DateTime(now.year, now.month, 1),
-      end: _filterEnd ?? now,
-    );
-
-    final picked = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(2020),
-      lastDate: now,
-      initialDateRange: initial,
-    );
-
-    if (picked != null) {
-      setState(() {
-        _filterStart = picked.start;
-        _filterEnd = picked.end.add(const Duration(days: 1)).subtract(const Duration(seconds: 1));
-      });
-    }
-  }
-
-  String get _filterLabel {
-    if (_filterStart == null || _filterEnd == null) {
-      return 'All sales';
-    }
-    String fmt(DateTime d) =>
-        '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-    return '${fmt(_filterStart!)} to ${fmt(_filterEnd!)}';
-  }
-
-  Future<List<Sale>> _getSalesForExport() async {
-    final salesService = ref.read(salesServiceProvider);
-    if (_filterStart != null && _filterEnd != null) {
-      return salesService.getSalesByDateRange(_filterStart!, _filterEnd!);
-    }
-    return salesService.getSales();
-  }
-
-  Future<void> _recordExport({
-    required String fileFormat,
-    required String filePath,
-  }) async {
-    // Record through the ReportService provider so the UI never accesses
-    // the repository or session manager directly.
-    await ref.read(reportServiceProvider).recordExport(
-          fileFormat: fileFormat,
-          filePath: filePath,
-          dateRangeStart: _filterStart,
-          dateRangeEnd: _filterEnd,
-        );
-  }
 
   @override
   Widget build(BuildContext context) {
     final authNotifier = ref.read(authStateProvider.notifier);
     final canExport = authNotifier.hasPermission('export_reports');
+    final state = ref.watch(reportsProvider);
 
-    if (_isLoading) {
+    if (state.isLoading) {
       return Scaffold(
-        appBar: AppHeader(
-          title: 'Reports',
-        ),
-        body: const LoadingState(),
+        appBar: const AppHeader(title: 'Reports'),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (state.error != null) {
+      return Scaffold(
+        appBar: const AppHeader(title: 'Reports'),
+        body: _buildErrorState(state.error!),
       );
     }
 
@@ -140,7 +59,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _loadStats,
+            onPressed: () => ref.read(reportsProvider.notifier).load(),
           ),
         ],
       ),
@@ -149,85 +68,20 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Sales Summary',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 16),
-            AppCard(
-              child: Column(
-                children: [
-                  _buildStatRow("Today's Sales", 'PHP ${_todaySales.toStringAsFixed(2)}'),
-                  const Divider(),
-                  _buildStatRow('Month Sales', 'PHP ${_monthSales.toStringAsFixed(2)}'),
-                ],
-              ),
-            ),
+            if (state.storeInfoIncomplete) _buildStoreInfoBanner(context, state),
+            _buildStoreHeader(context, state),
             const SizedBox(height: 24),
-            Text(
-              'Inventory Summary',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 16),
-            AppCard(
-              child: Column(
-                children: [
-                  _buildStatRow('Total Products', '$_totalProducts'),
-                  const Divider(),
-                  _buildStatRow('Low Stock Items', '$_lowStockCount'),
-                ],
-              ),
-            ),
+            _buildDateRangeFilter(context, state),
             const SizedBox(height: 24),
-            Text(
-              'Export Report',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 16),
-            // Date range filter card
-            AppCard(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Row(
-                  children: [
-                    const Icon(Icons.date_range),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Date Range'),
-                          Text(
-                            _filterLabel,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ],
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: _pickDateRange,
-                      child: const Text('Filter'),
-                    ),
-                    if (_filterStart != null)
-                      TextButton(
-                        onPressed: () {
-                          setState(() {
-                            _filterStart = null;
-                            _filterEnd = null;
-                          });
-                        },
-                        child: const Text('Clear'),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Format selection
-            _buildFormatSelection(canExport),
-            const SizedBox(height: 16),
-            // Export button + last export path
-            if (canExport) _buildExportAction(),
+            _buildSummaryCards(context, state),
+            const SizedBox(height: 24),
+            _buildPaymentBreakdown(context, state),
+            const SizedBox(height: 24),
+            _buildTopProducts(context, state),
+            const SizedBox(height: 24),
+            _buildDailySales(context, state),
+            const SizedBox(height: 24),
+            _buildExportSection(context, state, canExport),
             if (_lastExportPath != null) ...[
               const SizedBox(height: 12),
               _buildLastExportInfo(),
@@ -238,13 +92,302 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     );
   }
 
+  Widget _buildErrorState(String message) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline,
+                size: 48, color: Theme.of(context).colorScheme.error),
+            const SizedBox(height: 16),
+            Text(message, textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+              onPressed: () => ref.read(reportsProvider.notifier).load(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStoreInfoBanner(BuildContext context, ReportsState state) {
+    final cs = Theme.of(context).colorScheme;
+    return AppCard(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Icon(Icons.store, color: cs.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Set up your store information',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                  Text(
+                    'Your store name, address, and contact will appear on receipts and exports.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const StoreInformationSettingsPage()),
+              ).then((_) => ref.read(reportsProvider.notifier).refreshStoreInfo()),
+              child: const Text('Set Up'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStoreHeader(BuildContext context, ReportsState state) {
+    final store = state.storeInfo;
+    final cs = Theme.of(context).colorScheme;
+
+    return AppCard(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Icon(Icons.storefront, color: cs.primary, size: 40),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    store.storeName,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                  if (store.storeAddress.isNotEmpty)
+                    Text(
+                      store.storeAddress,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  if (store.storePhone.isNotEmpty)
+                    Text(
+                      'Contact: ${store.storePhone}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  Text(
+                    'Currency: ${store.currency}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDateRangeFilter(BuildContext context, ReportsState state) {
+    final label = state.filterStart != null && state.filterEnd != null
+        ? _formatRange(state.filterStart!, state.filterEnd!)
+        : 'This month';
+
+    return AppCard(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+        child: Row(
+          children: [
+            const Icon(Icons.date_range),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Date Range'),
+                  Text(
+                    label,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+            TextButton(
+              onPressed: () => _pickDateRange(context),
+              child: const Text('Filter'),
+            ),
+            if (state.filterStart != null)
+              TextButton(
+                onPressed: () => ref.read(reportsProvider.notifier).clearDateRange(),
+                child: const Text('Clear'),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickDateRange(BuildContext context) async {
+    final now = DateTime.now();
+    final initial = DateTimeRange(
+      start: ref.read(reportsProvider).filterStart ??
+          DateTime(now.year, now.month, 1),
+      end: ref.read(reportsProvider).filterEnd ?? now,
+    );
+
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: now,
+      initialDateRange: initial,
+    );
+
+    if (picked != null && mounted) {
+      final start = DateTime(picked.start.year, picked.start.month, picked.start.day);
+      final end = DateTime(picked.end.year, picked.end.month, picked.end.day, 23, 59, 59);
+      ref.read(reportsProvider.notifier).setDateRange(start, end);
+    }
+  }
+
+  Widget _buildSummaryCards(BuildContext context, ReportsState state) {
+    final currency = state.storeInfo.currency;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Sales Summary',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: 16),
+        AppCard(
+          child: Column(
+            children: [
+              _buildStatRow("Today's Sales", '$currency ${_todaySales(state)}'),
+              const Divider(),
+              _buildStatRow('Month Sales', '$currency ${_monthSales(state)}'),
+              const Divider(),
+              _buildStatRow('Total Transactions', '${state.totalTransactions}'),
+              const Divider(),
+              _buildStatRow('Total Products', '${state.totalProducts}'),
+              const Divider(),
+              _buildStatRow('Low Stock Items', '${state.lowStockCount}'),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _todaySales(ReportsState state) {
+    return state.todaySales.toStringAsFixed(2);
+  }
+
+  String _monthSales(ReportsState state) {
+    return state.monthSales.toStringAsFixed(2);
+  }
+
+  Widget _buildPaymentBreakdown(BuildContext context, ReportsState state) {
+    if (state.paymentBreakdown.isEmpty) return const SizedBox.shrink();
+
+    final currency = state.storeInfo.currency;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Payment Breakdown',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: 16),
+        AppCard(
+          child: Column(
+            children: state.paymentBreakdown.map((p) {
+              return _buildStatRow(
+                '${p.method} (${p.count})',
+                '$currency ${p.total.toStringAsFixed(2)}',
+              );
+            }).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTopProducts(BuildContext context, ReportsState state) {
+    if (state.topProducts.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Top Products',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: 16),
+        AppCard(
+          child: Column(
+            children: state.topProducts.asMap().entries.map((entry) {
+              final p = entry.value;
+              return _buildStatRow(
+                '${entry.key + 1}. ${p.productName}',
+                '${p.totalQuantity} sold',
+              );
+            }).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDailySales(BuildContext context, ReportsState state) {
+    if (state.dailySales.length < 2) return const SizedBox.shrink();
+
+    final currency = state.storeInfo.currency;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Daily Sales',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: 16),
+        AppCard(
+          child: Column(
+            children: state.dailySales.map((d) {
+              return _buildStatRow(
+                '${d.date.month.toString().padLeft(2, '0')}-${d.date.day.toString().padLeft(2, '0')}',
+                '$currency ${d.total.toStringAsFixed(2)} (${d.count} txn)',
+              );
+            }).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildStatRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label),
+          Flexible(
+            child: Text(
+              label,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 16),
           Text(
             value,
             style: AppTypography.titleMediumBold(context),
@@ -256,28 +399,40 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
   // ── Export UI ──────────────────────────────────────────────────────
 
-  Widget _buildFormatSelection(bool canExport) {
-    return Row(
+  Widget _buildExportSection(BuildContext context, ReportsState state, bool canExport) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: _buildFormatCard(
-            icon: Icons.picture_as_pdf,
-            label: 'PDF',
-            description: 'Formatted report',
-            format: ExportFormat.pdf,
-            canExport: canExport,
-          ),
+        Text(
+          'Export Report',
+          style: Theme.of(context).textTheme.titleLarge,
         ),
-        const SizedBox(width: Spacing.md),
-        Expanded(
-          child: _buildFormatCard(
-            icon: Icons.table_view,
-            label: 'Excel',
-            description: 'Spreadsheet (.xlsx)',
-            format: ExportFormat.excel,
-            canExport: canExport,
-          ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: _buildFormatCard(
+                icon: Icons.picture_as_pdf,
+                label: 'PDF',
+                description: 'Formatted report',
+                format: ExportFormat.pdf,
+                canExport: canExport,
+              ),
+            ),
+            const SizedBox(width: Spacing.md),
+            Expanded(
+              child: _buildFormatCard(
+                icon: Icons.table_view,
+                label: 'Excel',
+                description: 'Spreadsheet (.xlsx)',
+                format: ExportFormat.excel,
+                canExport: canExport,
+              ),
+            ),
+          ],
         ),
+        const SizedBox(height: 16),
+        if (canExport) _buildExportAction(state),
       ],
     );
   }
@@ -329,32 +484,15 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     );
   }
 
-  Widget _buildExportAction() {
+  Widget _buildExportAction(ReportsState state) {
     return SizedBox(
       width: double.infinity,
       child: LoadingButton(
         isLoading: _isExporting,
-        onPressed: _selectedFormat != null ? _performExport : null,
+        onPressed: _selectedFormat != null ? () => _performExport(state) : null,
         label: _selectedFormat == null
             ? 'Select a format'
             : 'Export to ${_selectedFormat == ExportFormat.pdf ? 'PDF' : 'Excel'}',
-        child: _isExporting
-            ? null
-            : Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(_selectedFormat == ExportFormat.pdf
-                      ? Icons.picture_as_pdf
-                      : Icons.table_view),
-                  const SizedBox(width: 8),
-                  Text(
-                    _selectedFormat == null
-                        ? 'Select a format'
-                        : 'Export to ${_selectedFormat == ExportFormat.pdf ? 'PDF' : 'Excel'}',
-                  ),
-                ],
-              ),
       ),
     );
   }
@@ -364,7 +502,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       padding: const EdgeInsets.all(Spacing.md),
       child: Row(
         children: [
-          Icon(Icons.check_circle, color: Theme.of(context).colorScheme.primary, size: 20),
+          Icon(Icons.check_circle,
+              color: Theme.of(context).colorScheme.primary, size: 20),
           const SizedBox(width: Spacing.sm),
           Expanded(
             child: Column(
@@ -392,13 +531,25 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
   // ── Export execution ───────────────────────────────────────────────
 
-  Future<void> _performExport() async {
+  Future<void> _performExport(ReportsState state) async {
     if (_selectedFormat == null) return;
 
     setState(() => _isExporting = true);
 
     try {
-      final sales = await _getSalesForExport();
+      final reportService = ref.read(reportServiceProvider);
+      final DateTime start;
+      final DateTime end;
+      if (state.filterStart != null && state.filterEnd != null) {
+        start = state.filterStart!;
+        end = state.filterEnd!;
+      } else {
+        final now = DateTime.now();
+        start = DateTime(now.year, now.month, 1);
+        end = now;
+      }
+
+      final sales = await reportService.getSalesByDateRange(start, end);
 
       if (sales.isEmpty) {
         if (mounted) {
@@ -412,11 +563,14 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
 
       if (_selectedFormat == ExportFormat.pdf) {
-        await _exportToPdf(sales, timestamp);
+        await _exportToPdf(state, sales, timestamp);
       } else {
-        await _exportToExcel(sales, timestamp);
+        await _exportToExcel(state, sales, timestamp);
       }
-    } catch (e) {
+    } catch (e, st) {
+      if (kDebugMode) {
+        debugPrint('[ReportsScreen] export failed: $e\n$st');
+      }
       if (mounted) {
         AppDialogService.error(context,
             title: 'Export Failed',
@@ -447,15 +601,25 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     return result;
   }
 
-  Future<void> _exportToPdf(List<Sale> sales, String timestamp) async {
+  Future<void> _exportToPdf(
+    ReportsState state,
+    List<Sale> sales,
+    String timestamp,
+  ) async {
     final pdf = pw.Document();
+    final store = state.storeInfo;
+    final currency = store.currency;
+
+    final paymentRows = state.paymentBreakdown
+        .map((p) => [p.method, '${p.count}', '$currency ${p.total.toStringAsFixed(2)}'])
+        .toList();
 
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(40),
         build: (pw.Context context) => [
-          _buildPdfLogo(),
+          _buildPdfHeader(store),
           pw.SizedBox(height: 16),
           pw.Text(
             'Sales Report',
@@ -464,34 +628,47 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           pw.Paragraph(
             text: 'Generated: ${DateTime.now().toLocal().toString().split('.')[0]}',
           ),
-          pw.Paragraph(text: 'Date Range: $_filterLabel'),
+          pw.Paragraph(text: 'Date Range: ${_formatRange(state.filterStart, state.filterEnd)}'),
           pw.SizedBox(height: 20),
           pw.Header(level: 1, child: pw.Text('Summary')),
           pw.TableHelper.fromTextArray(
             headers: ['Metric', 'Value'],
             data: [
-              ["Today's Sales", 'PHP ${_todaySales.toStringAsFixed(2)}'],
-              ['Month Sales', 'PHP ${_monthSales.toStringAsFixed(2)}'],
-              ['Total Products', '$_totalProducts'],
-              ['Low Stock Items', '$_lowStockCount'],
-              ['Total Transactions', '${sales.length}'],
+              ["Today's Sales", '$currency ${state.todaySales.toStringAsFixed(2)}'],
+              ['Month Sales', '$currency ${state.monthSales.toStringAsFixed(2)}'],
+              ['Total Products', '${state.totalProducts}'],
+              ['Low Stock Items', '${state.lowStockCount}'],
+              ['Total Transactions', '${state.totalTransactions}'],
             ],
             headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
             headerDecoration: pw.BoxDecoration(color: PdfColors.grey300),
             cellAlignment: pw.Alignment.centerLeft,
             cellPadding: const pw.EdgeInsets.all(8),
           ),
+          if (paymentRows.isNotEmpty) ...[
+            pw.SizedBox(height: 20),
+            pw.Header(level: 1, child: pw.Text('Payment Breakdown')),
+            pw.TableHelper.fromTextArray(
+              headers: ['Method', 'Count', 'Total ($currency)'],
+              data: paymentRows,
+              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+              headerDecoration: pw.BoxDecoration(color: PdfColors.grey300),
+              cellAlignment: pw.Alignment.centerLeft,
+              cellPadding: const pw.EdgeInsets.all(6),
+            ),
+          ],
           pw.SizedBox(height: 20),
           pw.Header(level: 1, child: pw.Text('Sales Detail')),
           pw.TableHelper.fromTextArray(
-            headers: ['Receipt #', 'Date', 'Total (PHP)', 'Cash (PHP)', 'Change (PHP)'],
+            headers: ['Receipt #', 'Date', 'Method', 'Total', 'Cash', 'Change'],
             data: sales
                 .map((s) => [
                       '${s.receiptNumber ?? s.id}',
                       s.createdAt.toLocal().toString().split('.')[0],
-                      s.totalAmount.toStringAsFixed(2),
-                      s.cashReceived.toStringAsFixed(2),
-                      s.change.toStringAsFixed(2),
+                      s.paymentMethod,
+                      '$currency ${s.totalAmount.toStringAsFixed(2)}',
+                      '$currency ${s.cashReceived.toStringAsFixed(2)}',
+                      '$currency ${s.change.toStringAsFixed(2)}',
                     ])
                 .toList(),
             headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
@@ -517,7 +694,12 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     final file = File(savePath);
     await file.writeAsBytes(await pdf.save());
 
-    await _recordExport(fileFormat: 'pdf', filePath: savePath);
+    await ref.read(reportServiceProvider).recordExport(
+          fileFormat: 'pdf',
+          filePath: savePath,
+          dateRangeStart: state.filterStart,
+          dateRangeEnd: state.filterEnd,
+        );
 
     if (mounted) {
       setState(() => _lastExportPath = savePath);
@@ -527,70 +709,70 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     }
   }
 
-  pw.Widget _buildPdfLogo() {
-    return pw.Row(
+  pw.Widget _buildPdfHeader(Settings store) {
+    return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        pw.Container(
-          width: 48,
-          height: 60,
-          decoration: pw.BoxDecoration(
-            border: pw.Border.all(color: PdfColor.fromInt(0xFF3567D6), width: 2),
-            borderRadius: pw.BorderRadius.circular(8),
-          ),
-          child: pw.Center(
-            child: pw.Text(
-              'P',
-              style: pw.TextStyle(
-                fontSize: 28,
-                fontWeight: pw.FontWeight.bold,
-                color: PdfColor.fromInt(0xFFE91E63),
-              ),
-            ),
+        pw.Text(
+          store.storeName,
+          style: pw.TextStyle(
+            fontSize: 24,
+            fontWeight: pw.FontWeight.bold,
+            color: PdfColor.fromInt(0xFF3567D6),
           ),
         ),
-        pw.SizedBox(width: 12),
-        pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Text(
-              'Pinoy POS',
-              style: pw.TextStyle(
-                fontSize: 24,
-                fontWeight: pw.FontWeight.bold,
-                color: PdfColor.fromInt(0xFF3567D6),
-              ),
-            ),
-            pw.Text(
-              'Point of Sale System',
-              style: pw.TextStyle(
-                fontSize: 10,
-                color: PdfColors.grey600,
-              ),
-            ),
-          ],
-        ),
+        if (store.storeAddress.isNotEmpty)
+          pw.Text(store.storeAddress,
+              style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600)),
+        if (store.storePhone.isNotEmpty)
+          pw.Text('Contact: ${store.storePhone}',
+              style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600)),
+        if (store.receiptFooter?.isNotEmpty == true)
+          pw.Text(store.receiptFooter!,
+              style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600)),
       ],
     );
   }
 
-  Future<void> _exportToExcel(List<Sale> sales, String timestamp) async {
+  Future<void> _exportToExcel(
+    ReportsState state,
+    List<Sale> sales,
+    String timestamp,
+  ) async {
     final excel = Excel.createExcel();
+    final store = state.storeInfo;
 
     final sheet = excel['Sales Report'];
     excel.delete('Sheet1');
 
-    sheet.cell(CellIndex.indexByString('A1')).value = TextCellValue('Pinoy POS - Sales Report');
-    sheet.cell(CellIndex.indexByString('A2')).value =
+    sheet.cell(CellIndex.indexByString('A1')).value =
+        TextCellValue(store.storeName);
+    if (store.storeAddress.isNotEmpty) {
+      sheet.cell(CellIndex.indexByString('A2')).value =
+          TextCellValue(store.storeAddress);
+    }
+    if (store.storePhone.isNotEmpty) {
+      sheet.cell(CellIndex.indexByString('A3')).value =
+          TextCellValue('Contact: ${store.storePhone}');
+    }
+    sheet.cell(CellIndex.indexByString('A5')).value =
+        TextCellValue('${store.storeName} - Sales Report');
+    sheet.cell(CellIndex.indexByString('A6')).value =
         TextCellValue('Generated: ${DateTime.now().toLocal().toString().split('.')[0]}');
-    sheet.cell(CellIndex.indexByString('A3')).value = TextCellValue('Date Range: $_filterLabel');
+    sheet.cell(CellIndex.indexByString('A7')).value =
+        TextCellValue('Date Range: ${_formatRange(state.filterStart, state.filterEnd)}');
 
+    int row = 9;
+    sheet.cell(CellIndex.indexByString('A$row')).value =
+        TextCellValue('Sales Detail');
+    row++;
     sheet.appendRow([
       TextCellValue('Receipt #'),
       TextCellValue('Date'),
-      TextCellValue('Total (PHP)'),
-      TextCellValue('Cash Received (PHP)'),
-      TextCellValue('Change (PHP)'),
+      TextCellValue('Payment Method'),
+      TextCellValue('Total'),
+      TextCellValue('Cash Received'),
+      TextCellValue('Change'),
       TextCellValue('Notes'),
     ]);
 
@@ -598,6 +780,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       sheet.appendRow([
         TextCellValue('${s.receiptNumber ?? s.id}'),
         TextCellValue(s.createdAt.toLocal().toString().split('.')[0]),
+        TextCellValue(s.paymentMethod),
         DoubleCellValue(s.totalAmount),
         DoubleCellValue(s.cashReceived),
         DoubleCellValue(s.change),
@@ -605,13 +788,29 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       ]);
     }
 
-    sheet.appendRow([TextCellValue('')]);
-    sheet.appendRow([TextCellValue('Summary')]);
-    sheet.appendRow([TextCellValue("Today's Sales"), DoubleCellValue(_todaySales)]);
-    sheet.appendRow([TextCellValue('Month Sales'), DoubleCellValue(_monthSales)]);
-    sheet.appendRow([TextCellValue('Total Products'), IntCellValue(_totalProducts)]);
-    sheet.appendRow([TextCellValue('Low Stock Items'), IntCellValue(_lowStockCount)]);
-    sheet.appendRow([TextCellValue('Total Transactions'), IntCellValue(sales.length)]);
+    row = sheet.rows.length + 2;
+    sheet.cell(CellIndex.indexByString('A$row')).value =
+        TextCellValue('Summary');
+    row++;
+    sheet.appendRow([TextCellValue("Today's Sales"), DoubleCellValue(state.todaySales)]);
+    sheet.appendRow([TextCellValue('Month Sales'), DoubleCellValue(state.monthSales)]);
+    sheet.appendRow([TextCellValue('Total Products'), IntCellValue(state.totalProducts)]);
+    sheet.appendRow([TextCellValue('Low Stock Items'), IntCellValue(state.lowStockCount)]);
+    sheet.appendRow([TextCellValue('Total Transactions'), IntCellValue(state.totalTransactions)]);
+
+    if (state.paymentBreakdown.isNotEmpty) {
+      row = sheet.rows.length + 2;
+      sheet.cell(CellIndex.indexByString('A$row')).value =
+          TextCellValue('Payment Breakdown');
+      row++;
+      for (final p in state.paymentBreakdown) {
+        sheet.appendRow([
+          TextCellValue(p.method),
+          IntCellValue(p.count),
+          DoubleCellValue(p.total),
+        ]);
+      }
+    }
 
     final bytes = excel.save();
     if (bytes == null) {
@@ -636,7 +835,12 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     final file = File(savePath);
     await file.writeAsBytes(bytes);
 
-    await _recordExport(fileFormat: 'excel', filePath: savePath);
+    await ref.read(reportServiceProvider).recordExport(
+          fileFormat: 'excel',
+          filePath: savePath,
+          dateRangeStart: state.filterStart,
+          dateRangeEnd: state.filterEnd,
+        );
 
     if (mounted) {
       setState(() => _lastExportPath = savePath);
@@ -644,5 +848,12 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           title: 'Export Complete',
           message: 'Excel report saved successfully.');
     }
+  }
+
+  String _formatRange(DateTime? start, DateTime? end) {
+    if (start == null || end == null) return 'This month';
+    String fmt(DateTime d) =>
+        '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    return '${fmt(start)} to ${fmt(end)}';
   }
 }

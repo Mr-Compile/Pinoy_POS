@@ -2,9 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/data/models/product.dart';
-import 'package:pinoy_pos/data/models/sale_item.dart';
 import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/providers/cart_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
@@ -26,9 +26,7 @@ class POSScreen extends ConsumerStatefulWidget {
 class _POSScreenState extends ConsumerState<POSScreen> {
   List<Product> _products = [];
   List<Category> _categories = [];
-  final Map<int, int> _cart = {}; // productId → quantity
   bool _isLoading = true;
-  bool _isProcessing = false;
 
   // Search + filter state
   final _searchController = TextEditingController();
@@ -114,92 +112,20 @@ class _POSScreenState extends ConsumerState<POSScreen> {
 
   // ── Cart operations ────────────────────────────────────────────────
 
-  double get _subtotal {
-    double total = 0;
-    _cart.forEach((productId, quantity) {
-      try {
-        final product = _products.firstWhere((p) => p.id == productId);
-        total += product.price * quantity;
-      } catch (_) {}
-    });
-    return total;
-  }
-
-  int get _cartItemCount => _cart.values.fold(0, (sum, qty) => sum + qty);
-
   void _addToCart(Product product) {
-    if (product.id == null) return;
-
-    if (product.stock <= 0) {
-      AppDialogService.error(context,
-          title: 'Out of Stock',
-          message: '${product.name} is currently out of stock.');
-      return;
-    }
-
-    final currentQty = _cart[product.id!] ?? 0;
-    if (currentQty >= product.stock) {
-      AppDialogService.error(context,
-          title: 'Insufficient Stock',
-          message: 'Only ${product.stock} units of ${product.name} are available.');
-      return;
-    }
-
-    setState(() {
-      _cart[product.id!] = currentQty + 1;
-    });
-  }
-
-  void _incrementCart(int productId) {
-    try {
-      final product = _products.firstWhere((p) => p.id == productId);
-      final currentQty = _cart[productId] ?? 0;
-      if (currentQty >= product.stock) {
+    ref.read(cartProvider.notifier).addProduct(product).then((error) {
+      if (error != null && mounted) {
         AppDialogService.error(context,
-            title: 'Insufficient Stock',
-            message: 'Only ${product.stock} units of ${product.name} are available.');
-        return;
-      }
-      setState(() {
-        _cart[productId] = currentQty + 1;
-      });
-    } catch (_) {}
-  }
-
-  void _decrementCart(int productId) {
-    setState(() {
-      final currentQty = _cart[productId] ?? 0;
-      if (currentQty <= 1) {
-        _cart.remove(productId);
-      } else {
-        _cart[productId] = currentQty - 1;
+            title: 'Unable to add', message: error);
       }
     });
-  }
-
-  void _removeFromCart(int productId) {
-    setState(() {
-      _cart.remove(productId);
-    });
-  }
-
-  Future<void> _clearCart() async {
-    if (_cart.isEmpty) return;
-    final confirmed = await AppDialogService.deleteConfirm(
-      context,
-      itemName: 'all cart items',
-    );
-    if (confirmed == true && mounted) {
-      setState(() {
-        _cart.clear();
-      });
-    }
   }
 
   // ── Checkout ───────────────────────────────────────────────────────
 
   Future<void> _checkout() async {
-    if (_cart.isEmpty) {
+    final cart = ref.read(cartProvider);
+    if (cart.isEmpty) {
       AppDialogService.error(context,
           title: 'Empty Cart', message: 'Add products to the cart before checkout.');
       return;
@@ -211,7 +137,7 @@ class _POSScreenState extends ConsumerState<POSScreen> {
       return;
     }
 
-    final total = _subtotal;
+    final total = cart.total;
     final result = await showDialog<_PaymentResult>(
       context: context,
       builder: (context) => _PaymentDialog(total: total),
@@ -219,44 +145,31 @@ class _POSScreenState extends ConsumerState<POSScreen> {
 
     if (result == null || !mounted) return;
 
-    setState(() => _isProcessing = true);
+    ref.read(cartProvider.notifier).setProcessing(true);
 
     try {
-      final saleItems = <SaleItem>[];
-      _cart.forEach((productId, quantity) {
-        try {
-          final product = _products.firstWhere((p) => p.id == productId);
-          saleItems.add(SaleItem(
-            saleId: 0,
-            productId: productId,
-            quantity: quantity,
-            unitPrice: product.price,
-            totalPrice: product.price * quantity,
-          ));
-        } catch (_) {}
-      });
-
+      final saleItems = ref.read(cartProvider.notifier).toSaleItems();
       final success = await ref.read(salesServiceProvider).createSale(
             items: saleItems,
             totalAmount: total,
             cashReceived: result.cashReceived,
             notes: result.notes,
+            paymentMethod: result.paymentMethod,
           );
 
       if (mounted) {
         if (success) {
-          setState(() {
-            _cart.clear();
-            _isProcessing = false;
-          });
+          // Cart is only cleared after the sale has been persisted.
+          ref.read(cartProvider.notifier).clear();
+          ref.read(cartProvider.notifier).setProcessing(false);
           await AppDialogService.success(
             context,
             title: 'Sale Completed',
             message: 'Transaction completed successfully.',
           );
-          _loadProducts();
+          await _loadProducts();
         } else {
-          setState(() => _isProcessing = false);
+          ref.read(cartProvider.notifier).setProcessing(false);
           AppDialogService.error(context,
               title: 'Transaction Failed',
               message: 'Failed to complete the sale. Please try again.');
@@ -264,7 +177,7 @@ class _POSScreenState extends ConsumerState<POSScreen> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isProcessing = false);
+        ref.read(cartProvider.notifier).setProcessing(false);
         AppDialogService.error(context,
             title: 'Transaction Failed',
             message: 'An error occurred while processing the sale.');
@@ -279,6 +192,8 @@ class _POSScreenState extends ConsumerState<POSScreen> {
       setState(() {
         _products = products;
       });
+      // Keep cart items in sync with the latest product data (stock changes).
+      ref.read(cartProvider.notifier).refreshProducts(products);
     }
   }
 
@@ -325,7 +240,6 @@ class _POSScreenState extends ConsumerState<POSScreen> {
               label: const Text('Go to Products'),
               onPressed: () {
                 // Navigate to products tab — the AppShell handles routing.
-                // Staff won't see this button because canManageProducts is false.
               },
             )
           : null,
@@ -396,7 +310,6 @@ class _POSScreenState extends ConsumerState<POSScreen> {
   // ── Product card ───────────────────────────────────────────────────
 
   Widget _buildProductCard(Product product, {bool isTablet = false}) {
-    final quantity = _cart[product.id] ?? 0;
     final isOutOfStock = product.stock <= 0;
     final isLowStock = !isOutOfStock && product.isLowStock;
     final cs = Theme.of(context).colorScheme;
@@ -439,26 +352,7 @@ class _POSScreenState extends ConsumerState<POSScreen> {
                         ),
                       ),
                     ),
-                  if (quantity > 0)
-                    Positioned(
-                      top: 6,
-                      right: 6,
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: cs.primary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Text(
-                          '$quantity',
-                          style: TextStyle(
-                            color: cs.onPrimary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
+                  _ProductQuantityBadge(productId: product.id!),
                 ],
               ),
             ),
@@ -566,190 +460,14 @@ class _POSScreenState extends ConsumerState<POSScreen> {
     );
   }
 
-  // ── Cart item row ──────────────────────────────────────────────────
-
-  Widget _buildCartItemRow(int productId, int quantity) {
-    try {
-      final product = _products.firstWhere((p) => p.id == productId);
-      final cs = Theme.of(context).colorScheme;
-
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: Spacing.xs),
-        child: Row(
-          children: [
-            // Name + price
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    product.name,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    '₱${product.price.toStringAsFixed(2)} × $quantity',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: cs.onSurfaceVariant,
-                        ),
-                  ),
-                ],
-              ),
-            ),
-            // Quantity controls
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildQtyButton(
-                  icon: Icons.remove,
-                  onTap: () => _decrementCart(productId),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
-                  child: Text(
-                    '$quantity',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-                _buildQtyButton(
-                  icon: Icons.add,
-                  onTap: () => _incrementCart(productId),
-                ),
-              ],
-            ),
-            // Subtotal
-            SizedBox(
-              width: 70,
-              child: Text(
-                '₱${(product.price * quantity).toStringAsFixed(2)}',
-                style: AppTypography.titleSmallBold(context),
-                textAlign: TextAlign.right,
-              ),
-            ),
-            // Remove
-            IconButton(
-              icon: const Icon(Icons.delete_outline, size: 20),
-              onPressed: () => _removeFromCart(productId),
-              tooltip: 'Remove item',
-              visualDensity: VisualDensity.compact,
-            ),
-          ],
-        ),
-      );
-    } catch (_) {
-      return const SizedBox.shrink();
-    }
-  }
-
-  Widget _buildQtyButton({required IconData icon, required VoidCallback onTap}) {
-    return SizedBox(
-      width: 32,
-      height: 32,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: Theme.of(context).colorScheme.outline),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(icon, size: 16),
-        ),
-      ),
-    );
-  }
-
   // ── Cart summary + checkout ────────────────────────────────────────
 
   Widget _buildCheckoutPanel(bool canSell, {bool isTablet = false}) {
-    final cs = Theme.of(context).colorScheme;
-
-    return Column(
-      children: [
-        // Cart header
-        Padding(
-          padding: const EdgeInsets.all(Spacing.lg),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Cart', style: Theme.of(context).textTheme.titleLarge),
-              if (_cart.isNotEmpty)
-                TextButton.icon(
-                  icon: const Icon(Icons.delete_sweep, size: 18),
-                  label: const Text('Clear'),
-                  onPressed: _clearCart,
-                ),
-            ],
-          ),
-        ),
-        // Cart items
-        Expanded(
-          child: _cart.isEmpty
-              ? EmptyState(
-                  icon: Icons.shopping_cart_outlined,
-                  title: 'Your cart is empty',
-                  message: 'Select a product to start a transaction.',
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
-                  itemCount: _cart.length,
-                  itemBuilder: (context, index) {
-                    final productId = _cart.keys.elementAt(index);
-                    return _buildCartItemRow(productId, _cart[productId]!);
-                  },
-                ),
-        ),
-        // Totals + checkout
-        if (_cart.isNotEmpty)
-          Container(
-            padding: const EdgeInsets.all(Spacing.lg),
-            decoration: BoxDecoration(
-              border: Border(
-                top: BorderSide(color: cs.outlineVariant, width: 1),
-              ),
-            ),
-            child: SafeArea(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Subtotal', style: Theme.of(context).textTheme.bodyLarge),
-                      Text(
-                        '₱${_subtotal.toStringAsFixed(2)}',
-                        style: Theme.of(context).textTheme.bodyLarge,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: Spacing.sm),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Total', style: AppTypography.titleLargeBold(context)),
-                      Text(
-                        '₱${_subtotal.toStringAsFixed(2)}',
-                        style: AppTypography.headlineSmallBold(context).copyWith(
-                              color: cs.primary,
-                            ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: Spacing.md),
-                  LoadingButton(
-                    isLoading: _isProcessing,
-                    onPressed: canSell ? _checkout : null,
-                    label: 'Complete Sale',
-                  ),
-                ],
-              ),
-            ),
-          ),
-      ],
+    // The checkout panel watches the cart provider so it rebuilds
+    // immediately, even when displayed inside a modal bottom sheet.
+    return _CheckoutPanel(
+      canSell: canSell,
+      onCheckout: _checkout,
     );
   }
 
@@ -767,21 +485,12 @@ class _POSScreenState extends ConsumerState<POSScreen> {
           ],
         ),
         // Floating cart button
-        if (_cart.isNotEmpty)
-          Positioned(
-            bottom: Spacing.lg,
-            right: Spacing.lg,
-            child: FloatingActionButton.extended(
-              icon: const Icon(Icons.shopping_cart),
-              label: Text('$_cartItemCount items · ₱${_subtotal.toStringAsFixed(2)}'),
-              onPressed: () => _showMobileCartSheet(canSell),
-            ),
-          ),
+        _FloatingCartButton(onOpenCart: _showMobileCartSheet),
       ],
     );
   }
 
-  void _showMobileCartSheet(bool canSell) {
+  void _showMobileCartSheet() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -794,7 +503,13 @@ class _POSScreenState extends ConsumerState<POSScreen> {
         minChildSize: 0.5,
         maxChildSize: 0.95,
         expand: false,
-        builder: (context, scrollController) => _buildCheckoutPanel(canSell),
+        builder: (context, scrollController) => _CheckoutPanel(
+          canSell: ref.read(authStateProvider.notifier).hasPermission('create_sales'),
+          onCheckout: () {
+            Navigator.of(context).pop();
+            _checkout();
+          },
+        ),
       ),
     );
   }
@@ -834,13 +549,297 @@ class _POSScreenState extends ConsumerState<POSScreen> {
   }
 }
 
+// ── Quantity badge on product card ───────────────────────────────────
+
+class _ProductQuantityBadge extends ConsumerWidget {
+  final int productId;
+
+  const _ProductQuantityBadge({required this.productId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final quantity = ref.watch(
+      cartProvider.select((cart) => cart.quantityFor(productId) ?? 0),
+    );
+    if (quantity <= 0) return const SizedBox.shrink();
+
+    final cs = Theme.of(context).colorScheme;
+    return Positioned(
+      top: 6,
+      right: 6,
+      child: Container(
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: cs.primary,
+          shape: BoxShape.circle,
+        ),
+        child: Text(
+          '$quantity',
+          style: TextStyle(
+            color: cs.onPrimary,
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Floating cart button (mobile) ───────────────────────────────────
+
+class _FloatingCartButton extends ConsumerWidget {
+  final VoidCallback onOpenCart;
+
+  const _FloatingCartButton({required this.onOpenCart});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cart = ref.watch(cartProvider);
+    if (cart.isEmpty) return const SizedBox.shrink();
+
+    return Positioned(
+      bottom: Spacing.lg,
+      right: Spacing.lg,
+      child: FloatingActionButton.extended(
+        icon: const Icon(Icons.shopping_cart),
+        label: Text('${cart.itemCount} items · ₱${cart.total.toStringAsFixed(2)}'),
+        onPressed: onOpenCart,
+      ),
+    );
+  }
+}
+
+// ── Checkout panel ───────────────────────────────────────────────────
+
+class _CheckoutPanel extends ConsumerWidget {
+  final bool canSell;
+  final VoidCallback onCheckout;
+
+  const _CheckoutPanel({
+    required this.canSell,
+    required this.onCheckout,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cart = ref.watch(cartProvider);
+    final cs = Theme.of(context).colorScheme;
+
+    return Column(
+      children: [
+        // Cart header
+        Padding(
+          padding: const EdgeInsets.all(Spacing.lg),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Cart', style: Theme.of(context).textTheme.titleLarge),
+              if (cart.isNotEmpty)
+                TextButton.icon(
+                  icon: const Icon(Icons.delete_sweep, size: 18),
+                  label: const Text('Clear'),
+                  onPressed: () => _confirmClear(context, ref),
+                ),
+            ],
+          ),
+        ),
+        // Cart items
+        Expanded(
+          child: cart.isEmpty
+              ? EmptyState(
+                  icon: Icons.shopping_cart_outlined,
+                  title: 'Your cart is empty',
+                  message: 'Select a product to start a transaction.',
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
+                  itemCount: cart.items.length,
+                  itemBuilder: (context, index) =>
+                      _CartItemRow(item: cart.items[index]),
+                ),
+        ),
+        // Totals + checkout
+        if (cart.isNotEmpty)
+          Container(
+            padding: const EdgeInsets.all(Spacing.lg),
+            decoration: BoxDecoration(
+              border: Border(
+                top: BorderSide(color: cs.outlineVariant, width: 1),
+              ),
+            ),
+            child: SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Subtotal', style: Theme.of(context).textTheme.bodyLarge),
+                      Text(
+                        '₱${cart.subtotal.toStringAsFixed(2)}',
+                        style: Theme.of(context).textTheme.bodyLarge,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: Spacing.sm),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Total', style: AppTypography.titleLargeBold(context)),
+                      Text(
+                        '₱${cart.total.toStringAsFixed(2)}',
+                        style: AppTypography.headlineSmallBold(context).copyWith(
+                              color: cs.primary,
+                            ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: Spacing.md),
+                  LoadingButton(
+                    isLoading: cart.isProcessing,
+                    onPressed: canSell ? onCheckout : null,
+                    label: 'Complete Sale',
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Future<void> _confirmClear(BuildContext context, WidgetRef ref) async {
+    final confirmed = await AppDialogService.deleteConfirm(
+      context,
+      itemName: 'all cart items',
+    );
+    if (confirmed == true) {
+      ref.read(cartProvider.notifier).clear();
+    }
+  }
+}
+
+// ── Cart item row ────────────────────────────────────────────────────
+
+class _CartItemRow extends ConsumerWidget {
+  final CartItem item;
+
+  const _CartItemRow({required this.item});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final product = item.product;
+    final cs = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: Spacing.xs),
+      child: Row(
+        children: [
+          // Name + price
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  product.name,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  '₱${product.price.toStringAsFixed(2)} × ${item.quantity}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                ),
+              ],
+            ),
+          ),
+          // Quantity controls
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _QtyButton(
+                icon: Icons.remove,
+                onTap: () => ref.read(cartProvider.notifier).decrement(product.id!),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
+                child: Text(
+                  '${item.quantity}',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              _QtyButton(
+                icon: Icons.add,
+                onTap: () => ref.read(cartProvider.notifier).increment(product.id!),
+              ),
+            ],
+          ),
+          // Subtotal
+          SizedBox(
+            width: 70,
+            child: Text(
+              '₱${item.lineTotal.toStringAsFixed(2)}',
+              style: AppTypography.titleSmallBold(context),
+              textAlign: TextAlign.right,
+            ),
+          ),
+          // Remove
+          IconButton(
+            icon: const Icon(Icons.delete_outline, size: 20),
+            onPressed: () => ref.read(cartProvider.notifier).remove(product.id!),
+            tooltip: 'Remove item',
+            visualDensity: VisualDensity.compact,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QtyButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _QtyButton({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 32,
+      height: 32,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: Theme.of(context).colorScheme.outline),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 16),
+        ),
+      ),
+    );
+  }
+}
+
 // ── Payment dialog ────────────────────────────────────────────────────
 
 class _PaymentResult {
   final double cashReceived;
+  final String paymentMethod;
   final String? notes;
 
-  _PaymentResult({required this.cashReceived, this.notes});
+  _PaymentResult({
+    required this.cashReceived,
+    this.paymentMethod = 'Cash',
+    this.notes,
+  });
 }
 
 class _PaymentDialog extends StatefulWidget {
@@ -856,6 +855,10 @@ class _PaymentDialogState extends State<_PaymentDialog> {
   final _formKey = GlobalKey<FormState>();
   final _cashController = TextEditingController();
   final _notesController = TextEditingController();
+
+  // Payment methods available to the POS.  The default is Cash.
+  static const _paymentMethods = ['Cash', 'GCash', 'Card', 'Other'];
+  String _paymentMethod = 'Cash';
 
   @override
   void dispose() {
@@ -902,6 +905,26 @@ class _PaymentDialogState extends State<_PaymentDialog> {
                     ),
                   ],
                 ),
+              ),
+              const SizedBox(height: Spacing.lg),
+              // Payment method
+              DropdownButtonFormField<String>(
+                initialValue: _paymentMethod,
+                decoration: const InputDecoration(
+                  labelText: 'Payment Method',
+                  prefixIcon: Icon(Icons.payment),
+                  border: OutlineInputBorder(),
+                ),
+                items: _paymentMethods
+                    .map((m) => DropdownMenuItem(
+                          value: m,
+                          child: Text(m),
+                        ))
+                    .toList(),
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() => _paymentMethod = value);
+                },
               ),
               const SizedBox(height: Spacing.lg),
               // Cash received
@@ -988,6 +1011,7 @@ class _PaymentDialogState extends State<_PaymentDialog> {
               context,
               _PaymentResult(
                 cashReceived: _parseCash(),
+                paymentMethod: _paymentMethod,
                 notes: _notesController.text.trim().isEmpty
                     ? null
                     : _notesController.text.trim(),

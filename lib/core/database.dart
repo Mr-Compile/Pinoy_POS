@@ -232,6 +232,12 @@ class DatabaseHelper {
       await db.execute('ALTER TABLE backup_history ADD COLUMN display_name TEXT');
       await db.execute('ALTER TABLE backup_history ADD COLUMN location_json TEXT');
     }
+
+    // Migration from v9 → v10: add payment_method to sales so reports can
+    // break down revenue by payment method (Cash, GCash, Card, etc.).
+    if (oldVersion < 10) {
+      await db.execute('ALTER TABLE sales ADD COLUMN payment_method TEXT NOT NULL DEFAULT \'Cash\'');
+    }
   }
 
   Future<void> _createTables(Database db) async {
@@ -300,6 +306,7 @@ class DatabaseHelper {
         total_amount REAL NOT NULL,
         cash_received REAL NOT NULL,
         change REAL NOT NULL,
+        payment_method TEXT NOT NULL DEFAULT 'Cash',
         user_id INTEGER NOT NULL,
         created_at TEXT NOT NULL,
         receipt_number TEXT UNIQUE,

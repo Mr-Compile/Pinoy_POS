@@ -10,6 +10,7 @@ import 'package:pinoy_pos/services/report_service.dart';
 import 'package:pinoy_pos/services/backup_service.dart';
 import 'package:pinoy_pos/services/ai_usage_service.dart';
 import 'package:pinoy_pos/services/ai_advisor_service.dart';
+import 'package:pinoy_pos/services/cart_service.dart';
 import 'package:pinoy_pos/services/business_intelligence_service.dart';
 import 'package:pinoy_pos/services/groq_service.dart';
 import 'package:pinoy_pos/services/trash_service.dart';
@@ -27,6 +28,10 @@ final categoryServiceProvider = Provider<CategoryService>((ref) {
 
 final salesServiceProvider = Provider<SalesService>((ref) {
   return SalesService();
+});
+
+final cartServiceProvider = Provider<CartService>((ref) {
+  return CartService();
 });
 
 final stockServiceProvider = Provider<StockService>((ref) {

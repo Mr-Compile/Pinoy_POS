@@ -94,8 +94,12 @@ class AIAdvisorChatNotifier extends StateNotifier<AIAdvisorChatState> {
   Future<void> checkConfig() async {
     final authNotifier = _ref.read(authStateProvider.notifier);
 
-    // Owner-only check. Admin and Staff don't have use_ai_advisor.
-    if (!authNotifier.hasPermission('use_ai_advisor')) {
+    // AI Advisor is available to users with `use_ai_advisor` (Owner,
+    // Admin, Staff).  The config screen also refreshes this provider
+    // after an Admin saves/clears the Groq configuration, so we also
+    // accept `manage_ai_config` for that refresh-only path.
+    if (!authNotifier.hasPermission('use_ai_advisor') &&
+        !authNotifier.hasPermission('manage_ai_config')) {
       state = state.copyWith(configStatus: AIConfigStatus.unavailable);
       return;
     }

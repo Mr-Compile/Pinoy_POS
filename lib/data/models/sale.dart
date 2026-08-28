@@ -3,6 +3,7 @@ class Sale {
   final double totalAmount;
   final double cashReceived;
   final double change;
+  final String paymentMethod;
   final int userId;
   final DateTime createdAt;
   final String? receiptNumber;
@@ -14,6 +15,7 @@ class Sale {
     required this.totalAmount,
     required this.cashReceived,
     required this.change,
+    this.paymentMethod = 'Cash',
     required this.userId,
     required this.createdAt,
     this.receiptNumber,
@@ -27,6 +29,7 @@ class Sale {
       'total_amount': totalAmount,
       'cash_received': cashReceived,
       'change': change,
+      'payment_method': paymentMethod,
       'user_id': userId,
       'created_at': createdAt.toIso8601String(),
       'receipt_number': receiptNumber,
@@ -41,6 +44,7 @@ class Sale {
       totalAmount: (map['total_amount'] as num).toDouble(),
       cashReceived: (map['cash_received'] as num).toDouble(),
       change: (map['change'] as num).toDouble(),
+      paymentMethod: (map['payment_method'] as String?) ?? 'Cash',
       userId: map['user_id'] as int,
       createdAt: DateTime.parse(map['created_at'] as String),
       receiptNumber: map['receipt_number'] as String?,
@@ -56,6 +60,7 @@ class Sale {
     double? totalAmount,
     double? cashReceived,
     double? change,
+    String? paymentMethod,
     int? userId,
     DateTime? createdAt,
     String? receiptNumber,
@@ -67,6 +72,7 @@ class Sale {
       totalAmount: totalAmount ?? this.totalAmount,
       cashReceived: cashReceived ?? this.cashReceived,
       change: change ?? this.change,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
       userId: userId ?? this.userId,
       createdAt: createdAt ?? this.createdAt,
       receiptNumber: receiptNumber ?? this.receiptNumber,

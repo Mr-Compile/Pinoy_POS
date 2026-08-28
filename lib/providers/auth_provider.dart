@@ -2,7 +2,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/ai_advisor_provider.dart';
+import 'package:pinoy_pos/providers/cart_provider.dart';
 import 'package:pinoy_pos/providers/dashboard_provider.dart';
+import 'package:pinoy_pos/providers/reports_provider.dart';
 import 'package:pinoy_pos/providers/notification_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/providers/user_provider.dart';
@@ -178,6 +180,8 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
     _ref.invalidate(userServiceProvider);
     _ref.invalidate(userControllerProvider);
     _ref.invalidate(dashboardProvider);
+    _ref.invalidate(cartProvider);
+    _ref.invalidate(reportsProvider);
     state = AuthState();
   }
 
@@ -271,6 +275,8 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
     _ref.invalidate(userServiceProvider);
     _ref.invalidate(userControllerProvider);
     _ref.invalidate(dashboardProvider);
+    _ref.invalidate(cartProvider);
+    _ref.invalidate(reportsProvider);
     state = AuthState();
   }
 

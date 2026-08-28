@@ -99,6 +99,7 @@ class SalesService {
     required double totalAmount,
     required double cashReceived,
     String? notes,
+    String paymentMethod = 'Cash',
   }) async {
     if (!_sessionManager.hasPermission('create_sales')) {
       await _activityLogService.logActivity(
@@ -136,6 +137,7 @@ class SalesService {
         totalAmount: totalAmount,
         cashReceived: cashReceived,
         change: change,
+        paymentMethod: paymentMethod,
         userId: _sessionManager.currentUser!.id!,
         createdAt: DateTime.now(),
         receiptNumber: receiptNumber,

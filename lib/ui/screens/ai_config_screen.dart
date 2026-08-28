@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/providers/ai_advisor_provider.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/services/groq_service.dart';
@@ -309,6 +310,7 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
                 title: 'Saved',
                 message: 'AI model updated successfully.');
             _loadConfig();
+            await _notifyChatProvider();
           } else {
             AppDialogService.error(context,
                 title: 'Save Failed',
@@ -333,6 +335,7 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
                 title: 'Saved',
                 message: 'Groq AI configuration saved successfully.');
             _loadConfig();
+            await _notifyChatProvider();
           } else {
             AppDialogService.error(context,
                 title: 'Save Failed',
@@ -402,6 +405,7 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
           await AppDialogService.success(context,
               title: 'Cleared',
               message: 'AI configuration has been cleared.');
+          await _notifyChatProvider();
         } else {
           AppDialogService.error(context,
               title: 'Error', message: 'Failed to clear AI configuration.');
@@ -937,6 +941,17 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
         ),
       ),
     );
+  }
+
+  /// Notifies the shared AI chat provider that the configuration has
+  /// changed, so the floating chat head, dashboard AI card, and any open
+  /// chat panel reflect the new status immediately.
+  Future<void> _notifyChatProvider() async {
+    try {
+      await ref.read(aiAdvisorChatProvider.notifier).checkConfig();
+    } catch (e, st) {
+      _log('notifyChatProvider failed', e, st);
+    }
   }
 
   void _log(String message, Object error, StackTrace stackTrace) {

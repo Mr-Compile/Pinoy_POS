@@ -8,6 +8,7 @@ import 'package:pinoy_pos/data/repositories/category_repository.dart';
 import 'package:pinoy_pos/data/repositories/export_history_repository.dart';
 import 'package:pinoy_pos/data/repositories/product_repository.dart';
 import 'package:pinoy_pos/data/repositories/sale_repository.dart';
+import 'package:pinoy_pos/data/repositories/settings_repository.dart';
 import 'package:pinoy_pos/data/repositories/user_repository.dart';
 
 /// Supported analytical intents the AI Business Advisor can handle.
@@ -124,6 +125,7 @@ class BusinessIntelligenceService {
       BackupHistoryRepository();
   final ExportHistoryRepository _exportHistoryRepository =
       ExportHistoryRepository();
+  final SettingsRepository _settingsRepository = SettingsRepository();
   final SessionManager _sessionManager = SessionManager();
 
   /// Detects the analytical intent from a user's natural-language query.
@@ -1151,6 +1153,32 @@ class BusinessIntelligenceService {
     UserRole? role,
   }) async {
     final buf = StringBuffer();
+
+    // Add store and user context to every AI context so the assistant can
+    // personalize its answer and avoid claiming missing business identity.
+    final store = await _settingsRepository.getSettings();
+    if (store != null) {
+      buf.writeln('--- STORE CONTEXT ---');
+      buf.writeln('Store: ${store.storeName}');
+      if (store.storeAddress.isNotEmpty) {
+        buf.writeln('Address: ${store.storeAddress}');
+      }
+      if (store.storePhone.isNotEmpty) {
+        buf.writeln('Contact: ${store.storePhone}');
+      }
+      buf.writeln('Currency: ${store.currency}');
+      buf.writeln('--- END STORE CONTEXT ---');
+      buf.writeln('');
+    }
+
+    final currentUser = _sessionManager.currentUser;
+    if (currentUser != null) {
+      buf.writeln('--- USER CONTEXT ---');
+      buf.writeln('User: ${currentUser.fullName}');
+      buf.writeln('Role: ${currentUser.role.displayName}');
+      buf.writeln('--- END USER CONTEXT ---');
+      buf.writeln('');
+    }
 
     if (role == UserRole.admin) {
       // Admin general context: system overview only.
