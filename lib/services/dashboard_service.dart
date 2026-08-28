@@ -2,8 +2,10 @@ import 'package:pinoy_pos/core/date_utils.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/activity_log.dart';
 import 'package:pinoy_pos/data/models/announcement.dart';
+import 'package:pinoy_pos/data/models/daily_sales_point.dart';
 import 'package:pinoy_pos/data/models/product.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
+import 'package:pinoy_pos/data/models/top_product_result.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/data/repositories/activity_log_repository.dart';
 import 'package:pinoy_pos/data/repositories/announcement_repository.dart';
@@ -21,32 +23,6 @@ import 'package:pinoy_pos/data/repositories/user_repository.dart';
 // entities and have no DAO/table of their own; they aggregate real SQLite
 // rows fetched through the repositories.
 // ─────────────────────────────────────────────────────────────────────────
-
-/// One day's aggregated sales total + transaction count.
-class DailySalesPoint {
-  final DateTime date;
-  final double total;
-  final int transactionCount;
-
-  const DailySalesPoint({
-    required this.date,
-    required this.total,
-    required this.transactionCount,
-  });
-}
-
-/// A product ranked by total quantity sold.
-class TopProductStat {
-  final int productId;
-  final String name;
-  final int totalQuantity;
-
-  const TopProductStat({
-    required this.productId,
-    required this.name,
-    required this.totalQuantity,
-  });
-}
 
 /// Inventory health distribution across active products.
 class InventoryStatus {
@@ -93,7 +69,7 @@ class OwnerDashboardData {
   final int lowStockCount;
   final int outOfStockCount;
   final List<DailySalesPoint> salesTrend;
-  final List<TopProductStat> topProducts;
+  final List<TopProductResult> topProducts;
   final InventoryStatus inventoryStatus;
   final List<Sale> recentSales;
   final List<ActivityLog> recentActivities;
@@ -408,7 +384,7 @@ class DashboardService {
       points.add(DailySalesPoint(
         date: day,
         total: daySales.fold<double>(0.0, (sum, s) => sum + s.totalAmount),
-        transactionCount: daySales.length,
+        count: daySales.length,
       ));
     }
     return points;
@@ -447,10 +423,10 @@ class DashboardService {
     return items;
   }
 
-  TopProductStat _mapTopProduct(Map<String, dynamic> row) {
-    return TopProductStat(
+  TopProductResult _mapTopProduct(Map<String, dynamic> row) {
+    return TopProductResult(
       productId: (row['product_id'] as num?)?.toInt() ?? 0,
-      name: (row['product_name'] as String?) ?? 'Unknown',
+      productName: (row['product_name'] as String?) ?? 'Unknown',
       totalQuantity: (row['total_quantity'] as num?)?.toInt() ?? 0,
     );
   }

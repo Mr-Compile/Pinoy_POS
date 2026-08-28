@@ -216,6 +216,7 @@ The cycles are currently used for cross-provider invalidation but increase coupl
 6. **`lib/services/settings_service.dart`** — Added `getStoreInfo()`, `isStoreInfoIncomplete()`, and `refreshStoreInfo()` as the canonical source for store metadata used by receipts, reports and exports.
 7. **`lib/services/sales_service.dart`** — Replaced `ReportService.getStoreInfo()` call with `SettingsService.getStoreInfo()` and removed the `SalesService -> ReportService` dependency.
 8. **`lib/services/report_service.dart`** — Delegated `getTodaySales()`, `getMonthSales()` and `getSalesByDateRange()` to `SalesService`; removed the duplicate `getAllSales()` path. This eliminates a circular service dependency and the duplicated date-range sales queries.
+9. **`lib/data/models/daily_sales_point.dart`** and **`lib/data/models/top_product_result.dart`** — Extracted shared analytics DTOs so `ReportService` and `DashboardService` no longer duplicate them.
 
 ## Verification
 

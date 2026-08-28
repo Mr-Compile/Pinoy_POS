@@ -1,9 +1,11 @@
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
+import 'package:pinoy_pos/data/models/daily_sales_point.dart';
 import 'package:pinoy_pos/data/models/export_history.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
+import 'package:pinoy_pos/data/models/top_product_result.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/data/repositories/export_history_repository.dart';
 import 'package:pinoy_pos/data/repositories/product_repository.dart';
@@ -21,19 +23,6 @@ class PaymentBreakdown {
 
   PaymentBreakdown({
     required this.method,
-    required this.total,
-    required this.count,
-  });
-}
-
-/// A simple daily sales point for trend charts and date-range reports.
-class DailySalesPoint {
-  final DateTime date;
-  final double total;
-  final int count;
-
-  DailySalesPoint({
-    required this.date,
     required this.total,
     required this.count,
   });
@@ -291,17 +280,4 @@ class ReportService {
   /// Refreshes the cached store info, used after settings are updated.
   /// Delegated to [SettingsService].
   Future<void> refreshStoreInfo() => _settingsService.refreshStoreInfo();
-}
-
-/// A top-selling product result returned by [ReportService.getTopProducts].
-class TopProductResult {
-  final int productId;
-  final String productName;
-  final int totalQuantity;
-
-  TopProductResult({
-    required this.productId,
-    required this.productName,
-    required this.totalQuantity,
-  });
 }
