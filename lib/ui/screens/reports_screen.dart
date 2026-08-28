@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pdf/pdf.dart';
@@ -568,13 +567,12 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         await _exportToExcel(state, sales, timestamp);
       }
     } catch (e, st) {
-      if (kDebugMode) {
-        debugPrint('[ReportsScreen] export failed: $e\n$st');
-      }
+      debugPrint('[ReportsScreen] export failed: $e\n$st');
       if (mounted) {
         AppDialogService.error(context,
             title: 'Export Failed',
-            message: 'An error occurred during export. Please try again.');
+            message:
+                'An error occurred during export. Please try again.\n\nDetails: $e');
       }
     } finally {
       if (mounted) setState(() => _isExporting = false);
@@ -582,15 +580,6 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   }
 
   Future<String?> _pickSavePath(String fileName, String extension) async {
-    if (kIsWeb) {
-      return await FilePicker.platform.saveFile(
-        dialogTitle: 'Save Report',
-        fileName: fileName,
-        type: FileType.custom,
-        allowedExtensions: [extension],
-      );
-    }
-
     final result = await FilePicker.platform.saveFile(
       dialogTitle: 'Save Report',
       fileName: fileName,
@@ -598,7 +587,14 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       allowedExtensions: [extension],
     );
 
-    return result;
+    if (result == null) return null;
+
+    // Some file dialogs return the path without the requested extension.
+    // Make sure the file can be written with the correct type.
+    final lower = result.toLowerCase();
+    final dotExt = '.$extension';
+    if (lower.endsWith(dotExt)) return result;
+    return '$result$dotExt';
   }
 
   Future<void> _exportToPdf(

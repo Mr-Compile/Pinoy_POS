@@ -22,4 +22,41 @@ class SaleRepository {
   Future<double> getTotalSalesForUser(int userId) => _saleDao.getTotalSalesForUser(userId);
   Future<double> getTotalSalesForDateForUser(DateTime date, int userId) => _saleDao.getTotalSalesForDateForUser(date, userId);
   Future<double> getTotalSalesForMonthForUser(int year, int month, int userId) => _saleDao.getTotalSalesForMonthForUser(year, month, userId);
+
+  Future<Sale?> findByReferenceNumber(
+    String referenceNumber,
+    String paymentMethod, {
+    DatabaseExecutor? txn,
+  }) =>
+      _saleDao.findByReferenceNumber(referenceNumber, paymentMethod, txn: txn);
+
+  Future<List<Sale>> getByPaymentStatus(
+    String paymentStatus, {
+    int limit = 200,
+    DatabaseExecutor? txn,
+  }) =>
+      _saleDao.getByPaymentStatus(paymentStatus, limit: limit, txn: txn);
+
+  Future<List<Sale>> getPendingPayments({int limit = 200}) => _saleDao.getPendingPayments(limit: limit);
+
+  Future<List<Sale>> getFilteredSales({
+    DateTime? start,
+    DateTime? end,
+    String? paymentMethod,
+    String? paymentStatus,
+    String? search,
+    int? userId,
+    int limit = 500,
+    DatabaseExecutor? txn,
+  }) =>
+      _saleDao.getFilteredSales(
+        start: start,
+        end: end,
+        paymentMethod: paymentMethod,
+        paymentStatus: paymentStatus,
+        search: search,
+        userId: userId,
+        limit: limit,
+        txn: txn,
+      );
 }

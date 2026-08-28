@@ -6,6 +6,7 @@ import 'package:pinoy_pos/ui/screens/ai_config_screen.dart';
 import 'package:pinoy_pos/ui/screens/backup_restore_screen.dart';
 import 'package:pinoy_pos/ui/screens/profile_screen.dart';
 import 'package:pinoy_pos/ui/screens/settings/appearance_settings_page.dart';
+import 'package:pinoy_pos/ui/screens/payment_settings_page.dart';
 import 'package:pinoy_pos/ui/screens/settings/pin_settings_page.dart';
 import 'package:pinoy_pos/ui/screens/settings/security_settings_page.dart';
 import 'package:pinoy_pos/ui/screens/settings/store_information_settings_page.dart';
@@ -83,6 +84,16 @@ class SettingsScreen extends ConsumerWidget {
         title: 'Store Information',
         subtitle: 'Store name, address, contact, receipt footer, currency',
         screen: const StoreInformationSettingsPage(),
+      ));
+    }
+
+    // ── Payment Settings (Owner / Admin) ──
+    if (authNotifier.hasPermission('edit_settings')) {
+      systemEntries.add(_SettingsEntry(
+        icon: Icons.payments_outlined,
+        title: 'Payment Settings',
+        subtitle: 'GCash, customer, proof, and verification rules',
+        screen: const PaymentSettingsPage(),
       ));
     }
 

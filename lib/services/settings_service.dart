@@ -1,5 +1,6 @@
 import 'package:pinoy_pos/core/authorization_exception.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
+import 'package:pinoy_pos/data/models/payment_settings.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
 import 'package:pinoy_pos/data/repositories/settings_repository.dart';
 import 'package:pinoy_pos/services/groq_service.dart';
@@ -40,6 +41,35 @@ class SettingsService {
     }
 
     return _currentSettings!;
+  }
+
+  /// Returns the operational GCash/payment settings for the POS flow.
+  ///
+  /// This is intentionally scoped so that Staff (who have `create_sales`)
+  /// can read the GCash rules without receiving sensitive store
+  /// configuration such as the Groq API key.
+  Future<PaymentSettings> getPaymentSettings() async {
+    if (!_sessionManager.hasPermission('create_sales') &&
+        !_sessionManager.hasPermission('view_settings') &&
+        !_sessionManager.hasPermission('edit_settings')) {
+      throw AuthorizationException('create_sales');
+    }
+
+    var settings = await _settingsRepository.getSettings();
+
+    if (settings == null) {
+      final defaultSettings = Settings(
+        storeName: 'My Store',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+      final id = await _settingsRepository.insert(defaultSettings);
+      settings = defaultSettings.copyWith(id: id);
+    }
+
+    _currentSettings = settings;
+
+    return PaymentSettings.fromSettings(settings);
   }
 
   Future<bool> updateSettings(Settings settings) async {

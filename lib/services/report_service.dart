@@ -103,34 +103,40 @@ class ReportService {
   }
 
   /// Returns total active (non-voided) sales for the authenticated role.
+  ///
+  /// Only [Sale.paymentStatus] == 'confirmed' sales are counted; pending,
+  /// cancelled, and refunded sales are excluded from the total.
   Future<int> getTotalTransactions() async {
     if (!_sessionManager.hasPermission('view_reports')) return 0;
 
-    if (_sessionManager.currentUser?.role == UserRole.staff) {
-      final sales = await _saleRepository
-          .getByUserId(_sessionManager.currentUser!.id!, limit: 99999);
-      return sales.length;
-    }
+    final userId = _sessionManager.currentUser?.role == UserRole.staff
+        ? _sessionManager.currentUser!.id
+        : null;
 
-    final sales = await _saleRepository.getAllActive();
+    final sales = await _saleRepository.getFilteredSales(
+      paymentStatus: 'confirmed',
+      userId: userId,
+      limit: 99999,
+    );
     return sales.length;
   }
 
   /// Returns the sales for a date range.  For Staff the results are
-  /// filtered to the current user's own sales.
+  /// filtered to the current user's own sales. Cancelled/refunded sales
+  /// are excluded from reporting views.
   Future<List<Sale>> getSalesByDateRange(DateTime start, DateTime end) async {
     if (!_sessionManager.hasPermission('view_reports')) return [];
 
-    if (_sessionManager.currentUser?.role == UserRole.staff) {
-      return _saleRepository.getByDateRangeAndUser(
-        start,
-        end,
-        _sessionManager.currentUser!.id!,
-        limit: 500,
-      );
-    }
+    final userId = _sessionManager.currentUser?.role == UserRole.staff
+        ? _sessionManager.currentUser!.id
+        : null;
 
-    return _saleRepository.getByDateRange(start, end, limit: 500);
+    return _saleRepository.getFilteredSales(
+      start: start,
+      end: end,
+      userId: userId,
+      limit: 500,
+    );
   }
 
   /// Returns all non-voided sales for the authenticated role.
@@ -158,6 +164,7 @@ class ReportService {
     final counts = <String, int>{};
 
     for (final sale in sales) {
+      if (sale.paymentStatus != 'confirmed') continue;
       final method = sale.paymentMethod;
       totals[method] = (totals[method] ?? 0.0) + sale.totalAmount;
       counts[method] = (counts[method] ?? 0) + 1;
@@ -211,6 +218,7 @@ class ReportService {
     final map = <DateTime, DailySalesPoint>{};
 
     for (final sale in sales) {
+      if (sale.paymentStatus != 'confirmed') continue;
       final day = DateTime(
         sale.createdAt.year,
         sale.createdAt.month,

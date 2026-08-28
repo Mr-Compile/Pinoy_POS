@@ -52,11 +52,19 @@ class ImageService {
   /// Picks an image from the gallery, validates it, copies it into
   /// app-controlled storage, and returns the relative path.
   ///
+  /// The optional [directory] places the file under a subdirectory of the
+  /// application documents folder (e.g. `images` for product photos,
+  /// `payment_evidence/tmp` for transient payment proof). When [fileName]
+  /// is provided, that name (without extension) is used; otherwise a UUID
+  /// is generated.
+  ///
   /// Returns [ImagePickResult.failure] with a user-friendly message if
   /// the user cancels, the file is too large, the extension is not
   /// supported, or the file cannot be read.
   Future<ImagePickResult> pickAndStoreImage({
     ImageSource source = ImageSource.gallery,
+    String directory = 'images',
+    String? fileName,
     double maxWidth = 1024,
     double maxHeight = 1024,
   }) async {
@@ -94,8 +102,13 @@ class ImageService {
         }
       }
 
-      // Store the image in app-controlled directory
-      final storedPath = await _storeImage(xFile, extension);
+      // Store the image in the requested app-controlled directory
+      final storedPath = await _storeImage(
+        xFile,
+        extension,
+        directory: directory,
+        fileName: fileName,
+      );
       if (storedPath == null) {
         return ImagePickResult.failure('Failed to save image. Please try again.');
       }
@@ -107,19 +120,26 @@ class ImageService {
   }
 
   /// Stores the picked image in the app documents directory under
-  /// `images/` with a UUID-based filename.  Returns the **relative** path
-  /// from the app documents directory, or null on failure.
-  Future<String?> _storeImage(XFile xFile, String extension) async {
+  /// [directory] with a UUID-based filename unless [fileName] is given.
+  /// Returns the **relative** path from the app documents directory,
+  /// or null on failure.
+  Future<String?> _storeImage(
+    XFile xFile,
+    String extension, {
+    required String directory,
+    String? fileName,
+  }) async {
     try {
       final appDir = await getApplicationDocumentsDirectory();
-      final imagesDir = Directory(p.join(appDir.path, 'images'));
+      final targetDir = Directory(p.join(appDir.path, directory));
 
-      if (!await imagesDir.exists()) {
-        await imagesDir.create(recursive: true);
+      if (!await targetDir.exists()) {
+        await targetDir.create(recursive: true);
       }
 
-      final filename = '${const Uuid().v4()}$extension';
-      final destPath = p.join(imagesDir.path, filename);
+      final baseName = fileName ?? const Uuid().v4();
+      final filename = '$baseName$extension';
+      final destPath = p.join(targetDir.path, filename);
 
       if (kIsWeb) {
         // On web, read bytes and write to the virtual filesystem
@@ -152,6 +172,32 @@ class ImageService {
         return file;
       }
       return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Moves a stored image from [oldRelativePath] to [newRelativePath]
+  /// (both relative to the app documents directory) and returns the new
+  /// relative path, or null if the move fails.
+  Future<String?> moveImage(String? oldRelativePath, String newRelativePath) async {
+    if (oldRelativePath == null || oldRelativePath.isEmpty) return null;
+
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final oldAbsolute = p.join(appDir.path, oldRelativePath);
+      final newAbsolute = p.join(appDir.path, newRelativePath);
+
+      final oldFile = File(oldAbsolute);
+      if (!await oldFile.exists()) return null;
+
+      final newDir = Directory(p.dirname(newAbsolute));
+      if (!await newDir.exists()) {
+        await newDir.create(recursive: true);
+      }
+
+      await oldFile.rename(newAbsolute);
+      return newRelativePath;
     } catch (e) {
       return null;
     }

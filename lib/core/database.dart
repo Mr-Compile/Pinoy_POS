@@ -238,6 +238,38 @@ class DatabaseHelper {
     if (oldVersion < 10) {
       await db.execute('ALTER TABLE sales ADD COLUMN payment_method TEXT NOT NULL DEFAULT \'Cash\'');
     }
+
+    // Migration from v10 → v11: add GCash/payment verification fields to sales
+    // and GCash configuration columns to settings.
+    if (oldVersion < 11) {
+      await db.execute('ALTER TABLE sales ADD COLUMN payment_status TEXT NOT NULL DEFAULT \'confirmed\'');
+      await db.execute('ALTER TABLE sales ADD COLUMN reference_number TEXT');
+      await db.execute('ALTER TABLE sales ADD COLUMN customer_name TEXT');
+      await db.execute('ALTER TABLE sales ADD COLUMN payment_proof_path TEXT');
+      await db.execute('ALTER TABLE sales ADD COLUMN payment_proof_type TEXT');
+      await db.execute('ALTER TABLE sales ADD COLUMN verified_at TEXT');
+      await db.execute('ALTER TABLE sales ADD COLUMN verified_by INTEGER');
+
+      await db.execute('ALTER TABLE settings ADD COLUMN gcash_enabled INTEGER NOT NULL DEFAULT 1');
+      await db.execute('ALTER TABLE settings ADD COLUMN gcash_reference_required INTEGER NOT NULL DEFAULT 1');
+      await db.execute('ALTER TABLE settings ADD COLUMN gcash_customer_name_requirement TEXT NOT NULL DEFAULT \'optional\'');
+      await db.execute('ALTER TABLE settings ADD COLUMN gcash_payment_proof_requirement TEXT NOT NULL DEFAULT \'optional\'');
+      await db.execute('ALTER TABLE settings ADD COLUMN gcash_verification_mode TEXT NOT NULL DEFAULT \'immediate\'');
+      await db.execute('ALTER TABLE settings ADD COLUMN gcash_reference_min_length INTEGER NOT NULL DEFAULT 6');
+
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_sales_payment_method ON sales(payment_method)',
+      );
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_sales_payment_status ON sales(payment_status)',
+      );
+      await db.execute(
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_sales_gcash_reference '
+        'ON sales(reference_number) '
+        'WHERE payment_method = \'GCash\' AND deleted_at IS NULL AND reference_number IS NOT NULL '
+        'AND payment_status NOT IN (\'cancelled\', \'refunded\')',
+      );
+    }
   }
 
   Future<void> _createTables(Database db) async {
@@ -307,6 +339,13 @@ class DatabaseHelper {
         cash_received REAL NOT NULL,
         change REAL NOT NULL,
         payment_method TEXT NOT NULL DEFAULT 'Cash',
+        payment_status TEXT NOT NULL DEFAULT 'confirmed',
+        reference_number TEXT,
+        customer_name TEXT,
+        payment_proof_path TEXT,
+        payment_proof_type TEXT,
+        verified_at TEXT,
+        verified_by INTEGER,
         user_id INTEGER NOT NULL,
         created_at TEXT NOT NULL,
         receipt_number TEXT UNIQUE,
@@ -390,6 +429,12 @@ class DatabaseHelper {
         accent_color TEXT,
         groq_api_key TEXT,
         groq_model TEXT,
+        gcash_enabled INTEGER NOT NULL DEFAULT 1,
+        gcash_reference_required INTEGER NOT NULL DEFAULT 1,
+        gcash_customer_name_requirement TEXT NOT NULL DEFAULT 'optional',
+        gcash_payment_proof_requirement TEXT NOT NULL DEFAULT 'optional',
+        gcash_verification_mode TEXT NOT NULL DEFAULT 'immediate',
+        gcash_reference_min_length INTEGER NOT NULL DEFAULT 6,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       )
@@ -498,6 +543,14 @@ class DatabaseHelper {
     await db.execute('CREATE INDEX IF NOT EXISTS idx_products_active ON products(is_active)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_sales_user ON sales(user_id)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(created_at)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_sales_payment_method ON sales(payment_method)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_sales_payment_status ON sales(payment_status)');
+    await db.execute(
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_sales_gcash_reference '
+      'ON sales(reference_number) '
+      'WHERE payment_method = \'GCash\' AND deleted_at IS NULL AND reference_number IS NOT NULL '
+      'AND payment_status NOT IN (\'cancelled\', \'refunded\')',
+    );
     await db.execute('CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_sale_items_product ON sale_items(product_id)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_stock_history_product ON stock_history(product_id)');

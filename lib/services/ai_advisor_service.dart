@@ -3,6 +3,7 @@ import 'package:pinoy_pos/core/ai_capability_policy.dart';
 import 'package:pinoy_pos/core/authorization_exception.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/user.dart';
+import 'package:pinoy_pos/services/ai_response_policy.dart';
 import 'package:pinoy_pos/services/ai_usage_service.dart';
 import 'package:pinoy_pos/services/business_intelligence_service.dart';
 import 'package:pinoy_pos/services/groq_service.dart';
@@ -87,11 +88,23 @@ class ConversationMessage {
 /// the raw database file. The AI only sees the aggregated facts returned
 /// by [BusinessIntelligenceService], scoped to the authenticated role.
 class AIAdvisorService {
-  final GroqService _groqService = GroqService();
-  final AIUsageService _aiUsageService = AIUsageService();
-  final SettingsService _settingsService = SettingsService();
-  final SessionManager _sessionManager = SessionManager();
-  final BusinessIntelligenceService _biService = BusinessIntelligenceService();
+  final GroqService _groqService;
+  final AIUsageService _aiUsageService;
+  final SettingsService _settingsService;
+  final SessionManager _sessionManager;
+  final BusinessIntelligenceService _biService;
+
+  AIAdvisorService({
+    GroqService? groqService,
+    AIUsageService? aiUsageService,
+    SettingsService? settingsService,
+    SessionManager? sessionManager,
+    BusinessIntelligenceService? biService,
+  })  : _groqService = groqService ?? GroqService(),
+        _aiUsageService = aiUsageService ?? AIUsageService(),
+        _settingsService = settingsService ?? SettingsService(),
+        _sessionManager = sessionManager ?? SessionManager(),
+        _biService = biService ?? BusinessIntelligenceService();
 
   /// Sends a user query to the AI Advisor and returns the result.
   ///
@@ -209,9 +222,22 @@ class AIAdvisorService {
       );
     }
 
-    // 12. Record usage (only after a successful API response).
+    // 12. Sanitize and validate the model's raw output before storing or
+    //     displaying it.  This enforces the humanized response policy at the
+    //     application layer even if the model ignores the system prompt.
+    final rawContent = groqResult.content ?? '';
+    final sanitized = AiResponsePolicy.sanitizeAndValidate(rawContent);
+    if (sanitized.isEmpty) {
+      return AIAdvisorResult(
+        success: false,
+        errorMessage:
+            'The AI returned an empty or unsupported response. Please try again.',
+      );
+    }
+
+    // 13. Record usage (only after a successful API response).
     final recorded =
-        await _aiUsageService.recordQuery(userQuery, groqResult.content);
+        await _aiUsageService.recordQuery(userQuery, sanitized);
 
     if (!recorded) {
       // The limit was reached between our check and the recording (concurrent
@@ -219,11 +245,11 @@ class AIAdvisorService {
       // content but warn about the limit.
       return AIAdvisorResult(
         success: true,
-        content: groqResult.content,
+        content: sanitized,
       );
     }
 
-    return AIAdvisorResult(success: true, content: groqResult.content);
+    return AIAdvisorResult(success: true, content: sanitized);
   }
 
   /// Validates that the saved model exists in the current Groq model list.
@@ -368,22 +394,7 @@ CRITICAL RULES:
 FINANCIAL SAFETY:
 You are a business assistant, not a licensed financial or investment advisor. Do not tell the user to borrow money, invest in specific financial products, or make high-risk business decisions. Frame all monetary advice as practical operational suggestions (e.g., "consider reviewing slow-moving stock") rather than guarantees of profit.
 
-RESPONSE FORMAT:
-Structure your response with clear sections:
-
-ANSWER
-A direct answer to the question first.
-
-WHAT I FOUND
-Bullet points of the key facts from the database.
-
-INSIGHT
-What the facts may indicate (optional, when relevant).
-
-RECOMMENDATION
-One or two practical suggestions based on the facts above.
-
-Use only the sections that are relevant to the question. For simple questions, give a concise direct answer. If the data is empty, explain what that means. Keep the response scannable: use short bullet points, bold numbers, and clear labels.
+${AiResponsePolicy.instruction}
 
 AUTHORIZED CONTEXT:
 ${facts.context}

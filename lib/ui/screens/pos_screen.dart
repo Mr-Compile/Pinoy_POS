@@ -3,9 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/data/models/product.dart';
 import 'package:pinoy_pos/data/models/category.dart';
+import 'package:pinoy_pos/core/payment_validation_exception.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/cart_provider.dart';
+import 'package:pinoy_pos/providers/payment_settings_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
+import 'package:pinoy_pos/data/models/payment_settings.dart';
+import 'package:pinoy_pos/ui/screens/gcash_payment_screen.dart';
+import 'package:pinoy_pos/ui/screens/payment_success_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
@@ -145,6 +150,17 @@ class _POSScreenState extends ConsumerState<POSScreen> {
 
     if (result == null || !mounted) return;
 
+    // GCash requires a dedicated flow (customer, reference, proof, review).
+    if (result.paymentMethod == 'GCash') {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => GcashPaymentScreen(total: total),
+        ),
+      );
+      return;
+    }
+
     ref.read(cartProvider.notifier).setProcessing(true);
 
     try {
@@ -155,6 +171,8 @@ class _POSScreenState extends ConsumerState<POSScreen> {
             cashReceived: result.cashReceived,
             notes: result.notes,
             paymentMethod: result.paymentMethod,
+            referenceNumber: result.referenceNumber,
+            customerName: result.customerName,
           );
 
       if (mounted) {
@@ -162,11 +180,27 @@ class _POSScreenState extends ConsumerState<POSScreen> {
           // Cart is only cleared after the sale has been persisted.
           ref.read(cartProvider.notifier).clear();
           ref.read(cartProvider.notifier).setProcessing(false);
-          await AppDialogService.success(
-            context,
-            title: 'Sale Completed',
-            message: 'Transaction completed successfully.',
-          );
+
+          final sales = await ref.read(salesServiceProvider).getSales();
+          final sale = sales.isNotEmpty ? sales.first : null;
+
+          if (!mounted) return;
+
+          if (sale != null) {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => PaymentSuccessScreen(sale: sale),
+              ),
+            );
+          } else {
+            await AppDialogService.success(
+              context,
+              title: 'Sale Completed',
+              message: 'Transaction completed successfully.',
+            );
+          }
+
           await _loadProducts();
         } else {
           ref.read(cartProvider.notifier).setProcessing(false);
@@ -174,6 +208,14 @@ class _POSScreenState extends ConsumerState<POSScreen> {
               title: 'Transaction Failed',
               message: 'Failed to complete the sale. Please try again.');
         }
+      }
+    } on PaymentValidationException catch (e) {
+      if (mounted) {
+        ref.read(cartProvider.notifier).setProcessing(false);
+        AppDialogService.error(context,
+            title: 'Invalid Payment',
+            message: e.message,
+            details: e.details);
       }
     } catch (e) {
       if (mounted) {
@@ -834,36 +876,42 @@ class _PaymentResult {
   final double cashReceived;
   final String paymentMethod;
   final String? notes;
+  final String? referenceNumber;
+  final String? customerName;
 
   _PaymentResult({
     required this.cashReceived,
     this.paymentMethod = 'Cash',
     this.notes,
+    this.referenceNumber,
+    this.customerName,
   });
 }
 
-class _PaymentDialog extends StatefulWidget {
+class _PaymentDialog extends ConsumerStatefulWidget {
   final double total;
 
   const _PaymentDialog({required this.total});
 
   @override
-  State<_PaymentDialog> createState() => _PaymentDialogState();
+  ConsumerState<_PaymentDialog> createState() => _PaymentDialogState();
 }
 
-class _PaymentDialogState extends State<_PaymentDialog> {
+class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
   final _formKey = GlobalKey<FormState>();
   final _cashController = TextEditingController();
   final _notesController = TextEditingController();
+  final _referenceController = TextEditingController();
+  final _customerNameController = TextEditingController();
 
-  // Payment methods available to the POS.  The default is Cash.
-  static const _paymentMethods = ['Cash', 'GCash', 'Card', 'Other'];
   String _paymentMethod = 'Cash';
 
   @override
   void dispose() {
     _cashController.dispose();
     _notesController.dispose();
+    _referenceController.dispose();
+    _customerNameController.dispose();
     super.dispose();
   }
 
@@ -871,11 +919,58 @@ class _PaymentDialogState extends State<_PaymentDialog> {
     return double.tryParse(_cashController.text.trim()) ?? 0.0;
   }
 
+  List<String> _availableMethods(bool gcashEnabled) {
+    if (gcashEnabled) {
+      return const ['Cash', 'GCash', 'Card', 'Other'];
+    }
+    return const ['Cash', 'Card', 'Other'];
+  }
+
   @override
   Widget build(BuildContext context) {
-    final cash = _parseCash();
-    final change = cash - widget.total;
+    final paymentSettingsAsync = ref.watch(paymentSettingsProvider);
+
+    return paymentSettingsAsync.when(
+      loading: () => AlertDialog(
+        title: const Text('Payment'),
+        content: const SizedBox(
+          height: 120,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+      error: (error, stackTrace) => AlertDialog(
+        title: const Text('Payment'),
+        content: Text('Failed to load payment settings: $error'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+      data: (settings) => _buildContent(context, settings),
+    );
+  }
+
+  Widget _buildContent(BuildContext context, PaymentSettings settings) {
     final cs = Theme.of(context).colorScheme;
+    final methods = _availableMethods(settings.gcashEnabled);
+    final currentMethod =
+        methods.contains(_paymentMethod) ? _paymentMethod : 'Cash';
+    final cash = currentMethod == 'Cash' ? _parseCash() : widget.total;
+    final change = cash - widget.total;
+
+    if (currentMethod != _paymentMethod) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _paymentMethod = currentMethod);
+      });
+    }
 
     return AlertDialog(
       title: const Text('Payment'),
@@ -909,13 +1004,14 @@ class _PaymentDialogState extends State<_PaymentDialog> {
               const SizedBox(height: Spacing.lg),
               // Payment method
               DropdownButtonFormField<String>(
-                initialValue: _paymentMethod,
+                key: ValueKey(currentMethod),
+                initialValue: currentMethod,
                 decoration: const InputDecoration(
                   labelText: 'Payment Method',
                   prefixIcon: Icon(Icons.payment),
                   border: OutlineInputBorder(),
                 ),
-                items: _paymentMethods
+                items: methods
                     .map((m) => DropdownMenuItem(
                           value: m,
                           child: Text(m),
@@ -927,63 +1023,86 @@ class _PaymentDialogState extends State<_PaymentDialog> {
                 },
               ),
               const SizedBox(height: Spacing.lg),
-              // Cash received
-              TextFormField(
-                controller: _cashController,
-                decoration: const InputDecoration(
-                  labelText: 'Cash Received',
-                  prefixText: '₱',
-                  prefixIcon: Icon(Icons.payments),
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.number,
-                autofocus: true,
-                validator: (value) {
-                  final cash = double.tryParse(value?.trim() ?? '');
-                  if (cash == null) {
-                    return 'Enter a valid amount';
-                  }
-                  if (cash < widget.total) {
-                    return 'Insufficient cash received';
-                  }
-                  return null;
-                },
-                onChanged: (_) => setState(() {}),
-              ),
-              const SizedBox(height: Spacing.md),
-              // Change display
-              if (cash >= widget.total)
-                Container(
-                  padding: const EdgeInsets.all(Spacing.md),
-                  decoration: BoxDecoration(
-                    color: cs.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(12),
+              // Cash received (Cash only)
+              if (currentMethod == 'Cash') ...[
+                TextFormField(
+                  controller: _cashController,
+                  decoration: const InputDecoration(
+                    labelText: 'Cash Received',
+                    prefixText: '₱',
+                    prefixIcon: Icon(Icons.payments),
+                    border: OutlineInputBorder(),
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Change',
-                          style: TextStyle(color: cs.onSurfaceVariant)),
-                      Text(
-                        '₱${change.toStringAsFixed(2)}',
-                        style: AppTypography.titleLargeBold(context)
-                            .copyWith(color: cs.primary),
-                      ),
-                    ],
+                  keyboardType: TextInputType.number,
+                  autofocus: true,
+                  validator: (value) {
+                    final cash = double.tryParse(value?.trim() ?? '');
+                    if (cash == null) {
+                      return 'Enter a valid amount';
+                    }
+                    if (cash < widget.total) {
+                      return 'Insufficient cash received';
+                    }
+                    return null;
+                  },
+                  onChanged: (_) => setState(() {}),
+                ),
+                const SizedBox(height: Spacing.md),
+                // Change display
+                if (cash >= widget.total)
+                  Container(
+                    padding: const EdgeInsets.all(Spacing.md),
+                    decoration: BoxDecoration(
+                      color: cs.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Change',
+                            style: TextStyle(color: cs.onSurfaceVariant)),
+                        Text(
+                          '₱${change.toStringAsFixed(2)}',
+                          style: AppTypography.titleLargeBold(context)
+                              .copyWith(color: cs.primary),
+                        ),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: Spacing.md),
+                // Quick cash buttons
+                Wrap(
+                  spacing: Spacing.sm,
+                  children: [
+                    _buildQuickCashButton(widget.total),
+                    _buildQuickCashButton(_roundUp(widget.total, 50)),
+                    _buildQuickCashButton(_roundUp(widget.total, 100)),
+                    _buildQuickCashButton(_roundUp(widget.total, 500)),
+                  ],
+                ),
+                const SizedBox(height: Spacing.md),
+              ],
+              // Reference and customer (Card/Other only)
+              if (currentMethod == 'Card' || currentMethod == 'Other') ...[
+                TextFormField(
+                  controller: _referenceController,
+                  decoration: const InputDecoration(
+                    labelText: 'Reference Number (optional)',
+                    prefixIcon: Icon(Icons.confirmation_number),
+                    border: OutlineInputBorder(),
                   ),
                 ),
-              const SizedBox(height: Spacing.md),
-              // Quick cash buttons
-              Wrap(
-                spacing: Spacing.sm,
-                children: [
-                  _buildQuickCashButton(widget.total),
-                  _buildQuickCashButton(_roundUp(widget.total, 50)),
-                  _buildQuickCashButton(_roundUp(widget.total, 100)),
-                  _buildQuickCashButton(_roundUp(widget.total, 500)),
-                ],
-              ),
-              const SizedBox(height: Spacing.md),
+                const SizedBox(height: Spacing.md),
+                TextFormField(
+                  controller: _customerNameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Customer Name (optional)',
+                    prefixIcon: Icon(Icons.person),
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: Spacing.md),
+              ],
               // Notes
               TextFormField(
                 controller: _notesController,
@@ -1003,23 +1122,50 @@ class _PaymentDialogState extends State<_PaymentDialog> {
           onPressed: () => Navigator.pop(context),
           child: const Text('Cancel'),
         ),
-        LoadingButton(
-          isLoading: false,
-          onPressed: () {
-            if (!_formKey.currentState!.validate()) return;
-            Navigator.pop(
-              context,
-              _PaymentResult(
-                cashReceived: _parseCash(),
-                paymentMethod: _paymentMethod,
-                notes: _notesController.text.trim().isEmpty
-                    ? null
-                    : _notesController.text.trim(),
-              ),
-            );
-          },
-          label: 'Complete Sale',
-        ),
+        if (currentMethod == 'GCash')
+          LoadingButton(
+            isLoading: false,
+            onPressed: () {
+              Navigator.pop(
+                context,
+                _PaymentResult(
+                  cashReceived: 0.0,
+                  paymentMethod: 'GCash',
+                ),
+              );
+            },
+            label: 'Continue with GCash',
+          )
+        else
+          LoadingButton(
+            isLoading: false,
+            onPressed: () {
+              if (!_formKey.currentState!.validate()) return;
+              Navigator.pop(
+                context,
+                _PaymentResult(
+                  cashReceived: currentMethod == 'Cash'
+                      ? _parseCash()
+                      : widget.total,
+                  paymentMethod: currentMethod,
+                  notes: _notesController.text.trim().isEmpty
+                      ? null
+                      : _notesController.text.trim(),
+                  referenceNumber:
+                      (currentMethod == 'Card' || currentMethod == 'Other') &&
+                              _referenceController.text.trim().isNotEmpty
+                          ? _referenceController.text.trim()
+                          : null,
+                  customerName:
+                      (currentMethod == 'Card' || currentMethod == 'Other') &&
+                              _customerNameController.text.trim().isNotEmpty
+                          ? _customerNameController.text.trim()
+                          : null,
+                ),
+              );
+            },
+            label: 'Complete Sale',
+          ),
       ],
     );
   }

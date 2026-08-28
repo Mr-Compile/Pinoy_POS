@@ -9,6 +9,12 @@ class Settings {
   final String? accentColor;
   final String? groqApiKey;
   final String? groqModel;
+  final bool gcashEnabled;
+  final bool gcashReferenceRequired;
+  final String gcashCustomerNameRequirement;
+  final String gcashPaymentProofRequirement;
+  final String gcashVerificationMode;
+  final int gcashReferenceMinLength;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -23,6 +29,12 @@ class Settings {
     this.accentColor,
     this.groqApiKey,
     this.groqModel,
+    this.gcashEnabled = true,
+    this.gcashReferenceRequired = true,
+    this.gcashCustomerNameRequirement = 'optional',
+    this.gcashPaymentProofRequirement = 'optional',
+    this.gcashVerificationMode = 'immediate',
+    this.gcashReferenceMinLength = 6,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -39,6 +51,12 @@ class Settings {
       'accent_color': accentColor,
       'groq_api_key': groqApiKey,
       'groq_model': groqModel,
+      'gcash_enabled': gcashEnabled ? 1 : 0,
+      'gcash_reference_required': gcashReferenceRequired ? 1 : 0,
+      'gcash_customer_name_requirement': gcashCustomerNameRequirement,
+      'gcash_payment_proof_requirement': gcashPaymentProofRequirement,
+      'gcash_verification_mode': gcashVerificationMode,
+      'gcash_reference_min_length': gcashReferenceMinLength,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -48,14 +66,23 @@ class Settings {
     return Settings(
       id: map['id'] as int?,
       storeName: map['store_name'] as String,
-      storeAddress: map['store_address'] as String? ?? '',
-      storePhone: map['store_phone'] as String? ?? '',
-      currency: map['currency'] as String? ?? 'PHP',
+      storeAddress: (map['store_address'] as String?) ?? '',
+      storePhone: (map['store_phone'] as String?) ?? '',
+      currency: (map['currency'] as String?) ?? 'PHP',
       receiptFooter: map['receipt_footer'] as String?,
       theme: map['theme'] as String?,
       accentColor: map['accent_color'] as String?,
       groqApiKey: map['groq_api_key'] as String?,
       groqModel: map['groq_model'] as String?,
+      gcashEnabled: (map['gcash_enabled'] as int?) == 1,
+      gcashReferenceRequired: (map['gcash_reference_required'] as int?) == 1,
+      gcashCustomerNameRequirement:
+          (map['gcash_customer_name_requirement'] as String?) ?? 'optional',
+      gcashPaymentProofRequirement:
+          (map['gcash_payment_proof_requirement'] as String?) ?? 'optional',
+      gcashVerificationMode:
+          (map['gcash_verification_mode'] as String?) ?? 'immediate',
+      gcashReferenceMinLength: (map['gcash_reference_min_length'] as int?) ?? 6,
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
     );
@@ -72,6 +99,12 @@ class Settings {
     String? accentColor,
     String? groqApiKey,
     String? groqModel,
+    bool? gcashEnabled,
+    bool? gcashReferenceRequired,
+    String? gcashCustomerNameRequirement,
+    String? gcashPaymentProofRequirement,
+    String? gcashVerificationMode,
+    int? gcashReferenceMinLength,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -86,8 +119,18 @@ class Settings {
       accentColor: accentColor ?? this.accentColor,
       groqApiKey: groqApiKey ?? this.groqApiKey,
       groqModel: groqModel ?? this.groqModel,
+      gcashEnabled: gcashEnabled ?? this.gcashEnabled,
+      gcashReferenceRequired: gcashReferenceRequired ?? this.gcashReferenceRequired,
+      gcashCustomerNameRequirement:
+          gcashCustomerNameRequirement ?? this.gcashCustomerNameRequirement,
+      gcashPaymentProofRequirement:
+          gcashPaymentProofRequirement ?? this.gcashPaymentProofRequirement,
+      gcashVerificationMode: gcashVerificationMode ?? this.gcashVerificationMode,
+      gcashReferenceMinLength: gcashReferenceMinLength ?? this.gcashReferenceMinLength,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
+
+  bool get isGcashEnabled => gcashEnabled;
 }
