@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/date_utils.dart';
+import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/screens/sale_detail_screen.dart';
-import 'package:pinoy_pos/ui/widgets/app_card.dart';
+import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
+import 'package:pinoy_pos/ui/widgets/app_icon_button.dart';
+import 'package:pinoy_pos/ui/widgets/app_list_item.dart';
+import 'package:pinoy_pos/ui/widgets/app_section.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
-import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
-import 'package:pinoy_pos/core/app_theme.dart';
 
 class SalesScreen extends ConsumerStatefulWidget {
   const SalesScreen({super.key});
@@ -272,17 +275,20 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
       appBar: AppHeader(
         title: 'My Sales',
         actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
+          AppIconButton(
+            icon: Icons.search,
             onPressed: _isProcessing ? null : _showSearchDialog,
+            tooltip: 'Search',
           ),
-          IconButton(
-            icon: const Icon(Icons.filter_list),
+          AppIconButton(
+            icon: Icons.filter_list,
             onPressed: _isProcessing ? null : _showFilterDialog,
+            tooltip: 'Filters',
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
+          AppIconButton(
+            icon: Icons.refresh,
             onPressed: _isProcessing ? null : _loadSales,
+            tooltip: 'Refresh',
           ),
         ],
       ),
@@ -294,10 +300,11 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                   ? 'No sales match the selected filters.'
                   : 'Start selling to see sales history',
               action: filtersActive
-                  ? FilledButton.icon(
+                  ? AppButton.filled(
                       onPressed: _clearFilters,
-                      icon: const Icon(Icons.clear),
-                      label: const Text('Clear Filters'),
+                      icon: Icons.clear,
+                      label: 'Clear Filters',
+                      size: AppButtonSize.small,
                     )
                   : null,
             )
@@ -309,31 +316,14 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                   itemCount: grouped.length,
                   itemBuilder: (context, index) {
                     final group = grouped[index];
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.only(
-                            top: 8,
-                            bottom: 8,
-                            left: 4,
-                          ),
-                          child: Text(
-                            group.label,
-                            style: AppTypography.titleSmallBold(context)
-                                .copyWith(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                        ...group.sales.map((sale) => _buildSaleCard(
-                              sale,
-                              canVoid,
-                              context,
-                            )),
-                      ],
+                    return AppSection(
+                      title: group.label,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: group.sales
+                            .map((sale) => _buildSaleCard(sale, canVoid, context))
+                            .toList(),
+                      ),
                     );
                   },
                 ),
@@ -381,96 +371,46 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     final statusColor = _statusColor(sale.paymentStatus, cs);
     final time = _formatTime(sale.createdAt);
 
-    return AppCard(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => SaleDetailScreen(sale: sale),
-            ),
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Sale #${sale.receiptNumber ?? sale.id}',
-                          style: AppTypography.titleMediumBold(context),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          time,
-                          style: TextStyle(
-                            color: cs.onSurfaceVariant,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Text(
-                    '₱${sale.totalAmount.toStringAsFixed(2)}',
-                    style: AppTypography.titleMediumBold(context)
-                        .copyWith(color: cs.primary),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 4,
-                children: [
-                  _buildPill(sale.paymentMethod, cs),
-                  if (sale.customerName != null &&
-                      sale.customerName!.isNotEmpty)
-                    _buildPill(sale.customerName!, cs),
-                  if (sale.referenceNumber != null &&
-                      sale.referenceNumber!.isNotEmpty)
-                    _buildPill('Ref: ${sale.referenceNumber}', cs),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Chip(
-                    avatar: Icon(
-                      _statusIcon(sale.paymentStatus),
-                      size: 14,
-                      color: statusColor,
-                    ),
-                    label: Text(
-                      _statusLabel(sale.paymentStatus),
-                      style: TextStyle(color: statusColor, fontSize: 12),
-                    ),
-                    side: BorderSide(color: statusColor),
-                    backgroundColor: statusColor.withValues(alpha: 0.1),
-                  ),
-                  if (canVoid && sale.paymentStatus == 'confirmed')
-                    LoadingButton(
-                      isLoading: _isProcessing,
-                      onPressed: () => _voidSale(sale),
-                      label: 'Void',
-                      isDanger: true,
-                    ),
-                ],
-              ),
-            ],
-          ),
+    final chips = <Widget>[
+      _buildPill(sale.paymentMethod, cs),
+      if (sale.customerName != null && sale.customerName!.isNotEmpty)
+        _buildPill(sale.customerName!, cs),
+      if (sale.referenceNumber != null && sale.referenceNumber!.isNotEmpty)
+        _buildPill('Ref: ${sale.referenceNumber}', cs),
+    ];
+
+    final actions = <AppListAction>[
+      if (canVoid && sale.paymentStatus == 'confirmed')
+        AppListAction(
+          icon: Icons.delete,
+          tooltip: 'Void sale',
+          color: cs.error,
+          onPressed: () => _voidSale(sale),
         ),
+    ];
+
+    return AppListItem(
+      margin: const EdgeInsets.only(bottom: Spacing.md),
+      title: 'Sale #${sale.receiptNumber ?? sale.id}',
+      subtitle: time,
+      trailing: Text(
+        '₱${sale.totalAmount.toStringAsFixed(2)}',
+        style: AppTypography.titleMediumBold(context)
+            .copyWith(color: cs.primary),
       ),
+      chips: chips,
+      statusLabel: _statusLabel(sale.paymentStatus),
+      statusColor: statusColor,
+      statusIcon: _statusIcon(sale.paymentStatus),
+      actions: actions.isNotEmpty ? actions : null,
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SaleDetailScreen(sale: sale),
+          ),
+        );
+      },
     );
   }
 

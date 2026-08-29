@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/product.dart';
 import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/services/image_service.dart';
-import 'package:pinoy_pos/ui/widgets/app_card.dart';
+import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
+import 'package:pinoy_pos/ui/widgets/app_list_item.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/validators.dart';
@@ -137,9 +140,10 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
         ? (isTablet
             ? Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: FilledButton.icon(
-                  icon: const Icon(Icons.add),
-                  label: const Text('Add Product'),
+                child: AppButton.filled(
+                  size: AppButtonSize.small,
+                  icon: Icons.add,
+                  label: 'Add Product',
                   onPressed: () => _showProductDialog(),
                 ),
               )
@@ -219,64 +223,100 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                     // No create button here — the FAB (mobile) / AppBar
                     // action (tablet) is the single primary create action.
                   )
-                : ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _filteredProducts.length,
-                    itemBuilder: (context, index) {
-                      final product = _filteredProducts[index];
-                      final category = _categories.firstWhere(
-                        (c) => c.id == product.categoryId,
-                        orElse: () => Category(
-                            id: 0,
-                            name: 'Uncategorized',
-                            createdAt: DateTime.now()),
-                      );
-                      return AppCard(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        child: ListTile(
-                          leading: SizedBox(
-                            width: 56,
-                            height: 56,
-                            child: AppImage(
-                              imagePath: product.imageUrl,
-                              borderRadius: 8,
-                              placeholderIcon: Icons.inventory_2,
-                              placeholderIconSize: 28,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                          title: Text(product.name),
-                          subtitle: Text(
-                              '${category.name} • Stock: ${product.stock}'),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                '₱${product.price.toStringAsFixed(2)}',
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                              if (canEdit || canDelete) ...[
-                                const SizedBox(width: 8),
-                                if (canEdit)
-                                  IconButton(
-                                    icon: const Icon(Icons.edit),
-                                    onPressed: () =>
-                                        _showProductDialog(product: product),
-                                  ),
-                                if (canDelete)
-                                  IconButton(
-                                    icon: const Icon(Icons.delete),
-                                    onPressed: () => _deleteProduct(product),
-                                  ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+                : _buildProductList(canEdit, canDelete),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildProductList(bool canEdit, bool canDelete) {
+    return ListView.builder(
+      padding: const EdgeInsets.all(Spacing.lg),
+      itemCount: _filteredProducts.length,
+      itemBuilder: (context, index) {
+        final product = _filteredProducts[index];
+        final category = _categories.firstWhere(
+          (c) => c.id == product.categoryId,
+          orElse: () => Category(
+            id: 0,
+            name: 'Uncategorized',
+            createdAt: DateTime.now(),
+          ),
+        );
+        return _buildProductItem(product, category, canEdit, canDelete);
+      },
+    );
+  }
+
+  Widget _buildProductItem(
+    Product product,
+    Category category,
+    bool canEdit,
+    bool canDelete,
+  ) {
+    final cs = Theme.of(context).colorScheme;
+    final isOutOfStock = product.stock <= 0;
+    final isLowStock = !isOutOfStock && product.isLowStock;
+
+    final String? statusLabel;
+    final Color? statusColor;
+    final IconData? statusIcon;
+    if (isOutOfStock) {
+      statusLabel = 'Out of stock';
+      statusColor = cs.error;
+      statusIcon = Icons.error_outline;
+    } else if (isLowStock) {
+      statusLabel = 'Low stock';
+      statusColor = AppSemanticColors.warning;
+      statusIcon = Icons.warning_amber;
+    } else {
+      statusLabel = null;
+      statusColor = null;
+      statusIcon = null;
+    }
+
+    final actions = <AppListAction>[
+      if (canEdit)
+        AppListAction(
+          icon: Icons.edit,
+          onPressed: () => _showProductDialog(product: product),
+          tooltip: 'Edit product',
+        ),
+      if (canDelete)
+        AppListAction(
+          icon: Icons.delete,
+          onPressed: () => _deleteProduct(product),
+          tooltip: 'Delete product',
+        ),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: AppListItem(
+        leading: SizedBox(
+          width: 56,
+          height: 56,
+          child: AppImage(
+            imagePath: product.imageUrl,
+            borderRadius: 8,
+            placeholderIcon: Icons.inventory_2,
+            placeholderIconSize: 28,
+            fit: BoxFit.cover,
+          ),
+        ),
+        title: product.name,
+        subtitle: '${category.name} • Stock: ${product.stock}',
+        trailing: Text(
+          '₱${product.price.toStringAsFixed(2)}',
+          style: AppTypography.titleMediumBold(context)
+              .copyWith(color: cs.primary),
+        ),
+        statusLabel: statusLabel,
+        statusColor: statusColor,
+        statusIcon: statusIcon,
+        actions: actions.isNotEmpty ? actions : null,
+        onTap: canEdit ? () => _showProductDialog(product: product) : null,
       ),
     );
   }

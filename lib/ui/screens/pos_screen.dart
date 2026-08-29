@@ -11,15 +11,18 @@ import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/data/models/payment_settings.dart';
 import 'package:pinoy_pos/ui/screens/gcash_payment_screen.dart';
 import 'package:pinoy_pos/ui/screens/payment_success_screen.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/breakpoints.dart';
+import 'package:pinoy_pos/core/spacing.dart';
+import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
+import 'package:pinoy_pos/ui/widgets/app_icon_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
+import 'package:pinoy_pos/ui/widgets/app_status_chip.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
-import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
-import 'package:pinoy_pos/core/app_theme.dart';
-import 'package:pinoy_pos/core/spacing.dart';
 
 class POSScreen extends ConsumerStatefulWidget {
   const POSScreen({super.key});
@@ -245,8 +248,8 @@ class _POSScreenState extends ConsumerState<POSScreen> {
   Widget build(BuildContext context) {
     final authNotifier = ref.read(authStateProvider.notifier);
     final canSell = authNotifier.hasPermission('create_sales');
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isTablet = screenWidth >= 600;
+    final layout = layoutClassFor(MediaQuery.of(context).size.width);
+    final isTablet = layout.isAtLeastMedium;
 
     if (_isLoading) {
       return Scaffold(
@@ -277,9 +280,9 @@ class _POSScreenState extends ConsumerState<POSScreen> {
           ? 'Add active products before starting a transaction.'
           : 'Please ask an administrator to add products.',
       action: canManageProducts
-          ? FilledButton.icon(
-              icon: const Icon(Icons.inventory_2),
-              label: const Text('Go to Products'),
+          ? AppButton.filled(
+              icon: Icons.inventory_2,
+              label: 'Go to Products',
               onPressed: () {
                 // Navigate to products tab — the AppShell handles routing.
               },
@@ -356,86 +359,90 @@ class _POSScreenState extends ConsumerState<POSScreen> {
     final isLowStock = !isOutOfStock && product.isLowStock;
     final cs = Theme.of(context).colorScheme;
 
+    final String stockLabel;
+    final Color stockColor;
+    final IconData? stockIcon;
+    if (isOutOfStock) {
+      stockLabel = 'Out of stock';
+      stockColor = cs.error;
+      stockIcon = Icons.error_outline;
+    } else if (isLowStock) {
+      stockLabel = 'Low stock: ${product.stock}';
+      stockColor = AppSemanticColors.warning;
+      stockIcon = Icons.warning_amber;
+    } else {
+      stockLabel = '${product.stock} available';
+      stockColor = cs.onSurfaceVariant;
+      stockIcon = null;
+    }
+
     return AppCard(
-      child: InkWell(
-        onTap: isOutOfStock ? null : () => _addToCart(product),
-        borderRadius: BorderRadius.circular(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Product image
-            Expanded(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                    child: AppImage(
-                      imagePath: product.imageUrl,
-                      placeholderIcon: Icons.inventory_2,
-                      placeholderIconSize: isTablet ? 40 : 32,
-                      fit: BoxFit.cover,
-                    ),
+      onTap: isOutOfStock ? null : () => _addToCart(product),
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Product image
+          Expanded(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                  child: AppImage(
+                    imagePath: product.imageUrl,
+                    placeholderIcon: Icons.inventory_2,
+                    placeholderIconSize: isTablet ? 40 : 32,
+                    fit: BoxFit.cover,
                   ),
-                  if (isOutOfStock)
-                    Container(
-                      decoration: BoxDecoration(
-                        color: cs.surface.withValues(alpha: 0.7),
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                      ),
-                      child: Center(
-                        child: Text(
-                          'Out of Stock',
-                          style: TextStyle(
-                            color: cs.error,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
+                ),
+                if (isOutOfStock)
+                  Container(
+                    decoration: BoxDecoration(
+                      color: cs.surface.withValues(alpha: 0.7),
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                    ),
+                    child: Center(
+                      child: Text(
+                        'Out of Stock',
+                        style: AppTypography.titleSmallBold(context)
+                            .copyWith(color: cs.error),
                       ),
                     ),
-                  _ProductQuantityBadge(productId: product.id!),
-                ],
-              ),
-            ),
-            // Product info
-            Padding(
-              padding: const EdgeInsets.all(Spacing.sm),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    product.name,
-                    style: Theme.of(context).textTheme.titleSmall,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '₱${product.price.toStringAsFixed(2)}',
-                    style: AppTypography.titleMediumBold(context),
-                  ),
-                  const SizedBox(height: 2),
-                  if (isOutOfStock)
-                    Text(
-                      'Out of stock',
-                      style: TextStyle(fontSize: 11, color: cs.error),
-                    )
-                  else if (isLowStock)
-                    Text(
-                      'Low stock: ${product.stock} left',
-                      style: TextStyle(fontSize: 11, color: cs.secondary),
-                    )
-                  else
-                    Text(
-                      '${product.stock} available',
-                      style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
-                    ),
-                ],
-              ),
+                _ProductQuantityBadge(productId: product.id!),
+              ],
             ),
-          ],
-        ),
+          ),
+          // Product info
+          Padding(
+            padding: const EdgeInsets.all(Spacing.sm),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  product.name,
+                  style: AppTypography.titleSmall(context),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: Spacing.xs),
+                Text(
+                  '₱${product.price.toStringAsFixed(2)}',
+                  style: AppTypography.titleMediumBold(context)
+                      .copyWith(color: cs.primary),
+                ),
+                const SizedBox(height: Spacing.xs),
+                AppStatusChip(
+                  label: stockLabel,
+                  color: stockColor,
+                  icon: stockIcon,
+                  filled: false,
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -492,10 +499,11 @@ class _POSScreenState extends ConsumerState<POSScreen> {
                 : 'No products in this category.'
             : 'No products available in this category.',
         action: hasFilters
-            ? TextButton.icon(
-                icon: const Icon(Icons.filter_alt_off),
-                label: const Text('Clear Filters'),
+            ? AppButton.text(
+                icon: Icons.filter_alt_off,
+                label: 'Clear Filters',
                 onPressed: _clearFilters,
+                size: AppButtonSize.small,
               )
             : null,
       ),
@@ -676,11 +684,12 @@ class _CheckoutPanel extends ConsumerWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Cart', style: Theme.of(context).textTheme.titleLarge),
+              Text('Cart', style: AppTypography.titleLargeBold(context)),
               if (cart.isNotEmpty)
-                TextButton.icon(
-                  icon: const Icon(Icons.delete_sweep, size: 18),
-                  label: const Text('Clear'),
+                AppButton.text(
+                  icon: Icons.delete_sweep,
+                  label: 'Clear',
+                  size: AppButtonSize.small,
                   onPressed: () => _confirmClear(context, ref),
                 ),
             ],
@@ -718,10 +727,11 @@ class _CheckoutPanel extends ConsumerWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Subtotal', style: Theme.of(context).textTheme.bodyLarge),
+                      Text('Subtotal', style: AppTypography.bodyLarge(context)),
                       Text(
                         '₱${cart.subtotal.toStringAsFixed(2)}',
-                        style: Theme.of(context).textTheme.bodyLarge,
+                        style: AppTypography.bodyLarge(context)
+                            .copyWith(fontWeight: FontWeight.w600),
                       ),
                     ],
                   ),
@@ -739,10 +749,11 @@ class _CheckoutPanel extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: Spacing.md),
-                  LoadingButton(
+                  AppButton.filled(
                     isLoading: cart.isProcessing,
                     onPressed: canSell ? onCheckout : null,
                     label: 'Complete Sale',
+                    icon: Icons.point_of_sale,
                   ),
                 ],
               ),
@@ -775,28 +786,31 @@ class _CartItemRow extends ConsumerWidget {
     final product = item.product;
     final cs = Theme.of(context).colorScheme;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: Spacing.xs),
+    return AppCard(
+      variant: AppCardVariant.filled,
+      padding: const EdgeInsets.symmetric(
+        horizontal: Spacing.md,
+        vertical: Spacing.sm,
+      ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Name + price
+          // Name + price/qty
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   product.name,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                  style: AppTypography.bodyLarge(context)
+                      .copyWith(fontWeight: FontWeight.w600),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
                   '₱${product.price.toStringAsFixed(2)} × ${item.quantity}',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: cs.onSurfaceVariant,
-                      ),
+                  style: AppTypography.bodySmall(context)
+                      .copyWith(color: cs.onSurfaceVariant),
                 ),
               ],
             ),
@@ -805,26 +819,32 @@ class _CartItemRow extends ConsumerWidget {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _QtyButton(
+              AppIconButton(
                 icon: Icons.remove,
-                onTap: () => ref.read(cartProvider.notifier).decrement(product.id!),
+                onPressed: () =>
+                  ref.read(cartProvider.notifier).decrement(product.id!),
+                tooltip: 'Decrease quantity',
               ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
+              SizedBox(
+                width: 40,
                 child: Text(
                   '${item.quantity}',
-                  style: Theme.of(context).textTheme.titleMedium,
+                  style: AppTypography.titleMedium(context),
+                  textAlign: TextAlign.center,
                 ),
               ),
-              _QtyButton(
+              AppIconButton(
                 icon: Icons.add,
-                onTap: () => ref.read(cartProvider.notifier).increment(product.id!),
+                onPressed: () =>
+                  ref.read(cartProvider.notifier).increment(product.id!),
+                tooltip: 'Increase quantity',
               ),
             ],
           ),
+          const SizedBox(width: Spacing.sm),
           // Subtotal
           SizedBox(
-            width: 70,
+            width: 72,
             child: Text(
               '₱${item.lineTotal.toStringAsFixed(2)}',
               style: AppTypography.titleSmallBold(context),
@@ -832,39 +852,14 @@ class _CartItemRow extends ConsumerWidget {
             ),
           ),
           // Remove
-          IconButton(
-            icon: const Icon(Icons.delete_outline, size: 20),
-            onPressed: () => ref.read(cartProvider.notifier).remove(product.id!),
+          AppIconButton(
+            icon: Icons.delete_outline,
+            onPressed: () =>
+              ref.read(cartProvider.notifier).remove(product.id!),
             tooltip: 'Remove item',
-            visualDensity: VisualDensity.compact,
+            color: cs.error,
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _QtyButton extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-
-  const _QtyButton({required this.icon, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 32,
-      height: 32,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: Theme.of(context).colorScheme.outline),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(icon, size: 16),
-        ),
       ),
     );
   }
@@ -1118,13 +1113,12 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
         ),
       ),
       actions: [
-        TextButton(
+        AppButton.text(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          label: 'Cancel',
         ),
         if (currentMethod == 'GCash')
-          LoadingButton(
-            isLoading: false,
+          AppButton.filled(
             onPressed: () {
               Navigator.pop(
                 context,
@@ -1137,8 +1131,7 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
             label: 'Continue with GCash',
           )
         else
-          LoadingButton(
-            isLoading: false,
+          AppButton.filled(
             onPressed: () {
               if (!_formKey.currentState!.validate()) return;
               Navigator.pop(

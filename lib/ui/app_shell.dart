@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/auth_navigation.dart';
+import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/ai_advisor_provider.dart';
@@ -61,7 +62,8 @@ class _AppShellState extends ConsumerState<AppShell> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
     final screenWidth = MediaQuery.of(context).size.width;
-    final isTablet = screenWidth >= 600;
+    final layout = layoutClassFor(screenWidth);
+    final isTablet = layout.isAtLeastMedium;
 
     // AppShell should only be visible when fully authenticated.
     // If the phase changes (e.g. forced password change, PIN lock,
@@ -159,6 +161,7 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   NavigationRail _buildNavigationRail(
       List<AppTab> tabs, double screenWidth, int selectedIndex) {
+    final layout = layoutClassFor(screenWidth);
     return NavigationRail(
       selectedIndex: selectedIndex,
       onDestinationSelected: (index) {
@@ -167,11 +170,11 @@ class _AppShellState extends ConsumerState<AppShell> {
         });
         _updateCurrentDestination();
       },
-      extended: screenWidth >= 900,
+      extended: layout.isAtLeastExpanded,
       minExtendedWidth: 200,
       leading: Padding(
         padding: const EdgeInsets.symmetric(vertical: Spacing.lg),
-        child: screenWidth >= 900
+        child: layout.isAtLeastExpanded
             ? const AppLogo(size: 56, variant: LogoVariant.full)
             : const AppIcon(size: 40),
       ),

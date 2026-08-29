@@ -19,8 +19,10 @@ import 'package:pinoy_pos/ui/screens/trash_screen.dart';
 import 'package:pinoy_pos/ui/screens/users_screen.dart';
 import 'package:pinoy_pos/ui/screens/backup_restore_screen.dart';
 import 'package:pinoy_pos/ui/screens/activity_logs_screen.dart';
+import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
+import 'package:pinoy_pos/ui/widgets/app_section.dart';
 import 'package:pinoy_pos/ui/widgets/donut_chart.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/kpi_card.dart';
@@ -196,7 +198,7 @@ class _WelcomeHeader extends StatelessWidget {
             children: [
               Text(
                 'Welcome, ${user.fullName}',
-                style: Theme.of(context).textTheme.headlineSmall,
+                style: AppTypography.headlineSmallBold(context),
                 overflow: TextOverflow.ellipsis,
                 maxLines: 1,
               ),
@@ -208,9 +210,9 @@ class _WelcomeHeader extends StatelessWidget {
                   Flexible(
                     child: Text(
                       user.role.displayName,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: cs.onSurfaceVariant,
-                          ),
+                      style: AppTypography.bodySmall(context).copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -220,20 +222,6 @@ class _WelcomeHeader extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-/// Section title with consistent spacing.
-class _SectionTitle extends StatelessWidget {
-  final String text;
-  const _SectionTitle(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: Spacing.md),
-      child: Text(text, style: Theme.of(context).textTheme.titleLarge),
     );
   }
 }
@@ -266,39 +254,47 @@ class _OwnerDashboard extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // ── Primary KPIs ──
-        KpiGrid(
-          children: [
-            KpiCard(
-              label: "Today's Sales",
-              value: _peso(data.todaySales),
-              icon: Icons.payments_outlined,
-              iconColor: cs.primary,
-              subtitle: '${data.todayTransactions} transactions',
-              tier: KpiCardTier.primary,
-            ),
-            KpiCard(
-              label: 'Transactions',
-              value: '${data.todayTransactions}',
-              icon: Icons.receipt_long_outlined,
-              iconColor: cs.tertiary,
-              tier: KpiCardTier.secondary,
-            ),
-            KpiCard(
-              label: 'Low Stock',
-              value: '${data.lowStockCount}',
-              icon: Icons.warning_amber,
-              iconColor: AppSemanticColors.warning,
-              tier: KpiCardTier.secondary,
-            ),
-            KpiCard(
-              label: 'Out of Stock',
-              value: '${data.outOfStockCount}',
-              icon: Icons.error_outline,
-              iconColor: AppSemanticColors.error,
-              tier: KpiCardTier.secondary,
-            ),
-          ],
+        AppSection(
+          title: 'Key Performance Indicators',
+          padding: const EdgeInsets.only(bottom: Spacing.md),
+          child: KpiGrid(
+            children: [
+              KpiCard(
+                label: "Today's Sales",
+                value: _peso(data.todaySales),
+                icon: Icons.payments_outlined,
+                iconColor: cs.primary,
+                subtitle: '${data.todayTransactions} transactions',
+                tier: KpiCardTier.primary,
+              ),
+              KpiCard(
+                label: 'Transactions',
+                value: '${data.todayTransactions}',
+                icon: Icons.receipt_long_outlined,
+                iconColor: cs.tertiary,
+                tier: KpiCardTier.secondary,
+              ),
+              KpiCard(
+                label: 'Low Stock',
+                value: '${data.lowStockCount}',
+                icon: Icons.warning_amber,
+                iconColor: AppSemanticColors.warning,
+                tier: KpiCardTier.secondary,
+              ),
+              KpiCard(
+                label: 'Out of Stock',
+                value: '${data.outOfStockCount}',
+                icon: Icons.error_outline,
+                iconColor: AppSemanticColors.error,
+                tier: KpiCardTier.secondary,
+              ),
+            ],
+          ),
         ),
+        const SizedBox(height: Spacing.xxl),
+
+        // ── Quick actions ──
+        _buildOwnerQuickActions(context, ref, authNotifier),
         const SizedBox(height: Spacing.xxl),
 
         // ── Sales trend chart ──
@@ -335,121 +331,97 @@ class _OwnerDashboard extends ConsumerWidget {
           _buildAIAdvisorCard(context),
           const SizedBox(height: Spacing.xxl),
         ],
-
-        // ── Quick actions ──
-        _buildOwnerQuickActions(context, ref, authNotifier),
       ],
     );
   }
 
   Widget _buildSalesTrendCard(BuildContext context) {
     final hasData = data.salesTrend.any((p) => p.total > 0);
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.trending_up, size: 20),
-              const SizedBox(width: Spacing.sm),
-              Text('Sales (Last 7 Days)',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      )),
-            ],
-          ),
-          const SizedBox(height: Spacing.lg),
-          if (hasData)
-            MiniBarChart(
-              points: data.salesTrend
-                  .map((p) => BarChartPoint(
-                        label: _dayLabel(p.date),
-                        value: p.total,
-                      ))
-                  .toList(),
-              valuePrefix: '₱',
-            )
-          else
-            const _ChartEmptyState(message: 'No sales data available yet.'),
-        ],
+    return AppSection(
+      title: 'Sales (Last 7 Days)',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: AppCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (hasData)
+              MiniBarChart(
+                points: data.salesTrend
+                    .map((p) => BarChartPoint(
+                          label: _dayLabel(p.date),
+                          value: p.total,
+                        ))
+                    .toList(),
+                valuePrefix: '₱',
+              )
+            else
+              const _ChartEmptyState(message: 'No sales data available yet.'),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildTopProductsCard(BuildContext context) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.leaderboard_outlined, size: 20),
-              const SizedBox(width: Spacing.sm),
-              Text('Top Products',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      )),
-            ],
-          ),
-          const SizedBox(height: Spacing.md),
-          if (data.topProducts.isEmpty)
-            const _ChartEmptyState(message: 'No sales recorded yet.')
-          else
-            Column(
-              children: data.topProducts.asMap().entries.map((entry) {
-                final i = entry.key;
-                final p = entry.value;
-                return _RankedListTile(
-                  rank: i + 1,
-                  title: p.name,
-                  trailing: '${p.totalQuantity} sold',
-                );
-              }).toList(),
-            ),
-        ],
+    return AppSection(
+      title: 'Top Products',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: AppCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (data.topProducts.isEmpty)
+              const _ChartEmptyState(message: 'No sales recorded yet.')
+            else
+              Column(
+                children: data.topProducts.asMap().entries.map((entry) {
+                  final i = entry.key;
+                  final p = entry.value;
+                  return _RankedListTile(
+                    rank: i + 1,
+                    title: p.name,
+                    trailing: '${p.totalQuantity} sold',
+                  );
+                }).toList(),
+              ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildInventoryCard(BuildContext context) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.inventory_2_outlined, size: 20),
-              const SizedBox(width: Spacing.sm),
-              Text('Inventory Status',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      )),
-            ],
-          ),
-          const SizedBox(height: Spacing.lg),
-          if (data.inventoryStatus.total == 0)
-            const _ChartEmptyState(message: 'No products yet.')
-          else
-            DonutChart(
-              segments: [
-                DonutSegment(
-                  label: 'Normal',
-                  value: data.inventoryStatus.normal,
-                  color: AppSemanticColors.success,
-                ),
-                DonutSegment(
-                  label: 'Low Stock',
-                  value: data.inventoryStatus.lowStock,
-                  color: AppSemanticColors.warning,
-                ),
-                DonutSegment(
-                  label: 'Out of Stock',
-                  value: data.inventoryStatus.outOfStock,
-                  color: AppSemanticColors.error,
-                ),
-              ],
-            ),
-        ],
+    return AppSection(
+      title: 'Inventory Status',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: AppCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (data.inventoryStatus.total == 0)
+              const _ChartEmptyState(message: 'No products yet.')
+            else
+              DonutChart(
+                segments: [
+                  DonutSegment(
+                    label: 'Normal',
+                    value: data.inventoryStatus.normal,
+                    color: AppSemanticColors.success,
+                  ),
+                  DonutSegment(
+                    label: 'Low Stock',
+                    value: data.inventoryStatus.lowStock,
+                    color: AppSemanticColors.warning,
+                  ),
+                  DonutSegment(
+                    label: 'Out of Stock',
+                    value: data.inventoryStatus.outOfStock,
+                    color: AppSemanticColors.error,
+                  ),
+                ],
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -457,245 +429,217 @@ class _OwnerDashboard extends ConsumerWidget {
   Widget _buildLowStockAlert(
       BuildContext context, List<dynamic> products, dynamic authNotifier) {
     if (products.isEmpty) {
-      return AppCard(
-        child: Row(
-          children: [
-            Icon(Icons.check_circle, color: AppSemanticColors.success),
-            const SizedBox(width: Spacing.md),
-            const Expanded(child: Text('Inventory is healthy')),
-          ],
+      return AppSection(
+        title: 'Low Stock Alert',
+        padding: const EdgeInsets.only(bottom: Spacing.md),
+        child: AppCard(
+          child: Row(
+            children: [
+              Icon(Icons.check_circle, color: AppSemanticColors.success),
+              const SizedBox(width: Spacing.md),
+              const Expanded(child: Text('Inventory is healthy')),
+            ],
+          ),
         ),
       );
     }
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.warning_amber, color: AppSemanticColors.warning),
-              const SizedBox(width: Spacing.sm),
-              Text('Low Stock Alert',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      )),
-            ],
-          ),
-          const SizedBox(height: Spacing.md),
-          ...products.take(5).map((p) => _LowStockTile(
-                name: (p as dynamic).name as String,
-                remaining: (p as dynamic).stock as int,
-              )),
-          if (authNotifier.hasPermission('add_stock')) ...[
-            const SizedBox(height: Spacing.sm),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const StockScreen()),
+    return AppSection(
+      title: 'Low Stock Alert',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: AppCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ...products.take(5).map((p) => _LowStockTile(
+                  name: (p as dynamic).name as String,
+                  remaining: (p as dynamic).stock as int,
+                )),
+            if (authNotifier.hasPermission('add_stock')) ...[
+              const SizedBox(height: Spacing.sm),
+              Align(
+                alignment: Alignment.centerRight,
+                child: AppButton.text(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const StockScreen()),
+                  ),
+                  icon: Icons.warehouse_outlined,
+                  label: 'View Stock',
                 ),
-                icon: const Icon(Icons.warehouse_outlined),
-                label: const Text('View Stock'),
               ),
-            ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildRecentSalesCard(BuildContext context) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.receipt_outlined, size: 20),
-              const SizedBox(width: Spacing.sm),
-              Text('Recent Sales',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      )),
-            ],
-          ),
-          const SizedBox(height: Spacing.md),
-          if (data.recentSales.isEmpty)
-            const _ChartEmptyState(message: 'No sales recorded yet.')
-          else
-            Column(
-              children: data.recentSales.map((s) => _RecentSaleTile(
-                    receipt: '#${s.receiptNumber ?? s.id}',
-                    amount: _peso(s.totalAmount),
-                    time: _formatDateTime(s.createdAt),
-                  )).toList(),
-            ),
-        ],
+    return AppSection(
+      title: 'Recent Sales',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: AppCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (data.recentSales.isEmpty)
+              const _ChartEmptyState(message: 'No sales recorded yet.')
+            else
+              Column(
+                children: data.recentSales.map((s) => _RecentSaleTile(
+                      receipt: '#${s.receiptNumber ?? s.id}',
+                      amount: _peso(s.totalAmount),
+                      time: _formatDateTime(s.createdAt),
+                    )).toList(),
+              ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildAnnouncementsCard(BuildContext context) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.campaign_outlined, size: 20),
-              const SizedBox(width: Spacing.sm),
-              Text('Announcements',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      )),
-            ],
-          ),
-          const SizedBox(height: Spacing.md),
-          ...data.announcements.take(3).map((a) => _AnnouncementTile(
-                title: a.title,
-                content: a.content,
-                isPinned: a.isPinned,
-              )),
-        ],
+    return AppSection(
+      title: 'Announcements',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: AppCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ...data.announcements.take(3).map((a) => _AnnouncementTile(
+                  title: a.title,
+                  content: a.content,
+                  isPinned: a.isPinned,
+                )),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildRecentActivityCard(BuildContext context, List<dynamic> activities) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.history, size: 20),
-              const SizedBox(width: Spacing.sm),
-              Text('Recent Activity',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      )),
-            ],
-          ),
-          const SizedBox(height: Spacing.md),
-          if (activities.isEmpty)
-            const _ChartEmptyState(message: 'No activity yet.')
-          else
-            Column(
-              children: activities.take(5).map((a) {
-                final log = a as dynamic;
-                return _ActivityTile(
-                  action: _humanizeAction(log.action as String),
-                  details: log.details as String?,
-                  time: _formatDateTime(log.createdAt as DateTime),
-                );
-              }).toList(),
-            ),
-        ],
+    return AppSection(
+      title: 'Recent Activity',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: AppCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (activities.isEmpty)
+              const _ChartEmptyState(message: 'No activity yet.')
+            else
+              Column(
+                children: activities.take(5).map((a) {
+                  final log = a as dynamic;
+                  return _ActivityTile(
+                    action: _humanizeAction(log.action as String),
+                    details: log.details as String?,
+                    time: _formatDateTime(log.createdAt as DateTime),
+                  );
+                }).toList(),
+              ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildAIAdvisorCard(BuildContext context) {
-    return AppCard(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const AIAdvisorScreen()),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.auto_awesome, color: Theme.of(context).colorScheme.tertiary),
-          const SizedBox(width: Spacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Business Advisor',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        )),
-                Text('Analyze your latest sales and inventory.',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        )),
-              ],
+    final cs = Theme.of(context).colorScheme;
+    return AppSection(
+      title: 'Business Advisor',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: AppCard(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const AIAdvisorScreen()),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.auto_awesome, color: cs.tertiary),
+            const SizedBox(width: Spacing.md),
+            Expanded(
+              child: Text(
+                'Analyze your latest sales and inventory.',
+                style: AppTypography.bodySmall(context).copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
             ),
-          ),
-          const Icon(Icons.chevron_right),
-        ],
+            const Icon(Icons.chevron_right),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildOwnerQuickActions(
       BuildContext context, WidgetRef ref, dynamic authNotifier) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const _SectionTitle('Quick Actions'),
-        Wrap(
-          spacing: Spacing.md,
-          runSpacing: Spacing.md,
-          children: [
-            if (authNotifier.hasPermission('create_sales'))
-              _QuickAction(
-                label: 'New Sale',
-                icon: Icons.point_of_sale,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const POSScreen()),
-                ),
+    return AppSection(
+      title: 'Quick Actions',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: Wrap(
+        spacing: Spacing.md,
+        runSpacing: Spacing.md,
+        children: [
+          if (authNotifier.hasPermission('create_sales'))
+            _QuickAction(
+              label: 'New Sale',
+              icon: Icons.point_of_sale,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const POSScreen()),
               ),
-            if (authNotifier.hasPermission('edit_products'))
-              _QuickAction(
-                label: 'Add Product',
-                icon: Icons.add_box_outlined,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ProductsScreen()),
-                ),
+            ),
+          if (authNotifier.hasPermission('edit_products'))
+            _QuickAction(
+              label: 'Add Product',
+              icon: Icons.add_box_outlined,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ProductsScreen()),
               ),
-            if (authNotifier.hasPermission('add_stock'))
-              _QuickAction(
-                label: 'Add Stock',
-                icon: Icons.warehouse_outlined,
-                onTap: () => RouteGuard.pushIfAuthorized(
-                  context, ref,
-                  screen: const StockScreen(),
-                  permission: 'add_stock',
-                  routeName: 'stock',
-                ),
+            ),
+          if (authNotifier.hasPermission('add_stock'))
+            _QuickAction(
+              label: 'Add Stock',
+              icon: Icons.warehouse_outlined,
+              onTap: () => RouteGuard.pushIfAuthorized(
+                context, ref,
+                screen: const StockScreen(),
+                permission: 'add_stock',
+                routeName: 'stock',
               ),
-            if (authNotifier.hasPermission('view_sales'))
-              _QuickAction(
-                label: 'View Sales',
-                icon: Icons.receipt_long,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SalesScreen()),
-                ),
+            ),
+          if (authNotifier.hasPermission('view_sales'))
+            _QuickAction(
+              label: 'View Sales',
+              icon: Icons.receipt_long,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SalesScreen()),
               ),
-            if (authNotifier.hasPermission('view_reports'))
-              _QuickAction(
-                label: 'Reports',
-                icon: Icons.analytics_outlined,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ReportsScreen()),
-                ),
+            ),
+          if (authNotifier.hasPermission('view_reports'))
+            _QuickAction(
+              label: 'Reports',
+              icon: Icons.analytics_outlined,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ReportsScreen()),
               ),
-            if (authNotifier.hasPermission('view_ai_advisor'))
-              _QuickAction(
-                label: 'AI Advisor',
-                icon: Icons.auto_awesome,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const AIAdvisorScreen()),
-                ),
+            ),
+          if (authNotifier.hasPermission('view_ai_advisor'))
+            _QuickAction(
+              label: 'AI Advisor',
+              icon: Icons.auto_awesome,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AIAdvisorScreen()),
               ),
-          ],
-        ),
-      ],
+            ),
+        ],
+      ),
     );
   }
 }
@@ -717,39 +661,47 @@ class _AdminDashboard extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // ── Primary KPIs ──
-        KpiGrid(
-          children: [
-            KpiCard(
-              label: 'Active Users',
-              value: '${data.activeUsers}',
-              icon: Icons.person_outline,
-              iconColor: AppSemanticColors.success,
-              tier: KpiCardTier.primary,
-            ),
-            KpiCard(
-              label: 'Inactive Users',
-              value: '${data.inactiveUsers}',
-              icon: Icons.person_off_outlined,
-              iconColor: cs.onSurfaceVariant,
-              tier: KpiCardTier.secondary,
-            ),
-            KpiCard(
-              label: 'Recent Activity',
-              value: '${data.recentActivityCount}',
-              icon: Icons.history,
-              iconColor: cs.tertiary,
-              subtitle: 'last 7 days',
-              tier: KpiCardTier.secondary,
-            ),
-            KpiCard(
-              label: 'Trash Items',
-              value: '${data.trashCount}',
-              icon: Icons.delete_outline,
-              iconColor: AppSemanticColors.warning,
-              tier: KpiCardTier.secondary,
-            ),
-          ],
+        AppSection(
+          title: 'Key Performance Indicators',
+          padding: const EdgeInsets.only(bottom: Spacing.md),
+          child: KpiGrid(
+            children: [
+              KpiCard(
+                label: 'Active Users',
+                value: '${data.activeUsers}',
+                icon: Icons.person_outline,
+                iconColor: AppSemanticColors.success,
+                tier: KpiCardTier.primary,
+              ),
+              KpiCard(
+                label: 'Inactive Users',
+                value: '${data.inactiveUsers}',
+                icon: Icons.person_off_outlined,
+                iconColor: cs.onSurfaceVariant,
+                tier: KpiCardTier.secondary,
+              ),
+              KpiCard(
+                label: 'Recent Activity',
+                value: '${data.recentActivityCount}',
+                icon: Icons.history,
+                iconColor: cs.tertiary,
+                subtitle: 'last 7 days',
+                tier: KpiCardTier.secondary,
+              ),
+              KpiCard(
+                label: 'Trash Items',
+                value: '${data.trashCount}',
+                icon: Icons.delete_outline,
+                iconColor: AppSemanticColors.warning,
+                tier: KpiCardTier.secondary,
+              ),
+            ],
+          ),
         ),
+        const SizedBox(height: Spacing.xxl),
+
+        // ── Quick actions ──
+        _buildAdminQuickActions(context, ref, authNotifier),
         const SizedBox(height: Spacing.xxl),
 
         // ── Two-column: user distribution + backup status ──
@@ -761,202 +713,180 @@ class _AdminDashboard extends ConsumerWidget {
 
         // ── Recent activity ──
         _buildRecentActivityCard(context, data.recentActivities),
-        const SizedBox(height: Spacing.xxl),
-
-        // ── Quick actions ──
-        _buildAdminQuickActions(context, ref, authNotifier),
       ],
     );
   }
 
   Widget _buildUserDistributionCard(BuildContext context) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.people_outline, size: 20),
-              const SizedBox(width: Spacing.sm),
-              Text('Users by Role',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      )),
-            ],
-          ),
-          const SizedBox(height: Spacing.lg),
-          if (data.usersByRole.total == 0)
-            const _ChartEmptyState(message: 'No users yet.')
-          else
-            DonutChart(
-              segments: [
-                DonutSegment(
-                  label: 'Owner',
-                  value: data.usersByRole.owner,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                DonutSegment(
-                  label: 'Admin',
-                  value: data.usersByRole.admin,
-                  color: Theme.of(context).colorScheme.tertiary,
-                ),
-                DonutSegment(
-                  label: 'Staff',
-                  value: data.usersByRole.staff,
-                  color: AppSemanticColors.info,
-                ),
-              ],
-            ),
-        ],
+    return AppSection(
+      title: 'Users by Role',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: AppCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (data.usersByRole.total == 0)
+              const _ChartEmptyState(message: 'No users yet.')
+            else
+              DonutChart(
+                segments: [
+                  DonutSegment(
+                    label: 'Owner',
+                    value: data.usersByRole.owner,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  DonutSegment(
+                    label: 'Admin',
+                    value: data.usersByRole.admin,
+                    color: Theme.of(context).colorScheme.tertiary,
+                  ),
+                  DonutSegment(
+                    label: 'Staff',
+                    value: data.usersByRole.staff,
+                    color: AppSemanticColors.info,
+                  ),
+                ],
+              ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildBackupCard(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.backup_outlined, size: 20),
-              const SizedBox(width: Spacing.sm),
-              Text('Backup Status',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      )),
-            ],
-          ),
-          const SizedBox(height: Spacing.md),
-          if (data.backupStatus.hasBackup && data.backupStatus.lastBackupDate != null)
-            Row(
-              children: [
-                Icon(Icons.check_circle, color: AppSemanticColors.success),
-                const SizedBox(width: Spacing.sm),
-                Expanded(
-                  child: Text(
-                    'Latest: ${DateFormat('MMM d, y · h:mm a').format(data.backupStatus.lastBackupDate!.toLocal())}',
-                    style: Theme.of(context).textTheme.bodyMedium,
+    return AppSection(
+      title: 'Backup Status',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: AppCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (data.backupStatus.hasBackup && data.backupStatus.lastBackupDate != null)
+              Row(
+                children: [
+                  Icon(Icons.check_circle, color: AppSemanticColors.success),
+                  const SizedBox(width: Spacing.sm),
+                  Expanded(
+                    child: Text(
+                      'Latest: ${DateFormat('MMM d, y · h:mm a').format(data.backupStatus.lastBackupDate!.toLocal())}',
+                      style: AppTypography.bodyMedium(context),
+                    ),
                   ),
-                ),
-              ],
-            )
-          else
-            Row(
-              children: [
-                Icon(Icons.info_outline, color: cs.onSurfaceVariant),
-                const SizedBox(width: Spacing.sm),
-                const Expanded(child: Text('No backup has been created yet.')),
-              ],
-            ),
-        ],
+                ],
+              )
+            else
+              Row(
+                children: [
+                  Icon(Icons.info_outline, color: cs.onSurfaceVariant),
+                  const SizedBox(width: Spacing.sm),
+                  Expanded(
+                    child: Text(
+                      'No backup has been created yet.',
+                      style: AppTypography.bodyMedium(context),
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildRecentActivityCard(BuildContext context, List<dynamic> activities) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.history, size: 20),
-              const SizedBox(width: Spacing.sm),
-              Text('Recent System Activity',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      )),
-            ],
-          ),
-          const SizedBox(height: Spacing.md),
-          if (activities.isEmpty)
-            const _ChartEmptyState(message: 'No activity yet.')
-          else
-            Column(
-              children: activities.take(5).map((a) {
-                final log = a as dynamic;
-                return _ActivityTile(
-                  action: _humanizeAction(log.action as String),
-                  details: log.details as String?,
-                  time: _formatDateTime(log.createdAt as DateTime),
-                );
-              }).toList(),
-            ),
-        ],
+    return AppSection(
+      title: 'Recent System Activity',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: AppCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (activities.isEmpty)
+              const _ChartEmptyState(message: 'No activity yet.')
+            else
+              Column(
+                children: activities.take(5).map((a) {
+                  final log = a as dynamic;
+                  return _ActivityTile(
+                    action: _humanizeAction(log.action as String),
+                    details: log.details as String?,
+                    time: _formatDateTime(log.createdAt as DateTime),
+                  );
+                }).toList(),
+              ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildAdminQuickActions(
       BuildContext context, WidgetRef ref, dynamic authNotifier) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const _SectionTitle('Quick Actions'),
-        Wrap(
-          spacing: Spacing.md,
-          runSpacing: Spacing.md,
-          children: [
-            if (authNotifier.hasPermission('manage_users'))
-              _QuickAction(
-                label: 'Manage Users',
-                icon: Icons.people,
-                onTap: () => RouteGuard.pushIfAuthorized(
-                  context, ref,
-                  screen: const UsersScreen(),
-                  permission: 'manage_users',
-                  routeName: 'users',
-                ),
+    return AppSection(
+      title: 'Quick Actions',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: Wrap(
+        spacing: Spacing.md,
+        runSpacing: Spacing.md,
+        children: [
+          if (authNotifier.hasPermission('manage_users'))
+            _QuickAction(
+              label: 'Manage Users',
+              icon: Icons.people,
+              onTap: () => RouteGuard.pushIfAuthorized(
+                context, ref,
+                screen: const UsersScreen(),
+                permission: 'manage_users',
+                routeName: 'users',
               ),
-            if (authNotifier.hasPermission('backup_restore'))
-              _QuickAction(
-                label: 'Backup & Restore',
-                icon: Icons.backup,
-                onTap: () => RouteGuard.pushIfAuthorized(
-                  context, ref,
-                  screen: const BackupRestoreScreen(),
-                  permission: 'backup_restore',
-                  routeName: 'backup_restore',
-                ),
+            ),
+          if (authNotifier.hasPermission('backup_restore'))
+            _QuickAction(
+              label: 'Backup & Restore',
+              icon: Icons.backup,
+              onTap: () => RouteGuard.pushIfAuthorized(
+                context, ref,
+                screen: const BackupRestoreScreen(),
+                permission: 'backup_restore',
+                routeName: 'backup_restore',
               ),
-            if (authNotifier.hasPermission('view_trash'))
-              _QuickAction(
-                label: 'Trash',
-                icon: Icons.delete_outline,
-                onTap: () => RouteGuard.pushIfAuthorized(
-                  context, ref,
-                  screen: const TrashScreen(),
-                  permission: 'view_trash',
-                  routeName: 'trash',
-                ),
+            ),
+          if (authNotifier.hasPermission('view_trash'))
+            _QuickAction(
+              label: 'Trash',
+              icon: Icons.delete_outline,
+              onTap: () => RouteGuard.pushIfAuthorized(
+                context, ref,
+                screen: const TrashScreen(),
+                permission: 'view_trash',
+                routeName: 'trash',
               ),
-            if (authNotifier.hasPermission('view_activity_logs'))
-              _QuickAction(
-                label: 'Activity Logs',
-                icon: Icons.history,
-                onTap: () => RouteGuard.pushIfAuthorized(
-                  context, ref,
-                  screen: const ActivityLogsScreen(),
-                  permission: 'view_activity_logs',
-                  routeName: 'activity_logs',
-                ),
+            ),
+          if (authNotifier.hasPermission('view_activity_logs'))
+            _QuickAction(
+              label: 'Activity Logs',
+              icon: Icons.history,
+              onTap: () => RouteGuard.pushIfAuthorized(
+                context, ref,
+                screen: const ActivityLogsScreen(),
+                permission: 'view_activity_logs',
+                routeName: 'activity_logs',
               ),
-            if (authNotifier.hasPermission('view_settings'))
-              _QuickAction(
-                label: 'Settings',
-                icon: Icons.settings,
-                onTap: () => RouteGuard.pushIfAuthorized(
-                  context, ref,
-                  screen: const SettingsScreen(),
-                  permission: 'view_settings',
-                  routeName: 'settings',
-                ),
+            ),
+          if (authNotifier.hasPermission('view_settings'))
+            _QuickAction(
+              label: 'Settings',
+              icon: Icons.settings,
+              onTap: () => RouteGuard.pushIfAuthorized(
+                context, ref,
+                screen: const SettingsScreen(),
+                permission: 'view_settings',
+                routeName: 'settings',
               ),
-          ],
-        ),
-      ],
+            ),
+        ],
+      ),
     );
   }
 }
@@ -978,39 +908,47 @@ class _StaffDashboard extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // ── Primary KPIs (own sales only) ──
-        KpiGrid(
-          children: [
-            KpiCard(
-              label: 'My Sales Today',
-              value: _peso(data.mySalesToday),
-              icon: Icons.payments_outlined,
-              iconColor: cs.primary,
-              subtitle: '${data.myTransactionsToday} transactions',
-              tier: KpiCardTier.primary,
-            ),
-            KpiCard(
-              label: 'My Transactions',
-              value: '${data.myTransactionsToday}',
-              icon: Icons.receipt_long_outlined,
-              iconColor: cs.tertiary,
-              tier: KpiCardTier.secondary,
-            ),
-            KpiCard(
-              label: 'Low Stock',
-              value: '${data.lowStockCount}',
-              icon: Icons.warning_amber,
-              iconColor: AppSemanticColors.warning,
-              tier: KpiCardTier.secondary,
-            ),
-            KpiCard(
-              label: 'Out of Stock',
-              value: '${data.outOfStockCount}',
-              icon: Icons.error_outline,
-              iconColor: AppSemanticColors.error,
-              tier: KpiCardTier.secondary,
-            ),
-          ],
+        AppSection(
+          title: 'Key Performance Indicators',
+          padding: const EdgeInsets.only(bottom: Spacing.md),
+          child: KpiGrid(
+            children: [
+              KpiCard(
+                label: 'My Sales Today',
+                value: _peso(data.mySalesToday),
+                icon: Icons.payments_outlined,
+                iconColor: cs.primary,
+                subtitle: '${data.myTransactionsToday} transactions',
+                tier: KpiCardTier.primary,
+              ),
+              KpiCard(
+                label: 'My Transactions',
+                value: '${data.myTransactionsToday}',
+                icon: Icons.receipt_long_outlined,
+                iconColor: cs.tertiary,
+                tier: KpiCardTier.secondary,
+              ),
+              KpiCard(
+                label: 'Low Stock',
+                value: '${data.lowStockCount}',
+                icon: Icons.warning_amber,
+                iconColor: AppSemanticColors.warning,
+                tier: KpiCardTier.secondary,
+              ),
+              KpiCard(
+                label: 'Out of Stock',
+                value: '${data.outOfStockCount}',
+                icon: Icons.error_outline,
+                iconColor: AppSemanticColors.error,
+                tier: KpiCardTier.secondary,
+              ),
+            ],
+          ),
         ),
+        const SizedBox(height: Spacing.xxl),
+
+        // ── Quick actions ──
+        _buildStaffQuickActions(context, ref, authNotifier),
         const SizedBox(height: Spacing.xxl),
 
         // ── My sales trend ──
@@ -1031,87 +969,69 @@ class _StaffDashboard extends ConsumerWidget {
 
         // ── Recent activity (own) ──
         _buildRecentActivityCard(context, data.recentActivities),
-        const SizedBox(height: Spacing.xxl),
-
-        // ── Quick actions ──
-        _buildStaffQuickActions(context, ref, authNotifier),
       ],
     );
   }
 
   Widget _buildMySalesTrendCard(BuildContext context) {
     final hasData = data.mySalesTrend.any((p) => p.total > 0);
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.trending_up, size: 20),
-              const SizedBox(width: Spacing.sm),
-              Text('My Sales (Last 7 Days)',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      )),
-            ],
-          ),
-          const SizedBox(height: Spacing.lg),
-          if (hasData)
-            MiniBarChart(
-              points: data.mySalesTrend
-                  .map((p) => BarChartPoint(
-                        label: _dayLabel(p.date),
-                        value: p.total,
-                      ))
-                  .toList(),
-              valuePrefix: '₱',
-            )
-          else
-            const _ChartEmptyState(message: 'No sales data available yet.'),
-        ],
+    return AppSection(
+      title: 'My Sales (Last 7 Days)',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: AppCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (hasData)
+              MiniBarChart(
+                points: data.mySalesTrend
+                    .map((p) => BarChartPoint(
+                          label: _dayLabel(p.date),
+                          value: p.total,
+                        ))
+                    .toList(),
+                valuePrefix: '₱',
+              )
+            else
+              const _ChartEmptyState(message: 'No sales data available yet.'),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildInventoryCard(BuildContext context) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.inventory_2_outlined, size: 20),
-              const SizedBox(width: Spacing.sm),
-              Text('Inventory Status',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      )),
-            ],
-          ),
-          const SizedBox(height: Spacing.lg),
-          if (data.inventoryStatus.total == 0)
-            const _ChartEmptyState(message: 'No products yet.')
-          else
-            DonutChart(
-              segments: [
-                DonutSegment(
-                  label: 'Normal',
-                  value: data.inventoryStatus.normal,
-                  color: AppSemanticColors.success,
-                ),
-                DonutSegment(
-                  label: 'Low Stock',
-                  value: data.inventoryStatus.lowStock,
-                  color: AppSemanticColors.warning,
-                ),
-                DonutSegment(
-                  label: 'Out of Stock',
-                  value: data.inventoryStatus.outOfStock,
-                  color: AppSemanticColors.error,
-                ),
-              ],
-            ),
-        ],
+    return AppSection(
+      title: 'Inventory Status',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: AppCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (data.inventoryStatus.total == 0)
+              const _ChartEmptyState(message: 'No products yet.')
+            else
+              DonutChart(
+                segments: [
+                  DonutSegment(
+                    label: 'Normal',
+                    value: data.inventoryStatus.normal,
+                    color: AppSemanticColors.success,
+                  ),
+                  DonutSegment(
+                    label: 'Low Stock',
+                    value: data.inventoryStatus.lowStock,
+                    color: AppSemanticColors.warning,
+                  ),
+                  DonutSegment(
+                    label: 'Out of Stock',
+                    value: data.inventoryStatus.outOfStock,
+                    color: AppSemanticColors.error,
+                  ),
+                ],
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -1119,172 +1039,153 @@ class _StaffDashboard extends ConsumerWidget {
   Widget _buildLowStockAlert(
       BuildContext context, WidgetRef ref, List<dynamic> products, dynamic authNotifier) {
     if (products.isEmpty) {
-      return AppCard(
-        child: Row(
-          children: [
-            Icon(Icons.check_circle, color: AppSemanticColors.success),
-            const SizedBox(width: Spacing.md),
-            const Expanded(child: Text('Inventory is healthy')),
-          ],
+      return AppSection(
+        title: 'Low Stock Alert',
+        padding: const EdgeInsets.only(bottom: Spacing.md),
+        child: AppCard(
+          child: Row(
+            children: [
+              Icon(Icons.check_circle, color: AppSemanticColors.success),
+              const SizedBox(width: Spacing.md),
+              const Expanded(child: Text('Inventory is healthy')),
+            ],
+          ),
         ),
       );
     }
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.warning_amber, color: AppSemanticColors.warning),
-              const SizedBox(width: Spacing.sm),
-              Text('Low Stock Alert',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      )),
-            ],
-          ),
-          const SizedBox(height: Spacing.md),
-          ...products.take(5).map((p) => _LowStockTile(
-                name: (p as dynamic).name as String,
-                remaining: (p as dynamic).stock as int,
-              )),
-          if (authNotifier.hasPermission('add_stock')) ...[
-            const SizedBox(height: Spacing.sm),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: () => RouteGuard.pushIfAuthorized(
-                  context, ref,
-                  screen: const StockScreen(),
-                  permission: 'add_stock',
-                  routeName: 'stock',
+    return AppSection(
+      title: 'Low Stock Alert',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: AppCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ...products.take(5).map((p) => _LowStockTile(
+                  name: (p as dynamic).name as String,
+                  remaining: (p as dynamic).stock as int,
+                )),
+            if (authNotifier.hasPermission('add_stock')) ...[
+              const SizedBox(height: Spacing.sm),
+              Align(
+                alignment: Alignment.centerRight,
+                child: AppButton.text(
+                  onPressed: () => RouteGuard.pushIfAuthorized(
+                    context, ref,
+                    screen: const StockScreen(),
+                    permission: 'add_stock',
+                    routeName: 'stock',
+                  ),
+                  icon: Icons.warehouse_outlined,
+                  label: 'View Stock',
                 ),
-                icon: const Icon(Icons.warehouse_outlined),
-                label: const Text('View Stock'),
               ),
-            ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildMyRecentSalesCard(BuildContext context) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.receipt_outlined, size: 20),
-              const SizedBox(width: Spacing.sm),
-              Text('My Recent Sales',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      )),
-            ],
-          ),
-          const SizedBox(height: Spacing.md),
-          if (data.myRecentSales.isEmpty)
-            const _ChartEmptyState(message: 'No sales recorded yet.')
-          else
-            Column(
-              children: data.myRecentSales.map((s) => _RecentSaleTile(
-                    receipt: '#${s.receiptNumber ?? s.id}',
-                    amount: _peso(s.totalAmount),
-                    time: _formatDateTime(s.createdAt),
-                  )).toList(),
-            ),
-        ],
+    return AppSection(
+      title: 'My Recent Sales',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: AppCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (data.myRecentSales.isEmpty)
+              const _ChartEmptyState(message: 'No sales recorded yet.')
+            else
+              Column(
+                children: data.myRecentSales.map((s) => _RecentSaleTile(
+                      receipt: '#${s.receiptNumber ?? s.id}',
+                      amount: _peso(s.totalAmount),
+                      time: _formatDateTime(s.createdAt),
+                    )).toList(),
+              ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildRecentActivityCard(BuildContext context, List<dynamic> activities) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.history, size: 20),
-              const SizedBox(width: Spacing.sm),
-              Text('Recent Activity',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      )),
-            ],
-          ),
-          const SizedBox(height: Spacing.md),
-          if (activities.isEmpty)
-            const _ChartEmptyState(message: 'No activity yet.')
-          else
-            Column(
-              children: activities.take(5).map((a) {
-                final log = a as dynamic;
-                return _ActivityTile(
-                  action: _humanizeAction(log.action as String),
-                  details: log.details as String?,
-                  time: _formatDateTime(log.createdAt as DateTime),
-                );
-              }).toList(),
-            ),
-        ],
+    return AppSection(
+      title: 'Recent Activity',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: AppCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (activities.isEmpty)
+              const _ChartEmptyState(message: 'No activity yet.')
+            else
+              Column(
+                children: activities.take(5).map((a) {
+                  final log = a as dynamic;
+                  return _ActivityTile(
+                    action: _humanizeAction(log.action as String),
+                    details: log.details as String?,
+                    time: _formatDateTime(log.createdAt as DateTime),
+                  );
+                }).toList(),
+              ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildStaffQuickActions(
       BuildContext context, WidgetRef ref, dynamic authNotifier) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const _SectionTitle('Quick Actions'),
-        Wrap(
-          spacing: Spacing.md,
-          runSpacing: Spacing.md,
-          children: [
-            if (authNotifier.hasPermission('create_sales'))
-              _QuickAction(
-                label: 'New Sale',
-                icon: Icons.point_of_sale,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const POSScreen()),
-                ),
+    return AppSection(
+      title: 'Quick Actions',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: Wrap(
+        spacing: Spacing.md,
+        runSpacing: Spacing.md,
+        children: [
+          if (authNotifier.hasPermission('create_sales'))
+            _QuickAction(
+              label: 'New Sale',
+              icon: Icons.point_of_sale,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const POSScreen()),
               ),
-            if (authNotifier.hasPermission('add_stock'))
-              _QuickAction(
-                label: 'Add Stock',
-                icon: Icons.warehouse_outlined,
-                onTap: () => RouteGuard.pushIfAuthorized(
-                  context, ref,
-                  screen: const StockScreen(),
-                  permission: 'add_stock',
-                  routeName: 'stock',
-                ),
+            ),
+          if (authNotifier.hasPermission('add_stock'))
+            _QuickAction(
+              label: 'Add Stock',
+              icon: Icons.warehouse_outlined,
+              onTap: () => RouteGuard.pushIfAuthorized(
+                context, ref,
+                screen: const StockScreen(),
+                permission: 'add_stock',
+                routeName: 'stock',
               ),
-            if (authNotifier.hasPermission('view_sales'))
-              _QuickAction(
-                label: 'My Sales',
-                icon: Icons.receipt_long,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SalesScreen()),
-                ),
+            ),
+          if (authNotifier.hasPermission('view_sales'))
+            _QuickAction(
+              label: 'My Sales',
+              icon: Icons.receipt_long,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SalesScreen()),
               ),
-            if (authNotifier.hasPermission('view_reports'))
-              _QuickAction(
-                label: 'Reports',
-                icon: Icons.analytics_outlined,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ReportsScreen()),
-                ),
+            ),
+          if (authNotifier.hasPermission('view_reports'))
+            _QuickAction(
+              label: 'Reports',
+              icon: Icons.analytics_outlined,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ReportsScreen()),
               ),
-          ],
-        ),
-      ],
+            ),
+        ],
+      ),
     );
   }
 }
@@ -1564,28 +1465,21 @@ class _QuickAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    // Ensure minimum 48x48 touch target via SizedBox + adequate padding.
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-        padding: const EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.md),
-        decoration: BoxDecoration(
-          color: cs.primaryContainer,
-          borderRadius: BorderRadius.circular(12),
-        ),
+    return AppButton.filled(
+      onPressed: onTap,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minWidth: 64, minHeight: 48),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 28, color: cs.onPrimaryContainer),
+            Icon(icon, size: 28, color: cs.onPrimary),
             const SizedBox(height: Spacing.xs),
             Text(
               label,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: cs.onPrimaryContainer,
-                    fontWeight: FontWeight.w600,
-                  ),
+              style: AppTypography.labelMedium(context).copyWith(
+                color: cs.onPrimary,
+                fontWeight: FontWeight.w600,
+              ),
               textAlign: TextAlign.center,
             ),
           ],

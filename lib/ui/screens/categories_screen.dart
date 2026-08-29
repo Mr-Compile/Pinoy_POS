@@ -1,17 +1,18 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
-import 'package:pinoy_pos/ui/widgets/app_card.dart';
-import 'package:pinoy_pos/ui/widgets/empty_state.dart';
-import 'package:pinoy_pos/ui/widgets/loading_state.dart';
+import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
-import 'package:pinoy_pos/ui/widgets/validators.dart';
-import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
-import 'package:pinoy_pos/core/spacing.dart';
+import 'package:pinoy_pos/ui/widgets/app_list_item.dart';
+import 'package:pinoy_pos/ui/widgets/empty_state.dart';
+import 'package:pinoy_pos/ui/widgets/loading_button.dart';
+import 'package:pinoy_pos/ui/widgets/loading_state.dart';
+import 'package:pinoy_pos/ui/widgets/validators.dart';
 
 class CategoriesScreen extends ConsumerStatefulWidget {
   const CategoriesScreen({super.key});
@@ -195,15 +196,16 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
     }
 
     // Primary create action. On tablet/desktop a visible labeled
-    // FilledButton.icon is placed in the AppBar; on mobile a FAB.extended
+    // button is placed in the AppBar; on mobile a FAB.extended
     // is used so the action is always reachable and clearly labeled.
     final Widget? createAction = canEdit
         ? (isTablet
             ? Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: FilledButton.icon(
-                  icon: const Icon(Icons.add),
-                  label: const Text('Add Category'),
+                child: AppButton.filled(
+                  size: AppButtonSize.small,
+                  icon: Icons.add,
+                  label: 'Add Category',
                   onPressed: () => _showCategoryDialog(),
                 ),
               )
@@ -241,49 +243,79 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
                 Expanded(
                   child: _filteredCategories.isEmpty
                       ? _buildEmptyFilterState()
-                      : ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _filteredCategories.length,
-                          itemBuilder: (context, index) {
-                            final category = _filteredCategories[index];
-                            return AppCard(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              child: ListTile(
-                                title: Text(category.name),
-                                subtitle: Text(category.isActive ? 'Active' : 'Inactive'),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (canToggleStatus)
-                                      IconButton(
-                                        icon: Icon(
-                                          category.isActive ? Icons.toggle_on : Icons.toggle_off,
-                                          color: category.isActive
-                                              ? Theme.of(context).colorScheme.primary
-                                              : Theme.of(context).colorScheme.outline,
-                                        ),
-                                        tooltip: category.isActive ? 'Deactivate' : 'Activate',
-                                        onPressed: () => _toggleCategoryStatus(category),
-                                      ),
-                                    if (canEdit)
-                                      IconButton(
-                                        icon: const Icon(Icons.edit),
-                                        onPressed: () => _showCategoryDialog(category: category),
-                                      ),
-                                    if (canDelete)
-                                      IconButton(
-                                        icon: const Icon(Icons.delete),
-                                        onPressed: () => _deleteCategory(category),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
+                      : _buildCategoryList(
+                          canEdit,
+                          canDelete,
+                          canToggleStatus,
                         ),
                 ),
               ],
             ),
+    );
+  }
+
+  Widget _buildCategoryList(
+    bool canEdit,
+    bool canDelete,
+    bool canToggleStatus,
+  ) {
+    return ListView.builder(
+      padding: const EdgeInsets.all(Spacing.lg),
+      itemCount: _filteredCategories.length,
+      itemBuilder: (context, index) {
+        final category = _filteredCategories[index];
+        return _buildCategoryItem(
+          category,
+          canEdit,
+          canDelete,
+          canToggleStatus,
+        );
+      },
+    );
+  }
+
+  Widget _buildCategoryItem(
+    Category category,
+    bool canEdit,
+    bool canDelete,
+    bool canToggleStatus,
+  ) {
+    final cs = Theme.of(context).colorScheme;
+    final statusColor = category.isActive ? cs.primary : cs.outline;
+
+    final actions = <AppListAction>[
+      if (canToggleStatus)
+        AppListAction(
+          icon: category.isActive ? Icons.toggle_on : Icons.toggle_off,
+          tooltip: category.isActive ? 'Deactivate' : 'Activate',
+          color: statusColor,
+          onPressed: () => _toggleCategoryStatus(category),
+        ),
+      if (canEdit)
+        AppListAction(
+          icon: Icons.edit,
+          tooltip: 'Edit category',
+          onPressed: () => _showCategoryDialog(category: category),
+        ),
+      if (canDelete)
+        AppListAction(
+          icon: Icons.delete,
+          tooltip: 'Delete category',
+          color: cs.error,
+          onPressed: () => _deleteCategory(category),
+        ),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: AppListItem(
+        title: category.name,
+        subtitle: 'Category',
+        statusLabel: category.isActive ? 'Active' : 'Inactive',
+        statusColor: statusColor,
+        actions: actions.isNotEmpty ? actions : null,
+        onTap: canEdit ? () => _showCategoryDialog(category: category) : null,
+      ),
     );
   }
 

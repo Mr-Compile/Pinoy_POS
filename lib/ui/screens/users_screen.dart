@@ -1,18 +1,21 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/constants.dart';
+import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/user_provider.dart';
-import 'package:pinoy_pos/ui/widgets/app_card.dart';
+import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
+import 'package:pinoy_pos/ui/widgets/app_icon_button.dart';
+import 'package:pinoy_pos/ui/widgets/app_image.dart';
+import 'package:pinoy_pos/ui/widgets/app_list_item.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
+import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/validators.dart';
-import 'package:pinoy_pos/ui/widgets/loading_button.dart';
-import 'package:pinoy_pos/ui/widgets/app_image.dart';
 
 class UsersScreen extends ConsumerStatefulWidget {
   const UsersScreen({super.key});
@@ -589,9 +592,10 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
         ? (isTablet
             ? Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: FilledButton.icon(
-                  icon: const Icon(Icons.person_add),
-                  label: const Text('Add User'),
+                child: AppButton.filled(
+                  size: AppButtonSize.small,
+                  icon: Icons.person_add,
+                  label: 'Add User',
                   onPressed: () => _showAddUserDialog(),
                 ),
               )
@@ -603,8 +607,8 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
         title: 'Users',
         actions: [
           ?createAction,
-          IconButton(
-            icon: const Icon(Icons.refresh),
+          AppIconButton(
+            icon: Icons.refresh,
             tooltip: 'Refresh',
             onPressed: _refresh,
           ),
@@ -748,6 +752,26 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
       );
     }
 
+    return _buildUserList(
+      filteredUsers,
+      currentUser,
+      colorScheme,
+      canEdit,
+      canDelete,
+      canResetPassword,
+      canToggleActive,
+    );
+  }
+
+  Widget _buildUserList(
+    List<User> filteredUsers,
+    User? currentUser,
+    ColorScheme colorScheme,
+    bool canEdit,
+    bool canDelete,
+    bool canResetPassword,
+    bool canToggleActive,
+  ) {
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
       itemCount: filteredUsers.length,
@@ -756,10 +780,41 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
         final isSelf = currentUser?.id == user.id;
         final roleColor = _roleColor(user.role, colorScheme);
 
-        return AppCard(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
+        final chips = <Widget>[
+          _RoleBadge(role: user.role, color: roleColor),
+          if (!user.isActive)
+            _StatusBadge(
+              label: 'Inactive',
+              color: colorScheme.error,
+              icon: Icons.pause_circle,
+            ),
+          if (user.mustChangePassword)
+            _StatusBadge(
+              label: 'Temp Password',
+              color: colorScheme.tertiary,
+              icon: Icons.key,
+            ),
+          if (user.hasPin)
+            _StatusBadge(
+              label: 'PIN',
+              color: colorScheme.secondary,
+              icon: Icons.lock,
+            ),
+        ];
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: Spacing.md),
+          child: AppListItem(
+            leading: AppAvatar(
+              imagePath: user.profileImagePath,
+              initials: user.fullName.isNotEmpty
+                  ? user.fullName[0].toUpperCase()
+                  : '?',
+              radius: 24,
+            ),
+            title: user.fullName,
+            subtitle: '@${user.username}',
+            chips: chips,
             onTap: (canEdit || canDelete) && !isSelf
                 ? () => _showUserActionsSheet(
                       user,
@@ -770,147 +825,20 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                       isSelf,
                     )
                 : null,
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  // ── Avatar ──
-                  AppAvatar(
-                    imagePath: user.profileImagePath,
-                    initials: user.fullName.isNotEmpty
-                        ? user.fullName[0].toUpperCase()
-                        : '?',
-                    radius: 22,
-                  ),
-                  const SizedBox(width: 12),
-                  // ── User info ──
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                user.fullName,
-                                style: theme.textTheme.titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.w600),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            if (isSelf) ...[
-                              const SizedBox(width: 6),
-                              Icon(
-                                Icons.person_pin,
-                                size: 16,
-                                color: colorScheme.primary,
-                                semanticLabel: 'This is you',
-                              ),
-                            ],
-                          ],
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '@${user.username}',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        // ── Badges row ──
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 4,
-                          children: [
-                            _RoleBadge(
-                              role: user.role,
-                              color: roleColor,
-                            ),
-                            if (!user.isActive)
-                              _StatusBadge(
-                                label: 'Inactive',
-                                color: colorScheme.error,
-                                icon: Icons.pause_circle,
-                              ),
-                            if (user.mustChangePassword)
-                              _StatusBadge(
-                                label: 'Temp Password',
-                                color: colorScheme.tertiary,
-                                icon: Icons.key,
-                              ),
-                            if (user.hasPin)
-                              _StatusBadge(
-                                label: 'PIN',
-                                color: colorScheme.secondary,
-                                icon: Icons.lock,
-                              ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  // ── Actions menu ──
-                  if ((canEdit || canDelete) && !isSelf)
-                    PopupMenuButton<String>(
-                        tooltip: 'Actions',
-                        onSelected: (action) {
-                          switch (action) {
-                            case 'edit':
-                              _editUser(user);
-                            case 'reset_password':
-                              _resetPassword(user);
-                            case 'toggle_active':
-                              _toggleUserActive(user);
-                            case 'delete':
-                              _deleteUser(user);
-                          }
-                        },
-                        itemBuilder: (context) => [
-                          if (canEdit)
-                            const PopupMenuItem(
-                              value: 'edit',
-                              child: ListTile(
-                                leading: Icon(Icons.edit),
-                                title: Text('Edit'),
-                                contentPadding: EdgeInsets.zero,
-                              ),
-                            ),
-                          if (canResetPassword)
-                            const PopupMenuItem(
-                              value: 'reset_password',
-                              child: ListTile(
-                                leading: Icon(Icons.lock_reset),
-                                title: Text('Reset Password'),
-                                contentPadding: EdgeInsets.zero,
-                              ),
-                            ),
-                          if (canToggleActive && !isSelf)
-                            PopupMenuItem(
-                              value: 'toggle_active',
-                              child: ListTile(
-                                leading: Icon(user.isActive
-                                    ? Icons.person_off
-                                    : Icons.person),
-                                title: Text(user.isActive
-                                    ? 'Deactivate'
-                                    : 'Activate'),
-                                contentPadding: EdgeInsets.zero,
-                              ),
-                            ),
-                          if (canDelete)
-                            const PopupMenuItem(
-                              value: 'delete',
-                              child: ListTile(
-                                leading: Icon(Icons.delete),
-                                title: Text('Delete'),
-                                contentPadding: EdgeInsets.zero,
-                              ),
-                            ),
-                        ],
-                      ),
-                ],
-              ),
-            ),
+            trailing: (canEdit || canDelete) && !isSelf
+                ? _UserActionsMenu(
+                    user: user,
+                    canEdit: canEdit,
+                    canDelete: canDelete,
+                    canResetPassword: canResetPassword,
+                    canToggleActive: canToggleActive,
+                    isSelf: isSelf,
+                    onEdit: _editUser,
+                    onResetPassword: _resetPassword,
+                    onToggleActive: _toggleUserActive,
+                    onDelete: _deleteUser,
+                  )
+                : null,
           ),
         );
       },
@@ -989,6 +917,89 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _UserActionsMenu extends StatelessWidget {
+  final User user;
+  final bool canEdit;
+  final bool canDelete;
+  final bool canResetPassword;
+  final bool canToggleActive;
+  final bool isSelf;
+  final void Function(User) onEdit;
+  final void Function(User) onResetPassword;
+  final void Function(User) onToggleActive;
+  final void Function(User) onDelete;
+
+  const _UserActionsMenu({
+    required this.user,
+    required this.canEdit,
+    required this.canDelete,
+    required this.canResetPassword,
+    required this.canToggleActive,
+    required this.isSelf,
+    required this.onEdit,
+    required this.onResetPassword,
+    required this.onToggleActive,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<String>(
+      tooltip: 'Actions',
+      onSelected: (action) {
+        switch (action) {
+          case 'edit':
+            onEdit(user);
+          case 'reset_password':
+            onResetPassword(user);
+          case 'toggle_active':
+            onToggleActive(user);
+          case 'delete':
+            onDelete(user);
+        }
+      },
+      itemBuilder: (context) => [
+        if (canEdit)
+          const PopupMenuItem(
+            value: 'edit',
+            child: ListTile(
+              leading: Icon(Icons.edit),
+              title: Text('Edit'),
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+        if (canResetPassword)
+          const PopupMenuItem(
+            value: 'reset_password',
+            child: ListTile(
+              leading: Icon(Icons.lock_reset),
+              title: Text('Reset Password'),
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+        if (canToggleActive && !isSelf)
+          PopupMenuItem(
+            value: 'toggle_active',
+            child: ListTile(
+              leading: Icon(user.isActive ? Icons.person_off : Icons.person),
+              title: Text(user.isActive ? 'Deactivate' : 'Activate'),
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+        if (canDelete)
+          const PopupMenuItem(
+            value: 'delete',
+            child: ListTile(
+              leading: Icon(Icons.delete),
+              title: Text('Delete'),
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+      ],
     );
   }
 }
