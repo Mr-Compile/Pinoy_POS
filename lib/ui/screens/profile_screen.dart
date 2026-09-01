@@ -241,9 +241,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: usernameController,
-                    decoration: const InputDecoration(
+                    readOnly: user.hasChangedUsername,
+                    decoration: InputDecoration(
                       labelText: 'Username',
-                      border: OutlineInputBorder(),
+                      border: const OutlineInputBorder(),
+                      helperText: user.hasChangedUsername
+                          ? 'You have already changed your username.'
+                          : 'You can only change your username once.',
                     ),
                     validator: (value) => Validators.compose([
                       (v) => Validators.required(v, 'Username'),
@@ -265,13 +269,30 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               isLoading: isSaving,
               onPressed: () async {
                 if (!formKey.currentState!.validate()) return;
+
+                final newUsername = usernameController.text.trim();
+                final isChangingUsername = newUsername != user.username;
+
+                if (isChangingUsername && !user.hasChangedUsername) {
+                  final confirmed = await AppDialogService.confirmation(
+                    screenContext,
+                    title: 'Change Username?',
+                    message:
+                        'You can only change your username once. After saving, it will be permanently set to "$newUsername".',
+                    confirmLabel: 'Yes, Change It',
+                    cancelLabel: 'Cancel',
+                  );
+                  if (confirmed != true) return;
+                }
+
+                if (!context.mounted) return;
                 setState(() => isSaving = true);
                 final success = await ref
                     .read(authStateProvider.notifier)
                     .updateProfile(
                       userId: user.id!,
                       fullName: fullNameController.text.trim(),
-                      username: usernameController.text.trim(),
+                      username: newUsername,
                     );
                 if (context.mounted) {
                   setState(() => isSaving = false);
@@ -279,7 +300,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     await AppDialogService.success(
                       screenContext,
                       title: 'Profile Updated',
-                      message: 'Profile updated successfully.',
+                      message: isChangingUsername
+                          ? 'Your profile and username have been updated.'
+                          : 'Profile updated successfully.',
                     );
                     if (!context.mounted) return;
                     Navigator.of(context, rootNavigator: true).pop();
@@ -287,8 +310,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     await AppDialogService.error(
                       screenContext,
                       title: 'Update Failed',
-                      message:
-                          'Failed to update profile. The username may already be in use.',
+                      message: isChangingUsername
+                          ? 'Failed to change username. It may already be in use or you may have already changed it.'
+                          : 'Failed to update profile.',
                     );
                     if (!context.mounted) return;
                     Navigator.of(context, rootNavigator: true).pop();

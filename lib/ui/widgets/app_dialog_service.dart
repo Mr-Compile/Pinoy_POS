@@ -318,7 +318,7 @@ class AppDialogService {
   static Future<bool?> logoutConfirm(BuildContext context) {
     return _show<bool>(
       context: context,
-      type: AppDialogType.confirmation,
+      type: AppDialogType.error,
       title: 'Log out?',
       message: AppMessages.logoutConfirm,
       actions: [
@@ -329,6 +329,7 @@ class AppDialogService {
         AppDialogAction(
           label: 'Log Out',
           isPrimary: true,
+          isDestructive: true,
           onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(true),
         ),
       ],

@@ -50,6 +50,26 @@ class MainActivity : FlutterFragmentActivity() {
                 contentResolver.takePersistableUriPermission(uri, takeFlags)
             } catch (e: Exception) {
                 Log.w(TAG, "Could not take persistable permission for $uri", e)
+                result.error(
+                    "PERMISSION_DENIED",
+                    "Could not take persistable permission for the selected folder.",
+                    null,
+                )
+                return@registerForActivityResult
+            }
+
+            // Verify the write permission was actually persisted. Some
+            // document providers return a URI but do not grant write access.
+            val hasWrite = contentResolver.persistedUriPermissions.any {
+                it.uri == uri && it.isWritePermission
+            }
+            if (!hasWrite) {
+                result.error(
+                    "PERMISSION_DENIED",
+                    "Write permission was not granted for the selected folder.",
+                    null,
+                )
+                return@registerForActivityResult
             }
 
             result.success(
@@ -174,10 +194,16 @@ class MainActivity : FlutterFragmentActivity() {
                     return@Thread
                 }
 
-                val output = contentResolver.openOutputStream(docUri, "rwt")
+                // Use the simplest write mode ("w") first; "rwt" is not
+                // supported by every document provider and can cause
+                // "not allowed to write" / IllegalArgumentException failures.
+                val output = contentResolver.openOutputStream(docUri, "w")
+                    ?: contentResolver.openOutputStream(docUri, "wt")
+                    ?: contentResolver.openOutputStream(docUri)
+
                 if (output == null) {
                     runOnUiThread {
-                        result.error("WRITE_FAILED", "Could not open output stream", null)
+                        result.error("WRITE_FAILED", "Could not open output stream for writing", null)
                     }
                     return@Thread
                 }
@@ -195,6 +221,16 @@ class MainActivity : FlutterFragmentActivity() {
                             "displayName" to finalName,
                             "size" to bytes.size,
                         )
+                    )
+                }
+            } catch (e: SecurityException) {
+                Log.e(TAG, "Permission denied writing backup document", e)
+                runOnUiThread {
+                    result.error(
+                        "WRITE_FAILED",
+                        "Not allowed to write to the selected folder. " +
+                            "Choose a different location or grant write access.",
+                        null,
                     )
                 }
             } catch (e: Exception) {
@@ -258,7 +294,18 @@ class MainActivity : FlutterFragmentActivity() {
                     return@Thread
                 }
 
-                val canQuery = canReadUri(uri)
+                // Tree URIs must be queried through their document URI; a
+                // direct query on the tree URI fails on some providers.
+                val documentUri = if (DocumentsContract.isTreeUri(uri)) {
+                    DocumentsContract.buildDocumentUriUsingTree(
+                        uri,
+                        DocumentsContract.getTreeDocumentId(uri),
+                    )
+                } else {
+                    uri
+                }
+
+                val canQuery = canReadUri(documentUri)
                 runOnUiThread { result.success(canQuery) }
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to validate URI", e)
@@ -318,6 +365,10 @@ class MainActivity : FlutterFragmentActivity() {
             contentResolver.query(uri, null, null, null, null)?.use { cursor ->
                 if (cursor.moveToFirst()) {
                     val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                        .takeIf { it >= 0 }
+                        ?: cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                            .takeIf { it >= 0 }
+                            ?: -1
                     if (index >= 0) cursor.getString(index) else null
                 } else {
                     null

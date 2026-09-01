@@ -830,7 +830,8 @@ class BackupService {
 
   String _generateBackupFileName() {
     final now = DateTime.now();
-    final stamp = DateFormat('yyyy-MM-dd_HH-mm-ss').format(now);
+    // Include milliseconds so rapid consecutive backups do not collide.
+    final stamp = DateFormat('yyyy-MM-dd_HH-mm-ss-SSS').format(now);
     return 'pinoy_pos_backup_$stamp.db';
   }
 

@@ -186,8 +186,8 @@ class _ProfileDropdownContent extends StatelessWidget {
           _MenuTile(
             icon: Icons.logout_rounded,
             label: 'Logout',
-            iconColor: colorScheme.error,
-            textColor: colorScheme.error,
+            iconColor: AppSemanticColors.error,
+            textColor: AppSemanticColors.error,
             onTap: onLogout,
           ),
         ],

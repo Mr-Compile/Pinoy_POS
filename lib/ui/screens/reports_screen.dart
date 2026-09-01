@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:pinoy_pos/data/models/sale.dart';
+import 'package:pinoy_pos/data/models/sale_item.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/reports_provider.dart';
@@ -20,6 +21,16 @@ import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 
 enum ExportFormat { pdf, excel }
+
+/// A confirmed sale bundled with its line items for export.
+class _ExportSale {
+  final Sale sale;
+  final List<SaleItem> items;
+
+  const _ExportSale({required this.sale, required this.items});
+
+  int get itemCount => items.fold<int>(0, (sum, i) => sum + i.quantity);
+}
 
 class ReportsScreen extends ConsumerStatefulWidget {
   const ReportsScreen({super.key});
@@ -397,7 +408,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     );
   }
 
-  // ── Export UI ──────────────────────────────────────────────────────
+  // -- Export UI -------------------------------------------
 
   Widget _buildExportSection(BuildContext context, ReportsState state, bool canExport) {
     return Column(
@@ -529,7 +540,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     );
   }
 
-  // ── Export execution ───────────────────────────────────────────────
+  // -- Export execution ------------------------------------
 
   Future<void> _performExport(ReportsState state) async {
     if (_selectedFormat == null) return;
@@ -538,6 +549,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
     try {
       final reportService = ref.read(reportServiceProvider);
+      final salesService = ref.read(salesServiceProvider);
       final DateTime start;
       final DateTime end;
       if (state.filterStart != null && state.filterEnd != null) {
@@ -561,15 +573,28 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         return;
       }
 
+      final saleIds = sales.where((s) => s.id != null).map((s) => s.id!).toList();
+      final items = await salesService.getSaleItemsBySaleIds(saleIds);
+      final itemsBySaleId = <int, List<SaleItem>>{};
+      for (final item in items) {
+        if (item.saleId == null) continue;
+        itemsBySaleId.putIfAbsent(item.saleId!, () => []).add(item);
+      }
+
+      final exportSales = sales
+          .where((s) => s.id != null)
+          .map((s) => _ExportSale(sale: s, items: itemsBySaleId[s.id] ?? []))
+          .toList();
+
       final users = await ref.read(userServiceProvider).getAllUsers();
       final userNames = {for (final u in users) u.id!: u.fullName};
 
       final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
 
       if (_selectedFormat == ExportFormat.pdf) {
-        await _exportToPdf(state, sales, userNames, timestamp);
+        await _exportToPdf(state, exportSales, userNames, timestamp);
       } else {
-        await _exportToExcel(state, sales, userNames, timestamp);
+        await _exportToExcel(state, exportSales, userNames, timestamp);
       }
     } catch (e, st) {
       debugPrint('[ReportsScreen] export failed: $e\n$st');
@@ -586,7 +611,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
   Future<void> _exportToPdf(
     ReportsState state,
-    List<Sale> sales,
+    List<_ExportSale> exportSales,
     Map<int, String> userNames,
     String timestamp,
   ) async {
@@ -594,9 +619,275 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     final store = state.storeInfo;
     final currency = store.currency;
 
-    final paymentRows = state.paymentBreakdown
-        .map((p) => [p.method, '${p.count}', '$currency ${p.total.toStringAsFixed(2)}'])
-        .toList();
+    final brandColor = PdfColor.fromInt(0xFF1565C0);
+    final successLight = PdfColor.fromInt(0xFFC8E6C9);
+    final successDark = PdfColor.fromInt(0xFF2E7D32);
+
+    PdfColor methodColor(String method) {
+      return switch (method.toLowerCase()) {
+        'cash' => PdfColor.fromInt(0xFF1565C0),
+        'gcash' => PdfColor.fromInt(0xFF2E7D32),
+        'card' => PdfColor.fromInt(0xFF7C4DFF),
+        _ => PdfColor.fromInt(0xFF757575),
+      };
+    }
+
+    PdfColor methodBackground(String method) {
+      return switch (method.toLowerCase()) {
+        'cash' => PdfColor.fromInt(0xFFE3F2FD),
+        'gcash' => PdfColor.fromInt(0xFFC8E6C9),
+        'card' => PdfColor.fromInt(0xFFD1C4E9),
+        _ => PdfColor.fromInt(0xFFF5F5F5),
+      };
+    }
+
+    pw.Widget headerCell(String text) => pw.Container(
+          alignment: pw.Alignment.centerLeft,
+          padding: const pw.EdgeInsets.all(5),
+          color: brandColor,
+          child: pw.Text(
+            text,
+            style: pw.TextStyle(
+              color: PdfColors.white,
+              fontWeight: pw.FontWeight.bold,
+              fontSize: 9,
+            ),
+          ),
+        );
+
+    pw.Widget dataCell(
+      String text, {
+      PdfColor? backgroundColor,
+      PdfColor? textColor,
+      pw.Alignment? alignment,
+      bool bold = false,
+    }) =>
+        pw.Container(
+          alignment: alignment ?? pw.Alignment.centerLeft,
+          padding: const pw.EdgeInsets.all(4),
+          color: backgroundColor,
+          child: pw.Text(
+            text,
+            style: pw.TextStyle(
+              color: textColor,
+              fontWeight: bold ? pw.FontWeight.bold : null,
+              fontSize: 9,
+            ),
+          ),
+        );
+
+    pw.Table buildSummaryTable() {
+      final data = [
+        ["Today's Sales", '$currency ${state.todaySales.toStringAsFixed(2)}'],
+        ['Month Sales', '$currency ${state.monthSales.toStringAsFixed(2)}'],
+        ['Total Transactions', '${state.totalTransactions}'],
+        ['Total Products', '${state.totalProducts}'],
+        ['Low Stock Items', '${state.lowStockCount}'],
+      ];
+
+      return pw.Table(
+        columnWidths: {
+          0: const pw.FlexColumnWidth(),
+          1: const pw.FixedColumnWidth(120),
+        },
+        border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+        children: [
+          pw.TableRow(
+            children: [headerCell('Metric'), headerCell('Value')],
+          ),
+          ...data.map((row) => pw.TableRow(
+                children: [
+                  dataCell(row[0]),
+                  dataCell(
+                    row[1],
+                    alignment: pw.Alignment.centerRight,
+                  ),
+                ],
+              )),
+        ],
+      );
+    }
+
+    pw.Table buildPaymentBreakdownTable() {
+      return pw.Table(
+        columnWidths: {
+          0: const pw.FlexColumnWidth(),
+          1: const pw.FixedColumnWidth(60),
+          2: const pw.FixedColumnWidth(100),
+        },
+        border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+        children: [
+          pw.TableRow(
+            children: [
+              headerCell('Method'),
+              headerCell('Count'),
+              headerCell('Total ($currency)'),
+            ],
+          ),
+          ...state.paymentBreakdown.map((p) => pw.TableRow(
+                children: [
+                  dataCell(
+                    p.method,
+                    backgroundColor: methodBackground(p.method),
+                    textColor: methodColor(p.method),
+                  ),
+                  dataCell('${p.count}', alignment: pw.Alignment.centerRight),
+                  dataCell(
+                    '$currency ${p.total.toStringAsFixed(2)}',
+                    alignment: pw.Alignment.centerRight,
+                  ),
+                ],
+              )),
+        ],
+      );
+    }
+
+    pw.Table buildTransactionsTable() {
+      const headers = [
+        'Receipt #',
+        'Date/Time',
+        'Cashier',
+        'Customer',
+        'Method',
+        'Reference',
+        'Items',
+        'Total',
+      ];
+
+      final grandTotal = exportSales.fold<double>(
+        0.0,
+        (sum, e) => sum + e.sale.totalAmount,
+      );
+
+      return pw.Table(
+        columnWidths: {
+          0: const pw.FixedColumnWidth(70),
+          1: const pw.FixedColumnWidth(95),
+          2: const pw.FixedColumnWidth(75),
+          3: const pw.FixedColumnWidth(70),
+          4: const pw.FixedColumnWidth(50),
+          5: const pw.FixedColumnWidth(75),
+          6: const pw.FixedColumnWidth(40),
+          7: const pw.FixedColumnWidth(60),
+        },
+        border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+        children: [
+          pw.TableRow(
+            children: headers.map(headerCell).toList(),
+          ),
+          ...exportSales.map((e) => pw.TableRow(
+                children: [
+                  dataCell('${e.sale.receiptNumber ?? e.sale.id}'),
+                  dataCell(_formatDateTime(e.sale.createdAt)),
+                  dataCell(userNames[e.sale.userId] ?? 'User ${e.sale.userId}'),
+                  dataCell(e.sale.customerName ?? ''),
+                  dataCell(
+                    e.sale.paymentMethod,
+                    backgroundColor: methodBackground(e.sale.paymentMethod),
+                    textColor: methodColor(e.sale.paymentMethod),
+                  ),
+                  dataCell(e.sale.referenceNumber ?? ''),
+                  dataCell('${e.itemCount}', alignment: pw.Alignment.centerRight),
+                  dataCell(
+                    '$currency ${e.sale.totalAmount.toStringAsFixed(2)}',
+                    alignment: pw.Alignment.centerRight,
+                  ),
+                ],
+              )),
+          pw.TableRow(
+            children: [
+              dataCell(
+                'Grand Total',
+                backgroundColor: successLight,
+                textColor: successDark,
+                bold: true,
+              ),
+              pw.SizedBox.shrink(),
+              pw.SizedBox.shrink(),
+              pw.SizedBox.shrink(),
+              pw.SizedBox.shrink(),
+              pw.SizedBox.shrink(),
+              pw.SizedBox.shrink(),
+              dataCell(
+                '$currency ${grandTotal.toStringAsFixed(2)}',
+                backgroundColor: successLight,
+                textColor: successDark,
+                bold: true,
+                alignment: pw.Alignment.centerRight,
+              ),
+            ],
+          ),
+        ],
+      );
+    }
+
+    pw.Table buildLineItemsTable() {
+      const headers = ['Receipt #', 'Product', 'Qty', 'Unit Price', 'Line Total'];
+
+      final grandTotal = exportSales.fold<double>(
+        0.0,
+        (sum, e) => sum + e.sale.totalAmount,
+      );
+
+      final rows = <pw.TableRow>[
+        pw.TableRow(children: headers.map(headerCell).toList()),
+      ];
+
+      for (final export in exportSales) {
+        for (final item in export.items) {
+          rows.add(pw.TableRow(
+            children: [
+              dataCell('${export.sale.receiptNumber ?? export.sale.id}'),
+              dataCell(item.productName ?? 'Product #${item.productId}'),
+              dataCell('${item.quantity}', alignment: pw.Alignment.centerRight),
+              dataCell(
+                '$currency ${item.unitPrice.toStringAsFixed(2)}',
+                alignment: pw.Alignment.centerRight,
+              ),
+              dataCell(
+                '$currency ${item.totalPrice.toStringAsFixed(2)}',
+                alignment: pw.Alignment.centerRight,
+              ),
+            ],
+          ));
+        }
+      }
+
+      rows.add(pw.TableRow(
+        children: [
+          dataCell(
+            'Grand Total',
+            backgroundColor: successLight,
+            textColor: successDark,
+            bold: true,
+          ),
+          pw.SizedBox.shrink(),
+          pw.SizedBox.shrink(),
+          pw.SizedBox.shrink(),
+          dataCell(
+            '$currency ${grandTotal.toStringAsFixed(2)}',
+            backgroundColor: successLight,
+            textColor: successDark,
+            bold: true,
+            alignment: pw.Alignment.centerRight,
+          ),
+        ],
+      ));
+
+      return pw.Table(
+        columnWidths: {
+          0: const pw.FixedColumnWidth(70),
+          1: const pw.FlexColumnWidth(),
+          2: const pw.FixedColumnWidth(40),
+          3: const pw.FixedColumnWidth(70),
+          4: const pw.FixedColumnWidth(70),
+        },
+        border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+        children: rows,
+      );
+    }
+
+    final paymentBreakdownRows = state.paymentBreakdown;
 
     pdf.addPage(
       pw.MultiPage(
@@ -607,75 +898,34 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           pw.SizedBox(height: 16),
           pw.Text(
             'Sales Report',
-            style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+            style: pw.TextStyle(
+              fontSize: 20,
+              fontWeight: pw.FontWeight.bold,
+              color: brandColor,
+            ),
           ),
-          pw.Paragraph(
-            text: 'Generated: ${DateTime.now().toLocal().toString().split('.')[0]}',
+          pw.Text(
+            'Generated: ${_formatDateTime(DateTime.now())}',
+            style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
           ),
-          pw.Paragraph(text: 'Date Range: ${_formatRange(state.filterStart, state.filterEnd)}'),
+          pw.Text(
+            'Date Range: ${_formatRange(state.filterStart, state.filterEnd)}',
+            style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
+          ),
           pw.SizedBox(height: 20),
           pw.Header(level: 1, child: pw.Text('Summary')),
-          pw.TableHelper.fromTextArray(
-            headers: ['Metric', 'Value'],
-            data: [
-              ["Today's Sales", '$currency ${state.todaySales.toStringAsFixed(2)}'],
-              ['Month Sales', '$currency ${state.monthSales.toStringAsFixed(2)}'],
-              ['Total Products', '${state.totalProducts}'],
-              ['Low Stock Items', '${state.lowStockCount}'],
-              ['Total Transactions', '${state.totalTransactions}'],
-            ],
-            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-            headerDecoration: pw.BoxDecoration(color: PdfColors.grey300),
-            cellAlignment: pw.Alignment.centerLeft,
-            cellPadding: const pw.EdgeInsets.all(8),
-          ),
-          if (paymentRows.isNotEmpty) ...[
+          buildSummaryTable(),
+          if (paymentBreakdownRows.isNotEmpty) ...[
             pw.SizedBox(height: 20),
             pw.Header(level: 1, child: pw.Text('Payment Breakdown')),
-            pw.TableHelper.fromTextArray(
-              headers: ['Method', 'Count', 'Total ($currency)'],
-              data: paymentRows,
-              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-              headerDecoration: pw.BoxDecoration(color: PdfColors.grey300),
-              cellAlignment: pw.Alignment.centerLeft,
-              cellPadding: const pw.EdgeInsets.all(6),
-            ),
+            buildPaymentBreakdownTable(),
           ],
           pw.SizedBox(height: 20),
-          pw.Header(level: 1, child: pw.Text('Sales Detail')),
-          pw.TableHelper.fromTextArray(
-            headers: [
-              'Receipt #',
-              'Date',
-              'Method',
-              'Status',
-              'Total',
-              'Cash',
-              'Change',
-              'Reference',
-              'Customer',
-              'Cashier',
-            ],
-            data: sales
-                .map((s) => [
-                      '${s.receiptNumber ?? s.id}',
-                      s.createdAt.toLocal().toString().split('.')[0],
-                      s.paymentMethod,
-                      _statusLabel(s.paymentStatus),
-                      '$currency ${s.totalAmount.toStringAsFixed(2)}',
-                      '$currency ${s.cashReceived.toStringAsFixed(2)}',
-                      '$currency ${s.change.toStringAsFixed(2)}',
-                      s.referenceNumber ?? '',
-                      s.customerName ?? '',
-                      userNames[s.userId] ?? 'User ${s.userId}',
-                    ])
-                .toList(),
-            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-            headerDecoration: pw.BoxDecoration(color: PdfColors.grey300),
-            cellAlignment: pw.Alignment.centerLeft,
-            cellPadding: const pw.EdgeInsets.all(4),
-            tableWidth: pw.TableWidth.max,
-          ),
+          pw.Header(level: 1, child: pw.Text('Sales Transactions')),
+          buildTransactionsTable(),
+          pw.SizedBox(height: 20),
+          pw.Header(level: 1, child: pw.Text('Line Items')),
+          buildLineItemsTable(),
         ],
       ),
     );
@@ -714,6 +964,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   }
 
   pw.Widget _buildPdfHeader(Settings store) {
+    final brandColor = PdfColor.fromInt(0xFF1565C0);
+
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
@@ -722,107 +974,336 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           style: pw.TextStyle(
             fontSize: 24,
             fontWeight: pw.FontWeight.bold,
-            color: PdfColor.fromInt(0xFF3567D6),
+            color: brandColor,
           ),
         ),
         if (store.storeAddress.isNotEmpty)
           pw.Text(store.storeAddress,
-              style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600)),
+              style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600)),
         if (store.storePhone.isNotEmpty)
           pw.Text('Contact: ${store.storePhone}',
-              style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600)),
+              style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600)),
         if (store.receiptFooter?.isNotEmpty == true)
           pw.Text(store.receiptFooter!,
-              style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600)),
+              style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600)),
       ],
     );
   }
 
   Future<void> _exportToExcel(
     ReportsState state,
-    List<Sale> sales,
+    List<_ExportSale> exportSales,
     Map<int, String> userNames,
     String timestamp,
   ) async {
     final excel = Excel.createExcel();
     final store = state.storeInfo;
+    final currency = store.currency;
 
-    final sheet = excel['Sales Report'];
     excel.delete('Sheet1');
 
-    sheet.cell(CellIndex.indexByString('A1')).value =
-        TextCellValue(store.storeName);
+    final brandBlue = ExcelColor.fromHexString('FF1565C0');
+    final white = ExcelColor.white;
+    final successLight = ExcelColor.fromHexString('FFC8E6C9');
+    final successDark = ExcelColor.fromHexString('FF2E7D32');
+
+    ExcelColor methodColor(String method) {
+      return switch (method.toLowerCase()) {
+        'cash' => ExcelColor.fromHexString('FF1565C0'),
+        'gcash' => ExcelColor.fromHexString('FF2E7D32'),
+        'card' => ExcelColor.fromHexString('FF7C4DFF'),
+        _ => ExcelColor.fromHexString('FF757575'),
+      };
+    }
+
+    ExcelColor methodBackground(String method) {
+      return switch (method.toLowerCase()) {
+        'cash' => ExcelColor.fromHexString('FFE3F2FD'),
+        'gcash' => ExcelColor.fromHexString('FFC8E6C9'),
+        'card' => ExcelColor.fromHexString('FFD1C4E9'),
+        _ => ExcelColor.fromHexString('FFF5F5F5'),
+      };
+    }
+
+    CellStyle headerStyle() => CellStyle(
+          backgroundColorHex: brandBlue,
+          fontColorHex: white,
+          bold: true,
+        );
+
+    CellStyle totalStyle() => CellStyle(
+          backgroundColorHex: successLight,
+          fontColorHex: successDark,
+          bold: true,
+          numberFormat: NumFormat.standard_4,
+          horizontalAlign: HorizontalAlign.Right,
+        );
+
+    CellStyle rightAlignStyle() => CellStyle(
+          horizontalAlign: HorizontalAlign.Right,
+        );
+
+    CellStyle currencyStyle() => CellStyle(
+          numberFormat: NumFormat.standard_4,
+          horizontalAlign: HorizontalAlign.Right,
+        );
+
+    void writeCell(Sheet sheet, int row, int col, CellValue value,
+        {CellStyle? style}) {
+      final cell = sheet.cell(CellIndex.indexByColumnRow(
+        columnIndex: col,
+        rowIndex: row,
+      ));
+      cell.value = value;
+      if (style != null) cell.cellStyle = style;
+    }
+
+    void writeHeaderRow(Sheet sheet, int row, int startCol, List<String> headers) {
+      for (var i = 0; i < headers.length; i++) {
+        writeCell(
+          sheet,
+          row,
+          startCol + i,
+          TextCellValue(headers[i]),
+          style: headerStyle(),
+        );
+      }
+    }
+
+    // -- Sales Summary sheet --
+    final summary = excel['Sales Summary'];
+    excel.setDefaultSheet('Sales Summary');
+
+    writeCell(summary, 0, 0, TextCellValue(store.storeName));
     if (store.storeAddress.isNotEmpty) {
-      sheet.cell(CellIndex.indexByString('A2')).value =
-          TextCellValue(store.storeAddress);
+      writeCell(summary, 1, 0, TextCellValue(store.storeAddress));
     }
     if (store.storePhone.isNotEmpty) {
-      sheet.cell(CellIndex.indexByString('A3')).value =
-          TextCellValue('Contact: ${store.storePhone}');
+      writeCell(summary, 2, 0, TextCellValue('Contact: ${store.storePhone}'));
     }
-    sheet.cell(CellIndex.indexByString('A5')).value =
-        TextCellValue('${store.storeName} - Sales Report');
-    sheet.cell(CellIndex.indexByString('A6')).value =
-        TextCellValue('Generated: ${DateTime.now().toLocal().toString().split('.')[0]}');
-    sheet.cell(CellIndex.indexByString('A7')).value =
-        TextCellValue('Date Range: ${_formatRange(state.filterStart, state.filterEnd)}');
+    writeCell(summary, 4, 0, TextCellValue('${store.storeName} - Sales Report'));
+    writeCell(
+      summary,
+      5,
+      0,
+      TextCellValue('Generated: ${_formatDateTime(DateTime.now())}'),
+    );
+    writeCell(
+      summary,
+      6,
+      0,
+      TextCellValue('Date Range: ${_formatRange(state.filterStart, state.filterEnd)}'),
+    );
 
-    int row = 9;
-    sheet.cell(CellIndex.indexByString('A$row')).value =
-        TextCellValue('Sales Detail');
+    var row = 8;
+    writeCell(summary, row, 0, TextCellValue('Summary'));
     row++;
-    sheet.appendRow([
-      TextCellValue('Receipt #'),
-      TextCellValue('Date'),
-      TextCellValue('Payment Method'),
-      TextCellValue('Status'),
-      TextCellValue('Total'),
-      TextCellValue('Cash Received'),
-      TextCellValue('Change'),
-      TextCellValue('Reference'),
-      TextCellValue('Customer'),
-      TextCellValue('Cashier'),
-      TextCellValue('Notes'),
-    ]);
 
-    for (final s in sales) {
-      sheet.appendRow([
-        TextCellValue('${s.receiptNumber ?? s.id}'),
-        TextCellValue(s.createdAt.toLocal().toString().split('.')[0]),
-        TextCellValue(s.paymentMethod),
-        TextCellValue(_statusLabel(s.paymentStatus)),
-        DoubleCellValue(s.totalAmount),
-        DoubleCellValue(s.cashReceived),
-        DoubleCellValue(s.change),
-        TextCellValue(s.referenceNumber ?? ''),
-        TextCellValue(s.customerName ?? ''),
-        TextCellValue(userNames[s.userId] ?? 'User ${s.userId}'),
-        TextCellValue(s.notes ?? ''),
-      ]);
+    final summaryRows = [
+      ["Today's Sales", state.todaySales, true],
+      ['Month Sales', state.monthSales, true],
+      ['Total Transactions', state.totalTransactions.toDouble(), false],
+      ['Total Products', state.totalProducts.toDouble(), false],
+      ['Low Stock Items', state.lowStockCount.toDouble(), false],
+    ];
+
+    for (final entry in summaryRows) {
+      final isCurrency = entry[2] as bool;
+      writeCell(summary, row, 0, TextCellValue(entry[0] as String));
+      if (isCurrency) {
+        writeCell(
+          summary,
+          row,
+          1,
+          DoubleCellValue(entry[1] as double),
+          style: currencyStyle(),
+        );
+      } else {
+        writeCell(
+          summary,
+          row,
+          1,
+          IntCellValue((entry[1] as double).toInt()),
+          style: rightAlignStyle(),
+        );
+      }
+      row++;
     }
-
-    row = sheet.rows.length + 2;
-    sheet.cell(CellIndex.indexByString('A$row')).value =
-        TextCellValue('Summary');
-    row++;
-    sheet.appendRow([TextCellValue("Today's Sales"), DoubleCellValue(state.todaySales)]);
-    sheet.appendRow([TextCellValue('Month Sales'), DoubleCellValue(state.monthSales)]);
-    sheet.appendRow([TextCellValue('Total Products'), IntCellValue(state.totalProducts)]);
-    sheet.appendRow([TextCellValue('Low Stock Items'), IntCellValue(state.lowStockCount)]);
-    sheet.appendRow([TextCellValue('Total Transactions'), IntCellValue(state.totalTransactions)]);
 
     if (state.paymentBreakdown.isNotEmpty) {
-      row = sheet.rows.length + 2;
-      sheet.cell(CellIndex.indexByString('A$row')).value =
-          TextCellValue('Payment Breakdown');
+      row += 2;
+      writeCell(summary, row, 0, TextCellValue('Payment Breakdown'));
+      row++;
+      final paymentHeaders = ['Method', 'Count', 'Total ($currency)'];
+      writeHeaderRow(summary, row, 0, paymentHeaders);
       row++;
       for (final p in state.paymentBreakdown) {
-        sheet.appendRow([
+        writeCell(
+          summary,
+          row,
+          0,
           TextCellValue(p.method),
-          IntCellValue(p.count),
+          style: CellStyle(
+            backgroundColorHex: methodBackground(p.method),
+            fontColorHex: methodColor(p.method),
+          ),
+        );
+        writeCell(summary, row, 1, IntCellValue(p.count),
+            style: rightAlignStyle());
+        writeCell(
+          summary,
+          row,
+          2,
           DoubleCellValue(p.total),
-        ]);
+          style: currencyStyle(),
+        );
+        row++;
       }
+    }
+
+    row += 2;
+    writeCell(summary, row, 0, TextCellValue('Sales Transactions'));
+    row++;
+    final transactionHeaders = [
+      'Receipt #',
+      'Date/Time',
+      'Cashier',
+      'Customer',
+      'Payment Method',
+      'Reference',
+      'Items',
+      'Total ($currency)',
+    ];
+    writeHeaderRow(summary, row, 0, transactionHeaders);
+    row++;
+
+    for (final export in exportSales) {
+      final s = export.sale;
+      writeCell(summary, row, 0, TextCellValue('${s.receiptNumber ?? s.id}'));
+      writeCell(summary, row, 1, TextCellValue(_formatDateTime(s.createdAt)));
+      writeCell(
+          summary, row, 2, TextCellValue(userNames[s.userId] ?? 'User ${s.userId}'));
+      writeCell(summary, row, 3, TextCellValue(s.customerName ?? ''));
+      writeCell(
+        summary,
+        row,
+        4,
+        TextCellValue(s.paymentMethod),
+        style: CellStyle(
+          backgroundColorHex: methodBackground(s.paymentMethod),
+          fontColorHex: methodColor(s.paymentMethod),
+        ),
+      );
+      writeCell(summary, row, 5, TextCellValue(s.referenceNumber ?? ''));
+      writeCell(summary, row, 6, IntCellValue(export.itemCount),
+          style: rightAlignStyle());
+      writeCell(
+        summary,
+        row,
+        7,
+        DoubleCellValue(s.totalAmount),
+        style: currencyStyle(),
+      );
+      row++;
+    }
+
+    final grandTotal = exportSales.fold<double>(
+      0.0,
+      (sum, e) => sum + e.sale.totalAmount,
+    );
+    writeCell(summary, row, 0, TextCellValue('Grand Total'),
+        style: totalStyle());
+    for (var c = 1; c < 7; c++) {
+      writeCell(summary, row, c, TextCellValue(''));
+    }
+    writeCell(
+      summary,
+      row,
+      7,
+      DoubleCellValue(grandTotal),
+      style: totalStyle(),
+    );
+
+    for (var i = 0; i < transactionHeaders.length; i++) {
+      summary.setColumnAutoFit(i);
+    }
+
+    // -- Line Items sheet --
+    final itemsSheet = excel['Line Items'];
+    final itemHeaders = [
+      'Receipt #',
+      'Date/Time',
+      'Product',
+      'Qty',
+      'Unit Price ($currency)',
+      'Line Total ($currency)',
+      'Payment Method',
+    ];
+    writeHeaderRow(itemsSheet, 0, 0, itemHeaders);
+
+    var itemRow = 1;
+    for (final export in exportSales) {
+      final s = export.sale;
+      for (final item in export.items) {
+        writeCell(
+            itemsSheet, itemRow, 0, TextCellValue('${s.receiptNumber ?? s.id}'));
+        writeCell(
+            itemsSheet, itemRow, 1, TextCellValue(_formatDateTime(s.createdAt)));
+        writeCell(
+            itemsSheet,
+            itemRow,
+            2,
+            TextCellValue(item.productName ?? 'Product #${item.productId}'));
+        writeCell(itemsSheet, itemRow, 3, IntCellValue(item.quantity),
+            style: rightAlignStyle());
+        writeCell(
+          itemsSheet,
+          itemRow,
+          4,
+          DoubleCellValue(item.unitPrice),
+          style: currencyStyle(),
+        );
+        writeCell(
+          itemsSheet,
+          itemRow,
+          5,
+          DoubleCellValue(item.totalPrice),
+          style: currencyStyle(),
+        );
+        writeCell(
+          itemsSheet,
+          itemRow,
+          6,
+          TextCellValue(s.paymentMethod),
+          style: CellStyle(
+            backgroundColorHex: methodBackground(s.paymentMethod),
+            fontColorHex: methodColor(s.paymentMethod),
+          ),
+        );
+        itemRow++;
+      }
+    }
+
+    writeCell(
+      itemsSheet,
+      itemRow,
+      0,
+      TextCellValue('Grand Total'),
+      style: totalStyle(),
+    );
+    for (var c = 1; c < 5; c++) {
+      writeCell(itemsSheet, itemRow, c, TextCellValue(''));
+    }
+    writeCell(
+      itemsSheet,
+      itemRow,
+      5,
+      DoubleCellValue(grandTotal),
+      style: totalStyle(),
+    );
+
+    for (var i = 0; i < itemHeaders.length; i++) {
+      itemsSheet.setColumnAutoFit(i);
     }
 
     final bytes = excel.save();
@@ -866,15 +1347,23 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     }
   }
 
-  String _statusLabel(String status) {
-    if (status.isEmpty) return 'Unknown';
-    return status[0].toUpperCase() + status.substring(1);
-  }
-
   String _formatRange(DateTime? start, DateTime? end) {
     if (start == null || end == null) return 'This month';
     String fmt(DateTime d) =>
         '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
     return '${fmt(start)} to ${fmt(end)}';
+  }
+
+  String _formatDateTime(DateTime dt) {
+    final local = dt.toLocal();
+    final hour = local.hour;
+    final period = hour >= 12 ? 'PM' : 'AM';
+    final displayHour = hour == 0
+        ? 12
+        : hour > 12
+            ? hour - 12
+            : hour;
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '${local.year}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')} $displayHour:$minute $period';
   }
 }

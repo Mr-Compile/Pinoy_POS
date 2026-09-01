@@ -310,6 +310,14 @@ class DatabaseHelper {
         WHERE deleted_at IS NULL
       ''', [defaultQuota, today, now]);
     }
+
+    // Migration from v13 → v14: add has_changed_username to users table
+    // so self-service username changes can be limited to one per user.
+    if (oldVersion < 14) {
+      await db.execute(
+        'ALTER TABLE users ADD COLUMN has_changed_username INTEGER NOT NULL DEFAULT 0',
+      );
+    }
   }
 
   Future<void> _createTables(Database db) async {
@@ -337,7 +345,8 @@ class DatabaseHelper {
         created_at TEXT NOT NULL,
         updated_at TEXT,
         deleted_at TEXT,
-        must_change_password INTEGER NOT NULL DEFAULT 0
+        must_change_password INTEGER NOT NULL DEFAULT 0,
+        has_changed_username INTEGER NOT NULL DEFAULT 0
       )
     ''');
 

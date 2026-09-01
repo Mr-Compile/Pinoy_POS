@@ -217,8 +217,14 @@ class AuthService {
       return false;
     }
 
+    // Enforce the one-time username change rule.
+    final isChangingUsername = trimmedUsername != current.username;
+    if (isChangingUsername && current.hasChangedUsername) {
+      return false;
+    }
+
     // Check username uniqueness if it is being changed.
-    if (trimmedUsername != current.username) {
+    if (isChangingUsername) {
       final existing = await _userRepository.getByUsername(trimmedUsername);
       if (existing != null && existing.id != userId) {
         return false;
@@ -247,6 +253,7 @@ class AuthService {
       pin: newPin,
       pinLength: newPinLength,
       profileImagePath: profileImagePath ?? current.profileImagePath,
+      hasChangedUsername: current.hasChangedUsername || isChangingUsername,
       updatedAt: DateTime.now(),
     );
 

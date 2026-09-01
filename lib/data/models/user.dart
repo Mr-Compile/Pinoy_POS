@@ -23,6 +23,7 @@ class User {
   final String? profileImagePath;
   final bool isActive;
   final bool mustChangePassword;
+  final bool hasChangedUsername;
   final DateTime? lastLogin;
   final DateTime createdAt;
   final DateTime? updatedAt;
@@ -40,6 +41,7 @@ class User {
     this.profileImagePath,
     this.isActive = true,
     this.mustChangePassword = false,
+    this.hasChangedUsername = false,
     this.lastLogin,
     required this.createdAt,
     this.updatedAt,
@@ -59,6 +61,7 @@ class User {
       'profile_image_path': profileImagePath,
       'is_active': isActive ? 1 : 0,
       'must_change_password': mustChangePassword ? 1 : 0,
+      'has_changed_username': hasChangedUsername ? 1 : 0,
       'last_login': lastLogin?.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
@@ -82,6 +85,7 @@ class User {
       profileImagePath: map['profile_image_path'] as String?,
       isActive: (map['is_active'] as int) == 1,
       mustChangePassword: (map['must_change_password'] as int?) == 1,
+      hasChangedUsername: (map['has_changed_username'] as int?) == 1,
       lastLogin: map['last_login'] != null
           ? DateTime.parse(map['last_login'] as String)
           : null,
@@ -107,6 +111,7 @@ class User {
     String? profileImagePath,
     bool? isActive,
     bool? mustChangePassword,
+    bool? hasChangedUsername,
     DateTime? lastLogin,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -124,6 +129,7 @@ class User {
       profileImagePath: profileImagePath ?? this.profileImagePath,
       isActive: isActive ?? this.isActive,
       mustChangePassword: mustChangePassword ?? this.mustChangePassword,
+      hasChangedUsername: hasChangedUsername ?? this.hasChangedUsername,
       lastLogin: lastLogin ?? this.lastLogin,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,

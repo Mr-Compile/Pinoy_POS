@@ -92,7 +92,7 @@ class ReportService {
     return sales.length;
   }
 
-  /// Returns the sales for a date range.  Delegated to [SalesService].
+  /// Returns the confirmed sales for a date range.  Delegated to [SalesService].
   Future<List<Sale>> getSalesByDateRange(DateTime start, DateTime end) async {
     if (!_sessionManager.hasPermission('view_reports')) return [];
     return _salesService.getSalesByDateRange(start, end);

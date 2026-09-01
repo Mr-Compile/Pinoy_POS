@@ -75,10 +75,15 @@ class BackupStorageService {
 
   /// Picks a backup file for restore and returns its bytes.
   ///
-  /// Uses [FilePicker] on all platforms. On Android the chosen file is
-  /// copied to a temporary file so SQLite validation can open it by path.
+  /// On Android this launches a Storage Access Framework picker so the
+  /// user can choose any file (including `.db` files that the regular
+  /// file picker cannot filter for). On desktop it uses [FilePicker].
   /// The returned [BackupReadResult.bytes] are the raw backup bytes.
   Future<BackupReadResult> pickBackupForRestore() async {
+    if (Platform.isAndroid) {
+      return _pickBackupForRestoreAndroid();
+    }
+
     final result = await FilePicker.platform.pickFiles(
       dialogTitle: 'Import Backup',
       type: FileType.custom,
@@ -111,6 +116,56 @@ class BackupStorageService {
       fileSize: bytes.length,
       bytes: bytes,
     );
+  }
+
+  Future<BackupReadResult> _pickBackupForRestoreAndroid() async {
+    try {
+      final result = await _channel.invokeMapMethod<String, dynamic>(
+        'openDocument',
+        {
+          // Use a broad filter: Android's MIME mapping does not reliably
+          // recognise .db files, so a restrictive filter hides backups.
+          // The file is validated by its SQLite header after selection.
+          'mimeTypes': ['*/*'],
+        },
+      );
+
+      if (result == null) {
+        return const BackupReadResult(
+          success: false,
+          error: null,
+          bytes: null,
+          displayName: null,
+          fileSize: null,
+        );
+      }
+
+      final rawBytes = result['bytes'];
+      final bytes = rawBytes is Uint8List
+          ? rawBytes
+          : rawBytes is List<int>
+              ? Uint8List.fromList(rawBytes)
+              : null;
+
+      if (bytes == null || bytes.isEmpty) {
+        return const BackupReadResult(
+          success: false,
+          error: 'The selected backup file is empty.',
+        );
+      }
+
+      return BackupReadResult(
+        success: true,
+        displayName: result['displayName'] as String?,
+        fileSize: result['size'] as int? ?? bytes.length,
+        bytes: bytes,
+      );
+    } on PlatformException catch (e) {
+      return BackupReadResult(
+        success: false,
+        error: 'Failed to read backup: ${e.message}',
+      );
+    }
   }
 
   /// Writes a backup to the given [location].
@@ -168,7 +223,11 @@ class BackupStorageService {
         {
           'treeUri': location.reference,
           'displayName': _makeUniqueFileName(defaultFileName),
-          'mimeType': 'application/x-sqlite3',
+          // Use a generic MIME type: some document providers reject
+          // application/x-sqlite3, while application/octet-stream is
+          // accepted by all providers and the .db extension is preserved
+          // in the display name.
+          'mimeType': 'application/octet-stream',
           'bytes': bytes,
         },
       );

@@ -19,6 +19,21 @@ class SaleItemDao extends BaseDao<SaleItem> {
     return maps.map((map) => SaleItem.fromMap(map)).toList();
   }
 
+  /// Returns all sale items belonging to any of the given [saleIds].
+  Future<List<SaleItem>> getBySaleIds(List<int> saleIds, {DatabaseExecutor? txn}) async {
+    if (saleIds.isEmpty) return [];
+
+    final executor = txn ?? await db;
+    final placeholders = List.filled(saleIds.length, '?').join(', ');
+    final maps = await executor.query(
+      tableName,
+      where: 'sale_id IN ($placeholders)',
+      whereArgs: saleIds,
+      orderBy: 'sale_id, id',
+    );
+    return maps.map((map) => fromMap(map)).toList();
+  }
+
   Future<List<SaleItem>> getByProductId(int productId) async {
     final database = await db;
     final maps = await database.query(

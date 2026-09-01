@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/auth_navigation.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/services/password_strength_service.dart';
@@ -106,6 +107,8 @@ class _ForceChangePasswordScreenState
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        icon: const Icon(Icons.logout_rounded),
+        iconColor: AppSemanticColors.error,
         title: const Text('Sign Out?'),
         content: const Text(
           'You will need to log in again with your temporary password.',
@@ -117,6 +120,10 @@ class _ForceChangePasswordScreenState
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppSemanticColors.error,
+              foregroundColor: AppSemanticColors.onError,
+            ),
             child: const Text('Sign Out'),
           ),
         ],
@@ -290,6 +297,9 @@ class _ForceChangePasswordScreenState
                       const SizedBox(height: 12),
                       TextButton(
                         onPressed: _isSubmitting ? null : _handleSignOut,
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppSemanticColors.error,
+                        ),
                         child: const Text('Sign Out'),
                       ),
                     ],

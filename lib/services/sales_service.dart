@@ -62,7 +62,11 @@ class SalesService {
     return _saleRepository.getFilteredSales(userId: userId, limit: 500);
   }
 
-  Future<List<Sale>> getSalesByDateRange(DateTime start, DateTime end) async {
+  Future<List<Sale>> getSalesByDateRange(
+    DateTime start,
+    DateTime end, {
+    String? paymentStatus,
+  }) async {
     if (!_sessionManager.hasPermission('view_sales')) {
       return [];
     }
@@ -75,6 +79,7 @@ class SalesService {
     return _saleRepository.getFilteredSales(
       start: start,
       end: end,
+      paymentStatus: paymentStatus ?? 'confirmed',
       userId: userId,
       limit: 500,
     );
@@ -161,6 +166,31 @@ class SalesService {
     }
 
     return _saleItemRepository.getBySaleId(saleId);
+  }
+
+  /// Returns all sale items for the given [saleIds], scoped to the
+  /// current user when the role is Staff.
+  Future<List<SaleItem>> getSaleItemsBySaleIds(List<int> saleIds) async {
+    if (!_sessionManager.hasPermission('view_sales')) {
+      return [];
+    }
+
+    if (saleIds.isEmpty) return [];
+
+    final currentUser = _sessionManager.currentUser;
+    if (currentUser?.role == UserRole.staff) {
+      // Staff can only view their own sale items.  Verify each sale first.
+      final sales = await _saleRepository.getFilteredSales(
+        userId: _currentUserId('view_sales'),
+        limit: 99999,
+      );
+      final allowedIds = sales.map((s) => s.id).whereType<int>().toSet();
+      final filteredIds = saleIds.where(allowedIds.contains).toList();
+      if (filteredIds.isEmpty) return [];
+      return _saleItemRepository.getBySaleIds(filteredIds);
+    }
+
+    return _saleItemRepository.getBySaleIds(saleIds);
   }
 
   /// Builds a [ReceiptViewData] for the given sale id.

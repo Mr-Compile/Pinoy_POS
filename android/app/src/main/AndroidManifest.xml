@@ -1,4 +1,18 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Network access is used by AI / Groq integration and release builds. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+        Storage permissions support the file picker on older Android versions
+        and some document providers. Backup/restore primarily uses Storage
+        Access Framework (SAF), which does not require these permissions, but
+        declaring them keeps the file picker and fallback paths working on
+        devices where SAF alone is not sufficient.
+    -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+
     <application
         android:label="ePOS"
         android:name="${applicationName}"

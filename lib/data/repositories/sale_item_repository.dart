@@ -12,6 +12,9 @@ class SaleItemRepository {
   Future<List<SaleItem>> getBySaleId(int saleId, {DatabaseExecutor? txn}) => _saleItemDao.getBySaleId(saleId, txn: txn);
   Future<List<SaleItem>> getByProductId(int productId) => _saleItemDao.getByProductId(productId);
 
+  Future<List<SaleItem>> getBySaleIds(List<int> saleIds, {DatabaseExecutor? txn}) =>
+      _saleItemDao.getBySaleIds(saleIds, txn: txn);
+
   /// Analytics: top-selling products by total quantity sold. See
   /// [SaleItemDao.getTopProductsByQuantity] for parameter semantics.
   Future<List<Map<String, dynamic>>> getTopProductsByQuantity({

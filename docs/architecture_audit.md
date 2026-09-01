@@ -218,8 +218,53 @@ The cycles are currently used for cross-provider invalidation but increase coupl
 8. **`lib/services/report_service.dart`** — Delegated `getTodaySales()`, `getMonthSales()` and `getSalesByDateRange()` to `SalesService`; removed the duplicate `getAllSales()` path. This eliminates a circular service dependency and the duplicated date-range sales queries.
 9. **`lib/data/models/daily_sales_point.dart`** and **`lib/data/models/top_product_result.dart`** — Extracted shared analytics DTOs so `ReportService` and `DashboardService` no longer duplicate them.
 
+## 11. Backup / restore Android issues (SAF + file picker)
+
+### 11.1 Root causes found
+
+1. **Write mode `rwt` was not supported by every SAF document provider.**
+   - `MainActivity.createDocument()` opened the newly-created document with `"rwt"`.
+   - Several providers (and some Android versions) reject `"rwt"` for a fresh document, producing the `WRITE_FAILED` / "not allowed to write" errors.
+
+2. **Restore used `file_picker` with `allowedExtensions: ['db']` on Android.**
+   - Android's document picker filters by MIME type, not by extension.
+   - `.db` has no standard MIME mapping, so the picker often hides valid backups.
+
+3. **Android manifest was missing storage and network permissions.**
+   - `src/main/AndroidManifest.xml` had no `INTERNET`, `READ_EXTERNAL_STORAGE`, or `WRITE_EXTERNAL_STORAGE` entries.
+   - Release builds would run without network permission and the file picker fallback had no declared storage permissions.
+
+4. **`MainActivity.openDocumentTree()` did not verify the persisted write grant.**
+   - If a provider returned a tree URI but did not persist write access, the app still reported success and failed later at write time.
+
+5. **`MainActivity.isUriValid()` queried tree URIs directly.**
+   - A direct `ContentResolver.query()` on a tree URI fails on some providers, causing the saved location to be marked invalid unnecessarily.
+
+6. **Backup file names had second-level precision.**
+   - `BackupService._generateBackupFileName()` used `yyyy-MM-dd_HH-mm-ss`, so two exports in the same second could collide.
+
+### 11.2 Fixes applied
+
+- `android/app/src/main/AndroidManifest.xml` — added `INTERNET`, `READ_EXTERNAL_STORAGE`, and `WRITE_EXTERNAL_STORAGE` permissions.
+- `android/app/src/main/kotlin/com/pinoypos/pinoy_pos/MainActivity.kt`:
+  - `createDocument()` now tries `"w"`, `"wt"`, and the default `openOutputStream()` modes, and catches `SecurityException` with a clear "not allowed to write" message.
+  - `openDocumentTree()` verifies the persisted write grant and returns `PERMISSION_DENIED` if it is not actually persisted.
+  - `isUriValid()` builds a proper document URI for tree URIs via `DocumentsContract.buildDocumentUriUsingTree()` before querying.
+  - `getDisplayName()` falls back to `DocumentsContract.Document.COLUMN_DISPLAY_NAME` when `OpenableColumns.DISPLAY_NAME` is absent.
+- `lib/services/backup_storage_service_io.dart`:
+  - Android restore now calls the method channel `openDocument` (using the existing `MainActivity.openDocument` handler) with a broad `*/*` filter, then validates the SQLite header afterward.
+  - Android backup creation uses `application/octet-stream` instead of `application/x-sqlite3`, because some providers reject the less common SQLite MIME type.
+- `lib/services/backup_service.dart` — `_generateBackupFileName()` now includes milliseconds (`yyyy-MM-dd_HH-mm-ss-SSS`) to avoid name collisions.
+
+### 11.3 Remaining gaps
+
+- The Android method channel still loads the entire backup file into memory for restore. Very large databases may need a streaming copy to a temporary file instead.
+- iOS and other non-Android, non-web targets still use `file_picker` with `allowedExtensions: ['db']`; that path should also be tested and may need a platform-specific fix.
+- No unit or integration tests currently cover backup/restore; the SAF path can only be fully exercised on a physical Android device or emulator.
+
 ## Verification
 
 - `flutter analyze` — no issues found.
-- `flutter test` — 150 tests passed.
+- `flutter build apk --debug` — built successfully.
+- `flutter test` — 150 tests passed; 7 pre-existing `database is locked` failures in `gcash_payment_service_test.dart` / `app_header_test.dart` (Windows `sqflite_common_ffi` concurrency issue, unrelated to backup).
 

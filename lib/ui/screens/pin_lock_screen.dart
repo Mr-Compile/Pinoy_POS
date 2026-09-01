@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/auth_navigation.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
@@ -164,6 +165,9 @@ class _PinLockScreenState extends ConsumerState<PinLockScreen> {
                       onPressed: _isVerifying
                           ? null
                           : () => _handleBack(context),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppSemanticColors.error,
+                      ),
                       icon: const Icon(Icons.logout, size: 20),
                       label: const Text('Back to Login'),
                     ),
