@@ -33,13 +33,30 @@ class SalesService {
   final ImageService _imageService = ImageService();
   final UserRepository _userRepository = UserRepository();
 
+  /// Returns the current user's non-null id.
+  ///
+  /// Throws [AuthorizationException] for [permission] when the user is not
+  /// logged in or their id is missing.
+  int _currentUserId(String permission) {
+    final user = _sessionManager.currentUser;
+    if (user == null) {
+      throw AuthorizationException(permission);
+    }
+    final id = user.id;
+    if (id == null) {
+      throw AuthorizationException(permission);
+    }
+    return id;
+  }
+
   Future<List<Sale>> getSales() async {
     if (!_sessionManager.hasPermission('view_sales')) {
       return [];
     }
 
-    final userId = _sessionManager.currentUser?.role == UserRole.staff
-        ? _sessionManager.currentUser!.id
+    final currentUser = _sessionManager.currentUser;
+    final userId = currentUser?.role == UserRole.staff
+        ? _currentUserId('view_sales')
         : null;
 
     return _saleRepository.getFilteredSales(userId: userId, limit: 500);
@@ -50,8 +67,9 @@ class SalesService {
       return [];
     }
 
-    final userId = _sessionManager.currentUser?.role == UserRole.staff
-        ? _sessionManager.currentUser!.id
+    final currentUser = _sessionManager.currentUser;
+    final userId = currentUser?.role == UserRole.staff
+        ? _currentUserId('view_sales')
         : null;
 
     return _saleRepository.getFilteredSales(
@@ -74,8 +92,9 @@ class SalesService {
       return [];
     }
 
-    final userId = _sessionManager.currentUser?.role == UserRole.staff
-        ? _sessionManager.currentUser!.id
+    final currentUser = _sessionManager.currentUser;
+    final userId = currentUser?.role == UserRole.staff
+        ? _currentUserId('view_sales')
         : null;
 
     return _saleRepository.getFilteredSales(
@@ -98,8 +117,9 @@ class SalesService {
 
     if (sale == null) return null;
 
-    if (_sessionManager.currentUser?.role == UserRole.staff &&
-        sale.userId != _sessionManager.currentUser!.id) {
+    final currentUser = _sessionManager.currentUser;
+    if (currentUser?.role == UserRole.staff &&
+        sale.userId != currentUser?.id) {
       return null;
     }
 
@@ -111,8 +131,9 @@ class SalesService {
       return null;
     }
 
-    final userId = _sessionManager.currentUser?.role == UserRole.staff
-        ? _sessionManager.currentUser!.id
+    final currentUser = _sessionManager.currentUser;
+    final userId = currentUser?.role == UserRole.staff
+        ? _currentUserId('view_sales')
         : null;
 
     final sales = await _saleRepository.getFilteredSales(
@@ -131,9 +152,10 @@ class SalesService {
     // For Staff, verify the sale belongs to the current user before
     // returning items. This prevents accessing another user's sale items
     // by simply knowing the sale id.
-    if (_sessionManager.currentUser?.role == UserRole.staff) {
+    final currentUser = _sessionManager.currentUser;
+    if (currentUser?.role == UserRole.staff) {
       final sale = await _saleRepository.getById(saleId);
-      if (sale == null || sale.userId != _sessionManager.currentUser!.id) {
+      if (sale == null || sale.userId != currentUser?.id) {
         return [];
       }
     }
@@ -155,8 +177,9 @@ class SalesService {
     final sale = await _saleRepository.getById(saleId);
     if (sale == null) return null;
 
-    if (_sessionManager.currentUser?.role == UserRole.staff &&
-        sale.userId != _sessionManager.currentUser!.id) {
+    final currentUser = _sessionManager.currentUser;
+    if (currentUser?.role == UserRole.staff &&
+        sale.userId != currentUser?.id) {
       return null;
     }
 
@@ -180,6 +203,12 @@ class SalesService {
       ));
     }
 
+    final subtotal = receiptItems.fold<double>(
+      0.0,
+      (sum, item) => sum + item.totalPrice,
+    );
+    final discount = (subtotal - sale.totalAmount).clamp(0.0, subtotal);
+
     return ReceiptViewData(
       storeName: store.storeName,
       storeAddress: store.storeAddress,
@@ -194,8 +223,8 @@ class SalesService {
       paymentMethod: sale.paymentMethod,
       paymentStatus: sale.paymentStatus,
       total: sale.totalAmount,
-      subtotal: sale.totalAmount,
-      discount: 0,
+      subtotal: subtotal,
+      discount: discount,
       cashReceived: sale.cashReceived,
       change: sale.change,
       referenceNumber: sale.referenceNumber,
@@ -242,6 +271,8 @@ class SalesService {
       throw PaymentValidationException('Cart is empty.');
     }
 
+    _validateCart(items, totalAmount);
+
     // Load payment settings so GCash rules are applied immediately.
     final PaymentSettings paymentSettings;
     try {
@@ -266,11 +297,8 @@ class SalesService {
         );
       }
     } else {
-      // Non-cash payments are expected to match the total exactly.
-      // If a smaller amount was passed, treat it as the full total.
-      if (received < totalAmount) {
-        received = totalAmount;
-      }
+      // Non-cash payments must match the total exactly.
+      received = totalAmount;
     }
 
     String paymentStatus = 'confirmed';
@@ -365,16 +393,14 @@ class SalesService {
           change: change,
           paymentMethod: paymentMethod,
           paymentStatus: paymentStatus,
-          referenceNumber: paymentMethod == 'GCash'
-              ? (trimmedReference?.isNotEmpty == true ? trimmedReference : null)
-              : (trimmedReference?.isNotEmpty == true ? trimmedReference : null),
+          referenceNumber: trimmedReference?.isNotEmpty == true ? trimmedReference : null,
           customerName: trimmedCustomer?.isNotEmpty == true ? trimmedCustomer : null,
           paymentProofPath: paymentProofPath,
           paymentProofType: paymentProofType ??
               (paymentProofPath != null && paymentProofPath.isNotEmpty ? 'image' : null),
           verifiedAt: verifiedAt,
           verifiedBy: verifiedBy,
-          userId: _sessionManager.currentUser!.id!,
+          userId: _currentUserId('create_sales'),
           createdAt: DateTime.now(),
           receiptNumber: receiptNumber,
           notes: trimmedNotes?.isNotEmpty == true ? trimmedNotes : null,
@@ -409,7 +435,10 @@ class SalesService {
             sale = sale.copyWith(id: saleId, paymentProofPath: moved);
             await _saleRepository.update(sale, txn: txn);
           } else {
-            committedProofPath = paymentProofPath;
+            throw PaymentValidationException(
+              'Unable to save payment proof',
+              details: 'The payment evidence could not be moved to the sale directory.',
+            );
           }
         }
 
@@ -472,6 +501,50 @@ class SalesService {
     }
   }
 
+  static const _kPriceEpsilon = 0.01;
+
+  void _validateCart(List<SaleItem> items, double totalAmount) {
+    if (totalAmount < 0) {
+      throw PaymentValidationException('Total amount cannot be negative.');
+    }
+
+    var computedTotal = 0.0;
+    for (final item in items) {
+      if (item.productId <= 0) {
+        throw PaymentValidationException('Invalid product in cart.');
+      }
+      if (item.quantity <= 0) {
+        throw PaymentValidationException(
+          'Quantity must be greater than zero',
+          details: 'Product #${item.productId} has quantity ${item.quantity}.',
+        );
+      }
+      if (item.unitPrice < 0) {
+        throw PaymentValidationException(
+          'Unit price cannot be negative',
+          details: 'Product #${item.productId} has unit price ${item.unitPrice}.',
+        );
+      }
+      final expectedLineTotal = item.quantity * item.unitPrice;
+      if ((expectedLineTotal - item.totalPrice).abs() > _kPriceEpsilon) {
+        throw PaymentValidationException(
+          'Line total does not match for product #${item.productId}',
+          details:
+              'Expected ${expectedLineTotal.toStringAsFixed(2)}, got ${item.totalPrice.toStringAsFixed(2)}.',
+        );
+      }
+      computedTotal += item.totalPrice;
+    }
+
+    if ((computedTotal - totalAmount).abs() > _kPriceEpsilon) {
+      throw PaymentValidationException(
+        'Cart total does not match the item total',
+        details:
+            'Expected ${computedTotal.toStringAsFixed(2)}, got ${totalAmount.toStringAsFixed(2)}.',
+      );
+    }
+  }
+
   /// Returns all GCash payments that are pending owner/admin verification.
   Future<List<Sale>> getPendingPayments() async {
     if (!_sessionManager.hasPermission('verify_payments')) {
@@ -502,7 +575,7 @@ class SalesService {
       final updated = sale.copyWith(
         paymentStatus: 'confirmed',
         verifiedAt: DateTime.now(),
-        verifiedBy: _sessionManager.currentUser!.id,
+        verifiedBy: _currentUserId('verify_payments'),
       );
 
       await _saleRepository.update(updated, txn: txn);
@@ -555,7 +628,7 @@ class SalesService {
           previousStock: previousStock,
           newStock: newStock,
           reason: 'GCash payment rejected: ${sale.receiptNumber}${reason != null ? ' - $reason' : ''}',
-          userId: _sessionManager.currentUser?.id,
+          userId: _currentUserId('verify_payments'),
           createdAt: DateTime.now(),
         );
         await _stockHistoryRepository.insert(history, txn: txn);
@@ -591,9 +664,20 @@ class SalesService {
     final sale = await _saleRepository.getById(saleId, txn: txn);
     if (sale == null) return null;
 
-    if (_sessionManager.currentUser?.role == UserRole.staff &&
-        sale.userId != _sessionManager.currentUser!.id) {
-      return null;
+    final currentUser = _sessionManager.currentUser;
+    final userId = currentUser?.id;
+    final canVerify = _sessionManager.hasPermission('verify_payments');
+    final isOwn = userId != null && userId == sale.userId;
+
+    if (!canVerify && !(isOwn && _sessionManager.hasPermission('create_sales'))) {
+      await _activityLogService.logActivity(
+        action: 'unauthorized_replace_payment_proof',
+        entity: 'sale',
+        entityId: saleId,
+        details: 'Attempted to replace payment proof without permission',
+        txn: txn,
+      );
+      throw AuthorizationException('verify_payments');
     }
 
     final oldPath = sale.paymentProofPath;
@@ -654,7 +738,7 @@ class SalesService {
           previousStock: previousStock,
           newStock: newStock,
           reason: 'Void sale: ${sale.receiptNumber}',
-          userId: _sessionManager.currentUser?.id,
+          userId: _currentUserId('void_sales'),
           createdAt: DateTime.now(),
         );
         await _stockHistoryRepository.insert(history, txn: txn);
@@ -688,7 +772,7 @@ class SalesService {
     if (_sessionManager.currentUser?.role == UserRole.staff) {
       return _saleRepository.getTotalSalesForDateForUser(
         now,
-        _sessionManager.currentUser!.id!,
+        _currentUserId('view_sales'),
       );
     }
     return _saleRepository.getTotalSalesForDate(now);
@@ -705,7 +789,7 @@ class SalesService {
       return _saleRepository.getTotalSalesForMonthForUser(
         now.year,
         now.month,
-        _sessionManager.currentUser!.id!,
+        _currentUserId('view_sales'),
       );
     }
     return _saleRepository.getTotalSalesForMonth(now.year, now.month);

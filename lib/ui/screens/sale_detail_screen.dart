@@ -37,6 +37,7 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
   bool _isLoading = false;
   bool _notFound = false;
   Sale? _loadedSale;
+  final Map<String, Future<File?>> _proofFutures = {};
 
   Sale get _sale => widget.sale ?? _loadedSale!;
   int get _saleId => _sale.id!;
@@ -523,7 +524,10 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
             ),
             const SizedBox(height: 8),
             FutureBuilder<File?>(
-              future: ImageService().resolveImageFile(receipt.paymentProofPath),
+              future: _proofFutures.putIfAbsent(
+                receipt.paymentProofPath!,
+                () => ImageService().resolveImageFile(receipt.paymentProofPath),
+              ),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const SizedBox(

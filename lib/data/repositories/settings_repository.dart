@@ -7,4 +7,7 @@ class SettingsRepository {
   Future<int> insert(Settings settings) => _settingsDao.insert(settings);
   Future<int> update(Settings settings) => _settingsDao.update(settings);
   Future<Settings?> getSettings() => _settingsDao.getSettings();
+
+  /// Returns the raw `groq_api_key` stored in the settings table.
+  Future<String?> getGroqApiKeyRaw() => _settingsDao.getGroqApiKeyRaw();
 }

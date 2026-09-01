@@ -17,4 +17,18 @@ class SettingsDao extends BaseDao<Settings> {
     if (maps.isEmpty) return null;
     return fromMap(maps.first);
   }
+
+  /// Returns the raw `groq_api_key` column for one-time migration to secure
+  /// storage. Returns null when the column is absent or empty.
+  Future<String?> getGroqApiKeyRaw() async {
+    final database = await db;
+    final maps = await database.query(
+      tableName,
+      columns: ['groq_api_key'],
+      limit: 1,
+    );
+    if (maps.isEmpty) return null;
+    final value = maps.first['groq_api_key'];
+    return value is String ? value : null;
+  }
 }

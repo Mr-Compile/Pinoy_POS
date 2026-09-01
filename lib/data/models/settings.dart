@@ -1,4 +1,6 @@
 ﻿class Settings {
+  static const Object _sentinel = Object();
+
   final int? id;
   final String storeName;
   final String storeAddress;
@@ -51,7 +53,7 @@
       'receipt_footer': receiptFooter,
       'theme': theme,
       'accent_color': accentColor,
-      'groq_api_key': groqApiKey,
+      'groq_api_key': null, // Stored in secure storage, never in the settings table
       'groq_model': groqModel,
       'gcash_enabled': gcashEnabled ? 1 : 0,
       'gcash_reference_required': gcashReferenceRequired ? 1 : 0,
@@ -66,29 +68,66 @@
   }
 
   factory Settings.fromMap(Map<String, dynamic> map) {
+    String? stringOrNull(String key) {
+      final value = map[key];
+      return value is String ? value : null;
+    }
+
+    int? intOrNull(String key) {
+      final value = map[key];
+      if (value is int) return value;
+      if (value is String) return int.tryParse(value);
+      return null;
+    }
+
+    bool boolFromInt(String key) {
+      final value = map[key];
+      if (value is bool) return value;
+      if (value is int) return value == 1;
+      if (value is String) return value == '1';
+      return false;
+    }
+
+    DateTime parseDateTime(String key) {
+      final value = map[key];
+      if (value is DateTime) return value;
+      if (value is! String) {
+        throw FormatException(
+          'Settings row field "$key" must be a date string, got $value.',
+        );
+      }
+      try {
+        return DateTime.parse(value);
+      } catch (e) {
+        throw FormatException(
+          'Settings row field "$key" has invalid date "$value".',
+        );
+      }
+    }
+
     return Settings(
-      id: map['id'] as int?,
-      storeName: map['store_name'] as String,
-      storeAddress: (map['store_address'] as String?) ?? '',
-      storePhone: (map['store_phone'] as String?) ?? '',
-      currency: (map['currency'] as String?) ?? 'PHP',
-      receiptFooter: map['receipt_footer'] as String?,
-      theme: map['theme'] as String?,
-      accentColor: map['accent_color'] as String?,
-      groqApiKey: map['groq_api_key'] as String?,
-      groqModel: map['groq_model'] as String?,
-      gcashEnabled: (map['gcash_enabled'] as int?) == 1,
-      gcashReferenceRequired: (map['gcash_reference_required'] as int?) == 1,
+      id: intOrNull('id'),
+      storeName: stringOrNull('store_name') ?? '',
+      storeAddress: stringOrNull('store_address') ?? '',
+      storePhone: stringOrNull('store_phone') ?? '',
+      currency: stringOrNull('currency') ?? 'PHP',
+      receiptFooter: stringOrNull('receipt_footer'),
+      theme: stringOrNull('theme'),
+      accentColor: stringOrNull('accent_color'),
+      groqApiKey: null, // Stored in flutter_secure_storage, never in memory from the DB
+      groqModel: stringOrNull('groq_model'),
+      gcashEnabled: boolFromInt('gcash_enabled'),
+      gcashReferenceRequired: boolFromInt('gcash_reference_required'),
       gcashCustomerNameRequirement:
-          (map['gcash_customer_name_requirement'] as String?) ?? 'optional',
+          stringOrNull('gcash_customer_name_requirement') ?? 'optional',
       gcashPaymentProofRequirement:
-          (map['gcash_payment_proof_requirement'] as String?) ?? 'optional',
+          stringOrNull('gcash_payment_proof_requirement') ?? 'optional',
       gcashVerificationMode:
-          (map['gcash_verification_mode'] as String?) ?? 'immediate',
-      gcashReferenceMinLength: (map['gcash_reference_min_length'] as int?) ?? 6,
-      aiDailyQuota: (map['ai_daily_quota'] as int?) ?? 20,
-      createdAt: DateTime.parse(map['created_at'] as String),
-      updatedAt: DateTime.parse(map['updated_at'] as String),
+          stringOrNull('gcash_verification_mode') ?? 'immediate',
+      gcashReferenceMinLength: intOrNull('gcash_reference_min_length') ?? 6,
+      aiDailyQuota: intOrNull('ai_daily_quota') ?? 20,
+      createdAt: parseDateTime('created_at'),
+      updatedAt: parseDateTime('updated_at'),
     );
   }
 
@@ -101,8 +140,8 @@
     String? receiptFooter,
     String? theme,
     String? accentColor,
-    String? groqApiKey,
-    String? groqModel,
+    Object? groqApiKey = _sentinel,
+    Object? groqModel = _sentinel,
     bool? gcashEnabled,
     bool? gcashReferenceRequired,
     String? gcashCustomerNameRequirement,
@@ -122,8 +161,10 @@
       receiptFooter: receiptFooter ?? this.receiptFooter,
       theme: theme ?? this.theme,
       accentColor: accentColor ?? this.accentColor,
-      groqApiKey: groqApiKey ?? this.groqApiKey,
-      groqModel: groqModel ?? this.groqModel,
+      groqApiKey:
+          groqApiKey == _sentinel ? this.groqApiKey : groqApiKey as String?,
+      groqModel:
+          groqModel == _sentinel ? this.groqModel : groqModel as String?,
       gcashEnabled: gcashEnabled ?? this.gcashEnabled,
       gcashReferenceRequired: gcashReferenceRequired ?? this.gcashReferenceRequired,
       gcashCustomerNameRequirement:

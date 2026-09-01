@@ -4,12 +4,15 @@ import 'package:pinoy_pos/data/models/payment_settings.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
 import 'package:pinoy_pos/data/repositories/settings_repository.dart';
 import 'package:pinoy_pos/services/groq_service.dart';
+import 'package:pinoy_pos/services/secure_storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsService {
   final SettingsRepository _settingsRepository = SettingsRepository();
   final SessionManager _sessionManager = SessionManager();
   final GroqService _groqService = GroqService();
+  final SecureStorageService _secureStorage = SecureStorageService();
+  static const String _groqApiKeySecureKey = 'groq_api_key';
   Settings? _currentSettings;
   Settings? _storeInfo;
 
@@ -26,6 +29,8 @@ class SettingsService {
       throw AuthorizationException('view_settings');
     }
     if (_currentSettings != null) {
+      await _migrateGroqApiKey();
+      _currentSettings = _currentSettings!.copyWith(groqApiKey: null);
       return _currentSettings!;
     }
 
@@ -41,6 +46,8 @@ class SettingsService {
       _currentSettings = defaultSettings.copyWith(id: id);
     }
 
+    await _migrateGroqApiKey();
+    _currentSettings = _currentSettings!.copyWith(groqApiKey: null);
     return _currentSettings!;
   }
 
@@ -77,7 +84,11 @@ class SettingsService {
     if (!_sessionManager.hasPermission('edit_settings')) {
       throw AuthorizationException('edit_settings');
     }
-    final updated = settings.copyWith(updatedAt: DateTime.now());
+    // The API key is never written to the settings table.
+    final updated = settings.copyWith(
+      groqApiKey: null,
+      updatedAt: DateTime.now(),
+    );
     await _settingsRepository.update(updated);
     _currentSettings = updated;
     _storeInfo = null;
@@ -118,6 +129,28 @@ class SettingsService {
     await getStoreInfo();
   }
 
+  /// Migrates a plain-text `groq_api_key` from the settings table into
+  /// [flutter_secure_storage] and clears the column.
+  ///
+  /// If the secure-storage key already exists, it overwrites the DB copy only.
+  Future<bool> _migrateGroqApiKey() async {
+    final dbKey = await _settingsRepository.getGroqApiKeyRaw();
+    if (dbKey == null || dbKey.isEmpty) return false;
+
+    final settings = await _settingsRepository.getSettings();
+    if (settings == null) return false;
+
+    final secureKey = await _secureStorage.read(key: _groqApiKeySecureKey);
+    if (secureKey == null || secureKey.isEmpty) {
+      await _secureStorage.write(key: _groqApiKeySecureKey, value: dbKey);
+    }
+
+    await _settingsRepository.update(
+      settings.copyWith(groqApiKey: null, updatedAt: DateTime.now()),
+    );
+    return true;
+  }
+
   Future<String> getTheme() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('theme') ?? 'light';
@@ -130,11 +163,11 @@ class SettingsService {
 
   // ── Groq AI configuration ────────────────────────────────────────────
   //
-  // The Groq API key and model are stored in the settings table. Only
-  // System Admin (who has the `manage_ai_config` permission) may set them.
-  // The Owner's AI Advisor reads the key via [getGroqApiKey] but never
-  // receives it through provider state — it is fetched inside the service
-  // and used only for the HTTP Authorization header.
+  // The Groq API key is stored in flutter_secure_storage, not the SQLite
+  // settings table. Only System Admin (who has the `manage_ai_config`
+  // permission) may set it. The Owner's AI Advisor reads the key via
+  // [getGroqApiKey]; it is fetched inside the service and used only for the
+  // HTTP Authorization header.
 
   /// Returns the configured Groq API key, or null if not configured.
   /// Requires `use_ai_advisor` (all roles — used to send AI requests) or
@@ -146,8 +179,9 @@ class SettingsService {
         !_sessionManager.hasPermission('manage_ai_config')) {
       return null;
     }
-    final settings = await getSettings();
-    final key = settings.groqApiKey;
+    // getSettings will migrate any old plain-text key from the DB first.
+    await getSettings();
+    final key = await _secureStorage.read(key: _groqApiKeySecureKey);
     if (key == null || key.trim().isEmpty) return null;
     return key.trim();
   }
@@ -173,10 +207,16 @@ class SettingsService {
     if (!_sessionManager.hasPermission('manage_ai_config')) {
       throw AuthorizationException('manage_ai_config');
     }
+    final trimmedKey = apiKey.trim();
+    final trimmedModel = model.trim();
+
+    // Store the key in secure storage, never in the settings table.
+    await _secureStorage.write(key: _groqApiKeySecureKey, value: trimmedKey);
+
     final settings = await getSettings();
     final updated = settings.copyWith(
-      groqApiKey: apiKey.trim(),
-      groqModel: model.trim(),
+      groqApiKey: null,
+      groqModel: trimmedModel,
       updatedAt: DateTime.now(),
     );
     return updateSettings(updated);
@@ -187,6 +227,8 @@ class SettingsService {
     if (!_sessionManager.hasPermission('manage_ai_config')) {
       throw AuthorizationException('manage_ai_config');
     }
+    await _secureStorage.delete(key: _groqApiKeySecureKey);
+
     final settings = await getSettings();
     final updated = settings.copyWith(
       groqApiKey: null,
