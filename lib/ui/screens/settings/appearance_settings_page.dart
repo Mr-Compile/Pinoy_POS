@@ -60,14 +60,13 @@ class AppearanceSettingsPage extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 24),
-            // Brand color info
             AppCard(
               child: ListTile(
                 leading: Icon(Icons.palette_outlined,
                     color: Theme.of(context).colorScheme.primary),
-                title: const Text('Brand Color'),
+                title: const Text('Accent Color'),
                 subtitle: const Text(
-                    'Pinoy POS Blue — universal across all roles'),
+                    'Derived from the semantic primary color.'),
                 trailing: Container(
                   width: 28,
                   height: 28,

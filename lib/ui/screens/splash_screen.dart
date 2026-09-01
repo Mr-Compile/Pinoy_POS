@@ -14,8 +14,8 @@ import 'package:pinoy_pos/ui/widgets/app_logo.dart';
 ///   - Authenticated → [AppShell]
 ///   - Unauthenticated → [LoginScreen]
 ///
-/// The splash is theme-aware (light/dark) and uses the universal
-/// Pinoy POS Blue branding. No artificial delays — the splash is
+/// The splash is theme-aware (light/dark) and uses the semantic
+/// primary color from the app's color scheme. No artificial delays —
 /// visible only while `AuthStateNotifier._init()` runs.
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});

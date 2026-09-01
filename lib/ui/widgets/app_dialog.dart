@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/spacing.dart';
+import 'package:pinoy_pos/ui/widgets/app_button.dart';
 
 enum AppDialogType {
   success,
@@ -261,40 +262,40 @@ class AppDialog extends StatelessWidget {
   }
 
   Widget _buildActions(BuildContext context, bool isTablet) {
-    Widget buildAction(AppDialogAction action) {
+    final stackVertically = actions.length > 2 || !isTablet;
+
+    Widget buildAction(AppDialogAction action, {required bool fullWidth}) {
       final handler = action.onPressed == null
           ? null
           : () => action.onPressed!(context);
 
-      return action.isPrimary
-          ? FilledButton(
-              onPressed: handler,
-              style: action.isDestructive
-                  ? FilledButton.styleFrom(
-                      backgroundColor: AppSemanticColors.error,
-                      foregroundColor: AppSemanticColors.onError,
-                      minimumSize: const Size(88, 48),
-                    )
-                  : FilledButton.styleFrom(
-                      minimumSize: const Size(88, 48),
-                    ),
-              child: Text(action.label),
-            )
-          : TextButton(
-              onPressed: handler,
-              style: action.isDestructive
-                  ? TextButton.styleFrom(
-                      foregroundColor: AppSemanticColors.error,
-                      minimumSize: const Size(88, 48),
-                    )
-                  : TextButton.styleFrom(
-                      minimumSize: const Size(88, 48),
-                    ),
-              child: Text(action.label),
-            );
+      if (action.isDestructive) {
+        return AppButton.destructive(
+          onPressed: handler,
+          label: action.label,
+          fullWidth: fullWidth,
+        );
+      }
+
+      if (action.isPrimary) {
+        return AppButton.filled(
+          onPressed: handler,
+          label: action.label,
+          fullWidth: fullWidth,
+        );
+      }
+
+      return AppButton.text(
+        onPressed: handler,
+        label: action.label,
+        color: action.isDestructive
+            ? AppButtonColor.error
+            : AppButtonColor.neutral,
+        fullWidth: fullWidth,
+      );
     }
 
-    if (actions.length > 2 || !isTablet) {
+    if (stackVertically) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: actions.asMap().entries.map((entry) {
@@ -304,7 +305,7 @@ class AppDialog extends StatelessWidget {
 
           return Padding(
             padding: EdgeInsets.only(top: isFirst ? 0 : Spacing.sm),
-            child: buildAction(action),
+            child: buildAction(action, fullWidth: true),
           );
         }).toList(),
       );
@@ -319,7 +320,7 @@ class AppDialog extends StatelessWidget {
 
         return Padding(
           padding: EdgeInsets.only(left: isLast ? 0 : Spacing.sm),
-          child: buildAction(action),
+          child: buildAction(action, fullWidth: false),
         );
       }).toList(),
     );

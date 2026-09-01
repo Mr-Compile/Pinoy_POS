@@ -5,6 +5,8 @@ import 'package:pinoy_pos/data/models/announcement.dart';
 import 'package:pinoy_pos/data/models/daily_sales_point.dart';
 import 'package:pinoy_pos/data/models/product.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
+import 'package:pinoy_pos/data/models/sales_by_hour_point.dart';
+import 'package:pinoy_pos/data/models/staff_sales_summary.dart';
 import 'package:pinoy_pos/data/models/top_product_result.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/data/repositories/activity_log_repository.dart';
@@ -75,6 +77,8 @@ class OwnerDashboardData {
   final List<ActivityLog> recentActivities;
   final List<Announcement> announcements;
   final List<Product> lowStockProducts;
+  final List<StaffSalesSummary> staffSales;
+  final List<SalesByHourPoint> salesByHour;
 
   const OwnerDashboardData({
     required this.todaySales,
@@ -88,11 +92,13 @@ class OwnerDashboardData {
     required this.recentActivities,
     required this.announcements,
     required this.lowStockProducts,
+    required this.staffSales,
+    required this.salesByHour,
   });
 }
 
 /// Aggregated System Admin dashboard data. All values come from real
-/// SQLite rows. Contains NO business/POS analytics.
+/// SQLite rows.
 class AdminDashboardData {
   final int activeUsers;
   final int inactiveUsers;
@@ -101,6 +107,8 @@ class AdminDashboardData {
   final BackupSummary backupStatus;
   final int trashCount;
   final List<ActivityLog> recentActivities;
+  final List<StaffSalesSummary> staffSales;
+  final List<SalesByHourPoint> salesByHour;
 
   const AdminDashboardData({
     required this.activeUsers,
@@ -110,6 +118,8 @@ class AdminDashboardData {
     required this.backupStatus,
     required this.trashCount,
     required this.recentActivities,
+    required this.staffSales,
+    required this.salesByHour,
   });
 }
 
@@ -125,6 +135,7 @@ class StaffDashboardData {
   final List<Sale> myRecentSales;
   final List<ActivityLog> recentActivities;
   final List<Product> lowStockProducts;
+  final List<SalesByHourPoint> mySalesByHour;
 
   const StaffDashboardData({
     required this.mySalesToday,
@@ -136,6 +147,7 @@ class StaffDashboardData {
     required this.myRecentSales,
     required this.recentActivities,
     required this.lowStockProducts,
+    required this.mySalesByHour,
   });
 }
 
@@ -236,6 +248,14 @@ class DashboardService {
     // Active announcements, pinned first.
     final announcements = await _loadAnnouncements();
 
+    // Staff performance and hourly sales for the same 7-day window.
+    final staffSales = await _saleRepository.getStaffSalesSummary(
+      trendStart,
+      trendEnd,
+      role: UserRole.staff,
+    );
+    final salesByHour = await _saleRepository.getSalesByHour(trendStart, trendEnd);
+
     return OwnerDashboardData(
       todaySales: todaySales,
       todayTransactions: todayTransactions,
@@ -248,6 +268,8 @@ class DashboardService {
       recentActivities: recentActivities,
       announcements: announcements,
       lowStockProducts: lowStockProducts,
+      staffSales: staffSales,
+      salesByHour: salesByHour,
     );
   }
 
@@ -290,6 +312,14 @@ class DashboardService {
     // Trash count.
     final trashItems = await _trashRepository.getAll();
 
+    // Staff performance and hourly sales for the last 7 days.
+    final staffSales = await _saleRepository.getStaffSalesSummary(
+      weekAgo,
+      now,
+      role: UserRole.staff,
+    );
+    final salesByHour = await _saleRepository.getSalesByHour(weekAgo, now);
+
     return AdminDashboardData(
       activeUsers: activeUsers.length,
       inactiveUsers: inactiveCount < 0 ? 0 : inactiveCount,
@@ -302,6 +332,8 @@ class DashboardService {
       backupStatus: backupSummary,
       trashCount: trashItems.length,
       recentActivities: recentActivities,
+      staffSales: staffSales,
+      salesByHour: salesByHour,
     );
   }
 
@@ -351,6 +383,13 @@ class DashboardService {
     final activities = await _activityLogRepository.getByUserId(userId);
     final recentActivities = activities.take(5).toList();
 
+    // Own sales by hour over the last 7 days.
+    final mySalesByHour = await _saleRepository.getSalesByHour(
+      trendStart,
+      trendEnd,
+      userId: userId,
+    );
+
     return StaffDashboardData(
       mySalesToday: myTodaySales,
       myTransactionsToday: myTodayTransactions,
@@ -361,6 +400,7 @@ class DashboardService {
       myRecentSales: myRecentSales,
       recentActivities: recentActivities,
       lowStockProducts: lowStockProducts,
+      mySalesByHour: mySalesByHour,
     );
   }
 
@@ -445,6 +485,8 @@ class DashboardService {
         recentActivities: [],
         announcements: [],
         lowStockProducts: [],
+        staffSales: [],
+        salesByHour: [],
       );
 
   AdminDashboardData _emptyAdmin() => const AdminDashboardData(
@@ -455,6 +497,8 @@ class DashboardService {
         backupStatus: BackupSummary(hasBackup: false),
         trashCount: 0,
         recentActivities: [],
+        staffSales: [],
+        salesByHour: [],
       );
 
   StaffDashboardData _emptyStaff() => const StaffDashboardData(
@@ -467,5 +511,6 @@ class DashboardService {
         myRecentSales: [],
         recentActivities: [],
         lowStockProducts: [],
+        mySalesByHour: [],
       );
 }

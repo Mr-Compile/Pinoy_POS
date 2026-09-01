@@ -32,6 +32,32 @@ class _ExportSale {
   int get itemCount => items.fold<int>(0, (sum, i) => sum + i.quantity);
 }
 
+/// Aggregated sales for a single product.
+class _ProductSummary {
+  final String name;
+  int quantity = 0;
+  double total = 0.0;
+
+  _ProductSummary({required this.name});
+}
+
+/// Builds an aggregated "Sales by Product" list from export sales.
+List<_ProductSummary> _salesByProduct(List<_ExportSale> exportSales) {
+  final map = <String, _ProductSummary>{};
+  for (final export in exportSales) {
+    for (final item in export.items) {
+      final name = item.productName ?? 'Product #${item.productId}';
+      final existing = map.putIfAbsent(
+          name, () => _ProductSummary(name: name));
+      existing.quantity += item.quantity;
+      existing.total += item.totalPrice;
+    }
+  }
+  final list = map.values.toList()
+    ..sort((a, b) => b.total.compareTo(a.total));
+  return list;
+}
+
 class ReportsScreen extends ConsumerStatefulWidget {
   const ReportsScreen({super.key});
 
@@ -587,7 +613,13 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           .toList();
 
       final users = await ref.read(userServiceProvider).getAllUsers();
-      final userNames = {for (final u in users) u.id!: u.fullName};
+      final userNames = {
+        for (final u in users)
+          if (u.id != null)
+            u.id!: u.fullName.isNotEmpty
+                ? u.fullName
+                : (u.username.isNotEmpty ? u.username : 'User ${u.id}')
+      };
 
       final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
 
@@ -619,36 +651,43 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     final store = state.storeInfo;
     final currency = store.currency;
 
-    final brandColor = PdfColor.fromInt(0xFF1565C0);
-    final successLight = PdfColor.fromInt(0xFFC8E6C9);
-    final successDark = PdfColor.fromInt(0xFF2E7D32);
+    final cs = AppColors.getLightColorScheme();
+
+    PdfColor pdfColor(Color color) => PdfColor.fromInt(color.pdfValue);
+
+    final primary = cs.primary;
+    final onPrimary = cs.onPrimary;
+    final successLight = pdfColor(AppSemanticColors.successContainer);
+    final successDark = pdfColor(AppSemanticColors.success);
 
     PdfColor methodColor(String method) {
-      return switch (method.toLowerCase()) {
-        'cash' => PdfColor.fromInt(0xFF1565C0),
-        'gcash' => PdfColor.fromInt(0xFF2E7D32),
-        'card' => PdfColor.fromInt(0xFF7C4DFF),
-        _ => PdfColor.fromInt(0xFF757575),
+      final color = switch (method.toLowerCase()) {
+        'cash' => cs.primary,
+        'gcash' => AppSemanticColors.success,
+        'card' => AppSemanticColors.info,
+        _ => AppSemanticColors.neutral,
       };
+      return pdfColor(color);
     }
 
     PdfColor methodBackground(String method) {
-      return switch (method.toLowerCase()) {
-        'cash' => PdfColor.fromInt(0xFFE3F2FD),
-        'gcash' => PdfColor.fromInt(0xFFC8E6C9),
-        'card' => PdfColor.fromInt(0xFFD1C4E9),
-        _ => PdfColor.fromInt(0xFFF5F5F5),
+      final color = switch (method.toLowerCase()) {
+        'cash' => cs.primaryContainer,
+        'gcash' => AppSemanticColors.successContainer,
+        'card' => AppSemanticColors.infoContainer,
+        _ => AppSemanticColors.neutralContainer,
       };
+      return pdfColor(color);
     }
 
     pw.Widget headerCell(String text) => pw.Container(
           alignment: pw.Alignment.centerLeft,
           padding: const pw.EdgeInsets.all(5),
-          color: brandColor,
+          color: pdfColor(primary),
           child: pw.Text(
             text,
             style: pw.TextStyle(
-              color: PdfColors.white,
+              color: pdfColor(onPrimary),
               fontWeight: pw.FontWeight.bold,
               fontSize: 9,
             ),
@@ -821,36 +860,30 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       );
     }
 
-    pw.Table buildLineItemsTable() {
-      const headers = ['Receipt #', 'Product', 'Qty', 'Unit Price', 'Line Total'];
+    pw.Table buildSalesByProductTable() {
+      final productSales = _salesByProduct(exportSales);
+      final headers = ['Product', 'Qty', 'Revenue ($currency)'];
 
-      final grandTotal = exportSales.fold<double>(
+      final grandTotal = productSales.fold<double>(
         0.0,
-        (sum, e) => sum + e.sale.totalAmount,
+        (sum, p) => sum + p.total,
       );
 
       final rows = <pw.TableRow>[
         pw.TableRow(children: headers.map(headerCell).toList()),
       ];
 
-      for (final export in exportSales) {
-        for (final item in export.items) {
-          rows.add(pw.TableRow(
-            children: [
-              dataCell('${export.sale.receiptNumber ?? export.sale.id}'),
-              dataCell(item.productName ?? 'Product #${item.productId}'),
-              dataCell('${item.quantity}', alignment: pw.Alignment.centerRight),
-              dataCell(
-                '$currency ${item.unitPrice.toStringAsFixed(2)}',
-                alignment: pw.Alignment.centerRight,
-              ),
-              dataCell(
-                '$currency ${item.totalPrice.toStringAsFixed(2)}',
-                alignment: pw.Alignment.centerRight,
-              ),
-            ],
-          ));
-        }
+      for (final product in productSales) {
+        rows.add(pw.TableRow(
+          children: [
+            dataCell(product.name),
+            dataCell('${product.quantity}', alignment: pw.Alignment.centerRight),
+            dataCell(
+              '$currency ${product.total.toStringAsFixed(2)}',
+              alignment: pw.Alignment.centerRight,
+            ),
+          ],
+        ));
       }
 
       rows.add(pw.TableRow(
@@ -861,8 +894,6 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             textColor: successDark,
             bold: true,
           ),
-          pw.SizedBox.shrink(),
-          pw.SizedBox.shrink(),
           pw.SizedBox.shrink(),
           dataCell(
             '$currency ${grandTotal.toStringAsFixed(2)}',
@@ -876,11 +907,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
       return pw.Table(
         columnWidths: {
-          0: const pw.FixedColumnWidth(70),
-          1: const pw.FlexColumnWidth(),
-          2: const pw.FixedColumnWidth(40),
-          3: const pw.FixedColumnWidth(70),
-          4: const pw.FixedColumnWidth(70),
+          0: const pw.FlexColumnWidth(),
+          1: const pw.FixedColumnWidth(50),
+          2: const pw.FixedColumnWidth(100),
         },
         border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
         children: rows,
@@ -894,14 +923,14 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(40),
         build: (pw.Context context) => [
-          _buildPdfHeader(store),
+          _buildPdfHeader(store, pdfColor(primary)),
           pw.SizedBox(height: 16),
           pw.Text(
             'Sales Report',
             style: pw.TextStyle(
               fontSize: 20,
               fontWeight: pw.FontWeight.bold,
-              color: brandColor,
+              color: pdfColor(primary),
             ),
           ),
           pw.Text(
@@ -924,8 +953,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           pw.Header(level: 1, child: pw.Text('Sales Transactions')),
           buildTransactionsTable(),
           pw.SizedBox(height: 20),
-          pw.Header(level: 1, child: pw.Text('Line Items')),
-          buildLineItemsTable(),
+          pw.Header(level: 1, child: pw.Text('Sales by Product')),
+          buildSalesByProductTable(),
         ],
       ),
     );
@@ -963,9 +992,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     }
   }
 
-  pw.Widget _buildPdfHeader(Settings store) {
-    final brandColor = PdfColor.fromInt(0xFF1565C0);
-
+  pw.Widget _buildPdfHeader(Settings store, PdfColor primaryColor) {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
@@ -974,7 +1001,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           style: pw.TextStyle(
             fontSize: 24,
             fontWeight: pw.FontWeight.bold,
-            color: brandColor,
+            color: primaryColor,
           ),
         ),
         if (store.storeAddress.isNotEmpty)
@@ -1002,38 +1029,44 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
     excel.delete('Sheet1');
 
-    final brandBlue = ExcelColor.fromHexString('FF1565C0');
-    final white = ExcelColor.white;
-    final successLight = ExcelColor.fromHexString('FFC8E6C9');
-    final successDark = ExcelColor.fromHexString('FF2E7D32');
+    final cs = AppColors.getLightColorScheme();
+
+    final primary = cs.primary;
+    final onPrimary = cs.onPrimary;
+    final successLight = AppSemanticColors.successContainer;
+    final successDark = AppSemanticColors.success;
+
+    ExcelColor excelColor(Color color) => ExcelColor.fromHexString(color.excelHex);
 
     ExcelColor methodColor(String method) {
-      return switch (method.toLowerCase()) {
-        'cash' => ExcelColor.fromHexString('FF1565C0'),
-        'gcash' => ExcelColor.fromHexString('FF2E7D32'),
-        'card' => ExcelColor.fromHexString('FF7C4DFF'),
-        _ => ExcelColor.fromHexString('FF757575'),
+      final color = switch (method.toLowerCase()) {
+        'cash' => cs.primary,
+        'gcash' => AppSemanticColors.success,
+        'card' => AppSemanticColors.info,
+        _ => AppSemanticColors.neutral,
       };
+      return excelColor(color);
     }
 
     ExcelColor methodBackground(String method) {
-      return switch (method.toLowerCase()) {
-        'cash' => ExcelColor.fromHexString('FFE3F2FD'),
-        'gcash' => ExcelColor.fromHexString('FFC8E6C9'),
-        'card' => ExcelColor.fromHexString('FFD1C4E9'),
-        _ => ExcelColor.fromHexString('FFF5F5F5'),
+      final color = switch (method.toLowerCase()) {
+        'cash' => cs.primaryContainer,
+        'gcash' => AppSemanticColors.successContainer,
+        'card' => AppSemanticColors.infoContainer,
+        _ => AppSemanticColors.neutralContainer,
       };
+      return excelColor(color);
     }
 
     CellStyle headerStyle() => CellStyle(
-          backgroundColorHex: brandBlue,
-          fontColorHex: white,
+          backgroundColorHex: excelColor(primary),
+          fontColorHex: excelColor(onPrimary),
           bold: true,
         );
 
     CellStyle totalStyle() => CellStyle(
-          backgroundColorHex: successLight,
-          fontColorHex: successDark,
+          backgroundColorHex: excelColor(successLight),
+          fontColorHex: excelColor(successDark),
           bold: true,
           numberFormat: NumFormat.standard_4,
           horizontalAlign: HorizontalAlign.Right,
@@ -1304,6 +1337,47 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
     for (var i = 0; i < itemHeaders.length; i++) {
       itemsSheet.setColumnAutoFit(i);
+    }
+
+    // ── Sales by Product sheet ──
+    final productSheet = excel['Sales by Product'];
+    final productHeaders = ['Product', 'Qty', 'Revenue ($currency)'];
+    writeHeaderRow(productSheet, 0, 0, productHeaders);
+
+    final productSales = _salesByProduct(exportSales);
+    var productRow = 1;
+    for (final p in productSales) {
+      writeCell(productSheet, productRow, 0, TextCellValue(p.name));
+      writeCell(productSheet, productRow, 1, IntCellValue(p.quantity),
+          style: rightAlignStyle());
+      writeCell(
+        productSheet,
+        productRow,
+        2,
+        DoubleCellValue(p.total),
+        style: currencyStyle(),
+      );
+      productRow++;
+    }
+
+    writeCell(
+      productSheet,
+      productRow,
+      0,
+      TextCellValue('Grand Total'),
+      style: totalStyle(),
+    );
+    writeCell(productSheet, productRow, 1, TextCellValue(''));
+    writeCell(
+      productSheet,
+      productRow,
+      2,
+      DoubleCellValue(grandTotal),
+      style: totalStyle(),
+    );
+
+    for (var i = 0; i < productHeaders.length; i++) {
+      productSheet.setColumnAutoFit(i);
     }
 
     final bytes = excel.save();

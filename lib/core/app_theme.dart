@@ -2,14 +2,25 @@ import 'package:flutter/material.dart';
 
 export 'app_typography.dart';
 
-/// Semantic colors that communicate meaning (success, warning, error, info).
+/// Semantic colors that communicate meaning (primary, success, warning, error,
+/// info, neutral, disabled).
 ///
-/// These are independent of the brand color and must NOT be overridden.
-/// They are intentionally hardcoded because they carry universal meaning
-/// (red = error, green = success, amber = warning, blue = info) and should
-/// remain consistent across light/dark mode and across all users.
+/// These are the SINGLE SOURCE OF TRUTH for fixed color roles. The
+/// [ColorScheme] used by the app is generated from [AppSemanticColors.primary]
+/// so the full Material 3 palette stays consistent in both light and dark mode.
+/// Status colors are intentionally hardcoded because they carry universal
+/// meaning and must remain consistent across themes.
 class AppSemanticColors {
   AppSemanticColors._();
+
+  // ── Primary color role ───────────────────────────────────────────────
+
+  /// The seed for the Material 3 dynamic palette. This is a semantic primary
+  /// role, not a brand asset. The same value is used by every role and screen.
+  static const Color primary = Color(0xFF1565C0);
+  static const Color onPrimary = Color(0xFFFFFFFF);
+
+  // ── Status and feedback colors ───────────────────────────────────────
 
   static const Color success = Color(0xFF2E7D32);
   static const Color onSuccess = Color(0xFFFFFFFF);
@@ -31,57 +42,61 @@ class AppSemanticColors {
   static const Color infoContainer = Color(0xFFB3E5FC);
   static const Color onInfoContainer = Color(0xFF001F3F);
 
+  /// Neutral grey for non-emphasised actions and secondary surfaces.
+  static const Color neutral = Color(0xFF5F6368);
+  static const Color onNeutral = Color(0xFFFFFFFF);
+  static const Color neutralContainer = Color(0xFFE8EAED);
+  static const Color onNeutralContainer = Color(0xFF202124);
+
   /// A subtle, accessible grey for disabled / placeholder states.
   static const Color disabled = Color(0xFF9E9E9E);
 }
 
-/// Centralized color and theme definitions — the SINGLE SOURCE OF TRUTH.
+/// Centralized color and theme definitions.
 ///
-/// The application uses ONE universal brand color: **Pinoy POS Blue**.
-/// There are no per-user accent colors. The same blue is used by Owner,
-/// Admin, Staff, and the login screen in both light and dark mode.
-///
-/// The theme uses `ColorScheme.fromSeed()` with a vibrant blue seed and
-/// custom surface tints to avoid the ash-gray appearance that default
-/// Material 3 produces.
+/// The application no longer uses a fixed brand color. The semantic primary
+/// color from [AppSemanticColors] seeds the dynamic Material 3 [ColorScheme]
+/// in both light and dark mode.
 class AppColors {
   AppColors._();
 
-  // ── Universal Pinoy POS Blue brand color ────────────────────────────
+  // ── ColorSchemes ────────────────────────────────────────────────────
 
-  /// The single brand seed color for the entire application.
-  /// A modern, vibrant blue (blue.shade800) that produces a clean
-  /// Material 3 ColorScheme in both light and dark mode.
-  static const Color brandBlue = Color(0xFF1565C0); // blue.shade800
+  /// Light mode [ColorScheme] derived from the semantic primary seed.
+  static ColorScheme getLightColorScheme() =>
+      _buildColorScheme(Brightness.light);
+
+  /// Dark mode [ColorScheme] derived from the semantic primary seed.
+  static ColorScheme getDarkColorScheme() =>
+      _buildColorScheme(Brightness.dark);
 
   // ── Light theme ─────────────────────────────────────────────────────
 
-  static ThemeData getLightTheme() {
-    return _buildTheme(
-      seedColor: brandBlue,
-      brightness: Brightness.light,
-    );
-  }
+  static ThemeData getLightTheme() => _buildTheme(Brightness.light);
 
   // ── Dark theme ──────────────────────────────────────────────────────
 
-  static ThemeData getDarkTheme() {
-    return _buildTheme(
-      seedColor: brandBlue,
-      brightness: Brightness.dark,
+  static ThemeData getDarkTheme() => _buildTheme(Brightness.dark);
+
+  // ── Shared color scheme builder ─────────────────────────────────────
+
+  static ColorScheme _buildColorScheme(Brightness brightness) {
+    return ColorScheme.fromSeed(
+      seedColor: AppSemanticColors.primary,
+      brightness: brightness,
+    ).copyWith(
+      // Keep the semantic error family in sync with the app palette.
+      error: AppSemanticColors.error,
+      onError: AppSemanticColors.onError,
+      errorContainer: AppSemanticColors.errorContainer,
+      onErrorContainer: AppSemanticColors.onErrorContainer,
     );
   }
 
-  // ── Shared theme builder ───────────────────────────────────────────
+  // ── Shared theme builder ────────────────────────────────────────────
 
-  static ThemeData _buildTheme({
-    required Color seedColor,
-    required Brightness brightness,
-  }) {
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: seedColor,
-      brightness: brightness,
-    );
+  static ThemeData _buildTheme(Brightness brightness) {
+    final colorScheme = _buildColorScheme(brightness);
 
     final isDark = brightness == Brightness.dark;
 
@@ -326,8 +341,8 @@ class AppColors {
   // ── Premium button gradient ────────────────────────────────────────
 
   /// Returns a subtle vertical gradient for a primary button, derived
-  /// from the brand color. Light mode uses a very subtle lift; dark
-  /// mode uses a slightly deeper shade for depth.
+  /// from the theme's primary color. Light mode uses a very subtle lift;
+  /// dark mode uses a slightly deeper shade for depth.
   static LinearGradient? premiumButtonGradient(
     ColorScheme colorScheme,
     Brightness brightness,
@@ -343,4 +358,15 @@ class AppColors {
           : [primary, darkened],
     );
   }
+}
+
+/// Convenience helpers for converting Flutter [Color]s into the formats that
+/// PDF and Excel packages expect.
+extension SemanticColorValue on Color {
+  /// 32-bit ARGB value for `PdfColor.fromInt`.
+  int get pdfValue => toARGB32();
+
+  /// ARGB hex string for `ExcelColor.fromHexString`.
+  String get excelHex =>
+      toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase();
 }

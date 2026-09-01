@@ -66,12 +66,13 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authStateProvider);
-    final screenWidth = MediaQuery.of(context).size.width;
-    final layout = layoutClassFor(screenWidth);
-    final isTablet = layout.isAtLeastMedium;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final authState = ref.watch(authStateProvider);
+        final layout = layoutClassFor(constraints.maxWidth);
+        final isTablet = layout.isAtLeastMedium;
 
-    // AppShell should only be visible when fully authenticated.
+        // AppShell should only be visible when fully authenticated.
     // If the phase changes (e.g. forced password change, PIN lock,
     // or logout), navigate to the appropriate screen.
     if ((authState.user == null ||
@@ -139,7 +140,7 @@ class _AppShellState extends ConsumerState<AppShell> {
           children: [
             Row(
               children: [
-                _buildNavigationRail(tabs, screenWidth, selectedIndex),
+                _buildNavigationRail(tabs, constraints.maxWidth, selectedIndex),
                 const VerticalDivider(thickness: 1, width: 1),
                 Expanded(
                   child: _getScreen(tabs[selectedIndex].screen),
@@ -167,6 +168,8 @@ class _AppShellState extends ConsumerState<AppShell> {
         ],
       ),
       bottomNavigationBar: _buildBottomNavigationBar(tabs, selectedIndex),
+    );
+      },
     );
   }
 

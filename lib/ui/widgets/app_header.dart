@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/ui/widgets/notification_bell.dart';
 import 'package:pinoy_pos/ui/widgets/profile_menu.dart';
+import 'package:pinoy_pos/ui/widgets/theme_toggle.dart';
 
 /// Reusable global app header (AppBar) that provides:
 ///
@@ -31,6 +32,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
   final String title;
   final bool showBackButton;
   final List<Widget>? actions;
+  final bool showThemeToggle;
   final bool showNotificationBell;
   final bool showProfileMenu;
   final PreferredSizeWidget? bottom;
@@ -40,6 +42,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
     required this.title,
     this.showBackButton = false,
     this.actions,
+    this.showThemeToggle = true,
     this.showNotificationBell = true,
     this.showProfileMenu = true,
     this.bottom,
@@ -54,6 +57,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     final headerActions = <Widget>[
       ...?actions,
+      if (showThemeToggle) const ThemeToggle(),
       if (showNotificationBell) const NotificationBell(),
       if (showProfileMenu) const ProfileMenu(),
     ];

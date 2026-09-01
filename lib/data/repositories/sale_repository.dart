@@ -1,5 +1,8 @@
 import 'package:pinoy_pos/data/dao/sale_dao.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
+import 'package:pinoy_pos/data/models/sales_by_hour_point.dart';
+import 'package:pinoy_pos/data/models/staff_sales_summary.dart';
+import 'package:pinoy_pos/data/models/user.dart';
 import 'package:sqflite/sqflite.dart';
 
 class SaleRepository {
@@ -59,4 +62,18 @@ class SaleRepository {
         limit: limit,
         txn: txn,
       );
+
+  Future<List<StaffSalesSummary>> getStaffSalesSummary(
+    DateTime start,
+    DateTime end, {
+    UserRole? role,
+  }) =>
+      _saleDao.getStaffSalesSummary(start, end, role: role);
+
+  Future<List<SalesByHourPoint>> getSalesByHour(
+    DateTime start,
+    DateTime end, {
+    int? userId,
+  }) =>
+      _saleDao.getSalesByHour(start, end, userId: userId);
 }

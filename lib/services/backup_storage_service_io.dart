@@ -185,6 +185,23 @@ class BackupStorageService {
     BackupLocation? defaultLocation,
   }) async {
     if (Platform.isAndroid) {
+      // A persisted fileSystem location on Android (e.g. from a v1 migration)
+      // cannot be used with the SAF createDocument channel.  If the directory
+      // is still writable, write through the desktop file path logic; otherwise
+      // force the user to pick a proper SAF folder.
+      if (location != null && location.type == BackupStorageType.fileSystem) {
+        final (writable, _) = await _isDirectoryWritable(location.reference);
+        if (!writable) {
+          location = null;
+        } else {
+          return _saveBackupDesktop(
+            bytes: bytes,
+            defaultFileName: defaultFileName,
+            location: location,
+          );
+        }
+      }
+
       return _saveBackupAndroid(
         bytes: bytes,
         defaultFileName: defaultFileName,
@@ -403,6 +420,12 @@ class BackupStorageService {
     }
 
     if (location.type == BackupStorageType.fileSystem) {
+      if (Platform.isAndroid) {
+        // On Android a non-SAF path is rarely persistently writable across
+        // sessions and should not count as a valid backup location.
+        final (writable, _) = await _isDirectoryWritable(location.reference);
+        return writable;
+      }
       final (valid, _) = await _isDirectoryWritable(location.reference);
       return valid;
     }

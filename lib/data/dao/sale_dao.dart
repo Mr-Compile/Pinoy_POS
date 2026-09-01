@@ -1,6 +1,9 @@
 import 'package:pinoy_pos/core/date_utils.dart';
 import 'package:pinoy_pos/data/dao/base_dao.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
+import 'package:pinoy_pos/data/models/sales_by_hour_point.dart';
+import 'package:pinoy_pos/data/models/staff_sales_summary.dart';
+import 'package:pinoy_pos/data/models/user.dart';
 import 'package:sqflite/sqflite.dart';
 
 class SaleDao extends BaseDao<Sale> {
@@ -234,5 +237,76 @@ class SaleDao extends BaseDao<Sale> {
       limit: limit,
     );
     return maps.map((map) => fromMap(map)).toList();
+  }
+
+  /// Staff sales performance over a date range, optionally filtered by role.
+  ///
+  /// Only confirmed, non-deleted sales are counted. Results are ordered by
+  /// total sales descending.
+  Future<List<StaffSalesSummary>> getStaffSalesSummary(
+    DateTime start,
+    DateTime end, {
+    UserRole? role,
+  }) async {
+    final database = await db;
+    final conditions = <String>[
+      "s.created_at >= ? AND s.created_at < ?",
+      "s.deleted_at IS NULL",
+      "s.payment_status = 'confirmed'",
+    ];
+    final args = <Object?>[start.toIso8601String(), end.toIso8601String()];
+
+    if (role != null) {
+      conditions.add('u.role = ?');
+      args.add(role.name);
+    }
+
+    final result = await database.rawQuery('''
+      SELECT s.user_id, u.full_name, u.role,
+             COALESCE(SUM(s.total_amount), 0) as total_sales,
+             COUNT(*) as transaction_count
+      FROM sales s
+      INNER JOIN users u ON s.user_id = u.id
+      WHERE ${conditions.join(' AND ')}
+      GROUP BY s.user_id
+      ORDER BY total_sales DESC
+    ''', args);
+
+    return result.map(StaffSalesSummary.fromMap).toList();
+  }
+
+  /// Sales totals grouped by hour of day (0-23) over a date range.
+  ///
+  /// Optionally filtered to a single [userId]. Missing hours are not returned,
+  /// so callers should fill gaps if a complete 24-hour chart is required.
+  Future<List<SalesByHourPoint>> getSalesByHour(
+    DateTime start,
+    DateTime end, {
+    int? userId,
+  }) async {
+    final database = await db;
+    final conditions = <String>[
+      "created_at >= ? AND created_at < ?",
+      "deleted_at IS NULL",
+      "payment_status = 'confirmed'",
+    ];
+    final args = <Object?>[start.toIso8601String(), end.toIso8601String()];
+
+    if (userId != null) {
+      conditions.add('user_id = ?');
+      args.add(userId);
+    }
+
+    final result = await database.rawQuery('''
+      SELECT CAST(strftime('%H', created_at) AS INTEGER) as hour,
+             COALESCE(SUM(total_amount), 0) as total,
+             COUNT(*) as count
+      FROM sales
+      WHERE ${conditions.join(' AND ')}
+      GROUP BY hour
+      ORDER BY hour
+    ''', args);
+
+    return result.map(SalesByHourPoint.fromMap).toList();
   }
 }

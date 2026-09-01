@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 
@@ -191,17 +192,31 @@ class KpiGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    final crossAxisCount = width >= 900 ? desktopColumns : (width >= 600 ? tabletColumns : 2);
-    return GridView.count(
-      crossAxisCount: crossAxisCount,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: Spacing.md,
-      crossAxisSpacing: Spacing.md,
-      // Wider cards on mobile so large numbers don't overflow at 320px.
-      childAspectRatio: width >= 600 ? 1.15 : 0.95,
-      children: children,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final layout = layoutClassFor(width);
+        final crossAxisCount = switch (layout) {
+          LayoutClass.expanded => desktopColumns,
+          LayoutClass.medium => tabletColumns,
+          LayoutClass.compact => 2,
+        };
+        final aspectRatio = switch (layout) {
+          LayoutClass.compact => 0.95,
+          _ => 1.15,
+        };
+
+        return GridView.count(
+          crossAxisCount: crossAxisCount,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: Spacing.md,
+          crossAxisSpacing: Spacing.md,
+          // Wider cards on mobile so large numbers don't overflow at 320px.
+          childAspectRatio: aspectRatio,
+          children: children,
+        );
+      },
     );
   }
 }

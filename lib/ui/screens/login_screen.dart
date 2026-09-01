@@ -3,10 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/auth_navigation.dart';
 import 'package:pinoy_pos/core/constants.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
-import 'package:pinoy_pos/providers/theme_provider.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_logo.dart';
+import 'package:pinoy_pos/ui/widgets/theme_toggle.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -93,22 +93,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
-  void _cycleTheme() {
-    final themeNotifier = ref.read(themeProvider.notifier);
-    final currentMode = ref.read(themeProvider).themeMode;
-    // Cycle: system → light → dark → system
-    final nextMode = switch (currentMode) {
-      'system' => 'light',
-      'light' => 'dark',
-      _ => 'system',
-    };
-    themeNotifier.setThemeMode(nextMode);
-  }
-
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
-    final themeState = ref.watch(themeProvider);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final screenWidth = MediaQuery.of(context).size.width;
@@ -116,13 +103,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     // Logo size scales with screen width but is capped
     final logoSize = isTablet ? 100.0 : 80.0;
-
-    // Theme icon based on current mode
-    final (themeIcon, themeLabel) = switch (themeState.themeMode) {
-      'system' => (Icons.brightness_auto_outlined, 'System'),
-      'light' => (Icons.light_mode_outlined, 'Light'),
-      _ => (Icons.dark_mode_outlined, 'Dark'),
-    };
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
@@ -284,22 +264,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
 
               // ── Theme toggle (top-right) ──
-              Positioned(
+              const Positioned(
                 top: 8,
                 right: 8,
-                child: Semantics(
-                  label: 'Change theme. Current: $themeLabel',
-                  button: true,
-                  child: Tooltip(
-                    message: 'Theme: $themeLabel. Tap to change.',
-                    child: IconButton(
-                      onPressed: _cycleTheme,
-                      icon: Icon(themeIcon),
-                      iconSize: 24,
-                      tooltip: 'Change theme',
-                    ),
-                  ),
-                ),
+                child: ThemeToggle(),
               ),
             ],
           ),

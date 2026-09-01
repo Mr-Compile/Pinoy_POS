@@ -362,7 +362,17 @@ class MainActivity : FlutterFragmentActivity() {
 
     private fun getDisplayName(uri: Uri): String? {
         return try {
-            contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+            // Tree URIs cannot be queried directly; resolve them to their
+            // document URI first so we can read the display name column.
+            val displayUri = if (DocumentsContract.isTreeUri(uri)) {
+                DocumentsContract.buildDocumentUriUsingTree(
+                    uri,
+                    DocumentsContract.getTreeDocumentId(uri),
+                )
+            } else {
+                uri
+            }
+            contentResolver.query(displayUri, null, null, null, null)?.use { cursor ->
                 if (cursor.moveToFirst()) {
                     val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
                         .takeIf { it >= 0 }

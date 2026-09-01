@@ -37,12 +37,13 @@ class _NotificationBellState extends ConsumerState<NotificationBell> {
       key: _iconKey,
       icon: Badge(
         isLabelVisible: unreadCount > 0,
+        backgroundColor: AppSemanticColors.error,
         label: Text(
           _formatBadge(unreadCount),
           style: const TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            color: AppSemanticColors.onError,
           ),
         ),
         child: const Icon(Icons.notifications_outlined),

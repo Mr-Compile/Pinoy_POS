@@ -25,8 +25,11 @@ import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_section.dart';
 import 'package:pinoy_pos/ui/widgets/donut_chart.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
+import 'package:pinoy_pos/ui/widgets/hourly_sales_chart.dart';
 import 'package:pinoy_pos/ui/widgets/kpi_card.dart';
 import 'package:pinoy_pos/ui/widgets/mini_bar_chart.dart';
+import 'package:pinoy_pos/ui/widgets/staff_performance_card.dart';
+import 'package:pinoy_pos/ui/widgets/staff_sales_list.dart';
 
 /// Role-based dashboard screen.
 ///
@@ -297,6 +300,14 @@ class _OwnerDashboard extends ConsumerWidget {
         _buildOwnerQuickActions(context, ref, authNotifier),
         const SizedBox(height: Spacing.xxl),
 
+        // ── Staff performance (top performer + ranked list) ──
+        _buildStaffPerformanceSection(context),
+        const SizedBox(height: Spacing.xxl),
+
+        // ── Sales by hour ──
+        _buildSalesByHourCard(context),
+        const SizedBox(height: Spacing.xxl),
+
         // ── Sales trend chart ──
         _buildSalesTrendCard(context),
         const SizedBox(height: Spacing.xxl),
@@ -459,6 +470,7 @@ class _OwnerDashboard extends ConsumerWidget {
               Align(
                 alignment: Alignment.centerRight,
                 child: AppButton.text(
+                  color: AppButtonColor.info,
                   onPressed: () => Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const StockScreen()),
@@ -585,6 +597,7 @@ class _OwnerDashboard extends ConsumerWidget {
           if (authNotifier.hasPermission('create_sales'))
             _QuickAction(
               label: 'New Sale',
+              color: AppButtonColor.success,
               icon: Icons.point_of_sale,
               onTap: () => Navigator.push(
                 context,
@@ -594,6 +607,7 @@ class _OwnerDashboard extends ConsumerWidget {
           if (authNotifier.hasPermission('edit_products'))
             _QuickAction(
               label: 'Add Product',
+              color: AppButtonColor.info,
               icon: Icons.add_box_outlined,
               onTap: () => Navigator.push(
                 context,
@@ -603,6 +617,7 @@ class _OwnerDashboard extends ConsumerWidget {
           if (authNotifier.hasPermission('add_stock'))
             _QuickAction(
               label: 'Add Stock',
+              color: AppButtonColor.warning,
               icon: Icons.warehouse_outlined,
               onTap: () => RouteGuard.pushIfAuthorized(
                 context, ref,
@@ -614,6 +629,7 @@ class _OwnerDashboard extends ConsumerWidget {
           if (authNotifier.hasPermission('view_sales'))
             _QuickAction(
               label: 'View Sales',
+              color: AppButtonColor.neutral,
               icon: Icons.receipt_long,
               onTap: () => Navigator.push(
                 context,
@@ -623,6 +639,7 @@ class _OwnerDashboard extends ConsumerWidget {
           if (authNotifier.hasPermission('view_reports'))
             _QuickAction(
               label: 'Reports',
+              color: AppButtonColor.neutral,
               icon: Icons.analytics_outlined,
               onTap: () => Navigator.push(
                 context,
@@ -639,6 +656,36 @@ class _OwnerDashboard extends ConsumerWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildStaffPerformanceSection(BuildContext context) {
+    return AppSection(
+      title: 'Staff Performance',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: _ResponsiveTwoColumn(
+        left: StaffPerformanceCard(summaries: data.staffSales),
+        right: AppCard(
+          child: data.staffSales.isEmpty
+              ? const _ChartEmptyState(message: 'No staff sales yet.')
+              : StaffSalesList(
+                  summaries: data.staffSales,
+                  valuePrefix: '₱',
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSalesByHourCard(BuildContext context) {
+    return AppSection(
+      title: 'Sales by Hour',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: AppCard(
+        child: data.salesByHour.isEmpty
+            ? const _ChartEmptyState(message: 'No hourly sales data yet.')
+            : HourlySalesChart(points: data.salesByHour),
       ),
     );
   }
@@ -702,6 +749,14 @@ class _AdminDashboard extends ConsumerWidget {
 
         // ── Quick actions ──
         _buildAdminQuickActions(context, ref, authNotifier),
+        const SizedBox(height: Spacing.xxl),
+
+        // ── Staff performance (top performer + ranked list) ──
+        _buildStaffPerformanceSection(context),
+        const SizedBox(height: Spacing.xxl),
+
+        // ── Sales by hour ──
+        _buildSalesByHourCard(context),
         const SizedBox(height: Spacing.xxl),
 
         // ── Two-column: user distribution + backup status ──
@@ -833,6 +888,7 @@ class _AdminDashboard extends ConsumerWidget {
           if (authNotifier.hasPermission('manage_users'))
             _QuickAction(
               label: 'Manage Users',
+              color: AppButtonColor.info,
               icon: Icons.people,
               onTap: () => RouteGuard.pushIfAuthorized(
                 context, ref,
@@ -844,6 +900,7 @@ class _AdminDashboard extends ConsumerWidget {
           if (authNotifier.hasPermission('backup_restore'))
             _QuickAction(
               label: 'Backup & Restore',
+              color: AppButtonColor.neutral,
               icon: Icons.backup,
               onTap: () => RouteGuard.pushIfAuthorized(
                 context, ref,
@@ -855,6 +912,7 @@ class _AdminDashboard extends ConsumerWidget {
           if (authNotifier.hasPermission('view_trash'))
             _QuickAction(
               label: 'Trash',
+              color: AppButtonColor.warning,
               icon: Icons.delete_outline,
               onTap: () => RouteGuard.pushIfAuthorized(
                 context, ref,
@@ -866,6 +924,7 @@ class _AdminDashboard extends ConsumerWidget {
           if (authNotifier.hasPermission('view_activity_logs'))
             _QuickAction(
               label: 'Activity Logs',
+              color: AppButtonColor.neutral,
               icon: Icons.history,
               onTap: () => RouteGuard.pushIfAuthorized(
                 context, ref,
@@ -877,6 +936,7 @@ class _AdminDashboard extends ConsumerWidget {
           if (authNotifier.hasPermission('view_settings'))
             _QuickAction(
               label: 'Settings',
+              color: AppButtonColor.neutral,
               icon: Icons.settings,
               onTap: () => RouteGuard.pushIfAuthorized(
                 context, ref,
@@ -886,6 +946,36 @@ class _AdminDashboard extends ConsumerWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildStaffPerformanceSection(BuildContext context) {
+    return AppSection(
+      title: 'Staff Performance',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: _ResponsiveTwoColumn(
+        left: StaffPerformanceCard(summaries: data.staffSales),
+        right: AppCard(
+          child: data.staffSales.isEmpty
+              ? const _ChartEmptyState(message: 'No staff sales yet.')
+              : StaffSalesList(
+                  summaries: data.staffSales,
+                  valuePrefix: '₱',
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSalesByHourCard(BuildContext context) {
+    return AppSection(
+      title: 'Sales by Hour',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: AppCard(
+        child: data.salesByHour.isEmpty
+            ? const _ChartEmptyState(message: 'No hourly sales data yet.')
+            : HourlySalesChart(points: data.salesByHour),
       ),
     );
   }
@@ -953,6 +1043,10 @@ class _StaffDashboard extends ConsumerWidget {
 
         // ── My sales trend ──
         _buildMySalesTrendCard(context),
+        const SizedBox(height: Spacing.xxl),
+
+        // ── My sales by hour ──
+        _buildMySalesByHourCard(context),
         const SizedBox(height: Spacing.xxl),
 
         // ── Inventory status ──
@@ -1069,6 +1163,7 @@ class _StaffDashboard extends ConsumerWidget {
               Align(
                 alignment: Alignment.centerRight,
                 child: AppButton.text(
+                  color: AppButtonColor.info,
                   onPressed: () => RouteGuard.pushIfAuthorized(
                     context, ref,
                     screen: const StockScreen(),
@@ -1149,6 +1244,7 @@ class _StaffDashboard extends ConsumerWidget {
           if (authNotifier.hasPermission('create_sales'))
             _QuickAction(
               label: 'New Sale',
+              color: AppButtonColor.success,
               icon: Icons.point_of_sale,
               onTap: () => Navigator.push(
                 context,
@@ -1158,6 +1254,7 @@ class _StaffDashboard extends ConsumerWidget {
           if (authNotifier.hasPermission('add_stock'))
             _QuickAction(
               label: 'Add Stock',
+              color: AppButtonColor.warning,
               icon: Icons.warehouse_outlined,
               onTap: () => RouteGuard.pushIfAuthorized(
                 context, ref,
@@ -1169,6 +1266,7 @@ class _StaffDashboard extends ConsumerWidget {
           if (authNotifier.hasPermission('view_sales'))
             _QuickAction(
               label: 'My Sales',
+              color: AppButtonColor.neutral,
               icon: Icons.receipt_long,
               onTap: () => Navigator.push(
                 context,
@@ -1178,6 +1276,7 @@ class _StaffDashboard extends ConsumerWidget {
           if (authNotifier.hasPermission('view_reports'))
             _QuickAction(
               label: 'Reports',
+              color: AppButtonColor.neutral,
               icon: Icons.analytics_outlined,
               onTap: () => Navigator.push(
                 context,
@@ -1185,6 +1284,18 @@ class _StaffDashboard extends ConsumerWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMySalesByHourCard(BuildContext context) {
+    return AppSection(
+      title: 'My Sales by Hour',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: AppCard(
+        child: data.mySalesByHour.isEmpty
+            ? const _ChartEmptyState(message: 'No hourly sales data yet.')
+            : HourlySalesChart(points: data.mySalesByHour),
       ),
     );
   }
@@ -1455,11 +1566,13 @@ class _QuickAction extends StatelessWidget {
   final String label;
   final IconData icon;
   final VoidCallback onTap;
+  final AppButtonColor color;
 
   const _QuickAction({
     required this.label,
     required this.icon,
     required this.onTap,
+    this.color = AppButtonColor.primary,
   });
 
   @override
@@ -1467,6 +1580,7 @@ class _QuickAction extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return AppButton.filled(
       onPressed: onTap,
+      color: color,
       child: ConstrainedBox(
         constraints: const BoxConstraints(minWidth: 64, minHeight: 48),
         child: Column(

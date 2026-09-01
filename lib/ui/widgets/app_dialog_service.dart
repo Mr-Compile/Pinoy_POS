@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_messages.dart';
 
@@ -438,52 +439,46 @@ class AppDialogService {
                         onChanged: (_) => setState(() {}),
                       ),
                       const SizedBox(height: 24),
-                      if (isTablet)
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            TextButton(
-                              onPressed: () => Navigator.of(context, rootNavigator: true).pop(null),
-                              style: TextButton.styleFrom(minimumSize: const Size(88, 48)),
-                              child: const Text('Cancel'),
-                            ),
-                            const SizedBox(width: 8),
-                            FilledButton(
-                              onPressed: reasonController.text.trim().isEmpty
-                                  ? null
-                                  : () => Navigator.of(context, rootNavigator: true).pop(reasonController.text.trim()),
-                              style: FilledButton.styleFrom(
-                                backgroundColor: AppSemanticColors.error,
-                                foregroundColor: AppSemanticColors.onError,
-                                minimumSize: const Size(88, 48),
-                              ),
-                              child: const Text('Void Sale'),
-                            ),
-                          ],
-                        )
-                      else
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            TextButton(
-                              onPressed: () => Navigator.of(context, rootNavigator: true).pop(null),
-                              style: TextButton.styleFrom(minimumSize: const Size(88, 48)),
-                              child: const Text('Cancel'),
-                            ),
-                            const SizedBox(height: 8),
-                            FilledButton(
-                              onPressed: reasonController.text.trim().isEmpty
-                                  ? null
-                                  : () => Navigator.of(context, rootNavigator: true).pop(reasonController.text.trim()),
-                              style: FilledButton.styleFrom(
-                                backgroundColor: AppSemanticColors.error,
-                                foregroundColor: AppSemanticColors.onError,
-                                minimumSize: const Size(88, 48),
-                              ),
-                              child: const Text('Void Sale'),
-                            ),
-                          ],
-                        ),
+                      Builder(
+                        builder: (context) {
+                          final onVoidPressed = reasonController.text.trim().isEmpty
+                              ? null
+                              : () => Navigator.of(context, rootNavigator: true).pop(reasonController.text.trim());
+                          return isTablet
+                              ? Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    AppButton.text(
+                                      onPressed: () => Navigator.of(context, rootNavigator: true).pop(null),
+                                      label: 'Cancel',
+                                      color: AppButtonColor.neutral,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    AppButton.destructive(
+                                      onPressed: onVoidPressed,
+                                      label: 'Void Sale',
+                                    ),
+                                  ],
+                                )
+                              : Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    AppButton.text(
+                                      onPressed: () => Navigator.of(context, rootNavigator: true).pop(null),
+                                      label: 'Cancel',
+                                      color: AppButtonColor.neutral,
+                                      fullWidth: true,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    AppButton.destructive(
+                                      onPressed: onVoidPressed,
+                                      label: 'Void Sale',
+                                      fullWidth: true,
+                                    ),
+                                  ],
+                                );
+                        },
+                      ),
                     ],
                   ),
                 ),

@@ -68,7 +68,7 @@ class _MyAppState extends ConsumerState<MyApp> {
       _ => ThemeMode.system,
     };
 
-    // Universal Pinoy POS Blue theme for all users and the login screen.
+    // Semantic theme derived from AppSemanticColors.primary.
     final lightTheme = AppColors.getLightTheme();
     final darkTheme = AppColors.getDarkTheme();
 
