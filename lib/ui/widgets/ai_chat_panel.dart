@@ -1,5 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/ai_config_status.dart';
 import 'package:pinoy_pos/core/ai_role_config.dart';
 import 'package:pinoy_pos/core/spacing.dart';
@@ -15,7 +16,7 @@ import 'package:pinoy_pos/providers/auth_provider.dart';
 /// floating panel positioned near the chat head.
 ///
 /// Features:
-/// - Modern Material 3 design with dynamic accent color
+/// - Modern Material 3 design with dynamic primary color
 /// - Clear visual hierarchy: header, conversation, input
 /// - User vs AI message bubbles with distinct alignment
 /// - Minimize (back to chat head) and close buttons
@@ -234,7 +235,12 @@ class _AIChatPanelState extends ConsumerState<AIChatPanel> {
     final isNotConfigured = status == AIConfigStatus.notConfigured;
     final isInvalid = status == AIConfigStatus.invalid;
 
-    final warningColor = isInvalid ? cs.error : (isNotConfigured ? Colors.orange : cs.error);
+    final warningColor = isInvalid
+        ? cs.error
+        : (isNotConfigured
+            ? AppSemanticColors.resolve(
+                AppSemanticColors.warning, Theme.of(context).brightness)
+            : cs.error);
     final icon = isNotConfigured ? Icons.key_off : (isInvalid ? Icons.error_outline : Icons.warning_amber);
 
     return Container(

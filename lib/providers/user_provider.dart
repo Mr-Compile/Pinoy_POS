@@ -72,6 +72,13 @@ class UserController extends StateNotifier<UserListState> {
 
   UserController(this._ref, this._userService) : super(const UserListState());
 
+  /// Clears any previous error so a stale message is not shown to the user.
+  void clearError() {
+    if (state.error != null) {
+      state = state.copyWith(error: null);
+    }
+  }
+
   /// Loads both active and deleted users from SQLite.
   Future<void> loadUsers() async {
     state = state.copyWith(isLoading: true, error: null);

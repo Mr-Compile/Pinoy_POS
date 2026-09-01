@@ -37,7 +37,13 @@ class StaffPerformanceCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.emoji_events, color: AppSemanticColors.success),
+              Icon(
+                Icons.emoji_events,
+                color: AppSemanticColors.resolve(
+                  AppSemanticColors.success,
+                  Theme.of(context).brightness,
+                ),
+              ),
               const SizedBox(width: Spacing.sm),
               Expanded(
                 child: Text(

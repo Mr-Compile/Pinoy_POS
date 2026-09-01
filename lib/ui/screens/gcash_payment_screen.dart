@@ -33,6 +33,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
   final ImageService _imageService = ImageService();
 
   String? _paymentProofPath;
+  String? _paymentProofType;
   bool _isReviewing = false;
   bool _isProcessing = false;
   bool _committed = false;
@@ -106,6 +107,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
     if (result.isSuccess) {
       setState(() {
         _paymentProofPath = result.filePath;
+        _paymentProofType = result.mediaType;
       });
     } else if (result.error != null) {
       AppDialogService.error(
@@ -121,6 +123,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
       _imageService.deleteImage(_paymentProofPath);
       setState(() {
         _paymentProofPath = null;
+        _paymentProofType = null;
       });
     }
   }
@@ -171,7 +174,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
             referenceNumber: _referenceController.text.trim(),
             customerName: _customerController.text.trim(),
             paymentProofPath: _paymentProofPath,
-            paymentProofType: _paymentProofPath != null ? 'image' : null,
+            paymentProofType: _paymentProofType,
             notes: null,
           );
 

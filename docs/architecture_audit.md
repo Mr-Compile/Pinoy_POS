@@ -268,3 +268,101 @@ The cycles are currently used for cross-provider invalidation but increase coupl
 - `flutter build apk --debug` — built successfully.
 - `flutter test` — 150 tests passed; 7 pre-existing `database is locked` failures in `gcash_payment_service_test.dart` / `app_header_test.dart` (Windows `sqflite_common_ffi` concurrency issue, unrelated to backup).
 
+## Modal/Dialog Architecture Audit
+
+Date: current session
+Scope: All modal and dialog flows in `lib/ui/`, `lib/core/modal_result.dart`, and `test/dialog_dismiss_test.dart`.
+
+### Components audited
+- `AppDialog`, `AppDialogService`, `AppMessages`
+- Details modals (`_StockHistoryDialog`, receipt, payment proof)
+- Edit modals (users, products, categories, AI quota, settings)
+- Confirmation dialogs (delete, restore, reset, toggle, unsaved changes)
+- Provider/controller state (`UserController`)
+- Navigation/dismissal patterns (`Navigator.pop`, `useRootNavigator`, `barrierDismissible`)
+- Error handling (`AppDialogService.error`, `SnackBar`)
+- Automated tests (`test/dialog_dismiss_test.dart`)
+
+### Key findings
+1. Inconsistent result values: `users_screen` previously returned `false` for both cancel and save failure.
+2. AI quota dialogs used `showDialog<void>` and unconditionally parsed the input after the dialog closed, so pressing Cancel still saved.
+3. `categories_screen` passed `isSaving` by value to `_saveCategory`, so the loading state never updated.
+4. `products_screen` and `categories_screen` could call `setState`/`setSaving` on an already-popped dialog in their `finally` blocks.
+5. Several inline `showDialog` calls did not use `useRootNavigator: true`, so success/error overlays and `Navigator.pop` could target different navigators.
+6. No shared, type-safe dialog result model existed; each screen invented its own result value.
+
+### Root causes
+- No shared `ModalResult` abstraction.
+- `StatefulBuilder` captures local state by value and has no lifecycle `dispose`.
+- Direct service calls inside dialog `onPressed` handlers without a clear save/cancel gate.
+
+## Changes Made
+
+### Shared result model
+- Added `lib/core/modal_result.dart`:
+  - `ModalResult<T>` with `saved`, `confirmed`, `cancelled`, `dismissed`, `failed`.
+  - Helpers `isSaved`, `isCancelled`, `isFailed`, `isSuccess`, `when`, `whenOrDefault`.
+  - A `ModalResult` is never `null` for cancel; callers always receive a typed, unambiguous value.
+
+### `lib/ui/screens/users_screen.dart`
+- Removed the ad-hoc `EditUserResult` enum.
+- `_editUser` now returns `ModalResult<void>`.
+- Cancel, back-press, and discard consistently pop `ModalResult.cancelled()`.
+- Save pops `ModalResult.saved()` on success and `ModalResult.failed(error: ...)` on a real service failure.
+- Added `PopScope` (`canPop: false`) to block accidental back-press while saving or with unsaved changes.
+- `Cancel` button is disabled while saving.
+- Uses `useRootNavigator: true`.
+
+### `lib/ui/screens/ai_quota_management_page.dart`
+- `_changeDefaultQuota` and `_editUserQuota` now return `ModalResult<...>` instead of `void`.
+- Save pops the parsed value in `ModalResult.saved(...)`; Cancel pops `ModalResult.cancelled()`.
+- The caller only executes the service call when `result.isSaved` is true, so Cancel/Back no longer save.
+- Controllers are disposed after the dialog closes.
+- Uses `useRootNavigator: true`.
+
+### `lib/ui/screens/categories_screen.dart`
+- Added `ModalResult<void>` and `useRootNavigator: true` to the category dialog.
+- Changed `_saveCategory` to use a `ValueChanged<bool>` setter instead of a captured `bool` value.
+- `_saveCategory` receives the dialog `BuildContext` and checks `dialogContext.mounted` before any `setSaving`, `Navigator.pop`, or `AppDialogService` call.
+- `TextFormField` and `Cancel` are disabled while saving.
+- The dialog no longer calls `setSaving(false)` after it has been popped.
+- `TextEditingController` is disposed after `await showDialog`.
+
+### `lib/ui/screens/products_screen.dart`
+- Added `ModalResult<void>` and `useRootNavigator: true` to the product dialog.
+- `_saveProduct` now receives the dialog `BuildContext` and checks `dialogContext.mounted` before any UI mutation.
+- Removed the unused `StateSetter` parameter.
+- `LoadingButton` and `Cancel` are disabled while saving.
+- `setSaving(false)` in `finally` is guarded by `dialogContext.mounted`.
+- Name, price, and stock `TextEditingController`s are disposed after the dialog closes.
+
+### Additional dialogs updated
+- `lib/ui/screens/sales_screen.dart`
+  - `_showSearchDialog` and `_showFilterDialog` now use `useRootNavigator: true`.
+  - `_showFilterDialog` uses local `selectedMethod`/`selectedStatus` copies so cancelling no longer mutates the screen's filter state.
+- `lib/ui/screens/stock_screen.dart`
+  - `_showStockHistory` (details modal) uses `useRootNavigator: true` and only displays pre-fetched data; it never writes to the database on close.
+
+### Verification
+- `flutter analyze` — no issues found.
+- `flutter test` — 159 tests passed, including the new `modal_result_test.dart` regression tests.
+- Manual UI trace: Cancel in the user-edit, category, product, and AI-quota dialogs no longer triggers a database write or an error dialog.
+
+### Remaining gaps
+- Raw `showDialog<bool>` confirmation dialogs in `trash_screen`, `settings`, and `ai_quota` resets still use `bool?`. They correctly check `confirmed == true`, so they do not have the cancel-saves/failure bug, but they have not been migrated to `ModalResult`.
+- `AppDialogService.emptyCart()` and `AppDialogService.adjustStockConfirm()` are defined but never invoked; they can be removed or wired up in a follow-up.
+- No `ref.listen` error listeners exist; error display is currently imperative inside `onPressed` callbacks.
+
+## Final Change Record
+
+| File | Change | Reason |
+|------|--------|--------|
+| `lib/core/modal_result.dart` | New shared result model | Single, unambiguous dialog result semantics |
+| `lib/ui/screens/users_screen.dart` | `_editUser` uses `ModalResult<void>`; `PopScope`; root navigator | Cancel is no longer treated as failure; back respected; no state updates on disposed widget |
+| `lib/ui/screens/ai_quota_management_page.dart` | Quota input dialogs return `ModalResult`; cancel no longer saves | Avoid DB side effect on cancel/dismiss |
+| `lib/ui/screens/categories_screen.dart` | `ModalResult<void>`; `ValueChanged<bool>`; dialog context; root navigator | Fix loading state and async lifecycle |
+| `lib/ui/screens/products_screen.dart` | `ModalResult<void>`; dialog context; root navigator; controller dispose | Fix async lifecycle and navigator consistency |
+| `lib/ui/screens/sales_screen.dart` | `useRootNavigator: true`; filter dialog local state | Consistent root navigator; state lifecycle |
+| `lib/ui/screens/stock_screen.dart` | `_showStockHistory` uses `useRootNavigator: true` | Consistent details dialog navigation |
+| `test/modal_result_test.dart` | Unit and widget tests for `ModalResult` | Regression tests for shared dialog infrastructure |
+

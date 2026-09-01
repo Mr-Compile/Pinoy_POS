@@ -33,22 +33,22 @@ class _NotificationBellState extends ConsumerState<NotificationBell> {
       orElse: () => 0,
     );
 
+    final brightness = Theme.of(context).brightness;
     return IconButton(
       key: _iconKey,
       icon: Badge(
         isLabelVisible: unreadCount > 0,
-        backgroundColor: AppSemanticColors.error,
+        backgroundColor:
+            AppSemanticColors.resolve(AppSemanticColors.error, brightness),
         label: Text(
           _formatBadge(unreadCount),
           style: const TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.bold,
-            color: AppSemanticColors.onError,
           ),
+          textScaler: TextScaler.noScaling,
         ),
-        child: const Icon(Icons.notifications_outlined),
       ),
-      tooltip: 'Notifications',
       onPressed: () => _onTap(unreadCount),
     );
   }
@@ -293,7 +293,11 @@ class _NotificationTile extends StatelessWidget {
     final isUnread = !notification.isRead;
 
     final iconData = _iconForType(notification.type);
-    final iconColor = _colorForType(notification.type, colorScheme);
+    final iconColor = _colorForType(
+      notification.type,
+      theme.brightness,
+      colorScheme,
+    );
 
     return InkWell(
       onTap: onTap,
@@ -377,14 +381,14 @@ class _NotificationTile extends StatelessWidget {
     }
   }
 
-  Color _colorForType(String? type, ColorScheme cs) {
+  Color _colorForType(String? type, Brightness brightness, ColorScheme cs) {
     switch (type) {
       case 'low_stock':
-        return AppSemanticColors.warning;
+        return AppSemanticColors.resolve(AppSemanticColors.warning, brightness);
       case 'announcement':
         return cs.primary;
       case 'backup':
-        return AppSemanticColors.info;
+        return AppSemanticColors.resolve(AppSemanticColors.info, brightness);
       default:
         return cs.onSurfaceVariant;
     }

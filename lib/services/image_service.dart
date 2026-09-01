@@ -1,26 +1,40 @@
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
+import 'package:pinoy_pos/core/file_type_utils.dart';
+
 /// Result of an image pick operation.
 ///
 /// Carries either a valid [filePath] pointing to the stored image or an
 /// [error] message describing why the pick failed.  The UI layer uses this
 /// to show a dialog (never a SnackBar) on failure.
+///
+/// [mediaType] is the canonical MIME type (e.g. `image/jpeg`) and
+/// [extension] is the canonical extension (e.g. `jpg`) detected from the
+/// file signature and/or filename.
 class ImagePickResult {
   final String? filePath;
+  final String? mediaType;
+  final String? extension;
   final String? error;
 
   bool get isSuccess => filePath != null && error == null;
 
-  ImagePickResult.success(this.filePath)
-      : error = null;
+  ImagePickResult.success(
+    this.filePath, {
+    this.mediaType,
+    this.extension,
+  }) : error = null;
 
   ImagePickResult.failure(this.error)
-      : filePath = null;
+      : filePath = null,
+        mediaType = null,
+        extension = null;
 }
 
 /// Centralised image handling service.
@@ -113,7 +127,12 @@ class ImageService {
         return ImagePickResult.failure('Failed to save image. Please try again.');
       }
 
-      return ImagePickResult.success(storedPath);
+      final fileType = await _detectType(xFile);
+      return ImagePickResult.success(
+        storedPath,
+        mediaType: fileType?.mime,
+        extension: fileType?.extension,
+      );
     } catch (e) {
       return ImagePickResult.failure('Failed to pick image: $e');
     }
@@ -155,6 +174,34 @@ class ImageService {
       return p.relative(destPath, from: appDir.path);
     } catch (e) {
       return null;
+    }
+  }
+
+  /// Detects the actual file type of a picked image using magic bytes and
+  /// filename fallback.
+  Future<FileType?> _detectType(XFile xFile) async {
+    try {
+      final chunk = await xFile.openRead(0, 64).first;
+      final fromBytes = FileTypeUtils.detect(chunk, fileName: xFile.name);
+      if (fromBytes != null) return fromBytes;
+      return FileType.fromExtension(xFile.name);
+    } catch (_) {
+      return FileType.fromExtension(xFile.name);
+    }
+  }
+
+  /// Detects the actual file type of a stored file from its relative path.
+  Future<FileType?> detectFileType(String? relativePath) async {
+    final file = await resolveImageFile(relativePath);
+    if (file == null) return null;
+
+    try {
+      final raf = await file.open();
+      final bytes = await raf.read(64);
+      await raf.close();
+      return FileTypeUtils.detect(bytes, fileName: file.path);
+    } catch (_) {
+      return FileType.fromExtension(file.path);
     }
   }
 

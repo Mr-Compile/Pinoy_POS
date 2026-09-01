@@ -15,6 +15,7 @@ import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
+import 'package:pinoy_pos/core/modal_result.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/validators.dart';
 
@@ -244,133 +245,181 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     bool hasChanges = false;
     bool isSaving = false;
 
-    final result = await showDialog<bool>(
+    // Clear any stale error before opening the dialog so a previous failure
+    // is not shown again if the user opens a different user.
+    ref.read(userControllerProvider.notifier).clearError();
+
+    void cancel(BuildContext dialogContext) {
+      if (isSaving) return;
+      if (hasChanges) {
+        AppDialogService.unsavedChanges(dialogContext).then((discard) {
+          if (discard == true && dialogContext.mounted) {
+            Navigator.of(dialogContext, rootNavigator: true)
+                .pop(const ModalResult<void>.cancelled());
+          }
+        });
+      } else if (dialogContext.mounted) {
+        Navigator.of(dialogContext, rootNavigator: true)
+            .pop(const ModalResult<void>.cancelled());
+      }
+    }
+
+    final result = await showDialog<ModalResult<void>>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: Text('Edit User: ${user.username}'),
-          content: SingleChildScrollView(
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: usernameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Username',
-                      border: OutlineInputBorder(),
+      barrierDismissible: false,
+      useRootNavigator: true,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setState) => PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop) cancel(dialogContext);
+          },
+          child: AlertDialog(
+            title: Text('Edit User: ${user.username}'),
+            content: SingleChildScrollView(
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextFormField(
+                      controller: usernameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Username',
+                        border: OutlineInputBorder(),
+                      ),
+                      autofocus: true,
+                      validator: (value) => Validators.required(value, 'Username'),
+                      onChanged: (_) {
+                        if (!hasChanges) setState(() => hasChanges = true);
+                      },
                     ),
-                    autofocus: true,
-                    validator: (value) => Validators.required(value, 'Username'),
-                    onChanged: (_) {
-                      if (!hasChanges) setState(() => hasChanges = true);
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: fullNameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Full Name',
-                      border: OutlineInputBorder(),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: fullNameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Full Name',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) => Validators.required(value, 'Full Name'),
+                      onChanged: (_) {
+                        if (!hasChanges) setState(() => hasChanges = true);
+                      },
                     ),
-                    validator: (value) => Validators.required(value, 'Full Name'),
-                    onChanged: (_) {
-                      if (!hasChanges) setState(() => hasChanges = true);
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: pinController,
-                    decoration: InputDecoration(
-                      labelText: 'PIN (optional)',
-                      border: const OutlineInputBorder(),
-                      hintText: user.hasPin
-                          ? 'Enter new PIN to replace (${user.configuredPinLength} digits)'
-                          : '4-6 digits',
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: pinController,
+                      decoration: InputDecoration(
+                        labelText: 'PIN (optional)',
+                        border: const OutlineInputBorder(),
+                        hintText: user.hasPin
+                            ? 'Enter new PIN to replace (${user.configuredPinLength} digits)'
+                            : '4-6 digits',
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) return null;
+                        return Validators.pin(value);
+                      },
+                      onChanged: (_) {
+                        if (!hasChanges) setState(() => hasChanges = true);
+                      },
                     ),
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) return null;
-                      return Validators.pin(value);
-                    },
-                    onChanged: (_) {
-                      if (!hasChanges) setState(() => hasChanges = true);
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<UserRole>(
-                    decoration: const InputDecoration(
-                      labelText: 'Role',
-                      border: OutlineInputBorder(),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<UserRole>(
+                      decoration: const InputDecoration(
+                        labelText: 'Role',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                            value: UserRole.owner, child: Text('Owner')),
+                        DropdownMenuItem(
+                            value: UserRole.admin, child: Text('System Admin')),
+                        DropdownMenuItem(
+                            value: UserRole.staff, child: Text('Staff')),
+                      ],
+                      initialValue: selectedRole,
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() {
+                            selectedRole = value;
+                            hasChanges = true;
+                          });
+                        }
+                      },
                     ),
-                    items: const [
-                      DropdownMenuItem(
-                          value: UserRole.owner, child: Text('Owner')),
-                      DropdownMenuItem(
-                          value: UserRole.admin, child: Text('System Admin')),
-                      DropdownMenuItem(
-                          value: UserRole.staff, child: Text('Staff')),
-                    ],
-                    initialValue: selectedRole,
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() {
-                          selectedRole = value;
-                          hasChanges = true;
-                        });
-                      }
-                    },
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () async {
-                if (hasChanges) {
-                  final discard = await AppDialogService.unsavedChanges(context);
-                  if (discard == true && context.mounted) {
-                    Navigator.pop(context, false);
+            actions: [
+              TextButton(
+                onPressed: isSaving ? null : () => cancel(context),
+                child: const Text('Cancel'),
+              ),
+              LoadingButton(
+                isLoading: isSaving,
+                onPressed: () async {
+                  if (!formKey.currentState!.validate()) return;
+                  setState(() => isSaving = true);
+                  final pinValue = pinController.text.trim();
+                  try {
+                    final res = await ref
+                        .read(userControllerProvider.notifier)
+                        .updateUser(
+                      userId: user.id!,
+                      username: usernameController.text.trim(),
+                      fullName: fullNameController.text.trim(),
+                      role: selectedRole,
+                      pin: pinValue.isEmpty ? null : pinValue,
+                    );
+                    if (context.mounted) {
+                      setState(() => isSaving = false);
+                      if (res.success) {
+                        Navigator.of(context, rootNavigator: true)
+                            .pop(const ModalResult<void>.saved());
+                      } else {
+                        Navigator.of(context, rootNavigator: true).pop(
+                          ModalResult<void>.failed(error: res.message),
+                        );
+                      }
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      setState(() => isSaving = false);
+                      Navigator.of(context, rootNavigator: true).pop(
+                        ModalResult<void>.failed(
+                          error: 'Failed to update user',
+                        ),
+                      );
+                    }
                   }
-                } else {
-                  Navigator.pop(context, false);
-                }
-              },
-              child: const Text('Cancel'),
-            ),
-            LoadingButton(
-              isLoading: isSaving,
-              onPressed: () async {
-                if (!formKey.currentState!.validate()) return;
-                setState(() => isSaving = true);
-                final pinValue = pinController.text.trim();
-                final res = await ref
-                    .read(userControllerProvider.notifier)
-                    .updateUser(
-                  userId: user.id!,
-                  username: usernameController.text.trim(),
-                  fullName: fullNameController.text.trim(),
-                  role: selectedRole,
-                  pin: pinValue.isEmpty ? null : pinValue,
-                );
-                if (context.mounted) {
-                  setState(() => isSaving = false);
-                  Navigator.pop(context, res.success);
-                }
-              },
-              label: 'Save',
-            ),
-          ],
+                },
+                label: 'Save',
+              ),
+            ],
+          ),
         ),
       ),
     );
 
-    if (result == true && mounted) {
-      await AppDialogService.success(context, title: 'Updated', message: 'User updated successfully.');
-    } else if (result == false && mounted) {
-      AppDialogService.error(context, title: 'Update Failed', message: ref.read(userControllerProvider).error ?? 'Failed to update user');
+    if (!mounted) return;
+
+    if (result case final r?) {
+      if (r.isSaved) {
+        await AppDialogService.success(
+          context,
+          title: 'Updated',
+          message: 'User updated successfully.',
+        );
+      } else if (r.isFailed) {
+        AppDialogService.error(
+          context,
+          title: 'Update Failed',
+          message: r.error ?? 'Failed to update user',
+        );
+      }
     }
   }
 

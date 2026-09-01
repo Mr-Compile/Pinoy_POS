@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/modal_result.dart';
 import 'package:pinoy_pos/data/models/ai_quota.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/services/ai_quota_service.dart';
@@ -88,8 +89,10 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
     final controller = TextEditingController(text: _defaultQuota.toString());
     var applyToExisting = false;
 
-    await showDialog<void>(
+    final result =
+        await showDialog<ModalResult<({int value, bool applyToExisting})>>(
       context: context,
+      useRootNavigator: true,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
@@ -123,11 +126,22 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: () => Navigator.of(context, rootNavigator: true).pop(
+                  const ModalResult<({int value, bool applyToExisting})>
+                      .cancelled(),
+                ),
                 child: const Text('Cancel'),
               ),
               FilledButton(
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: () {
+                  final value = int.tryParse(controller.text.trim());
+                  if (value == null) return;
+                  Navigator.of(context, rootNavigator: true).pop(
+                    ModalResult<({int value, bool applyToExisting})>.saved(
+                      (value: value, applyToExisting: applyToExisting),
+                    ),
+                  );
+                },
                 child: const Text('Save'),
               ),
             ],
@@ -136,34 +150,40 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
       ),
     );
 
-    final value = int.tryParse(controller.text.trim());
-    if (value == null) return;
-
-    final result = await _aiQuotaService.setDefaultQuota(
-      value: value,
-      applyToExisting: applyToExisting,
-      verified: _isVerified,
-    );
+    controller.dispose();
 
     if (!mounted) return;
 
-    if (result.success) {
-      await _loadData();
-      if (mounted) {
-        _showSnackBar('Default quota updated to $value');
+    if (result case final saved? when saved.isSaved) {
+      final (:value, :applyToExisting) = saved.value!;
+      final serviceResult = await _aiQuotaService.setDefaultQuota(
+        value: value,
+        applyToExisting: applyToExisting,
+        verified: _isVerified,
+      );
+
+      if (!mounted) return;
+
+      if (serviceResult.success) {
+        await _loadData();
+        if (mounted) {
+          _showSnackBar('Default quota updated to $value');
+        }
+      } else {
+        _showErrorSnackBar(serviceResult.message);
       }
-    } else {
-      _showErrorSnackBar(result.message);
     }
   }
 
   Future<void> _editUserQuota(User user) async {
     final quota = _quotas[user.id!];
-    final controller =
-        TextEditingController(text: (quota?.dailyQuota ?? _defaultQuota).toString());
+    final controller = TextEditingController(
+      text: (quota?.dailyQuota ?? _defaultQuota).toString(),
+    );
 
-    await showDialog<void>(
+    final result = await showDialog<ModalResult<int>>(
       context: context,
+      useRootNavigator: true,
       builder: (context) => AlertDialog(
         icon: const Icon(Icons.person_outline),
         iconColor: AppSemanticColors.info,
@@ -178,35 +198,46 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(context, rootNavigator: true)
+                .pop(const ModalResult<int>.cancelled()),
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () {
+              final value = int.tryParse(controller.text.trim());
+              if (value == null) return;
+              Navigator.of(context, rootNavigator: true)
+                  .pop(ModalResult<int>.saved(value));
+            },
             child: const Text('Save'),
           ),
         ],
       ),
     );
 
-    final value = int.tryParse(controller.text.trim());
-    if (value == null || user.id == null) return;
-
-    final result = await _aiQuotaService.updateUserQuota(
-      user.id!,
-      value: value,
-      verified: _isVerified,
-    );
+    controller.dispose();
 
     if (!mounted) return;
+    if (user.id == null) return;
 
-    if (result.success) {
-      await _loadData();
-      if (mounted) {
-        _showSnackBar('Quota for ${user.fullName} updated to $value');
+    if (result case final saved? when saved.isSaved) {
+      final value = saved.value!;
+      final serviceResult = await _aiQuotaService.updateUserQuota(
+        user.id!,
+        value: value,
+        verified: _isVerified,
+      );
+
+      if (!mounted) return;
+
+      if (serviceResult.success) {
+        await _loadData();
+        if (mounted) {
+          _showSnackBar('Quota for ${user.fullName} updated to $value');
+        }
+      } else {
+        _showErrorSnackBar(serviceResult.message);
       }
-    } else {
-      _showErrorSnackBar(result.message);
     }
   }
 

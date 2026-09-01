@@ -729,7 +729,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           0: const pw.FlexColumnWidth(),
           1: const pw.FixedColumnWidth(120),
         },
-        border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+        border: pw.TableBorder.all(color: pdfColor(cs.outlineVariant), width: 0.5),
         children: [
           pw.TableRow(
             children: [headerCell('Metric'), headerCell('Value')],
@@ -754,7 +754,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           1: const pw.FixedColumnWidth(60),
           2: const pw.FixedColumnWidth(100),
         },
-        border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+        border: pw.TableBorder.all(color: pdfColor(cs.outlineVariant), width: 0.5),
         children: [
           pw.TableRow(
             children: [
@@ -809,7 +809,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           6: const pw.FixedColumnWidth(40),
           7: const pw.FixedColumnWidth(60),
         },
-        border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+        border: pw.TableBorder.all(color: pdfColor(cs.outlineVariant), width: 0.5),
         children: [
           pw.TableRow(
             children: headers.map(headerCell).toList(),
@@ -911,7 +911,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           1: const pw.FixedColumnWidth(50),
           2: const pw.FixedColumnWidth(100),
         },
-        border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+        border: pw.TableBorder.all(color: pdfColor(cs.outlineVariant), width: 0.5),
         children: rows,
       );
     }
@@ -935,11 +935,11 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           ),
           pw.Text(
             'Generated: ${_formatDateTime(DateTime.now())}',
-            style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
+            style: pw.TextStyle(fontSize: 10, color: pdfColor(cs.onSurfaceVariant)),
           ),
           pw.Text(
             'Date Range: ${_formatRange(state.filterStart, state.filterEnd)}',
-            style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
+            style: pw.TextStyle(fontSize: 10, color: pdfColor(cs.onSurfaceVariant)),
           ),
           pw.SizedBox(height: 20),
           pw.Header(level: 1, child: pw.Text('Summary')),
@@ -993,6 +993,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   }
 
   pw.Widget _buildPdfHeader(Settings store, PdfColor primaryColor) {
+    final bodyText = PdfColor.fromInt(
+      AppColors.getLightColorScheme().onSurfaceVariant.pdfValue,
+    );
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
@@ -1006,13 +1009,13 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         ),
         if (store.storeAddress.isNotEmpty)
           pw.Text(store.storeAddress,
-              style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600)),
+              style: pw.TextStyle(fontSize: 10, color: bodyText)),
         if (store.storePhone.isNotEmpty)
           pw.Text('Contact: ${store.storePhone}',
-              style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600)),
+              style: pw.TextStyle(fontSize: 10, color: bodyText)),
         if (store.receiptFooter?.isNotEmpty == true)
           pw.Text(store.receiptFooter!,
-              style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600)),
+              style: pw.TextStyle(fontSize: 10, color: bodyText)),
       ],
     );
   }

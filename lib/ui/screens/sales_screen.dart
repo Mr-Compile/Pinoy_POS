@@ -119,6 +119,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     _searchController.text = _searchQuery;
     final result = await showDialog<String>(
       context: context,
+      useRootNavigator: true,
       builder: (context) => AlertDialog(
         title: const Text('Search Sales'),
         content: TextField(
@@ -131,12 +132,12 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(null),
+            onPressed: () => Navigator.of(context, rootNavigator: true).pop(null),
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () =>
-                Navigator.of(context).pop(_searchController.text.trim()),
+            onPressed: () => Navigator.of(context, rootNavigator: true)
+                .pop(_searchController.text.trim()),
             child: const Text('Search'),
           ),
         ],
@@ -155,8 +156,14 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     final methods = ['Cash', 'GCash', 'Card', 'Other'];
     const statuses = ['pending', 'confirmed', 'cancelled', 'refunded'];
 
+    // Local copies so that changing a dropdown and then cancelling does not
+    // mutate the screen's filter state.
+    var selectedMethod = _selectedPaymentMethod;
+    var selectedStatus = _selectedPaymentStatus;
+
     final result = await showDialog<_SalesFilter>(
       context: context,
+      useRootNavigator: true,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
@@ -166,8 +173,8 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   DropdownButtonFormField<String?>(
-                    key: ValueKey(_selectedPaymentMethod),
-                    initialValue: _selectedPaymentMethod,
+                    key: ValueKey(selectedMethod),
+                    initialValue: selectedMethod,
                     decoration: const InputDecoration(
                       labelText: 'Payment Method',
                       border: OutlineInputBorder(),
@@ -180,12 +187,12 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                           )),
                     ],
                     onChanged: (value) =>
-                        setDialogState(() => _selectedPaymentMethod = value),
+                        setDialogState(() => selectedMethod = value),
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String?>(
-                    key: ValueKey(_selectedPaymentStatus),
-                    initialValue: _selectedPaymentStatus,
+                    key: ValueKey(selectedStatus),
+                    initialValue: selectedStatus,
                     decoration: const InputDecoration(
                       labelText: 'Status',
                       border: OutlineInputBorder(),
@@ -201,20 +208,20 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                           )),
                     ],
                     onChanged: (value) =>
-                        setDialogState(() => _selectedPaymentStatus = value),
+                        setDialogState(() => selectedStatus = value),
                   ),
                 ],
               ),
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.of(context).pop(null),
+                onPressed: () => Navigator.of(context, rootNavigator: true).pop(null),
                 child: const Text('Cancel'),
               ),
               FilledButton(
-                onPressed: () => Navigator.of(context).pop(_SalesFilter(
-                  _selectedPaymentMethod,
-                  _selectedPaymentStatus,
+                onPressed: () => Navigator.of(context, rootNavigator: true).pop(_SalesFilter(
+                  selectedMethod,
+                  selectedStatus,
                 )),
                 child: const Text('Apply'),
               ),

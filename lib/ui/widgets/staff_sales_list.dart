@@ -35,17 +35,18 @@ class StaffSalesList extends StatelessWidget {
             maxTotal: maxTotal,
             valuePrefix: valuePrefix,
             isTop: i == 0,
-            barColor: _rankColor(cs, i),
+            barColor: _rankColor(context, cs, i),
           ),
       ],
     );
   }
 
-  Color _rankColor(ColorScheme cs, int index) {
+  Color _rankColor(BuildContext context, ColorScheme cs, int index) {
+    final brightness = Theme.of(context).brightness;
     return switch (index) {
-      0 => AppSemanticColors.success,
-      1 => AppSemanticColors.info,
-      2 => AppSemanticColors.warning,
+      0 => AppSemanticColors.resolve(AppSemanticColors.success, brightness),
+      1 => AppSemanticColors.resolve(AppSemanticColors.info, brightness),
+      2 => AppSemanticColors.resolve(AppSemanticColors.warning, brightness),
       _ => cs.primary,
     };
   }
@@ -84,7 +85,9 @@ class _StaffSalesRow extends StatelessWidget {
             height: 28,
             decoration: BoxDecoration(
               color: isTop
-                  ? AppSemanticColors.successContainer
+                  ? AppSemanticColors.resolve(
+                      AppSemanticColors.successContainer,
+                      Theme.of(context).brightness)
                   : cs.surfaceContainerHighest,
               shape: BoxShape.circle,
             ),
@@ -95,7 +98,9 @@ class _StaffSalesRow extends StatelessWidget {
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
                 color: isTop
-                    ? AppSemanticColors.onSuccessContainer
+                    ? AppSemanticColors.resolveOn(
+                        AppSemanticColors.onSuccessContainer,
+                        Theme.of(context).brightness)
                     : cs.onSurfaceVariant,
               ),
             ),

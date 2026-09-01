@@ -726,7 +726,12 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
           if (hasLocation) ...[
             Row(
               children: [
-                Icon(Icons.check_circle, size: 20, color: AppSemanticColors.success),
+                Icon(
+                  Icons.check_circle,
+                  size: 20,
+                  color: AppSemanticColors.resolve(
+                      AppSemanticColors.success, theme.brightness),
+                ),
                 const SizedBox(width: Spacing.sm),
                 Expanded(
                   child: Text(

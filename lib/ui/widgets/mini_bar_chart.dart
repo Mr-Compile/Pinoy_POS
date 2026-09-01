@@ -12,7 +12,7 @@ class BarChartPoint {
 /// A lightweight, dependency-free vertical bar chart for dashboard trends.
 ///
 /// Renders bars scaled to the max value, with the bar color taken from
-/// [ColorScheme.primary] (so it follows the user's accent preference).
+/// [ColorScheme.primary] (so it follows the semantic primary color).
 /// The last bar (today) is drawn in [ColorScheme.tertiary] to highlight
 /// the current period.
 ///

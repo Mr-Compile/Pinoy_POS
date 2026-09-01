@@ -99,7 +99,6 @@ class BackupService {
     'trash',
     'backup_history',
     'export_history',
-    'backup_metadata',
   ];
 
   // ── Backup Location Management ───────────────────────────────────────
@@ -625,25 +624,29 @@ class BackupService {
         }
       }
 
-      try {
-        final metaRows = await testDb.query(
-          'backup_metadata',
-          where: 'id = 1',
-          limit: 1,
-        );
-        if (metaRows.isEmpty) {
+      // Older backups may not have backup_metadata; allow them as long as
+      // the required data tables were present.
+      if (await _hasTable(testDb, 'backup_metadata')) {
+        try {
+          final metaRows = await testDb.query(
+            'backup_metadata',
+            where: 'id = 1',
+            limit: 1,
+          );
+          if (metaRows.isEmpty) {
+            await testDb.close();
+            return BackupImportResult.incompatible;
+          }
+          final appName = metaRows.first['app_name'] as String?;
+          if (appName != constants.AppConstants.appName) {
+            await testDb.close();
+            return BackupImportResult.incompatible;
+          }
+        } catch (e) {
+          _log('Backup metadata validation failed: $e');
           await testDb.close();
           return BackupImportResult.incompatible;
         }
-        final appName = metaRows.first['app_name'] as String?;
-        if (appName != constants.AppConstants.appName) {
-          await testDb.close();
-          return BackupImportResult.incompatible;
-        }
-      } catch (e) {
-        _log('Backup metadata validation failed: $e');
-        await testDb.close();
-        return BackupImportResult.incompatible;
       }
     } catch (e) {
       _log('Could not open backup file as SQLite database: $e');
@@ -762,12 +765,18 @@ class BackupService {
     final dbPath = db.path;
     final tempPath = await _tempPath('pinoy_pos_safety_backup.db');
 
+    await _dbHelper.close();
     try {
       await File(dbPath).copy(tempPath);
       return tempPath;
+    } on FileSystemException catch (e) {
+      _log('Failed to create safety backup: ${e.message}');
+      return null;
     } catch (e) {
       _log('Failed to create safety backup: $e');
       return null;
+    } finally {
+      await _dbHelper.database;
     }
   }
 
@@ -778,11 +787,21 @@ class BackupService {
     final dbPath = db.path;
     final tempPath = await _tempPath('pinoy_pos_backup_${_timestamp()}.db');
 
+    // Close the live connection before copying the file. On Windows the
+    // open database file is locked while the connection is active, which
+    // causes the copy to fail.
+    await _dbHelper.close();
     try {
       await File(dbPath).copy(tempPath);
+    } on FileSystemException catch (e) {
+      _log('Failed to copy database to temp file: ${e.message}');
+      return null;
     } catch (e) {
       _log('Failed to copy database to temp file: $e');
       return null;
+    } finally {
+      // Reopen the database so the app can keep using it.
+      await _dbHelper.database;
     }
 
     await _writeBackupMetadata(tempPath);
@@ -913,6 +932,15 @@ class BackupService {
     } catch (e) {
       // Ignore.
     }
+  }
+
+  Future<bool> _hasTable(Database db, String table) async {
+    final tables = await db.query(
+      'sqlite_master',
+      where: 'type = ? AND name = ?',
+      whereArgs: ['table', table],
+    );
+    return tables.isNotEmpty;
   }
 
   String _formatFileSize(int? bytes) {

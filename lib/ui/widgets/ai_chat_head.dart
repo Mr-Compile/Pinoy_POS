@@ -2,6 +2,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pinoy_pos/core/ai_config_status.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/providers/ai_advisor_provider.dart';
 import 'package:pinoy_pos/ui/screens/ai_advisor_screen.dart';
 
@@ -211,7 +212,11 @@ class _AIChatHeadState extends ConsumerState<AIChatHead> {
                     height: 12,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: _statusColor(chatState.configStatus, cs),
+                      color: _statusColor(
+                        chatState.configStatus,
+                        Theme.of(context).brightness,
+                        cs,
+                      ),
                       border: Border.all(
                         color: cs.surface,
                         width: 2,
@@ -227,19 +232,17 @@ class _AIChatHeadState extends ConsumerState<AIChatHead> {
     );
   }
 
-  Color _statusColor(AIConfigStatus status, ColorScheme cs) {
-    switch (status) {
-      case AIConfigStatus.active:
-        return Colors.green;
-      case AIConfigStatus.notConfigured:
-        return Colors.orange;
-      case AIConfigStatus.invalid:
-        return Colors.red;
-      case AIConfigStatus.unavailable:
-        return Colors.red;
-      case AIConfigStatus.checking:
-        return cs.secondary;
-    }
+  Color _statusColor(
+      AIConfigStatus status, Brightness brightness, ColorScheme cs) {
+    return switch (status) {
+      AIConfigStatus.active =>
+        AppSemanticColors.resolve(AppSemanticColors.success, brightness),
+      AIConfigStatus.notConfigured =>
+        AppSemanticColors.resolve(AppSemanticColors.warning, brightness),
+      AIConfigStatus.invalid || AIConfigStatus.unavailable =>
+        AppSemanticColors.resolve(AppSemanticColors.error, brightness),
+      AIConfigStatus.checking => cs.secondary,
+    };
   }
 }
 

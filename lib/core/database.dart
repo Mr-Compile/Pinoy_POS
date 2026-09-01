@@ -1,8 +1,13 @@
-﻿import 'package:flutter/foundation.dart';
+﻿import 'dart:io';
+
+import 'package:flutter/foundation.dart';
+import 'package:path/path.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:path/path.dart';
+
 import 'package:pinoy_pos/core/constants.dart';
+import 'package:pinoy_pos/core/file_type_utils.dart';
 import 'package:pinoy_pos/core/security.dart';
 
 class DatabaseHelper {
@@ -318,6 +323,119 @@ class DatabaseHelper {
         'ALTER TABLE users ADD COLUMN has_changed_username INTEGER NOT NULL DEFAULT 0',
       );
     }
+
+    // Migration from v14 → v15: remove the unused accent_color column
+    // from settings. The app now derives color entirely from the semantic
+    // primary seed and the Material 3 ColorScheme.
+    if (oldVersion < 15) {
+      try {
+        await db.execute('ALTER TABLE settings DROP COLUMN accent_color');
+      } catch (e) {
+        // Some older SQLite versions or Windows FFI builds do not support
+        // DROP COLUMN. Recreate the table and copy the data instead.
+        await db.execute('PRAGMA foreign_keys = OFF');
+        await db.execute('''
+          CREATE TABLE settings_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            store_name TEXT NOT NULL,
+            store_address TEXT,
+            store_phone TEXT,
+            currency TEXT NOT NULL DEFAULT 'PHP',
+            receipt_footer TEXT,
+            theme TEXT,
+            groq_api_key TEXT,
+            groq_model TEXT,
+            gcash_enabled INTEGER NOT NULL DEFAULT 1,
+            gcash_reference_required INTEGER NOT NULL DEFAULT 1,
+            gcash_customer_name_requirement TEXT NOT NULL DEFAULT 'optional',
+            gcash_payment_proof_requirement TEXT NOT NULL DEFAULT 'optional',
+            gcash_verification_mode TEXT NOT NULL DEFAULT 'immediate',
+            gcash_reference_min_length INTEGER NOT NULL DEFAULT 6,
+            ai_daily_quota INTEGER NOT NULL DEFAULT 20,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+          )
+        ''');
+        await db.execute('''
+          INSERT INTO settings_new
+            (id, store_name, store_address, store_phone, currency, receipt_footer,
+             theme, groq_api_key, groq_model, gcash_enabled, gcash_reference_required,
+             gcash_customer_name_requirement, gcash_payment_proof_requirement,
+             gcash_verification_mode, gcash_reference_min_length, ai_daily_quota,
+             created_at, updated_at)
+          SELECT
+            id, store_name, store_address, store_phone, currency, receipt_footer,
+            theme, groq_api_key, groq_model, gcash_enabled, gcash_reference_required,
+            gcash_customer_name_requirement, gcash_payment_proof_requirement,
+            gcash_verification_mode, gcash_reference_min_length, ai_daily_quota,
+            created_at, updated_at
+          FROM settings
+        ''');
+        await db.execute('DROP TABLE settings');
+        await db.execute('ALTER TABLE settings_new RENAME TO settings');
+        await db.execute('PRAGMA foreign_keys = ON');
+      }
+    }
+
+    // Migration from v15 → v16: backfill actual MIME types for payment proofs.
+    // Previous versions stored the generic string 'image' in
+    // payment_proof_type. Detect the real type from file signatures and
+    // update the column so exports and previews can rely on it.
+    if (oldVersion < 16) {
+      await _backfillPaymentProofTypes(db);
+    }
+  }
+
+  /// Backfills payment_proof_type for existing sales by detecting the actual
+  /// file type from the stored payment evidence.
+  ///
+  /// Missing or unreadable files have their type cleared. Failures are caught
+  /// per-file and per-batch so a single bad proof cannot block the upgrade.
+  Future<void> _backfillPaymentProofTypes(Database db) async {
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final rows = await db.query(
+        'sales',
+        columns: ['id', 'payment_proof_path', 'payment_proof_type'],
+        where: 'payment_proof_path IS NOT NULL AND payment_proof_path != ?',
+        whereArgs: [''],
+      );
+
+      for (final row in rows) {
+        final id = row['id'] as int?;
+        final path = row['payment_proof_path'] as String?;
+        if (id == null || path == null || path.isEmpty) continue;
+
+        try {
+          final file = File(join(appDir.path, path));
+          if (!await file.exists()) {
+            await db.update(
+              'sales',
+              {'payment_proof_type': null},
+              where: 'id = ?',
+              whereArgs: [id],
+            );
+            continue;
+          }
+
+          final raf = await file.open();
+          final bytes = await raf.read(64);
+          await raf.close();
+
+          final fileType = FileTypeUtils.detect(bytes, fileName: file.path);
+          await db.update(
+            'sales',
+            {'payment_proof_type': fileType?.mime},
+            where: 'id = ?',
+            whereArgs: [id],
+          );
+        } catch (_) {
+          // Leave the row as-is on a per-file error; do not block the upgrade.
+        }
+      }
+    } catch (_) {
+      // Do not block the app upgrade if the backfill cannot complete.
+    }
   }
 
   Future<void> _createTables(Database db) async {
@@ -476,7 +594,6 @@ class DatabaseHelper {
         currency TEXT NOT NULL DEFAULT 'PHP',
         receipt_footer TEXT,
         theme TEXT,
-        accent_color TEXT,
         groq_api_key TEXT,
         groq_model TEXT,
         gcash_enabled INTEGER NOT NULL DEFAULT 1,

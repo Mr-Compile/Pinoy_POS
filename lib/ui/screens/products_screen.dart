@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/modal_result.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/product.dart';
 import 'package:pinoy_pos/data/models/category.dart';
@@ -321,7 +322,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     );
   }
 
-  void _showProductDialog({Product? product}) {
+  Future<void> _showProductDialog({Product? product}) async {
     final formKey = GlobalKey<FormState>();
     final nameController = TextEditingController(text: product?.name ?? '');
     final priceController = TextEditingController(text: product?.price.toString() ?? '');
@@ -331,9 +332,10 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     bool isSaving = false;
     String? selectedImagePath = product?.imageUrl;
 
-    showDialog(
+    await showDialog<ModalResult<void>>(
       context: context,
-      builder: (context) => StatefulBuilder(
+      useRootNavigator: true,
+      builder: (dialogContext) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
           title: Text(product == null ? 'Add Product' : 'Edit Product'),
           content: SingleChildScrollView(
@@ -524,39 +526,49 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () async {
-                if (hasChanges) {
-                  final discard = await AppDialogService.unsavedChanges(
-                    context,
-                  );
-                  if (discard == true && context.mounted) {
-                    Navigator.pop(context);
-                  }
-                } else {
-                  Navigator.pop(context);
-                }
-              },
+              onPressed: isSaving
+                  ? null
+                  : () async {
+                      if (hasChanges) {
+                        final discard = await AppDialogService.unsavedChanges(
+                          context,
+                        );
+                        if (discard == true && dialogContext.mounted) {
+                          Navigator.of(dialogContext, rootNavigator: true)
+                              .pop(const ModalResult<void>.cancelled());
+                        }
+                      } else if (dialogContext.mounted) {
+                        Navigator.of(dialogContext, rootNavigator: true)
+                            .pop(const ModalResult<void>.cancelled());
+                      }
+                    },
               child: const Text('Cancel'),
             ),
             LoadingButton(
               isLoading: isSaving,
-              onPressed: () => _saveProduct(
-                formKey,
-                nameController,
-                priceController,
-                stockController,
-                selectedCategoryId,
-                selectedImagePath,
-                product,
-                setState,
-                (value) => setState(() => isSaving = value),
-              ),
+              onPressed: isSaving
+                  ? null
+                  : () => _saveProduct(
+                        formKey,
+                        nameController,
+                        priceController,
+                        stockController,
+                        selectedCategoryId,
+                        selectedImagePath,
+                        product,
+                        (value) => setState(() => isSaving = value),
+                        dialogContext,
+                      ),
               label: 'Save',
             ),
           ],
         ),
       ),
     );
+
+    nameController.dispose();
+    priceController.dispose();
+    stockController.dispose();
   }
 
   Future<void> _saveProduct(
@@ -567,24 +579,30 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     int? selectedCategoryId,
     String? selectedImagePath,
     Product? product,
-    StateSetter setState,
     ValueChanged<bool> setSaving,
+    BuildContext dialogContext,
   ) async {
     if (!formKey.currentState!.validate()) {
       return;
     }
 
     final name = nameController.text.trim();
-    
+
     // Check for duplicate product name within same category
-    final isDuplicate = _products.any((p) => 
-      p.name.toLowerCase() == name.toLowerCase() && 
+    final isDuplicate = _products.any((p) =>
+      p.name.toLowerCase() == name.toLowerCase() &&
       p.categoryId == selectedCategoryId &&
       (product == null || p.id != product.id)
     );
-    
+
     if (isDuplicate) {
-      AppDialogService.error(context, title: 'Duplicate Name', message: 'Product name already exists in this category.');
+      if (dialogContext.mounted) {
+        AppDialogService.error(
+          dialogContext,
+          title: 'Duplicate Name',
+          message: 'Product name already exists in this category.',
+        );
+      }
       return;
     }
 
@@ -603,9 +621,6 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
       if (product == null) {
         final productService = ref.read(productServiceProvider);
         await productService.createProduct(productData);
-        if (mounted) {
-          await AppDialogService.success(context, title: 'Created', message: 'Product created successfully.');
-        }
       } else {
         final productService = ref.read(productServiceProvider);
         await productService.updateProduct(
@@ -617,23 +632,38 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
             imageUrl: productData.imageUrl,
           ),
         );
-        // Old image cleanup is handled by ProductService.updateProduct so
-        // the UI does not contain image-persistence logic.
-        if (mounted) {
-          await AppDialogService.success(context, title: 'Updated', message: 'Product updated successfully.');
-        }
+      }
+
+      if (dialogContext.mounted) {
+        await AppDialogService.success(
+          dialogContext,
+          title: product == null ? 'Created' : 'Updated',
+          message: product == null
+              ? 'Product created successfully.'
+              : 'Product updated successfully.',
+        );
+      }
+
+      if (dialogContext.mounted) {
+        Navigator.of(dialogContext, rootNavigator: true)
+            .pop(const ModalResult<void>.saved());
       }
 
       if (mounted) {
-        Navigator.pop(context);
         _loadData();
       }
     } catch (e) {
-      if (mounted) {
-        AppDialogService.error(context, title: 'Save Failed', message: 'Failed to save product.');
+      if (dialogContext.mounted) {
+        AppDialogService.error(
+          dialogContext,
+          title: 'Save Failed',
+          message: 'Failed to save product.',
+        );
       }
     } finally {
-      setSaving(false);
+      if (dialogContext.mounted) {
+        setSaving(false);
+      }
     }
   }
 }

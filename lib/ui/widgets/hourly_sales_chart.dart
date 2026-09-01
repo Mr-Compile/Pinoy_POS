@@ -44,7 +44,8 @@ class HourlySalesChart extends StatelessWidget {
                 isCurrentHour: filledPoints[i].hour == DateTime.now().hour,
                 barColor: i == filledPoints.length - 1 &&
                         filledPoints[i].hour == DateTime.now().hour
-                    ? AppSemanticColors.info
+                    ? AppSemanticColors.resolve(
+                        AppSemanticColors.info, Theme.of(context).brightness)
                     : cs.primary,
               ),
           ],

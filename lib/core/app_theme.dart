@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 export 'app_typography.dart';
 
@@ -50,6 +50,28 @@ class AppSemanticColors {
 
   /// A subtle, accessible grey for disabled / placeholder states.
   static const Color disabled = Color(0xFF9E9E9E);
+
+  /// Returns the theme-aware variant of a [light] semantic color.
+  ///
+  /// In light mode the original [light] color is returned unchanged. In dark
+  /// mode the lightness is inverted (and clamped) so that foreground icons and
+  /// text stay visible on a dark surface, and filled containers keep enough
+  /// contrast against their on-color text.
+  static Color resolve(Color light, Brightness brightness) {
+    if (brightness == Brightness.light) return light;
+
+    final hsl = HSLColor.fromColor(light);
+    final inverted = 1.0 - hsl.lightness;
+    final clamped = inverted.clamp(0.18, 0.78);
+    return hsl.withLightness(clamped).toColor();
+  }
+
+  /// Convenience for resolving an on-color (white in light) to its dark
+  /// counterpart (a dark tone). Use this for text/icons that sit on top of a
+  /// resolved semantic background.
+  static Color resolveOn(Color lightOn, Brightness brightness) {
+    return resolve(lightOn, brightness);
+  }
 }
 
 /// Centralized color and theme definitions.
@@ -86,10 +108,13 @@ class AppColors {
       brightness: brightness,
     ).copyWith(
       // Keep the semantic error family in sync with the app palette.
-      error: AppSemanticColors.error,
-      onError: AppSemanticColors.onError,
-      errorContainer: AppSemanticColors.errorContainer,
-      onErrorContainer: AppSemanticColors.onErrorContainer,
+      // Resolve each tone so the error role is readable in both modes.
+      error: AppSemanticColors.resolve(AppSemanticColors.error, brightness),
+      onError: AppSemanticColors.resolveOn(AppSemanticColors.onError, brightness),
+      errorContainer:
+          AppSemanticColors.resolve(AppSemanticColors.errorContainer, brightness),
+      onErrorContainer:
+          AppSemanticColors.resolveOn(AppSemanticColors.onErrorContainer, brightness),
     );
   }
 

@@ -278,6 +278,7 @@ class _StockScreenState extends ConsumerState<StockScreen> {
 
     showDialog(
       context: context,
+      useRootNavigator: true,
       builder: (context) => _StockHistoryDialog(
         product: product,
         history: history,

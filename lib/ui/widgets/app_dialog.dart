@@ -39,49 +39,58 @@ extension AppDialogTypeX on AppDialogType {
     }
   }
 
-  Color get iconColor {
+  Color iconColor(Brightness brightness) {
     switch (this) {
       case AppDialogType.success:
-        return AppSemanticColors.success;
+        return AppSemanticColors.resolve(AppSemanticColors.success, brightness);
       case AppDialogType.error:
-        return AppSemanticColors.error;
+        return AppSemanticColors.resolve(AppSemanticColors.error, brightness);
       case AppDialogType.warning:
-        return AppSemanticColors.warning;
+        return AppSemanticColors.resolve(AppSemanticColors.warning, brightness);
       case AppDialogType.info:
-        return AppSemanticColors.info;
+        return AppSemanticColors.resolve(AppSemanticColors.info, brightness);
       case AppDialogType.restriction:
-        return AppSemanticColors.warning;
+        return AppSemanticColors.resolve(AppSemanticColors.warning, brightness);
       case AppDialogType.confirmation:
-        return AppSemanticColors.info;
+        return AppSemanticColors.resolve(AppSemanticColors.info, brightness);
       case AppDialogType.offline:
-        return AppSemanticColors.info;
+        return AppSemanticColors.resolve(AppSemanticColors.info, brightness);
       case AppDialogType.loading:
-        return AppSemanticColors.info;
+        return AppSemanticColors.resolve(AppSemanticColors.info, brightness);
       case AppDialogType.validation:
-        return AppSemanticColors.warning;
+        return AppSemanticColors.resolve(AppSemanticColors.warning, brightness);
     }
   }
 
-  Color get iconBgColor {
+  Color iconBgColor(Brightness brightness) {
     switch (this) {
       case AppDialogType.success:
-        return AppSemanticColors.successContainer;
+        return AppSemanticColors.resolve(
+            AppSemanticColors.successContainer, brightness);
       case AppDialogType.error:
-        return AppSemanticColors.errorContainer;
+        return AppSemanticColors.resolve(
+            AppSemanticColors.errorContainer, brightness);
       case AppDialogType.warning:
-        return AppSemanticColors.warningContainer;
+        return AppSemanticColors.resolve(
+            AppSemanticColors.warningContainer, brightness);
       case AppDialogType.info:
-        return AppSemanticColors.infoContainer;
+        return AppSemanticColors.resolve(
+            AppSemanticColors.infoContainer, brightness);
       case AppDialogType.restriction:
-        return AppSemanticColors.warningContainer;
+        return AppSemanticColors.resolve(
+            AppSemanticColors.warningContainer, brightness);
       case AppDialogType.confirmation:
-        return AppSemanticColors.infoContainer;
+        return AppSemanticColors.resolve(
+            AppSemanticColors.infoContainer, brightness);
       case AppDialogType.offline:
-        return AppSemanticColors.infoContainer;
+        return AppSemanticColors.resolve(
+            AppSemanticColors.infoContainer, brightness);
       case AppDialogType.loading:
-        return AppSemanticColors.infoContainer;
+        return AppSemanticColors.resolve(
+            AppSemanticColors.infoContainer, brightness);
       case AppDialogType.validation:
-        return AppSemanticColors.warningContainer;
+        return AppSemanticColors.resolve(
+            AppSemanticColors.warningContainer, brightness);
     }
   }
 
@@ -197,6 +206,7 @@ class AppDialog extends StatelessWidget {
   }
 
   Widget _buildIcon(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     if (type == AppDialogType.loading) {
       return Center(
         child: SizedBox(
@@ -204,7 +214,7 @@ class AppDialog extends StatelessWidget {
           height: 48,
           child: CircularProgressIndicator(
             strokeWidth: 3,
-            color: AppSemanticColors.info,
+            color: AppSemanticColors.resolve(AppSemanticColors.info, brightness),
           ),
         ),
       );
@@ -216,13 +226,13 @@ class AppDialog extends StatelessWidget {
         width: 56,
         height: 56,
         decoration: BoxDecoration(
-          color: type.iconBgColor,
+          color: type.iconBgColor(brightness),
           shape: BoxShape.circle,
         ),
         child: Icon(
           type.icon,
           size: 32,
-          color: type.iconColor,
+          color: type.iconColor(brightness),
         ),
       ),
     );

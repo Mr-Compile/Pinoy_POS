@@ -184,7 +184,7 @@ class AppButton extends StatelessWidget {
     final textStyle = resolved.$2;
     final iconSize = resolved.$3;
 
-    final (mainColor, onMainColor) = _resolveColors(cs, color);
+    final (mainColor, onMainColor) = _resolveColors(cs, theme.brightness, color);
     final labelColor = switch (variant) {
       AppButtonVariant.filled ||
       AppButtonVariant.elevated ||
@@ -251,8 +251,8 @@ class AppButton extends StatelessWidget {
       AppButtonVariant.destructive => FilledButton(
           onPressed: isLoading ? null : onPressed,
           style: FilledButton.styleFrom(
-            backgroundColor: AppSemanticColors.error,
-            foregroundColor: AppSemanticColors.onError,
+            backgroundColor: mainColor,
+            foregroundColor: onMainColor,
             shape: shape,
             padding: padding,
             minimumSize: const Size(48, 48),
@@ -272,19 +272,35 @@ class AppButton extends StatelessWidget {
     return button;
   }
 
-  /// Resolves the main and foreground colors for the chosen semantic role.
-  (Color, Color) _resolveColors(ColorScheme cs, AppButtonColor color) {
+  /// Resolves the main and foreground colors for the chosen semantic role,
+  /// adapting each tone to the current brightness.
+  (Color, Color) _resolveColors(
+    ColorScheme cs,
+    Brightness brightness,
+    AppButtonColor color,
+  ) {
     return switch (color) {
       AppButtonColor.primary => (cs.primary, cs.onPrimary),
-      AppButtonColor.success =>
-        (AppSemanticColors.success, AppSemanticColors.onSuccess),
-      AppButtonColor.warning =>
-        (AppSemanticColors.warning, AppSemanticColors.onWarning),
-      AppButtonColor.info => (AppSemanticColors.info, AppSemanticColors.onInfo),
-      AppButtonColor.error =>
-        (AppSemanticColors.error, AppSemanticColors.onError),
-      AppButtonColor.neutral =>
-        (AppSemanticColors.neutral, AppSemanticColors.onNeutral),
+      AppButtonColor.success => (
+          AppSemanticColors.resolve(AppSemanticColors.success, brightness),
+          AppSemanticColors.resolveOn(AppSemanticColors.onSuccess, brightness)
+        ),
+      AppButtonColor.warning => (
+          AppSemanticColors.resolve(AppSemanticColors.warning, brightness),
+          AppSemanticColors.resolveOn(AppSemanticColors.onWarning, brightness)
+        ),
+      AppButtonColor.info => (
+          AppSemanticColors.resolve(AppSemanticColors.info, brightness),
+          AppSemanticColors.resolveOn(AppSemanticColors.onInfo, brightness)
+        ),
+      AppButtonColor.error => (
+          AppSemanticColors.resolve(AppSemanticColors.error, brightness),
+          AppSemanticColors.resolveOn(AppSemanticColors.onError, brightness)
+        ),
+      AppButtonColor.neutral => (
+          AppSemanticColors.resolve(AppSemanticColors.neutral, brightness),
+          AppSemanticColors.resolveOn(AppSemanticColors.onNeutral, brightness)
+        ),
     };
   }
 

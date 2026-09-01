@@ -1,12 +1,13 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/data/models/receipt_view_data.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/providers/payment_proof_provider.dart';
 import 'package:pinoy_pos/providers/receipt_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
-import 'package:pinoy_pos/services/image_service.dart';
+
+import 'package:pinoy_pos/services/payment_proof_service.dart';
 import 'package:pinoy_pos/ui/screens/payment_proof_viewer_screen.dart';
 import 'package:pinoy_pos/ui/screens/receipt_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
@@ -34,10 +35,11 @@ class SaleDetailScreen extends ConsumerStatefulWidget {
 class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
   bool _isProcessing = false;
   bool _isExporting = false;
+  bool _isExportingProof = false;
   bool _isLoading = false;
   bool _notFound = false;
   Sale? _loadedSale;
-  final Map<String, Future<File?>> _proofFutures = {};
+  final Map<String, Future<PaymentProofInfo?>> _proofFutures = {};
 
   Sale get _sale => widget.sale ?? _loadedSale!;
   int get _saleId => _sale.id!;
@@ -194,6 +196,40 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
           context,
           title: 'Download Failed',
           message: 'Unable to save the receipt: $e',
+        );
+      }
+    }
+  }
+
+  Future<void> _downloadPaymentProof() async {
+    setState(() => _isExportingProof = true);
+    try {
+      final paymentProofService = ref.read(paymentProofServiceProvider);
+      final saved = await paymentProofService.exportPaymentProof(_sale);
+
+      if (mounted) {
+        setState(() => _isExportingProof = false);
+        if (saved != null) {
+          await AppDialogService.success(
+            context,
+            title: 'Payment Proof Saved',
+            message: 'Saved to $saved',
+          );
+        } else {
+          AppDialogService.error(
+            context,
+            title: 'Download Cancelled',
+            message: 'No save location selected.',
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isExportingProof = false);
+        AppDialogService.error(
+          context,
+          title: 'Download Failed',
+          message: 'Unable to export payment proof: $e',
         );
       }
     }
@@ -523,10 +559,12 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
               style: AppTypography.titleSmallBold(context),
             ),
             const SizedBox(height: 8),
-            FutureBuilder<File?>(
+            FutureBuilder<PaymentProofInfo?>(
               future: _proofFutures.putIfAbsent(
                 receipt.paymentProofPath!,
-                () => ImageService().resolveImageFile(receipt.paymentProofPath),
+                () => ref
+                    .read(paymentProofServiceProvider)
+                    .resolveProofFromPath(receipt.paymentProofPath),
               ),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -535,22 +573,44 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
                     child: Center(child: CircularProgressIndicator()),
                   );
                 }
-                final file = snapshot.data;
-                if (file == null) {
+                final info = snapshot.data;
+                if (info == null) {
                   return const Text('Unable to load payment proof.');
                 }
-                return GestureDetector(
-                  onTap: _viewPaymentProof,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.file(
-                      file,
-                      height: 120,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
+
+                if (info.isImage) {
+                  return GestureDetector(
+                    onTap: _viewPaymentProof,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.file(
+                        info.file,
+                        height: 120,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const SizedBox(
+                            height: 120,
+                            child: Center(
+                              child: Text('Unable to display this image.'),
+                            ),
+                          );
+                        },
+                      ),
                     ),
-                  ),
-                );
+                  );
+                }
+
+                if (info.isPdf) {
+                  return ListTile(
+                    leading: const Icon(Icons.picture_as_pdf),
+                    title: Text(info.fileType?.label ?? 'PDF Document'),
+                    subtitle: Text(info.originalName ?? 'Unknown file'),
+                    onTap: _viewPaymentProof,
+                  );
+                }
+
+                return const Text('Unsupported payment proof type.');
               },
             ),
           ],
@@ -576,12 +636,19 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
         ),
         const SizedBox(height: 12),
         if (receipt.paymentProofPath != null &&
-            receipt.paymentProofPath!.isNotEmpty)
+            receipt.paymentProofPath!.isNotEmpty) ...[
           OutlinedButton.icon(
             onPressed: _viewPaymentProof,
             icon: const Icon(Icons.image_outlined),
             label: const Text('View Payment Proof'),
           ),
+          const SizedBox(height: 12),
+          LoadingButton(
+            isLoading: _isExportingProof,
+            onPressed: _isExportingProof ? null : _downloadPaymentProof,
+            label: 'Download Payment Proof',
+          ),
+        ],
       ],
     );
   }

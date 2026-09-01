@@ -8,7 +8,6 @@
   final String currency;
   final String? receiptFooter;
   final String? theme;
-  final String? accentColor;
   final String? groqApiKey;
   final String? groqModel;
   final bool gcashEnabled;
@@ -29,7 +28,6 @@
     this.currency = 'PHP',
     this.receiptFooter,
     this.theme,
-    this.accentColor,
     this.groqApiKey,
     this.groqModel,
     this.gcashEnabled = true,
@@ -52,7 +50,6 @@
       'currency': currency,
       'receipt_footer': receiptFooter,
       'theme': theme,
-      'accent_color': accentColor,
       'groq_api_key': null, // Stored in secure storage, never in the settings table
       'groq_model': groqModel,
       'gcash_enabled': gcashEnabled ? 1 : 0,
@@ -113,7 +110,6 @@
       currency: stringOrNull('currency') ?? 'PHP',
       receiptFooter: stringOrNull('receipt_footer'),
       theme: stringOrNull('theme'),
-      accentColor: stringOrNull('accent_color'),
       groqApiKey: null, // Stored in flutter_secure_storage, never in memory from the DB
       groqModel: stringOrNull('groq_model'),
       gcashEnabled: boolFromInt('gcash_enabled'),
@@ -139,7 +135,6 @@
     String? currency,
     String? receiptFooter,
     String? theme,
-    String? accentColor,
     Object? groqApiKey = _sentinel,
     Object? groqModel = _sentinel,
     bool? gcashEnabled,
@@ -160,7 +155,6 @@
       currency: currency ?? this.currency,
       receiptFooter: receiptFooter ?? this.receiptFooter,
       theme: theme ?? this.theme,
-      accentColor: accentColor ?? this.accentColor,
       groqApiKey:
           groqApiKey == _sentinel ? this.groqApiKey : groqApiKey as String?,
       groqModel:

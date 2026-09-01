@@ -4,7 +4,7 @@ import 'package:pinoy_pos/providers/theme_provider.dart';
 
 /// Theme mode toggle that cycles through system, light, and dark.
 ///
-/// Displays the current mode as a pill-shaped icon button. Tapping it
+/// Displays the current mode as a subtle icon button. Tapping it
 /// advances to the next mode and persists the choice via [themeProvider].
 class ThemeToggle extends ConsumerWidget {
   const ThemeToggle({super.key});
@@ -13,7 +13,6 @@ class ThemeToggle extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final themeState = ref.watch(themeProvider);
     final themeNotifier = ref.read(themeProvider.notifier);
-    final colorScheme = Theme.of(context).colorScheme;
 
     final (icon, label) = switch (themeState.themeMode) {
       'light' => (Icons.light_mode_outlined, 'Light'),
@@ -33,12 +32,6 @@ class ThemeToggle extends ConsumerWidget {
           themeNotifier.setThemeMode(next);
         },
         icon: Icon(icon, size: 20),
-        style: IconButton.styleFrom(
-          shape: const StadiumBorder(),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          backgroundColor: colorScheme.primaryContainer,
-          foregroundColor: colorScheme.onPrimaryContainer,
-        ),
       ),
     );
   }

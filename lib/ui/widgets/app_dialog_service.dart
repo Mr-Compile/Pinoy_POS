@@ -410,10 +410,18 @@ class AppDialogService {
                           width: 56,
                           height: 56,
                           decoration: BoxDecoration(
-                            color: AppSemanticColors.warningContainer,
+                            color: AppSemanticColors.resolve(
+                                AppSemanticColors.warningContainer,
+                                Theme.of(context).brightness),
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(Icons.warning, size: 32, color: AppSemanticColors.warning),
+                          child: Icon(
+                            Icons.warning,
+                            size: 32,
+                            color: AppSemanticColors.resolve(
+                                AppSemanticColors.warning,
+                                Theme.of(context).brightness),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 16),

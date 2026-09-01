@@ -368,7 +368,10 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
       context: context,
       builder: (context) => AlertDialog(
         icon: const Icon(Icons.warning_amber),
-        iconColor: AppSemanticColors.warning,
+        iconColor: AppSemanticColors.resolve(
+          AppSemanticColors.warning,
+          Theme.of(context).brightness,
+        ),
         title: const Text('Clear AI Configuration?'),
         content: const Text(
             'This will remove the Groq API key and model. The AI Advisor will be unavailable until reconfigured.'),
@@ -380,8 +383,14 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(
-              backgroundColor: AppSemanticColors.error,
-              foregroundColor: AppSemanticColors.onError,
+              backgroundColor: AppSemanticColors.resolve(
+                AppSemanticColors.error,
+                Theme.of(context).brightness,
+              ),
+              foregroundColor: AppSemanticColors.resolveOn(
+                AppSemanticColors.onError,
+                Theme.of(context).brightness,
+              ),
             ),
             child: const Text('Clear'),
           ),
@@ -515,7 +524,8 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
     final isFailed = _connectionStatus == false;
 
     final statusColor = isConnected
-        ? Colors.green
+        ? AppSemanticColors.resolve(
+            AppSemanticColors.success, theme.brightness)
         : isFailed
             ? cs.error
             : cs.onSurfaceVariant;
@@ -873,15 +883,20 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
                       horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: model.active
-                        ? Colors.green.withValues(alpha: 0.1)
+                        ? AppSemanticColors.resolve(
+                                AppSemanticColors.success, theme.brightness)
+                            .withValues(alpha: 0.1)
                         : cs.error.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
                     model.active ? 'Active' : 'Inactive',
                     style: theme.textTheme.labelSmall?.copyWith(
-                          color: model.active ? Colors.green : cs.error,
-                        ),
+                      color: model.active
+                          ? AppSemanticColors.resolve(
+                              AppSemanticColors.success, theme.brightness)
+                          : cs.error,
+                    ),
                   ),
                 ),
               ],

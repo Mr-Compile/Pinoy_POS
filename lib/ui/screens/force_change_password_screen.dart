@@ -108,7 +108,8 @@ class _ForceChangePasswordScreenState
       context: context,
       builder: (context) => AlertDialog(
         icon: const Icon(Icons.logout_rounded),
-        iconColor: AppSemanticColors.error,
+        iconColor: AppSemanticColors.resolve(
+            AppSemanticColors.error, Theme.of(context).brightness),
         title: const Text('Sign Out?'),
         content: const Text(
           'You will need to log in again with your temporary password.',
@@ -121,8 +122,14 @@ class _ForceChangePasswordScreenState
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(
-              backgroundColor: AppSemanticColors.error,
-              foregroundColor: AppSemanticColors.onError,
+              backgroundColor: AppSemanticColors.resolve(
+                AppSemanticColors.error,
+                Theme.of(context).brightness,
+              ),
+              foregroundColor: AppSemanticColors.resolveOn(
+                AppSemanticColors.onError,
+                Theme.of(context).brightness,
+              ),
             ),
             child: const Text('Sign Out'),
           ),

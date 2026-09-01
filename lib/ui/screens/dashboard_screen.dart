@@ -281,14 +281,14 @@ class _OwnerDashboard extends ConsumerWidget {
                 label: 'Low Stock',
                 value: '${data.lowStockCount}',
                 icon: Icons.warning_amber,
-                iconColor: AppSemanticColors.warning,
+                iconColor: AppSemanticColors.resolve(AppSemanticColors.warning, Theme.of(context).brightness),
                 tier: KpiCardTier.secondary,
               ),
               KpiCard(
                 label: 'Out of Stock',
                 value: '${data.outOfStockCount}',
                 icon: Icons.error_outline,
-                iconColor: AppSemanticColors.error,
+                iconColor: AppSemanticColors.resolve(AppSemanticColors.error, Theme.of(context).brightness),
                 tier: KpiCardTier.secondary,
               ),
             ],
@@ -417,17 +417,17 @@ class _OwnerDashboard extends ConsumerWidget {
                   DonutSegment(
                     label: 'Normal',
                     value: data.inventoryStatus.normal,
-                    color: AppSemanticColors.success,
+                    color: AppSemanticColors.resolve(AppSemanticColors.success, Theme.of(context).brightness),
                   ),
                   DonutSegment(
                     label: 'Low Stock',
                     value: data.inventoryStatus.lowStock,
-                    color: AppSemanticColors.warning,
+                    color: AppSemanticColors.resolve(AppSemanticColors.warning, Theme.of(context).brightness),
                   ),
                   DonutSegment(
                     label: 'Out of Stock',
                     value: data.inventoryStatus.outOfStock,
-                    color: AppSemanticColors.error,
+                    color: AppSemanticColors.resolve(AppSemanticColors.error, Theme.of(context).brightness),
                   ),
                 ],
               ),
@@ -446,7 +446,7 @@ class _OwnerDashboard extends ConsumerWidget {
         child: AppCard(
           child: Row(
             children: [
-              Icon(Icons.check_circle, color: AppSemanticColors.success),
+              Icon(Icons.check_circle, color: AppSemanticColors.resolve(AppSemanticColors.success, Theme.of(context).brightness)),
               const SizedBox(width: Spacing.md),
               const Expanded(child: Text('Inventory is healthy')),
             ],
@@ -717,7 +717,7 @@ class _AdminDashboard extends ConsumerWidget {
                 label: 'Active Users',
                 value: '${data.activeUsers}',
                 icon: Icons.person_outline,
-                iconColor: AppSemanticColors.success,
+                iconColor: AppSemanticColors.resolve(AppSemanticColors.success, Theme.of(context).brightness),
                 tier: KpiCardTier.primary,
               ),
               KpiCard(
@@ -739,7 +739,7 @@ class _AdminDashboard extends ConsumerWidget {
                 label: 'Trash Items',
                 value: '${data.trashCount}',
                 icon: Icons.delete_outline,
-                iconColor: AppSemanticColors.warning,
+                iconColor: AppSemanticColors.resolve(AppSemanticColors.warning, Theme.of(context).brightness),
                 tier: KpiCardTier.secondary,
               ),
             ],
@@ -798,7 +798,7 @@ class _AdminDashboard extends ConsumerWidget {
                   DonutSegment(
                     label: 'Staff',
                     value: data.usersByRole.staff,
-                    color: AppSemanticColors.info,
+                    color: AppSemanticColors.resolve(AppSemanticColors.info, Theme.of(context).brightness),
                   ),
                 ],
               ),
@@ -820,7 +820,7 @@ class _AdminDashboard extends ConsumerWidget {
             if (data.backupStatus.hasBackup && data.backupStatus.lastBackupDate != null)
               Row(
                 children: [
-                  Icon(Icons.check_circle, color: AppSemanticColors.success),
+                  Icon(Icons.check_circle, color: AppSemanticColors.resolve(AppSemanticColors.success, Theme.of(context).brightness)),
                   const SizedBox(width: Spacing.sm),
                   Expanded(
                     child: Text(
@@ -1022,14 +1022,14 @@ class _StaffDashboard extends ConsumerWidget {
                 label: 'Low Stock',
                 value: '${data.lowStockCount}',
                 icon: Icons.warning_amber,
-                iconColor: AppSemanticColors.warning,
+                iconColor: AppSemanticColors.resolve(AppSemanticColors.warning, Theme.of(context).brightness),
                 tier: KpiCardTier.secondary,
               ),
               KpiCard(
                 label: 'Out of Stock',
                 value: '${data.outOfStockCount}',
                 icon: Icons.error_outline,
-                iconColor: AppSemanticColors.error,
+                iconColor: AppSemanticColors.resolve(AppSemanticColors.error, Theme.of(context).brightness),
                 tier: KpiCardTier.secondary,
               ),
             ],
@@ -1110,17 +1110,17 @@ class _StaffDashboard extends ConsumerWidget {
                   DonutSegment(
                     label: 'Normal',
                     value: data.inventoryStatus.normal,
-                    color: AppSemanticColors.success,
+                    color: AppSemanticColors.resolve(AppSemanticColors.success, Theme.of(context).brightness),
                   ),
                   DonutSegment(
                     label: 'Low Stock',
                     value: data.inventoryStatus.lowStock,
-                    color: AppSemanticColors.warning,
+                    color: AppSemanticColors.resolve(AppSemanticColors.warning, Theme.of(context).brightness),
                   ),
                   DonutSegment(
                     label: 'Out of Stock',
                     value: data.inventoryStatus.outOfStock,
-                    color: AppSemanticColors.error,
+                    color: AppSemanticColors.resolve(AppSemanticColors.error, Theme.of(context).brightness),
                   ),
                 ],
               ),
@@ -1139,7 +1139,7 @@ class _StaffDashboard extends ConsumerWidget {
         child: AppCard(
           child: Row(
             children: [
-              Icon(Icons.check_circle, color: AppSemanticColors.success),
+              Icon(Icons.check_circle, color: AppSemanticColors.resolve(AppSemanticColors.success, Theme.of(context).brightness)),
               const SizedBox(width: Spacing.md),
               const Expanded(child: Text('Inventory is healthy')),
             ],
@@ -1402,7 +1402,7 @@ class _LowStockTile extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: Spacing.xs),
       child: Row(
         children: [
-          Icon(Icons.circle, size: 8, color: AppSemanticColors.warning),
+          Icon(Icons.circle, size: 8, color: AppSemanticColors.resolve(AppSemanticColors.warning, Theme.of(context).brightness)),
           const SizedBox(width: Spacing.md),
           Expanded(
             child: Text(
@@ -1415,7 +1415,7 @@ class _LowStockTile extends StatelessWidget {
           Text(
             '$remaining remaining',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppSemanticColors.warning,
+                  color: AppSemanticColors.resolve(AppSemanticColors.warning, Theme.of(context).brightness),
                   fontWeight: FontWeight.w600,
                 ),
           ),

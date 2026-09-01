@@ -229,7 +229,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     ),
                                   ),
                                   child: authState.isLoading
-                                      ? const Row(
+                                      ? Row(
                                           mainAxisAlignment: MainAxisAlignment.center,
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
@@ -238,11 +238,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                               height: 20,
                                               child: CircularProgressIndicator(
                                                 strokeWidth: 2,
-                                                color: Colors.white,
+                                                color: Theme.of(context).colorScheme.onPrimary,
                                               ),
                                             ),
-                                            SizedBox(width: 12),
-                                            Text('Signing in...'),
+                                            const SizedBox(width: 12),
+                                            const Text('Signing in...'),
                                           ],
                                         )
                                       : const Text(

@@ -1,11 +1,11 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/data/models/receipt_view_data.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
+import 'package:pinoy_pos/providers/payment_proof_provider.dart';
 import 'package:pinoy_pos/providers/receipt_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
-import 'package:pinoy_pos/services/image_service.dart';
+import 'package:pinoy_pos/services/payment_proof_service.dart';
 import 'package:pinoy_pos/ui/screens/payment_proof_viewer_screen.dart';
 import 'package:pinoy_pos/ui/screens/sale_detail_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
@@ -32,10 +32,11 @@ class ReceiptScreen extends ConsumerStatefulWidget {
 
 class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
   bool _isExporting = false;
+  bool _isExportingProof = false;
   bool _isLoading = false;
   bool _notFound = false;
   Sale? _loadedSale;
-  final Map<String, Future<File?>> _proofFutures = {};
+  final Map<String, Future<PaymentProofInfo?>> _proofFutures = {};
 
   Sale get _sale => widget.sale ?? _loadedSale!;
   int get _saleId => _sale.id!;
@@ -119,6 +120,43 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
         builder: (_) => PaymentProofViewerScreen(sale: _sale),
       ),
     );
+  }
+
+  Future<void> _downloadPaymentProof(ReceiptViewData receipt) async {
+    setState(() => _isExportingProof = true);
+    try {
+      final paymentProofService = ref.read(paymentProofServiceProvider);
+      final saved = await paymentProofService.exportPaymentProofFromPath(
+        receipt.paymentProofPath,
+        receipt.saleId,
+      );
+
+      if (mounted) {
+        setState(() => _isExportingProof = false);
+        if (saved != null) {
+          await AppDialogService.success(
+            context,
+            title: 'Payment Proof Saved',
+            message: 'Saved to $saved',
+          );
+        } else {
+          AppDialogService.error(
+            context,
+            title: 'Download Cancelled',
+            message: 'No save location selected.',
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isExportingProof = false);
+        AppDialogService.error(
+          context,
+          title: 'Download Failed',
+          message: 'Unable to export payment proof: $e',
+        );
+      }
+    }
   }
 
   @override
@@ -454,17 +492,38 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
       children: [
         if (receipt.paymentProofPath != null &&
             receipt.paymentProofPath!.isNotEmpty) ...[
-          FutureBuilder<File?>(
+          FutureBuilder<PaymentProofInfo?>(
             future: _proofFutures.putIfAbsent(
               receipt.paymentProofPath!,
-              () => ImageService().resolveImageFile(receipt.paymentProofPath),
+              () => ref
+                  .read(paymentProofServiceProvider)
+                  .resolveProofFromPath(receipt.paymentProofPath),
             ),
             builder: (context, snapshot) {
-              final hasFile = snapshot.data != null;
-              return OutlinedButton.icon(
-                onPressed: hasFile ? () => _viewPaymentProof(receipt) : null,
-                icon: const Icon(Icons.image_outlined),
-                label: const Text('View Payment Proof'),
+              final info = snapshot.data;
+              final hasProof = info != null;
+              final isPdf = info?.isPdf ?? false;
+              final icon =
+                  isPdf ? Icons.picture_as_pdf : Icons.image_outlined;
+              final label = isPdf ? 'View PDF' : 'View Payment Proof';
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: hasProof ? () => _viewPaymentProof(receipt) : null,
+                    icon: Icon(icon),
+                    label: Text(label),
+                  ),
+                  const SizedBox(height: 12),
+                  LoadingButton(
+                    isLoading: _isExportingProof,
+                    onPressed: _isExportingProof
+                        ? null
+                        : () => _downloadPaymentProof(receipt),
+                    label: 'Download Payment Proof',
+                  ),
+                ],
               );
             },
           ),

@@ -166,7 +166,10 @@ class _PinLockScreenState extends ConsumerState<PinLockScreen> {
                           ? null
                           : () => _handleBack(context),
                       style: TextButton.styleFrom(
-                        foregroundColor: AppSemanticColors.error,
+                        foregroundColor: AppSemanticColors.resolve(
+                          AppSemanticColors.error,
+                          Theme.of(context).brightness,
+                        ),
                       ),
                       icon: const Icon(Icons.logout, size: 20),
                       label: const Text('Back to Login'),

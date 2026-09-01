@@ -317,6 +317,13 @@ class SalesService {
     final trimmedCustomer = customerName?.trim();
     final trimmedNotes = notes?.trim();
 
+    // Determine the actual payment proof MIME type from magic bytes / filename.
+    // Callers may pass an explicit type; otherwise detect from the file.
+    final resolvedProofType = paymentProofType ??
+        (paymentProofPath != null && paymentProofPath.isNotEmpty
+            ? await _detectPaymentProofType(paymentProofPath)
+            : null);
+
     // ── Payment-method-specific validation ───────────────────────────────
 
     if (paymentMethod == 'Cash') {
@@ -426,8 +433,7 @@ class SalesService {
           referenceNumber: trimmedReference?.isNotEmpty == true ? trimmedReference : null,
           customerName: trimmedCustomer?.isNotEmpty == true ? trimmedCustomer : null,
           paymentProofPath: paymentProofPath,
-          paymentProofType: paymentProofType ??
-              (paymentProofPath != null && paymentProofPath.isNotEmpty ? 'image' : null),
+          paymentProofType: resolvedProofType,
           verifiedAt: verifiedAt,
           verifiedBy: verifiedBy,
           userId: _currentUserId('create_sales'),
@@ -529,6 +535,16 @@ class SalesService {
     if (path != null && path.isNotEmpty) {
       await _imageService.deleteImage(path);
     }
+  }
+
+  /// Detects the actual MIME type of the payment proof at [relativePath].
+  ///
+  /// Uses magic bytes first and falls back to the filename extension. Returns
+  /// `null` when the file is missing or its type cannot be determined.
+  Future<String?> _detectPaymentProofType(String? relativePath) async {
+    if (relativePath == null || relativePath.isEmpty) return null;
+    final fileType = await _imageService.detectFileType(relativePath);
+    return fileType?.mime;
   }
 
   static const _kPriceEpsilon = 0.01;
@@ -727,10 +743,11 @@ class SalesService {
     }
 
     final oldPath = sale.paymentProofPath;
+    final proofType = await _detectPaymentProofType(newRelativePath);
 
     final updated = sale.copyWith(
       paymentProofPath: newRelativePath,
-      paymentProofType: 'image',
+      paymentProofType: proofType,
     );
     await _saleRepository.update(updated, txn: txn);
 

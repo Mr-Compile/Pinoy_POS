@@ -2,6 +2,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/ai_config_status.dart';
 import 'package:pinoy_pos/core/ai_role_config.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/providers/ai_advisor_provider.dart';
@@ -114,10 +115,15 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
     final status = chatState.configStatus;
 
     final color = switch (status) {
-      AIConfigStatus.active => Colors.green,
-      AIConfigStatus.notConfigured => Colors.orange,
-      AIConfigStatus.invalid => cs.error,
-      AIConfigStatus.unavailable => cs.error,
+      AIConfigStatus.active =>
+        AppSemanticColors.resolve(
+            AppSemanticColors.success, Theme.of(context).brightness),
+      AIConfigStatus.notConfigured =>
+        AppSemanticColors.resolve(
+            AppSemanticColors.warning, Theme.of(context).brightness),
+      AIConfigStatus.invalid ||
+      AIConfigStatus.unavailable =>
+        cs.error,
       AIConfigStatus.checking => cs.secondary,
     };
 
@@ -149,8 +155,12 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
     final isNotConfigured = status == AIConfigStatus.notConfigured;
     final isInvalid = status == AIConfigStatus.invalid;
 
-    final warningColor =
-        isInvalid ? cs.error : (isNotConfigured ? Colors.orange : cs.error);
+    final warningColor = isInvalid
+        ? cs.error
+        : (isNotConfigured
+            ? AppSemanticColors.resolve(
+                AppSemanticColors.warning, Theme.of(context).brightness)
+            : cs.error);
     final icon = isNotConfigured
         ? Icons.key_off
         : (isInvalid ? Icons.error_outline : Icons.wifi_off);

@@ -59,24 +59,6 @@ class AppearanceSettingsPage extends ConsumerWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 24),
-            AppCard(
-              child: ListTile(
-                leading: Icon(Icons.palette_outlined,
-                    color: Theme.of(context).colorScheme.primary),
-                title: const Text('Accent Color'),
-                subtitle: const Text(
-                    'Derived from the semantic primary color.'),
-                trailing: Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-            ),
           ],
         ),
       ),
@@ -101,21 +83,23 @@ class _ThemeOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return ListTile(
-      leading: Icon(icon,
-          color: isSelected
-              ? Theme.of(context).colorScheme.primary
-              : Theme.of(context).colorScheme.onSurfaceVariant),
-      title: Text(title,
-          style: TextStyle(
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          )),
+      leading: Icon(
+        icon,
+        color: isSelected ? cs.onSurface : cs.onSurfaceVariant,
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          color: cs.onSurface,
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+        ),
+      ),
       subtitle: Text(subtitle),
       trailing: Icon(
-        isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-        color: isSelected
-            ? Theme.of(context).colorScheme.primary
-            : Theme.of(context).colorScheme.onSurfaceVariant,
+        isSelected ? Icons.check : Icons.radio_button_unchecked,
+        color: isSelected ? cs.onSurface : cs.onSurfaceVariant,
       ),
       onTap: onTap,
     );

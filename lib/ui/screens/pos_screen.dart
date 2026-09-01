@@ -368,7 +368,10 @@ class _POSScreenState extends ConsumerState<POSScreen> {
       stockIcon = Icons.error_outline;
     } else if (isLowStock) {
       stockLabel = 'Low stock: ${product.stock}';
-      stockColor = AppSemanticColors.warning;
+      stockColor = AppSemanticColors.resolve(
+        AppSemanticColors.warning,
+        Theme.of(context).brightness,
+      );
       stockIcon = Icons.warning_amber;
     } else {
       stockLabel = '${product.stock} available';
@@ -928,11 +931,14 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
     return paymentSettingsAsync.when(
       loading: () => AlertDialog(
         title: const Text('Payment'),
-        content: const SizedBox(
+        content: SizedBox(
           height: 120,
           child: Center(
             child: CircularProgressIndicator(
-              color: AppSemanticColors.info,
+              color: AppSemanticColors.resolve(
+                AppSemanticColors.info,
+                Theme.of(context).brightness,
+              ),
             ),
           ),
         ),
@@ -945,7 +951,7 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
       ),
       error: (error, stackTrace) => AlertDialog(
         icon: const Icon(Icons.error_outline),
-        iconColor: AppSemanticColors.error,
+        iconColor: Theme.of(context).colorScheme.error,
         title: const Text('Payment'),
         content: Text('Failed to load payment settings: $error'),
         actions: [
