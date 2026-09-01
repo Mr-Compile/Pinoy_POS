@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/data/models/product.dart';
 import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/data/models/user.dart';
@@ -128,6 +129,8 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        icon: const Icon(Icons.warning_amber),
+        iconColor: AppSemanticColors.warning,
         title: const Text('Permanently Delete Product?'),
         content: Text(
           'Are you sure you want to permanently delete '
@@ -142,7 +145,8 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
+              backgroundColor: AppSemanticColors.error,
+              foregroundColor: AppSemanticColors.onError,
             ),
             child: const Text('Delete Permanently'),
           ),
@@ -221,6 +225,8 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        icon: const Icon(Icons.warning_amber),
+        iconColor: AppSemanticColors.warning,
         title: const Text('Permanently Delete Category?'),
         content: Text(
           'Are you sure you want to permanently delete '
@@ -235,7 +241,8 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
+              backgroundColor: AppSemanticColors.error,
+              foregroundColor: AppSemanticColors.onError,
             ),
             child: const Text('Delete Permanently'),
           ),
@@ -316,6 +323,8 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        icon: const Icon(Icons.warning_amber),
+        iconColor: AppSemanticColors.warning,
         title: const Text('Permanently Delete User?'),
         content: Text(
           'Are you sure you want to permanently delete '
@@ -330,7 +339,8 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
+              backgroundColor: AppSemanticColors.error,
+              foregroundColor: AppSemanticColors.onError,
             ),
             child: const Text('Delete Permanently'),
           ),

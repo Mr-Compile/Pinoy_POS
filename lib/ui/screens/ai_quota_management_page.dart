@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/data/models/ai_quota.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/services/ai_quota_service.dart';
@@ -8,11 +9,14 @@ import 'package:pinoy_pos/ui/widgets/app_header.dart';
 
 /// Admin page for managing per-user AI quotas and the default daily quota.
 ///
-/// All privileged actions require SuperAdmin password verification. The
-/// password is never persisted, logged, or exposed beyond the verification
-/// dialog.
+/// The SuperAdmin password is verified once when the page is opened. All
+/// privileged actions inside the page reuse that verification and do not ask
+/// for the password again. The password itself is never persisted, logged, or
+/// exposed beyond the verification dialog.
 class AIQuotaManagementPage extends StatefulWidget {
-  const AIQuotaManagementPage({super.key});
+  final bool verified;
+
+  const AIQuotaManagementPage({super.key, this.verified = false});
 
   @override
   State<AIQuotaManagementPage> createState() => _AIQuotaManagementPageState();
@@ -26,11 +30,35 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
   Map<int, AIQuota> _quotas = {};
   int _defaultQuota = 0;
   bool _isLoading = true;
+  bool _isVerified = false;
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _isVerified = widget.verified;
+    if (_isVerified) {
+      _loadData();
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _verifyOnEntry());
+    }
+  }
+
+  Future<void> _verifyOnEntry() async {
+    final result = await showDialog<bool>(
+      context: context,
+      useRootNavigator: true,
+      barrierDismissible: false,
+      builder: (context) => const SuperAdminVerificationDialog(),
+    );
+
+    if (result == true) {
+      if (mounted) {
+        setState(() => _isVerified = true);
+      }
+      await _loadData();
+    } else if (mounted) {
+      Navigator.of(context).pop();
+    }
   }
 
   Future<void> _loadData() async {
@@ -56,19 +84,9 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
     }
   }
 
-  Future<bool> _verifySuperAdmin() async {
-    final result = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const _SuperAdminVerificationDialog(),
-    );
-    return result ?? false;
-  }
-
   Future<void> _changeDefaultQuota() async {
     final controller = TextEditingController(text: _defaultQuota.toString());
     var applyToExisting = false;
-    var verified = false;
 
     await showDialog<void>(
       context: context,
@@ -76,6 +94,7 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
         builder: (context, setDialogState) {
           return AlertDialog(
             icon: const Icon(Icons.settings_outlined),
+            iconColor: AppSemanticColors.info,
             title: const Text('Change Default AI Quota'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
@@ -108,13 +127,8 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
                 child: const Text('Cancel'),
               ),
               FilledButton(
-                onPressed: () async {
-                  verified = await _verifySuperAdmin();
-                  if (verified && context.mounted) {
-                    Navigator.of(context).pop();
-                  }
-                },
-                child: const Text('Verify & Save'),
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Save'),
               ),
             ],
           );
@@ -122,15 +136,13 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
       ),
     );
 
-    if (!verified) return;
-
     final value = int.tryParse(controller.text.trim());
     if (value == null) return;
 
     final result = await _aiQuotaService.setDefaultQuota(
       value: value,
       applyToExisting: applyToExisting,
-      verified: true,
+      verified: _isVerified,
     );
 
     if (!mounted) return;
@@ -149,12 +161,12 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
     final quota = _quotas[user.id!];
     final controller =
         TextEditingController(text: (quota?.dailyQuota ?? _defaultQuota).toString());
-    var verified = false;
 
     await showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
         icon: const Icon(Icons.person_outline),
+        iconColor: AppSemanticColors.info,
         title: Text('Edit Quota for ${user.fullName}'),
         content: TextField(
           controller: controller,
@@ -170,19 +182,12 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () async {
-              verified = await _verifySuperAdmin();
-              if (verified && context.mounted) {
-                Navigator.of(context).pop();
-              }
-            },
-            child: const Text('Verify & Save'),
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Save'),
           ),
         ],
       ),
     );
-
-    if (!verified) return;
 
     final value = int.tryParse(controller.text.trim());
     if (value == null || user.id == null) return;
@@ -190,7 +195,7 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
     final result = await _aiQuotaService.updateUserQuota(
       user.id!,
       value: value,
-      verified: true,
+      verified: _isVerified,
     );
 
     if (!mounted) return;
@@ -210,6 +215,7 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
       context: context,
       builder: (context) => AlertDialog(
         icon: const Icon(Icons.restart_alt),
+        iconColor: AppSemanticColors.warning,
         title: Text('Reset usage for ${user.fullName}?'),
         content: const Text(
           "This will reset today's AI usage to 0. The daily quota remains unchanged.",
@@ -229,11 +235,9 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
 
     if (confirmed != true || user.id == null) return;
 
-    if (!await _verifySuperAdmin()) return;
-
     final result = await _aiQuotaService.resetUserUsage(
       user.id!,
-      verified: true,
+      verified: _isVerified,
     );
 
     if (!mounted) return;
@@ -253,6 +257,7 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
       context: context,
       builder: (context) => AlertDialog(
         icon: const Icon(Icons.restart_alt),
+        iconColor: AppSemanticColors.warning,
         title: const Text("Reset all users' usage?"),
         content: const Text(
           "This will reset today's AI usage to 0 for every active user.",
@@ -272,9 +277,7 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
 
     if (confirmed != true) return;
 
-    if (!await _verifySuperAdmin()) return;
-
-    final result = await _aiQuotaService.resetAllUserUsage(verified: true);
+    final result = await _aiQuotaService.resetAllUserUsage(verified: _isVerified);
 
     if (!mounted) return;
 
@@ -469,18 +472,19 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-class _SuperAdminVerificationDialog extends StatefulWidget {
-  const _SuperAdminVerificationDialog();
+class SuperAdminVerificationDialog extends StatefulWidget {
+  const SuperAdminVerificationDialog({super.key});
 
   @override
-  State<_SuperAdminVerificationDialog> createState() =>
+  State<SuperAdminVerificationDialog> createState() =>
       _SuperAdminVerificationDialogState();
 }
 
 class _SuperAdminVerificationDialogState
-    extends State<_SuperAdminVerificationDialog> {
+    extends State<SuperAdminVerificationDialog> {
   final _controller = TextEditingController();
   bool _obscure = true;
+  String? _errorText;
 
   void _verify() {
     final password = _controller.text;
@@ -490,30 +494,30 @@ class _SuperAdminVerificationDialogState
     if (isValid) {
       Navigator.of(context).pop(true);
     } else {
-      _showError('Incorrect SuperAdmin password');
+      setState(() => _errorText = 'Incorrect SuperAdmin password');
     }
   }
 
-  void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Theme.of(context).colorScheme.error,
-      ),
-    );
+  void _clearError() {
+    if (_errorText != null) setState(() => _errorText = null);
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
       icon: const Icon(Icons.lock_outline),
+      iconColor: AppSemanticColors.warning,
       title: const Text('SuperAdmin Verification'),
       content: TextField(
         controller: _controller,
         obscureText: _obscure,
         autofocus: true,
+        textInputAction: TextInputAction.done,
+        onSubmitted: (_) => _verify(),
+        onChanged: (_) => _clearError(),
         decoration: InputDecoration(
           labelText: 'SuperAdmin password',
+          errorText: _errorText,
           suffixIcon: IconButton(
             icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
             onPressed: () => setState(() => _obscure = !_obscure),

@@ -46,9 +46,15 @@ class _AppShellState extends ConsumerState<AppShell> {
           setState(() {
             _selectedIndex = 0;
           });
+          _updateCurrentDestination();
         }
       },
     );
+
+    // Set the initial destination once the shell is first built so the
+    // AI advisor knows which tab is visible before the user interacts
+    // with the navigation.
+    _updateCurrentDestination();
   }
 
   @override
@@ -108,6 +114,15 @@ class _AppShellState extends ConsumerState<AppShell> {
           if (mounted) setState(() => _selectedIndex = 0);
         });
       }
+    }
+
+    // Keep the AI advisor's current route in sync with the visible tab,
+    // including when the user pops back to the shell from a detail screen
+    // (e.g. sale detail or receipt).
+    final expectedDestination = _destinationIdForPermission(tabs[selectedIndex].permission);
+    if (expectedDestination != null &&
+        ref.read(currentRouteProvider) != expectedDestination) {
+      _updateCurrentDestination();
     }
 
     // AI Advisor floating chat head — available to users with

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/providers/ai_advisor_provider.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
@@ -366,6 +367,8 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        icon: const Icon(Icons.warning_amber),
+        iconColor: AppSemanticColors.warning,
         title: const Text('Clear AI Configuration?'),
         content: const Text(
             'This will remove the Groq API key and model. The AI Advisor will be unavailable until reconfigured.'),
@@ -377,7 +380,8 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
+              backgroundColor: AppSemanticColors.error,
+              foregroundColor: AppSemanticColors.onError,
             ),
             child: const Text('Clear'),
           ),
@@ -467,8 +471,6 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
             _buildApiKeyCard(context),
             const SizedBox(height: 16),
             _buildModelSelectionCard(context),
-            const SizedBox(height: 16),
-            _buildHelpCard(context),
           ],
         ),
       ),
@@ -908,40 +910,7 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
     return tokens.toString();
   }
 
-  // ── Help Card ─────────────────────────────────────────────────────────
 
-  Widget _buildHelpCard(BuildContext context) {
-    final theme = Theme.of(context);
-    return AppCard(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.info_outline, color: theme.colorScheme.primary),
-                const SizedBox(width: 8),
-                Text('How to get a Groq API Key',
-                    style: theme.textTheme.titleSmall),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '1. Visit console.groq.com and sign in.\n'
-              '2. Navigate to API Keys.\n'
-              '3. Create a new API key.\n'
-              '4. Copy and paste it above.\n'
-              '5. Test the connection.\n'
-              '6. Refresh models and select one.\n'
-              '7. Save the configuration.',
-              style: theme.textTheme.bodySmall,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   /// Notifies the shared AI chat provider that the configuration has
   /// changed, so the floating chat head, dashboard AI card, and any open

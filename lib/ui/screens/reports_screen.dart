@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -10,6 +10,7 @@ import 'package:pinoy_pos/data/models/settings.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/reports_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
+import 'package:pinoy_pos/services/file_export_service.dart';
 import 'package:pinoy_pos/ui/screens/settings/store_information_settings_page.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
@@ -583,24 +584,6 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     }
   }
 
-  Future<String?> _pickSavePath(String fileName, String extension) async {
-    final result = await FilePicker.platform.saveFile(
-      dialogTitle: 'Save Report',
-      fileName: fileName,
-      type: FileType.custom,
-      allowedExtensions: [extension],
-    );
-
-    if (result == null) return null;
-
-    // Some file dialogs return the path without the requested extension.
-    // Make sure the file can be written with the correct type.
-    final lower = result.toLowerCase();
-    final dotExt = '.$extension';
-    if (lower.endsWith(dotExt)) return result;
-    return '$result$dotExt';
-  }
-
   Future<void> _exportToPdf(
     ReportsState state,
     List<Sale> sales,
@@ -698,7 +681,14 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     );
 
     final fileName = 'pinoy_pos_sales_$timestamp.pdf';
-    final savePath = await _pickSavePath(fileName, 'pdf');
+    final bytes = Uint8List.fromList(await pdf.save());
+    final savePath = await FileExportService.saveBytes(
+      bytes: bytes,
+      fileName: fileName,
+      dialogTitle: 'Save Report',
+      type: FileType.custom,
+      allowedExtensions: ['pdf'],
+    );
 
     if (savePath == null) {
       if (mounted) {
@@ -707,9 +697,6 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       }
       return;
     }
-
-    final file = File(savePath);
-    await file.writeAsBytes(await pdf.save());
 
     await ref.read(reportServiceProvider).recordExport(
           fileFormat: 'pdf',
@@ -848,7 +835,13 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     }
 
     final fileName = 'pinoy_pos_sales_$timestamp.xlsx';
-    final savePath = await _pickSavePath(fileName, 'xlsx');
+    final savePath = await FileExportService.saveBytes(
+      bytes: Uint8List.fromList(bytes),
+      fileName: fileName,
+      dialogTitle: 'Save Report',
+      type: FileType.custom,
+      allowedExtensions: ['xlsx'],
+    );
 
     if (savePath == null) {
       if (mounted) {
@@ -857,9 +850,6 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       }
       return;
     }
-
-    final file = File(savePath);
-    await file.writeAsBytes(bytes);
 
     await ref.read(reportServiceProvider).recordExport(
           fileFormat: 'excel',

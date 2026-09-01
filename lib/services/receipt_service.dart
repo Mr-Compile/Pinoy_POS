@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:pinoy_pos/data/models/receipt_view_data.dart';
+import 'package:pinoy_pos/services/file_export_service.dart';
 import 'package:pinoy_pos/services/image_service.dart';
 
 /// Generates and saves customer receipts.
@@ -320,19 +321,13 @@ class ReceiptService {
     String dialogTitle = 'Save Receipt',
     String fileName = 'pinoy_pos_receipt.pdf',
   }) async {
-    final result = await FilePicker.platform.saveFile(
-      dialogTitle: dialogTitle,
+    return FileExportService.saveBytes(
+      bytes: bytes,
       fileName: fileName,
+      dialogTitle: dialogTitle,
       type: FileType.custom,
       allowedExtensions: ['pdf'],
     );
-
-    if (result == null) return null;
-
-    final path = result.toLowerCase().endsWith('.pdf') ? result : '$result.pdf';
-    final file = File(path);
-    await file.writeAsBytes(bytes);
-    return path;
   }
 
   /// Generates a PDF receipt and writes it to the application documents

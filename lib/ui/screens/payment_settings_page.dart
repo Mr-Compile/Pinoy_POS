@@ -147,7 +147,7 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
 
   static const _customerNameOptions = ['off', 'optional', 'required'];
   static const _proofOptions = ['off', 'optional', 'required'];
-  static const _verificationOptions = ['immediate', 'owner_admin'];
+  static const _verificationOptions = ['immediate', 'owner', 'admin', 'owner_admin'];
 
   String _label(String key) {
     return switch (key) {
@@ -155,8 +155,19 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
       'optional' => 'Optional',
       'required' => 'Required',
       'immediate' => 'Immediate Confirmation',
-      'owner_admin' => 'Require Owner/Admin Verification',
+      'owner' => 'Require Owner Verification',
+      'admin' => 'Require Admin Verification',
+      'owner_admin' => 'Require Owner or Admin Verification',
       _ => key,
+    };
+  }
+
+  String _verificationInfoText(String mode) {
+    return switch (mode) {
+      'owner' => 'Only an Owner can confirm pending GCash sales.',
+      'admin' => 'Only an Admin can confirm pending GCash sales.',
+      'owner_admin' => 'An Owner or Admin can confirm pending GCash sales.',
+      _ => 'GCash sales are confirmed automatically.',
     };
   }
 
@@ -249,23 +260,48 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
                   ),
                 ),
                 const Divider(),
-                ListTile(
-                  title: const Text('Verification'),
-                  subtitle: Text(_label(_verificationMode)),
-                  trailing: DropdownButton<String>(
-                    value: _verificationMode,
-                    onChanged: widget.isLoading
-                        ? null
-                        : (value) {
-                            if (value == null) return;
-                            setState(() => _verificationMode = value);
-                          },
-                    items: _verificationOptions
-                        .map((v) => DropdownMenuItem(
-                              value: v,
-                              child: Text(_label(v)),
-                            ))
-                        .toList(),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Verification',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: cs.outline),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: DropdownButton<String>(
+                          isExpanded: true,
+                          value: _verificationMode,
+                          underline: const SizedBox(),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          onChanged: widget.isLoading
+                              ? null
+                              : (value) {
+                                  if (value == null) return;
+                                  setState(() => _verificationMode = value);
+                                },
+                          items: _verificationOptions
+                              .map((v) => DropdownMenuItem(
+                                    value: v,
+                                    child: Text(_label(v)),
+                                  ))
+                              .toList(),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Choose who must confirm pending GCash payments.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
+                      ),
+                    ],
                   ),
                 ),
                 const Divider(),
@@ -294,7 +330,7 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
             ),
           ),
           const SizedBox(height: 24),
-          if (_verificationMode == 'owner_admin')
+          if (_verificationMode != 'immediate')
             AppCard(
               color: cs.secondaryContainer,
               child: Padding(
@@ -305,7 +341,7 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'GCash sales will be created as pending and must be confirmed by an owner or admin before they count as completed sales.',
+                        _verificationInfoText(_verificationMode),
                         style: TextStyle(color: cs.onSecondaryContainer),
                       ),
                     ),

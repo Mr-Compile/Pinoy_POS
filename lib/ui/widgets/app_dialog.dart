@@ -38,51 +38,49 @@ extension AppDialogTypeX on AppDialogType {
     }
   }
 
-  Color iconColor(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+  Color get iconColor {
     switch (this) {
       case AppDialogType.success:
-        return cs.tertiary;
+        return AppSemanticColors.success;
       case AppDialogType.error:
-        return cs.error;
+        return AppSemanticColors.error;
       case AppDialogType.warning:
-        return cs.secondary;
+        return AppSemanticColors.warning;
       case AppDialogType.info:
-        return cs.primary;
+        return AppSemanticColors.info;
       case AppDialogType.restriction:
-        return cs.secondary;
+        return AppSemanticColors.warning;
       case AppDialogType.confirmation:
-        return cs.secondary;
+        return AppSemanticColors.info;
       case AppDialogType.offline:
-        return cs.primary;
+        return AppSemanticColors.info;
       case AppDialogType.loading:
-        return cs.primary;
+        return AppSemanticColors.info;
       case AppDialogType.validation:
-        return cs.tertiary;
+        return AppSemanticColors.warning;
     }
   }
 
-  Color iconBgColor(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+  Color get iconBgColor {
     switch (this) {
       case AppDialogType.success:
-        return cs.tertiaryContainer;
+        return AppSemanticColors.successContainer;
       case AppDialogType.error:
-        return cs.errorContainer;
+        return AppSemanticColors.errorContainer;
       case AppDialogType.warning:
-        return cs.secondaryContainer;
+        return AppSemanticColors.warningContainer;
       case AppDialogType.info:
-        return cs.primaryContainer;
+        return AppSemanticColors.infoContainer;
       case AppDialogType.restriction:
-        return cs.secondaryContainer;
+        return AppSemanticColors.warningContainer;
       case AppDialogType.confirmation:
-        return cs.secondaryContainer;
+        return AppSemanticColors.infoContainer;
       case AppDialogType.offline:
-        return cs.primaryContainer;
+        return AppSemanticColors.infoContainer;
       case AppDialogType.loading:
-        return cs.primaryContainer;
+        return AppSemanticColors.infoContainer;
       case AppDialogType.validation:
-        return cs.tertiaryContainer;
+        return AppSemanticColors.warningContainer;
     }
   }
 
@@ -205,7 +203,7 @@ class AppDialog extends StatelessWidget {
           height: 48,
           child: CircularProgressIndicator(
             strokeWidth: 3,
-            color: Theme.of(context).colorScheme.primary,
+            color: AppSemanticColors.info,
           ),
         ),
       );
@@ -217,13 +215,13 @@ class AppDialog extends StatelessWidget {
         width: 56,
         height: 56,
         decoration: BoxDecoration(
-          color: type.iconBgColor(context),
+          color: type.iconBgColor,
           shape: BoxShape.circle,
         ),
         child: Icon(
           type.icon,
           size: 32,
-          color: type.iconColor(context),
+          color: type.iconColor,
         ),
       ),
     );
@@ -263,8 +261,6 @@ class AppDialog extends StatelessWidget {
   }
 
   Widget _buildActions(BuildContext context, bool isTablet) {
-    final cs = Theme.of(context).colorScheme;
-
     Widget buildAction(AppDialogAction action) {
       final handler = action.onPressed == null
           ? null
@@ -275,8 +271,8 @@ class AppDialog extends StatelessWidget {
               onPressed: handler,
               style: action.isDestructive
                   ? FilledButton.styleFrom(
-                      backgroundColor: cs.error,
-                      foregroundColor: cs.onError,
+                      backgroundColor: AppSemanticColors.error,
+                      foregroundColor: AppSemanticColors.onError,
                       minimumSize: const Size(88, 48),
                     )
                   : FilledButton.styleFrom(
@@ -288,7 +284,7 @@ class AppDialog extends StatelessWidget {
               onPressed: handler,
               style: action.isDestructive
                   ? TextButton.styleFrom(
-                      foregroundColor: cs.error,
+                      foregroundColor: AppSemanticColors.error,
                       minimumSize: const Size(88, 48),
                     )
                   : TextButton.styleFrom(

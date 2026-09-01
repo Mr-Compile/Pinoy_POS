@@ -545,9 +545,25 @@ class SalesService {
     }
   }
 
+  /// Returns true when the current user is allowed to verify GCash
+  /// payments for the configured verification mode.
+  Future<bool> _canVerify() async {
+    if (!_sessionManager.hasPermission('verify_payments')) return false;
+
+    final paymentSettings = await _settingsService.getPaymentSettings();
+    final currentUser = _sessionManager.currentUser;
+    if (currentUser == null) return false;
+
+    final mode = paymentSettings.gcashVerificationMode;
+    if (mode == 'owner' && currentUser.role != UserRole.owner) return false;
+    if (mode == 'admin' && currentUser.role != UserRole.admin) return false;
+
+    return true;
+  }
+
   /// Returns all GCash payments that are pending owner/admin verification.
   Future<List<Sale>> getPendingPayments() async {
-    if (!_sessionManager.hasPermission('verify_payments')) {
+    if (!await _canVerify()) {
       return [];
     }
     return _saleRepository.getPendingPayments(limit: 500);
@@ -558,7 +574,7 @@ class SalesService {
   /// Returns true when the sale is updated to confirmed, or false if the
   /// sale is not in a pending state.
   Future<bool> confirmGcashPayment(int saleId) async {
-    if (!_sessionManager.hasPermission('verify_payments')) {
+    if (!await _canVerify()) {
       await _activityLogService.logActivity(
         action: 'unauthorized_confirm_gcash',
         entity: 'sale',
@@ -597,7 +613,7 @@ class SalesService {
   ///
   /// Only Owner/Admin can reject.
   Future<bool> rejectGcashPayment(int saleId, {String? reason}) async {
-    if (!_sessionManager.hasPermission('verify_payments')) {
+    if (!await _canVerify()) {
       await _activityLogService.logActivity(
         action: 'unauthorized_reject_gcash',
         entity: 'sale',

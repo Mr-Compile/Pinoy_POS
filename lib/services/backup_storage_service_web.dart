@@ -20,6 +20,9 @@ class BackupStorageService {
     return null;
   }
 
+  /// No default desktop location on web.
+  Future<BackupLocation?> getDefaultDesktopLocation() async => null;
+
   /// Verifies the saved backup location.
   ///
   /// On web a persisted location is never valid.

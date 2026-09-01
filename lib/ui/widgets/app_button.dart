@@ -124,11 +124,12 @@ class AppButton extends StatelessWidget {
             height: 20,
             child: CircularProgressIndicator(
               strokeWidth: 2,
-              color: variant == AppButtonVariant.filled ||
-                      variant == AppButtonVariant.elevated ||
-                      variant == AppButtonVariant.destructive
-                  ? cs.onPrimary
-                  : cs.primary,
+              color: switch (variant) {
+                AppButtonVariant.destructive => AppSemanticColors.onError,
+                AppButtonVariant.filled ||
+                AppButtonVariant.elevated => cs.onPrimary,
+                _ => cs.primary,
+              },
             ),
           )
         : _buildIconLabel(effectiveLabel, icon, iconSize);
@@ -179,8 +180,8 @@ class AppButton extends StatelessWidget {
       AppButtonVariant.destructive => FilledButton(
           onPressed: isLoading ? null : onPressed,
           style: FilledButton.styleFrom(
-            backgroundColor: cs.error,
-            foregroundColor: cs.onError,
+            backgroundColor: AppSemanticColors.error,
+            foregroundColor: AppSemanticColors.onError,
             shape: shape,
             padding: padding,
             minimumSize: const Size(48, 48),

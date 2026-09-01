@@ -190,10 +190,10 @@ class AuthService {
     return user != null && user.hasPin;
   }
 
-  /// Updates the current user's own profile (full name, PIN, profile
-  /// image). No special permission is required - users can always edit
-  /// their own profile. Restricted fields (role, username, isActive) are
-  /// never modified here.
+  /// Updates the current user's own profile (full name, username, PIN,
+  /// profile image). No special permission is required - users can always
+  /// edit their own profile. Restricted fields (role, isActive) are never
+  /// modified here.
   ///
   /// If [pin] is null, the existing PIN is preserved.  If [pin] is an
   /// empty string, the PIN is cleared.  Otherwise the PIN is hashed
@@ -203,12 +203,26 @@ class AuthService {
   Future<bool> updateProfile({
     required int userId,
     required String fullName,
+    String? username,
     String? pin,
     String? profileImagePath,
   }) async {
     final current = _sessionManager.currentUser;
     if (current == null || current.id != userId) {
       return false;
+    }
+
+    final trimmedUsername = (username ?? current.username).trim();
+    if (trimmedUsername.isEmpty) {
+      return false;
+    }
+
+    // Check username uniqueness if it is being changed.
+    if (trimmedUsername != current.username) {
+      final existing = await _userRepository.getByUsername(trimmedUsername);
+      if (existing != null && existing.id != userId) {
+        return false;
+      }
     }
 
     // Determine the new PIN value and length.
@@ -228,6 +242,7 @@ class AuthService {
     }
 
     final updated = current.copyWith(
+      username: trimmedUsername,
       fullName: fullName,
       pin: newPin,
       pinLength: newPinLength,

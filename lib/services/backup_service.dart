@@ -50,11 +50,13 @@ class BackupImportRecord {
   final BackupImportResult result;
   final String? displayName;
   final int? fileSize;
+  final String? error;
 
   const BackupImportRecord({
     required this.result,
     this.displayName,
     this.fileSize,
+    this.error,
   });
 }
 
@@ -124,6 +126,15 @@ class BackupService {
       await _setBackupLocation(migrated);
       await prefs.remove(_legacyBackupLocationKey);
       return migrated;
+    }
+
+    // Use a default writable desktop folder when nothing is configured.
+    if (!kIsWeb) {
+      final defaultLocation = await _storage.getDefaultDesktopLocation();
+      if (defaultLocation != null && !defaultLocation.isNone) {
+        await _setBackupLocation(defaultLocation);
+        return defaultLocation;
+      }
     }
 
     return null;
@@ -390,24 +401,19 @@ class BackupService {
             : BackupImportResult.failed,
         displayName: read.displayName,
         fileSize: read.fileSize,
+        error: read.error,
       );
     }
 
-    final result = await _restoreFromBytes(
+    return await _restoreFromBytes(
       read.bytes!,
       read.displayName ?? 'backup.db',
       read.fileSize ?? read.bytes!.length,
     );
-
-    return BackupImportRecord(
-      result: result,
-      displayName: read.displayName,
-      fileSize: read.fileSize,
-    );
   }
 
   /// Restores a backup from a known storage reference (used by history).
-  Future<BackupImportResult> restoreFromHistory(BackupHistory backup) async {
+  Future<BackupImportRecord> restoreFromHistory(BackupHistory backup) async {
     if (!_sessionManager.hasPermission('backup_restore')) {
       throw AuthorizationException('backup_restore');
     }
@@ -415,7 +421,10 @@ class BackupService {
     final storageType = _typeFromString(backup.storageType);
 
     if (storageType == BackupStorageType.webDownload) {
-      return BackupImportResult.failed;
+      return const BackupImportRecord(
+        result: BackupImportResult.failed,
+        error: 'Web-downloaded backups cannot be restored from history.',
+      );
     }
 
     String? tempPath;
@@ -424,10 +433,19 @@ class BackupService {
           _isContentUri(backup.filePath)) {
         final read = await _storage.readBackup(backup.filePath);
         if (!read.success) {
-          return BackupImportResult.failed;
+          return BackupImportRecord(
+            result: BackupImportResult.failed,
+            displayName: backup.displayName,
+            fileSize: backup.fileSize,
+            error: read.error,
+          );
         }
         if (read.bytes == null || read.bytes!.isEmpty) {
-          return BackupImportResult.invalidFile;
+          return BackupImportRecord(
+            result: BackupImportResult.invalidFile,
+            displayName: read.displayName,
+            fileSize: read.fileSize,
+          );
         }
         tempPath = await _writeTempImportFile(
           read.bytes!,
@@ -438,7 +456,12 @@ class BackupService {
       }
 
       if (tempPath == null || tempPath.isEmpty) {
-        return BackupImportResult.failed;
+        return BackupImportRecord(
+          result: BackupImportResult.failed,
+          displayName: backup.displayName,
+          fileSize: backup.fileSize,
+          error: 'The backup file could not be opened.',
+        );
       }
 
       final validation = await _validateBackupFile(tempPath);
@@ -446,7 +469,11 @@ class BackupService {
         if (tempPath != backup.filePath) {
           await _safeDelete(File(tempPath));
         }
-        return validation;
+        return BackupImportRecord(
+          result: validation,
+          displayName: backup.displayName,
+          fileSize: backup.fileSize,
+        );
       }
 
       final fileSize = await File(tempPath).length();
@@ -466,7 +493,7 @@ class BackupService {
         _log('Failed to log restore start: $e');
       }
 
-      final success = await _performRestore(tempPath);
+      final (success, restoreError) = await _performRestore(tempPath);
 
       if (tempPath != backup.filePath) {
         await _safeDelete(File(tempPath));
@@ -480,20 +507,34 @@ class BackupService {
         if (safetyPath != null) {
           await _safeDelete(File(safetyPath));
         }
-        return BackupImportResult.failed;
+        return BackupImportRecord(
+          result: BackupImportResult.failed,
+          displayName: backup.displayName,
+          fileSize: backup.fileSize,
+          error: restoreError ?? 'The backup could not be restored.',
+        );
       }
 
       await _logRestoreSuccess(backup.displayName ?? backup.filePath);
       if (safetyPath != null) {
         await _safeDelete(File(safetyPath));
       }
-      return BackupImportResult.success;
+      return BackupImportRecord(
+        result: BackupImportResult.success,
+        displayName: backup.displayName,
+        fileSize: backup.fileSize,
+      );
     } catch (e) {
       _log('Restore from history failed: $e');
       if (tempPath != null && tempPath != backup.filePath) {
         await _safeDelete(File(tempPath));
       }
-      return BackupImportResult.failed;
+      return BackupImportRecord(
+        result: BackupImportResult.failed,
+        displayName: backup.displayName,
+        fileSize: backup.fileSize,
+        error: 'Restore failed: $e',
+      );
     }
   }
 
@@ -617,7 +658,7 @@ class BackupService {
 
   // ── Restore internals ────────────────────────────────────────────────
 
-  Future<BackupImportResult> _restoreFromBytes(
+  Future<BackupImportRecord> _restoreFromBytes(
     Uint8List bytes,
     String displayName,
     int fileSize,
@@ -626,13 +667,20 @@ class BackupService {
     try {
       tempPath = await _writeTempImportFile(bytes, displayName);
       if (tempPath == null || tempPath.isEmpty) {
-        return BackupImportResult.failed;
+        return const BackupImportRecord(
+          result: BackupImportResult.failed,
+          error: 'Could not create a temporary backup file.',
+        );
       }
 
       final validation = await _validateBackupFile(tempPath);
       if (validation != BackupImportResult.success) {
         await _safeDelete(File(tempPath));
-        return validation;
+        return BackupImportRecord(
+          result: validation,
+          displayName: displayName,
+          fileSize: fileSize,
+        );
       }
 
       final safetyPath = await _createSafetyBackup();
@@ -647,7 +695,7 @@ class BackupService {
         _log('Failed to log restore start: $e');
       }
 
-      final success = await _performRestore(tempPath);
+      final (success, restoreError) = await _performRestore(tempPath);
       await _safeDelete(File(tempPath));
 
       if (!success) {
@@ -658,24 +706,38 @@ class BackupService {
         if (safetyPath != null) {
           await _safeDelete(File(safetyPath));
         }
-        return BackupImportResult.failed;
+        return BackupImportRecord(
+          result: BackupImportResult.failed,
+          error: restoreError ?? 'The backup could not be restored.',
+          displayName: displayName,
+          fileSize: fileSize,
+        );
       }
 
       await _logRestoreSuccess(displayName);
       if (safetyPath != null) {
         await _safeDelete(File(safetyPath));
       }
-      return BackupImportResult.success;
+      return BackupImportRecord(
+        result: BackupImportResult.success,
+        displayName: displayName,
+        fileSize: fileSize,
+      );
     } catch (e) {
       _log('Backup restore failed: $e');
       if (tempPath != null) {
         await _safeDelete(File(tempPath));
       }
-      return BackupImportResult.failed;
+      return BackupImportRecord(
+        result: BackupImportResult.failed,
+        error: 'Backup restore failed: $e',
+        displayName: displayName,
+        fileSize: fileSize,
+      );
     }
   }
 
-  Future<bool> _performRestore(String backupPath) async {
+  Future<(bool, String?)> _performRestore(String backupPath) async {
     final db = await _dbHelper.database;
     final dbPath = db.path;
     await _dbHelper.close();
@@ -683,11 +745,15 @@ class BackupService {
     try {
       await File(backupPath).copy(dbPath);
       await _dbHelper.database;
-      return true;
+      return (true, null);
+    } on FileSystemException catch (e) {
+      _log('Failed to copy backup to database path: ${e.message}');
+      await _dbHelper.database;
+      return (false, 'Could not copy backup to the database location: ${e.message}');
     } catch (e) {
       _log('Failed to copy backup to database path: $e');
       await _dbHelper.database;
-      return false;
+      return (false, 'Could not copy backup to the database location: $e');
     }
   }
 

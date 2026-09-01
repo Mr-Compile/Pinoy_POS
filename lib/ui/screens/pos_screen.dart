@@ -930,7 +930,11 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
         title: const Text('Payment'),
         content: const SizedBox(
           height: 120,
-          child: Center(child: CircularProgressIndicator()),
+          child: Center(
+            child: CircularProgressIndicator(
+              color: AppSemanticColors.info,
+            ),
+          ),
         ),
         actions: [
           TextButton(
@@ -940,6 +944,8 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
         ],
       ),
       error: (error, stackTrace) => AlertDialog(
+        icon: const Icon(Icons.error_outline),
+        iconColor: AppSemanticColors.error,
         title: const Text('Payment'),
         content: Text('Failed to load payment settings: $error'),
         actions: [

@@ -36,5 +36,11 @@ class PaymentSettings {
   bool get paymentProofRequired => gcashPaymentProofRequirement == 'required';
   bool get paymentProofVisible => gcashPaymentProofRequirement != 'off';
 
-  bool get verificationRequired => gcashVerificationMode == 'owner_admin';
+  bool get verificationRequired => gcashVerificationMode != 'immediate';
+
+  bool get requiresOwnerVerification =>
+      gcashVerificationMode == 'owner' || gcashVerificationMode == 'owner_admin';
+
+  bool get requiresAdminVerification =>
+      gcashVerificationMode == 'admin' || gcashVerificationMode == 'owner_admin';
 }

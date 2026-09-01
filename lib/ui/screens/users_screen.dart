@@ -1,5 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/constants.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/user.dart';
@@ -177,7 +178,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                   Icon(
                     Icons.info_outline,
                     size: 20,
-                    color: Theme.of(context).colorScheme.primary,
+                    color: AppSemanticColors.info,
                   ),
                   const SizedBox(width: 8),
                   Expanded(

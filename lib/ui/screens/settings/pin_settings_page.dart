@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
@@ -187,6 +188,8 @@ class PinSettingsPage extends ConsumerWidget {
       useRootNavigator: true,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
+          icon: const Icon(Icons.warning_amber),
+          iconColor: AppSemanticColors.warning,
           title: const Text('Remove PIN'),
           content: const Text(
             'Are you sure you want to remove your PIN? '

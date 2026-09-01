@@ -43,7 +43,19 @@ class _MyAppState extends ConsumerState<MyApp> {
     // Create the observer once. Re-creating it on every rebuild of the
     // root widget could lead to stale observers being registered during
     // route transitions.
-    _navigationObserver = NavigationRouteObserver(ref);
+    //
+    // The observer does not hold a WidgetRef; instead it reports route
+    // name changes through a callback. The widget keeps ownership of the
+    // Riverpod update and the post-frame deferral that prevents the
+    // _InactiveElements assertion.
+    _navigationObserver = NavigationRouteObserver(
+      onRouteChanged: (name) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          ref.read(currentRouteProvider.notifier).state = name;
+        });
+      },
+    );
   }
 
   @override

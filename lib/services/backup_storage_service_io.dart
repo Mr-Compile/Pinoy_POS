@@ -5,8 +5,10 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 import 'package:pinoy_pos/data/models/backup_location.dart';
+import 'package:pinoy_pos/services/file_export_service.dart';
 
 /// Platform-specific backup storage implementation for Android, iOS,
 /// Windows, Linux, and macOS.
@@ -57,8 +59,11 @@ class BackupStorageService {
     if (path == null || path.isEmpty) return null;
 
     final displayName = _displayNameFromPath(path);
-    if (!await _isDirectoryWritable(path)) {
-      throw BackupStorageException('The selected folder cannot be written to.');
+    final (writable, error) = await _isDirectoryWritable(path);
+    if (!writable) {
+      throw BackupStorageException(
+        'The selected folder cannot be written to. ${error ?? 'Please choose a different folder.'}',
+      );
     }
 
     return BackupLocation(
@@ -205,16 +210,16 @@ class BackupStorageService {
 
     if (location == null || location.isNone) {
       // No default location: open a save-as dialog.
-      final picked = await FilePicker.platform.saveFile(
-        dialogTitle: 'Export Backup',
+      targetPath = await FileExportService.saveBytes(
+        bytes: bytes,
         fileName: defaultFileName,
+        dialogTitle: 'Export Backup',
         type: FileType.custom,
         allowedExtensions: ['db'],
       );
-      if (picked == null || picked.isEmpty) {
+      if (targetPath == null || targetPath.isEmpty) {
         return const BackupWriteResult(success: false, error: null);
       }
-      targetPath = _ensureDbExtension(picked);
       displayName = p.basename(targetPath);
       writtenTo = BackupLocation(
         type: BackupStorageType.fileSystem,
@@ -226,26 +231,38 @@ class BackupStorageService {
         location.reference,
         _makeUniqueFileName(defaultFileName, existingDir: Directory(location.reference)),
       );
+
+      try {
+        final file = File(targetPath);
+        await file.parent.create(recursive: true);
+        await file.writeAsBytes(bytes, flush: true);
+      } catch (e) {
+        return BackupWriteResult(
+          success: false,
+          error: 'Could not write the backup file: $e',
+        );
+      }
     }
 
+    final fileSize = await _safeFileSize(targetPath, fallback: bytes.length);
+
+    return BackupWriteResult(
+      success: true,
+      storageReference: targetPath,
+      displayName: displayName,
+      fileSize: fileSize,
+      writtenTo: writtenTo,
+    );
+  }
+
+  Future<int> _safeFileSize(String path, {required int fallback}) async {
     try {
-      final file = File(targetPath);
-      await file.writeAsBytes(bytes, flush: true);
-      final fileSize = await file.length();
-
-      return BackupWriteResult(
-        success: true,
-        storageReference: targetPath,
-        displayName: displayName,
-        fileSize: fileSize,
-        writtenTo: writtenTo,
-      );
-    } catch (e) {
-      return BackupWriteResult(
-        success: false,
-        error: 'Could not write the backup file: $e',
-      );
-    }
+      final file = File(path);
+      if (await file.exists()) {
+        return await file.length();
+      }
+    } catch (_) {}
+    return fallback;
   }
 
   /// Reads a backup from a saved [reference] (path or URI).
@@ -327,10 +344,42 @@ class BackupStorageService {
     }
 
     if (location.type == BackupStorageType.fileSystem) {
-      return _isDirectoryWritable(location.reference);
+      final (valid, _) = await _isDirectoryWritable(location.reference);
+      return valid;
     }
 
     return false;
+  }
+
+  /// Returns a default, writable backup folder on desktop.
+  ///
+  /// Uses `Documents/Pinoy POS Backups`. Creates the folder and verifies it
+  /// can be written before returning it. Returns null on unsupported platforms
+  /// or if the folder is not writable.
+  Future<BackupLocation?> getDefaultDesktopLocation() async {
+    if (Platform.isAndroid) return null;
+
+    try {
+      final docs = await getApplicationDocumentsDirectory();
+      final path = p.join(docs.path, 'Pinoy POS Backups');
+      final dir = Directory(path);
+      await dir.create(recursive: true);
+
+      final (writable, error) = await _isDirectoryWritable(path);
+      if (!writable) {
+        debugPrint('[BackupStorageService] Default backup location not writable: $error');
+        return null;
+      }
+
+      return BackupLocation(
+        type: BackupStorageType.fileSystem,
+        reference: path,
+        displayName: _displayNameFromPath(path),
+      );
+    } catch (e) {
+      debugPrint('[BackupStorageService] Could not create default backup location: $e');
+      return null;
+    }
   }
 
   /// Returns a human-readable label for a saved storage reference.
@@ -416,11 +465,6 @@ class BackupStorageService {
     return reference.startsWith('content://');
   }
 
-  String _ensureDbExtension(String path) {
-    if (!path.toLowerCase().endsWith('.db')) return '$path.db';
-    return path;
-  }
-
   String _makeUniqueFileName(String baseName, {Directory? existingDir}) {
     if (existingDir == null || !existingDir.existsSync()) return baseName;
 
@@ -435,16 +479,20 @@ class BackupStorageService {
     return '${name}_${DateTime.now().millisecondsSinceEpoch}$ext';
   }
 
-  Future<bool> _isDirectoryWritable(String path) async {
+  Future<(bool, String?)> _isDirectoryWritable(String path) async {
     try {
       final dir = Directory(path);
-      if (!await dir.exists()) return false;
+      if (!await dir.exists()) {
+        return (false, 'The folder does not exist.');
+      }
       final probe = File(p.join(path, '.pinoy_pos_probe'));
       await probe.writeAsString('probe', flush: true);
       await probe.delete();
-      return true;
+      return (true, null);
+    } on FileSystemException catch (e) {
+      return (false, 'File system error: ${e.message}');
     } catch (e) {
-      return false;
+      return (false, e.toString());
     }
   }
 }

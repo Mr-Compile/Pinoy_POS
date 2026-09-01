@@ -90,6 +90,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     leading: const Icon(Icons.alternate_email),
                     title: const Text('Username'),
                     subtitle: Text(user.username),
+                    trailing: const Icon(Icons.edit, size: 20),
+                    onTap: () => _showEditProfileDialog(user),
                   ),
                   const Divider(),
                   ListTile(
@@ -210,6 +212,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   void _showEditProfileDialog(User user) {
     final formKey = GlobalKey<FormState>();
     final fullNameController = TextEditingController(text: user.fullName);
+    final usernameController = TextEditingController(text: user.username);
     bool isSaving = false;
     final screenContext = context;
 
@@ -235,6 +238,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     validator: (value) =>
                         Validators.required(value, 'Full Name'),
                   ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: usernameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Username',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) => Validators.compose([
+                      (v) => Validators.required(v, 'Username'),
+                      (v) => Validators.minLength(v, 3, 'Username'),
+                      (v) => Validators.maxLength(v, 50, 'Username'),
+                    ], value),
+                  ),
                 ],
               ),
             ),
@@ -255,6 +271,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     .updateProfile(
                       userId: user.id!,
                       fullName: fullNameController.text.trim(),
+                      username: usernameController.text.trim(),
                     );
                 if (context.mounted) {
                   setState(() => isSaving = false);
@@ -270,7 +287,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     await AppDialogService.error(
                       screenContext,
                       title: 'Update Failed',
-                      message: 'Failed to update profile.',
+                      message:
+                          'Failed to update profile. The username may already be in use.',
                     );
                     if (!context.mounted) return;
                     Navigator.of(context, rootNavigator: true).pop();

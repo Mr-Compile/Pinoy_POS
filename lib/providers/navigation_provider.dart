@@ -10,24 +10,28 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// example, during app launch or on a route without a known destination ID).
 final currentRouteProvider = StateProvider<String?>((ref) => null);
 
-/// A [NavigatorObserver] that updates [currentRouteProvider] whenever the
-/// top route changes. Each [MaterialPageRoute] can expose its destination ID
-/// via [RouteSettings.name].
-///
-/// This is the single source of truth for "what screen is the user currently
-/// on?" for AI navigation context.
-class NavigationRouteObserver extends NavigatorObserver {
-  final WidgetRef _ref;
+/// Signature for callbacks invoked when the top [Navigator] route has a
+/// non-empty route name.
+typedef NavigationRouteChangedCallback = void Function(String routeName);
 
-  NavigationRouteObserver(this._ref);
+/// A [NavigatorObserver] that reports named route changes to [onRouteChanged].
+///
+/// [NavigatorObserver] methods are invoked synchronously during route
+/// transitions, so callers that need to update state during the build phase
+/// must defer the work themselves (for example with
+/// [WidgetsBinding.instance.addPostFrameCallback]).
+class NavigationRouteObserver extends NavigatorObserver {
+  final NavigationRouteChangedCallback? onRouteChanged;
+
+  NavigationRouteObserver({this.onRouteChanged});
 
   void _updateCurrentRoute(Route<dynamic>? route) {
     if (route == null) return;
 
     final name = route.settings.name;
-    if (name != null && name.isNotEmpty) {
-      _ref.read(currentRouteProvider.notifier).state = name;
-    }
+    if (name == null || name.isEmpty) return;
+
+    onRouteChanged?.call(name);
   }
 
   @override

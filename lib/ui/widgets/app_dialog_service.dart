@@ -408,10 +408,10 @@ class AppDialogService {
                           width: 56,
                           height: 56,
                           decoration: BoxDecoration(
-                            color: cs.secondaryContainer,
+                            color: AppSemanticColors.warningContainer,
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(Icons.warning, size: 32, color: cs.secondary),
+                          child: Icon(Icons.warning, size: 32, color: AppSemanticColors.warning),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -452,8 +452,8 @@ class AppDialogService {
                                   ? null
                                   : () => Navigator.of(context, rootNavigator: true).pop(reasonController.text.trim()),
                               style: FilledButton.styleFrom(
-                                backgroundColor: cs.error,
-                                foregroundColor: cs.onError,
+                                backgroundColor: AppSemanticColors.error,
+                                foregroundColor: AppSemanticColors.onError,
                                 minimumSize: const Size(88, 48),
                               ),
                               child: const Text('Void Sale'),
@@ -475,8 +475,8 @@ class AppDialogService {
                                   ? null
                                   : () => Navigator.of(context, rootNavigator: true).pop(reasonController.text.trim()),
                               style: FilledButton.styleFrom(
-                                backgroundColor: cs.error,
-                                foregroundColor: cs.onError,
+                                backgroundColor: AppSemanticColors.error,
+                                foregroundColor: AppSemanticColors.onError,
                                 minimumSize: const Size(88, 48),
                               ),
                               child: const Text('Void Sale'),
@@ -847,11 +847,16 @@ class AppDialogService {
 
   // ── Backup: Restore Failed ───────────────────────────────────────────
 
-  static Future<void> backupRestoreFailed(BuildContext context) {
+  static Future<void> backupRestoreFailed(
+    BuildContext context, {
+    String? reason,
+  }) {
     return error(
       context,
       title: 'Restore Failed',
-      message: 'Failed to restore the backup. The file may be corrupt or incompatible.',
+      message: reason != null && reason.isNotEmpty
+          ? 'Failed to restore the backup: $reason'
+          : 'Failed to restore the backup. The file may be corrupt or incompatible.',
     );
   }
 

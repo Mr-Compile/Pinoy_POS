@@ -386,12 +386,12 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
         case BackupImportResult.incompatible:
           await AppDialogService.incompatibleBackupFile(context);
         case BackupImportResult.failed:
-          await AppDialogService.backupRestoreFailed(context);
+          await AppDialogService.backupRestoreFailed(context, reason: result.error);
       }
     } catch (e, st) {
       _log('Backup import failed', e, st);
       if (mounted) {
-        await AppDialogService.backupRestoreFailed(context);
+        await AppDialogService.backupRestoreFailed(context, reason: e.toString());
       }
     } finally {
       if (mounted) {
@@ -423,7 +423,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
 
       if (!mounted) return;
 
-      switch (result) {
+      switch (result.result) {
         case BackupImportResult.success:
           _invalidateAllProviders();
           await AppDialogService.backupRestoreSuccess(context);
@@ -433,14 +433,14 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
         case BackupImportResult.incompatible:
           await AppDialogService.incompatibleBackupFile(context);
         case BackupImportResult.failed:
-          await AppDialogService.backupRestoreFailed(context);
+          await AppDialogService.backupRestoreFailed(context, reason: result.error);
         case BackupImportResult.canceled:
           break;
       }
     } catch (e, st) {
       _log('Restore from history failed', e, st);
       if (mounted) {
-        await AppDialogService.backupRestoreFailed(context);
+        await AppDialogService.backupRestoreFailed(context, reason: e.toString());
       }
     } finally {
       if (mounted) {

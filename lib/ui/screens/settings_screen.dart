@@ -121,7 +121,22 @@ class SettingsScreen extends ConsumerWidget {
         icon: Icons.rule_outlined,
         title: 'AI Quota Management',
         subtitle: 'Manage default and per-user AI query quotas',
-        screen: const AIQuotaManagementPage(),
+        onTap: (context) async {
+          final verified = await showDialog<bool>(
+            context: context,
+            useRootNavigator: true,
+            barrierDismissible: false,
+            builder: (context) => const SuperAdminVerificationDialog(),
+          );
+          if (verified == true && context.mounted) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const AIQuotaManagementPage(verified: true),
+              ),
+            );
+          }
+        },
       ));
     }
 
@@ -206,13 +221,15 @@ class _SettingsEntry {
   final IconData icon;
   final String title;
   final String subtitle;
-  final Widget screen;
+  final Widget? screen;
+  final void Function(BuildContext)? onTap;
 
   const _SettingsEntry({
     required this.icon,
     required this.title,
     required this.subtitle,
-    required this.screen,
+    this.screen,
+    this.onTap,
   });
 }
 
@@ -233,10 +250,16 @@ class _SettingsTile extends StatelessWidget {
         style: Theme.of(context).textTheme.bodySmall,
       ),
       trailing: const Icon(Icons.chevron_right),
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => entry.screen),
-      ),
+      onTap: () {
+        if (entry.onTap != null) {
+          entry.onTap!(context);
+        } else if (entry.screen != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => entry.screen!),
+          );
+        }
+      },
     );
   }
 }

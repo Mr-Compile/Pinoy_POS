@@ -19,7 +19,7 @@ enum AuthSessionPhase {
   /// No user is authenticated.
   unauthenticated,
 
-  /// Password login succeeded but the user's temporary password must
+  /// Password login succeeded but the user’s temporary password must
   /// be changed before any further access is granted.
   passwordAuthenticatedPendingPasswordChange,
 
@@ -118,7 +118,7 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
           phase: phase,
         );
         // Invalidate providers that hold per-user cached state so they
-        // reload with the new user's data.  Without this, the dashboard
+        // reload with the new user’s data.  Without this, the dashboard
         // and notification badge show stale data (or the "Not
         // authenticated" error left over from the previous logout).
         _ref.invalidate(dashboardProvider);
@@ -162,7 +162,7 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
     state = AuthState();
   }
 
-  /// Changes the current user's password during the forced first-login
+  /// Changes the current user’s password during the forced first-login
   /// flow.  Does not require the old password.  On success, transitions
   /// to the PIN phase (if configured) or fully authenticated.
   ///
@@ -263,7 +263,7 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
     _ref.invalidate(reportsProvider);
   }
 
-  /// Called after the current user's own record is edited (e.g. by
+  /// Called after the current user’s own record is edited (e.g. by
   /// UserController.updateUser) so that the session reflects the latest
   /// database state without causing a circular dependency.
   Future<void> refreshCurrentUser() async {
@@ -279,21 +279,23 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(user: _authService.currentUser);
   }
 
-  /// Updates the current user's own profile (full name, PIN, profile
-  /// image). No special permission is required — users can always
-  /// edit their own profile. Restricted fields (role, username, isActive)
-  /// are never modified here.
+  /// Updates the current user’s own profile (full name, username, PIN,
+  /// profile image). No special permission is required — users can always
+  /// edit their own profile. Restricted fields (role, isActive) are never
+  /// modified here.
   ///
   /// Returns true on success, false on failure.
   Future<bool> updateProfile({
     required int userId,
     required String fullName,
+    String? username,
     String? pin,
     String? profileImagePath,
   }) async {
     final success = await _authService.updateProfile(
       userId: userId,
       fullName: fullName,
+      username: username,
       pin: pin,
       profileImagePath: profileImagePath,
     );
