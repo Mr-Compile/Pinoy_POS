@@ -4,7 +4,7 @@ import 'package:pinoy_pos/core/route_guard.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/ui/screens/announcements_screen.dart';
 import 'package:pinoy_pos/ui/screens/categories_screen.dart';
-import 'package:pinoy_pos/ui/screens/reports_screen.dart';
+import 'package:pinoy_pos/ui/screens/sales_analytics_screen.dart';
 import 'package:pinoy_pos/ui/screens/stock_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 
@@ -54,7 +54,7 @@ class MoreEntry {
       title: 'Reports',
       permission: 'view_reports',
       routeName: 'reports',
-      screen: ReportsScreen(),
+      screen: SalesAnalyticsScreen(),
     ),
     MoreEntry(
       icon: Icons.campaign_outlined,

@@ -366,3 +366,49 @@ Scope: All modal and dialog flows in `lib/ui/`, `lib/core/modal_result.dart`, an
 | `lib/ui/screens/stock_screen.dart` | `_showStockHistory` uses `useRootNavigator: true` | Consistent details dialog navigation |
 | `test/modal_result_test.dart` | Unit and widget tests for `ModalResult` | Regression tests for shared dialog infrastructure |
 
+## Theme, Color, Backup & Export Audit + Repair
+
+Date: 2026-09-02
+Scope: Full audit of theme architecture, semantic colors, dark/light mode, notification bell, dialogs, backup/restore, and export.
+
+### Audit findings
+
+1. **Notification bell invisible (CRITICAL)** — `Badge` widget in `notification_bell.dart` had no `child` property set, so no bell icon rendered at all. The button was clickable but visually empty.
+2. **Appearance settings selected state** — Selected theme option used `cs.onSurface` instead of `cs.primary` for icon/trailing color, making selection indistinguishable from unselected.
+3. **No WAL checkpoint before backup** — `_prepareBackupFile()` and `_createSafetyBackup()` copied the database file without first flushing the WAL. If WAL mode were ever enabled, recent writes stored only in the `-wal` file would be missing from the backup.
+4. **No integrity check on backup validation or post-restore** — `_validateBackupFile()` checked the SQLite header and required tables but did not run `PRAGMA integrity_check`. A torn or corrupted file could pass validation and destroy the live database on restore. `_performRestore()` copied the file and reopened the database without verifying the restored file was structurally sound.
+5. **Incomplete provider invalidation after restore** — `_invalidateAllProviders()` missed `dashboardProvider`, `reportsProvider`, `cartProvider`, `paymentSettingsProvider`, `authStateProvider`, `aiAdvisorChatProvider`, `dashboardServiceProvider`, `receiptServiceProvider`, `imageServiceProvider`, and `businessIntelligenceServiceProvider`. After a restore, the dashboard and reports screens would show stale data.
+6. **Receipt PDF used default Helvetica** — The receipt and report PDFs used the pdf package's default Helvetica font instead of the app's Inter font. While the wrapping code (`Expanded` + `softWrap: true`) was correct, using a different font than the UI meant text measurement didn't match, which could cause unexpected wrapping in edge cases.
+7. **No CSV export** — The `csv` package was a dependency but unused. The reports screen only offered PDF and Excel. Users who needed a plain-text spreadsheet format had no option.
+
+### What was already correct
+
+- **Semantic color architecture** — `AppSemanticColors` in `app_theme.dart` is the single source of truth. All hardcoded `Color(0x...)` values are confined to this class. No `Colors.blue`, `Colors.black`, etc. found anywhere in `lib/`.
+- **Material 3 ColorScheme** — Both light and dark themes are generated from `ColorScheme.fromSeed()` seeded with the semantic primary, with per-brightness error role resolution.
+- **Dialog system** — `AppDialog` and `AppDialogService` use semantic colors (success/error/warning/info) consistently with brightness-aware resolution.
+- **Backup storage architecture** — `BackupService` → `BackupStorageService` correctly delegates platform-specific work (Android SAF, Windows file picker, Web download) to separate implementations.
+- **Backup validation** — Already checked SQLite header, required tables, and `backup_metadata` app name. The integrity check added here complements these.
+- **Restore safety backup** — Already creates a safety backup before restore and rolls back on failure.
+- **Export destination UX** — Both PDF and Excel exports use `FileExportService.saveBytes()` which presents a native save dialog on desktop and uses the platform save mechanism on mobile.
+
+### Changes made
+
+| File | Change | Reason |
+|------|--------|--------|
+| `lib/ui/widgets/notification_bell.dart` | Added `child: Icon(...)` to `Badge`; bell icon uses `onSurfaceVariant` (read state: `primary`); added tooltip with unread count | Fix invisible notification bell — the root cause was a missing Badge child |
+| `lib/ui/screens/settings/appearance_settings_page.dart` | Selected theme option now uses `cs.primary` for icon and trailing check icon | Make selected state visually distinct from unselected |
+| `lib/services/backup_service.dart` | Added `PRAGMA wal_checkpoint(TRUNCATE)` before copying DB in `_prepareBackupFile()` and `_createSafetyBackup()` | Ensure WAL writes are flushed into the main file before backup copy |
+| `lib/services/backup_service.dart` | Added `PRAGMA integrity_check` to `_validateBackupFile()` and post-restore verification in `_performRestore()` | Reject corrupted backups before restore; verify restored DB is structurally sound |
+| `lib/ui/screens/backup_restore_screen.dart` | `_invalidateAllProviders()` now invalidates dashboard, reports, cart, payment settings, auth, AI chat, BI, receipt, image, and dashboard service providers | Prevent stale UI after restore |
+| `lib/services/pdf_font_service.dart` | New shared service that loads and caches Inter TTF fonts for PDF generation | Single source of truth for PDF fonts; prevents Helvetica fallback |
+| `lib/services/receipt_service.dart` | Uses `PdfFontService` for Inter font in receipt PDF; all text styles use `_style()` helper | Consistent typography with app UI; correct text measurement prevents wrapping bugs |
+| `lib/ui/screens/reports_screen.dart` | PDF export uses `PdfFontService` for Inter font | Consistent typography with receipt PDF and app UI |
+| `lib/ui/screens/reports_screen.dart` | Added `ExportFormat.csv`; new `_exportToCsv()` method with proper CSV escaping via `ListToCsvConverter`; three format cards (PDF/Excel/CSV) | Users can now export sales data as CSV with proper escaping |
+| `test/app_header_test.dart` | Two new regression tests: bell icon visible with non-transparent color; filled bell shown when unread > 0 | Verify the notification bell fix and prevent regression |
+
+### Verification
+
+- `flutter analyze` — No issues found.
+- `flutter test` — 161 tests passed (159 original + 2 new notification bell regression tests).
+
+

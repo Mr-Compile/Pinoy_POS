@@ -9,6 +9,12 @@ import 'package:pinoy_pos/data/models/backup_location.dart';
 import 'package:pinoy_pos/providers/notification_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/providers/user_provider.dart';
+import 'package:pinoy_pos/providers/dashboard_provider.dart';
+import 'package:pinoy_pos/providers/reports_provider.dart';
+import 'package:pinoy_pos/providers/cart_provider.dart';
+import 'package:pinoy_pos/providers/payment_settings_provider.dart';
+import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/providers/ai_advisor_provider.dart';
 import 'package:pinoy_pos/services/backup_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
@@ -495,6 +501,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
   // ── Invalidate Providers ─────────────────────────────────────────────
 
   void _invalidateAllProviders() {
+    // ── Service providers ──
     ref.invalidate(productServiceProvider);
     ref.invalidate(categoryServiceProvider);
     ref.invalidate(salesServiceProvider);
@@ -508,10 +515,25 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
     ref.invalidate(aiUsageServiceProvider);
     ref.invalidate(aiAdvisorServiceProvider);
     ref.invalidate(groqServiceProvider);
+    ref.invalidate(businessIntelligenceServiceProvider);
     ref.invalidate(trashServiceProvider);
     ref.invalidate(announcementServiceProvider);
     ref.invalidate(userServiceProvider);
     ref.invalidate(userControllerProvider);
+    ref.invalidate(dashboardServiceProvider);
+    ref.invalidate(receiptServiceProvider);
+    ref.invalidate(imageServiceProvider);
+
+    // ── Stateful / cached providers ──
+    // These hold cached UI state derived from the database. After a
+    // restore the underlying data has changed, so they must be
+    // invalidated to force a fresh load on next access.
+    ref.invalidate(dashboardProvider);
+    ref.invalidate(reportsProvider);
+    ref.invalidate(cartProvider);
+    ref.invalidate(paymentSettingsProvider);
+    ref.invalidate(authStateProvider);
+    ref.invalidate(aiAdvisorChatProvider);
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────

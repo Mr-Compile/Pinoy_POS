@@ -8,18 +8,42 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:pinoy_pos/data/models/receipt_view_data.dart';
 import 'package:pinoy_pos/services/file_export_service.dart';
 import 'package:pinoy_pos/services/image_service.dart';
+import 'package:pinoy_pos/services/pdf_font_service.dart';
 
 /// Generates and saves customer receipts.
 ///
 /// All rendering uses a stable 80mm thermal-receipt page format with generous
 /// word-wrapping so product names, store names and references do not render
-/// one character per line.
+/// one character per line.  The Inter font (the same family used by the
+/// Flutter UI) is loaded into the PDF via [PdfFontService] so text
+/// measurement matches the app's typography and the default Helvetica
+/// fallback never produces incorrect wrapping.
 class ReceiptService {
   final ImageService _imageService = ImageService();
 
+  /// Returns the base text style for the receipt, using Inter when
+  /// available.
+  pw.TextStyle _style({
+    double fontSize = 10,
+    pw.FontWeight? fontWeight,
+    PdfColor? color,
+  }) {
+    return PdfFontService.style(
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color,
+    );
+  }
+
   /// Builds a PDF receipt for the given sale.
   Future<Uint8List> generateReceiptPdf(ReceiptViewData receipt) async {
-    final pdf = pw.Document();
+    await PdfFontService.ensureLoaded();
+
+    final pdf = pw.Document(
+      // Register the Inter font as the default so every widget that
+      // doesn't explicitly set a font still uses it.
+      theme: PdfFontService.theme(),
+    );
 
     final pageFormat = PdfPageFormat.roll80;
     final currency = receipt.currency;
@@ -84,7 +108,7 @@ class ReceiptService {
         pw.Center(
           child: pw.Text(
             receipt.storeName,
-            style: pw.TextStyle(
+            style: _style(
               fontSize: 16,
               fontWeight: pw.FontWeight.bold,
             ),
@@ -96,7 +120,7 @@ class ReceiptService {
           pw.Center(
             child: pw.Text(
               receipt.storeAddress,
-              style: const pw.TextStyle(fontSize: 9),
+              style: _style(fontSize: 9),
               textAlign: pw.TextAlign.center,
               softWrap: true,
             ),
@@ -105,7 +129,7 @@ class ReceiptService {
           pw.Center(
             child: pw.Text(
               'Contact: ${receipt.storePhone}',
-              style: const pw.TextStyle(fontSize: 9),
+              style: _style(fontSize: 9),
               textAlign: pw.TextAlign.center,
               softWrap: true,
             ),
@@ -122,7 +146,7 @@ class ReceiptService {
         pw.Center(
           child: pw.Text(
             'OFFICIAL RECEIPT',
-            style: pw.TextStyle(
+            style: _style(
               fontSize: 12,
               fontWeight: pw.FontWeight.bold,
             ),
@@ -132,19 +156,19 @@ class ReceiptService {
         pw.Center(
           child: pw.Text(
             'Receipt #${receipt.receiptNumber}',
-            style: const pw.TextStyle(fontSize: 10),
+            style: _style(fontSize: 10),
           ),
         ),
         pw.Center(
           child: pw.Text(
             receipt.date.toLocal().toString().split('.')[0],
-            style: const pw.TextStyle(fontSize: 9),
+            style: _style(fontSize: 9),
           ),
         ),
         pw.Center(
           child: pw.Text(
             'Cashier: ${receipt.cashierName}',
-            style: const pw.TextStyle(fontSize: 9),
+            style: _style(fontSize: 9),
           ),
         ),
         pw.SizedBox(height: 8),
@@ -162,12 +186,12 @@ class ReceiptService {
             pw.Expanded(
               child: pw.Text(
                 'Item',
-                style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                style: _style(fontWeight: pw.FontWeight.bold),
               ),
             ),
             pw.Text(
               'Total',
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+              style: _style(fontWeight: pw.FontWeight.bold),
             ),
           ],
         ),
@@ -189,20 +213,20 @@ class ReceiptService {
               pw.Expanded(
                 child: pw.Text(
                   item.productName,
-                  style: const pw.TextStyle(fontSize: 10),
+                  style: _style(fontSize: 10),
                   softWrap: true,
                 ),
               ),
               pw.SizedBox(width: 8),
               pw.Text(
                 item.formattedTotal(currency),
-                style: const pw.TextStyle(fontSize: 10),
+                style: _style(fontSize: 10),
               ),
             ],
           ),
           pw.Text(
             '${item.quantity} x ${item.formattedUnitPrice(currency)}',
-            style: const pw.TextStyle(fontSize: 9),
+            style: _style(fontSize: 9),
           ),
         ],
       ),
@@ -247,7 +271,7 @@ class ReceiptService {
   pw.Widget _buildNotes(ReceiptViewData receipt) {
     return pw.Text(
       'Notes: ${receipt.notes}',
-      style: const pw.TextStyle(fontSize: 9),
+      style: _style(fontSize: 9),
       softWrap: true,
     );
   }
@@ -260,7 +284,7 @@ class ReceiptService {
           pw.Center(
             child: pw.Text(
               receipt.receiptFooter!,
-              style: const pw.TextStyle(fontSize: 9),
+              style: _style(fontSize: 9),
               textAlign: pw.TextAlign.center,
               softWrap: true,
             ),
@@ -269,7 +293,7 @@ class ReceiptService {
         pw.Center(
           child: pw.Text(
             'Thank you!',
-            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+            style: _style(fontWeight: pw.FontWeight.bold),
           ),
         ),
       ],
@@ -286,18 +310,14 @@ class ReceiptService {
           pw.Expanded(
             child: pw.Text(
               label,
-              style: isBold
-                  ? pw.TextStyle(fontWeight: pw.FontWeight.bold)
-                  : const pw.TextStyle(),
+              style: _style(fontWeight: isBold ? pw.FontWeight.bold : null),
               softWrap: true,
             ),
           ),
           pw.SizedBox(width: 8),
           pw.Text(
             value,
-            style: isBold
-                ? pw.TextStyle(fontWeight: pw.FontWeight.bold)
-                : const pw.TextStyle(),
+            style: _style(fontWeight: isBold ? pw.FontWeight.bold : null),
           ),
         ],
       ),

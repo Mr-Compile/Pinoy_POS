@@ -130,6 +130,68 @@ void main() {
     expect(find.text('0'), findsNothing);
   }, timeout: const Timeout(Duration(seconds: 30)));
 
+  testWidgets('NotificationBell renders a visible bell icon (regression: '
+      'Badge previously had no child, making the bell invisible)',
+      (tester) async {
+    final owner = await authenticateAsOwner();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authStateProvider.overrideWith((ref) {
+            return _TestAuthNotifier(ref, owner);
+          }),
+          notificationCountProvider.overrideWith((ref) => 0),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(
+            body: NotificationBell(),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 500));
+
+    // The bell icon must be rendered inside the Badge's child.
+    final bellFinder = find.byIcon(Icons.notifications_outlined);
+    expect(bellFinder, findsOneWidget);
+
+    // The icon must have a visible (non-transparent) color.
+    final icon = tester.widget<Icon>(bellFinder);
+    expect(icon.color, isNotNull);
+    expect((icon.color!.a * 255.0).round().clamp(0, 255), greaterThan(0));
+  }, timeout: const Timeout(Duration(seconds: 30)));
+
+  testWidgets('NotificationBell renders filled bell icon when unread > 0',
+      (tester) async {
+    final owner = await authenticateAsOwner();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authStateProvider.overrideWith((ref) {
+            return _TestAuthNotifier(ref, owner);
+          }),
+          notificationCountProvider.overrideWith((ref) => 3),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(
+            body: NotificationBell(),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 500));
+
+    // With unread notifications, the filled (round) bell variant is shown.
+    expect(find.byIcon(Icons.notifications_rounded), findsOneWidget);
+    expect(find.text('3'), findsOneWidget);
+  }, timeout: const Timeout(Duration(seconds: 30)));
+
   testWidgets('ProfileMenu shows avatar and name', (tester) async {
     final owner = await authenticateAsOwner();
 

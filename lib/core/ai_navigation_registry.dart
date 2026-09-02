@@ -10,7 +10,7 @@ import 'package:pinoy_pos/ui/screens/pos_screen.dart';
 import 'package:pinoy_pos/ui/screens/products_screen.dart';
 import 'package:pinoy_pos/ui/screens/profile_screen.dart';
 import 'package:pinoy_pos/ui/screens/receipt_screen.dart';
-import 'package:pinoy_pos/ui/screens/reports_screen.dart';
+import 'package:pinoy_pos/ui/screens/sales_analytics_screen.dart';
 import 'package:pinoy_pos/ui/screens/sale_detail_screen.dart';
 import 'package:pinoy_pos/ui/screens/sales_screen.dart';
 import 'package:pinoy_pos/ui/screens/activity_logs_screen.dart';
@@ -377,7 +377,7 @@ class AINavigationRegistry {
   static Widget _categoriesBuilder(BuildContext context) => const CategoriesScreen();
   static Widget _stockBuilder(BuildContext context) => const StockScreen();
   static Widget _salesBuilder(BuildContext context) => const SalesScreen();
-  static Widget _reportsBuilder(BuildContext context) => const ReportsScreen();
+  static Widget _reportsBuilder(BuildContext context) => const SalesAnalyticsScreen();
   static Widget _usersBuilder(BuildContext context) => const UsersScreen();
   static Widget _settingsBuilder(BuildContext context) => const SettingsScreen();
   static Widget _aiConfigBuilder(BuildContext context) => const AIConfigScreen();

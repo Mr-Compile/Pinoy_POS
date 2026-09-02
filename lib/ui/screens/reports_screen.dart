@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'dart:typed_data';
+import 'package:csv/csv.dart';
 import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -12,6 +14,7 @@ import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/reports_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/services/file_export_service.dart';
+import 'package:pinoy_pos/services/pdf_font_service.dart';
 import 'package:pinoy_pos/ui/screens/settings/store_information_settings_page.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
@@ -20,7 +23,7 @@ import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 
-enum ExportFormat { pdf, excel }
+enum ExportFormat { pdf, excel, csv }
 
 /// A confirmed sale bundled with its line items for export.
 class _ExportSale {
@@ -466,6 +469,16 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                 canExport: canExport,
               ),
             ),
+            const SizedBox(width: Spacing.md),
+            Expanded(
+              child: _buildFormatCard(
+                icon: Icons.description_outlined,
+                label: 'CSV',
+                description: 'Comma-separated',
+                format: ExportFormat.csv,
+                canExport: canExport,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 16),
@@ -522,6 +535,12 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   }
 
   Widget _buildExportAction(ReportsState state) {
+    final formatLabel = switch (_selectedFormat) {
+      ExportFormat.pdf => 'PDF',
+      ExportFormat.excel => 'Excel',
+      ExportFormat.csv => 'CSV',
+      null => '',
+    };
     return SizedBox(
       width: double.infinity,
       child: LoadingButton(
@@ -529,7 +548,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         onPressed: _selectedFormat != null ? () => _performExport(state) : null,
         label: _selectedFormat == null
             ? 'Select a format'
-            : 'Export to ${_selectedFormat == ExportFormat.pdf ? 'PDF' : 'Excel'}',
+            : 'Export to $formatLabel',
       ),
     );
   }
@@ -625,8 +644,10 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
       if (_selectedFormat == ExportFormat.pdf) {
         await _exportToPdf(state, exportSales, userNames, timestamp);
-      } else {
+      } else if (_selectedFormat == ExportFormat.excel) {
         await _exportToExcel(state, exportSales, userNames, timestamp);
+      } else {
+        await _exportToCsv(state, exportSales, userNames, timestamp);
       }
     } catch (e, st) {
       debugPrint('[ReportsScreen] export failed: $e\n$st');
@@ -647,7 +668,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     Map<int, String> userNames,
     String timestamp,
   ) async {
-    final pdf = pw.Document();
+    await PdfFontService.ensureLoaded();
+
+    final pdf = pw.Document(theme: PdfFontService.theme());
     final store = state.storeInfo;
     final currency = store.currency;
 
@@ -1018,6 +1041,166 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               style: pw.TextStyle(fontSize: 10, color: bodyText)),
       ],
     );
+  }
+
+  /// Exports the sales report as a CSV file with proper escaping.
+  ///
+  /// The CSV contains two sections:
+  /// 1. **Sales Transactions** — one row per sale with receipt number,
+  ///    date, cashier, customer, payment method, reference, item count,
+  ///    and total.
+  /// 2. **Line Items** — one row per sale item with receipt number,
+  ///    date, product name, quantity, unit price, line total, and
+  ///    payment method.
+  ///
+  /// All field values are passed through [CsvCodec] so commas, quotes,
+  /// and newlines inside data are properly escaped.
+  Future<void> _exportToCsv(
+    ReportsState state,
+    List<_ExportSale> exportSales,
+    Map<int, String> userNames,
+    String timestamp,
+  ) async {
+    final store = state.storeInfo;
+    final currency = store.currency;
+
+    final rows = <List<dynamic>>[];
+
+    // ── Header / metadata ──
+    rows.add([store.storeName]);
+    if (store.storeAddress.isNotEmpty) rows.add([store.storeAddress]);
+    if (store.storePhone.isNotEmpty) rows.add(['Contact: ${store.storePhone}']);
+    rows.add([]);
+    rows.add(['${store.storeName} - Sales Report']);
+    rows.add(['Generated: ${_formatDateTime(DateTime.now())}']);
+    rows.add(['Date Range: ${_formatRange(state.filterStart, state.filterEnd)}']);
+    rows.add([]);
+
+    // ── Summary ──
+    rows.add(['Summary']);
+    rows.add(['Metric', 'Value']);
+    rows.add(["Today's Sales", '$currency ${state.todaySales.toStringAsFixed(2)}']);
+    rows.add(['Month Sales', '$currency ${state.monthSales.toStringAsFixed(2)}']);
+    rows.add(['Total Transactions', state.totalTransactions]);
+    rows.add(['Total Products', state.totalProducts]);
+    rows.add(['Low Stock Items', state.lowStockCount]);
+    rows.add([]);
+
+    // ── Payment breakdown ──
+    if (state.paymentBreakdown.isNotEmpty) {
+      rows.add(['Payment Breakdown']);
+      rows.add(['Method', 'Count', 'Total ($currency)']);
+      for (final p in state.paymentBreakdown) {
+        rows.add([p.method, p.count, p.total.toStringAsFixed(2)]);
+      }
+      rows.add([]);
+    }
+
+    // ── Sales transactions ──
+    rows.add(['Sales Transactions']);
+    rows.add([
+      'Receipt #',
+      'Date/Time',
+      'Cashier',
+      'Customer',
+      'Payment Method',
+      'Reference',
+      'Items',
+      'Total ($currency)',
+    ]);
+
+    for (final export in exportSales) {
+      final s = export.sale;
+      rows.add([
+        '${s.receiptNumber ?? s.id}',
+        _formatDateTime(s.createdAt),
+        userNames[s.userId] ?? 'User ${s.userId}',
+        s.customerName ?? '',
+        s.paymentMethod,
+        s.referenceNumber ?? '',
+        export.itemCount,
+        s.totalAmount.toStringAsFixed(2),
+      ]);
+    }
+
+    final grandTotal = exportSales.fold<double>(
+      0.0,
+      (sum, e) => sum + e.sale.totalAmount,
+    );
+    rows.add(['Grand Total', '', '', '', '', '', '', grandTotal.toStringAsFixed(2)]);
+    rows.add([]);
+
+    // ── Line items ──
+    rows.add(['Line Items']);
+    rows.add([
+      'Receipt #',
+      'Date/Time',
+      'Product',
+      'Qty',
+      'Unit Price ($currency)',
+      'Line Total ($currency)',
+      'Payment Method',
+    ]);
+
+    for (final export in exportSales) {
+      final s = export.sale;
+      for (final item in export.items) {
+        rows.add([
+          '${s.receiptNumber ?? s.id}',
+          _formatDateTime(s.createdAt),
+          item.productName ?? 'Product #${item.productId}',
+          item.quantity,
+          item.unitPrice.toStringAsFixed(2),
+          item.totalPrice.toStringAsFixed(2),
+          s.paymentMethod,
+        ]);
+      }
+    }
+    rows.add([]);
+
+    // ── Sales by product ──
+    rows.add(['Sales by Product']);
+    rows.add(['Product', 'Qty', 'Revenue ($currency)']);
+    final productSales = _salesByProduct(exportSales);
+    for (final p in productSales) {
+      rows.add([p.name, p.quantity, p.total.toStringAsFixed(2)]);
+    }
+    rows.add(['Grand Total', '', grandTotal.toStringAsFixed(2)]);
+
+    // ── Encode and save ──
+    final csvString = const ListToCsvConverter().convert(rows);
+    final bytes = Uint8List.fromList(utf8.encode(csvString));
+
+    final fileName = 'pinoy_pos_sales_$timestamp.csv';
+    final savePath = await FileExportService.saveBytes(
+      bytes: bytes,
+      fileName: fileName,
+      dialogTitle: 'Save Report',
+      type: FileType.custom,
+      allowedExtensions: ['csv'],
+    );
+
+    if (savePath == null) {
+      if (mounted) {
+        AppDialogService.error(context,
+            title: 'Export Cancelled', message: 'No save location selected.');
+      }
+      return;
+    }
+
+    await ref.read(reportServiceProvider).recordExport(
+          fileFormat: 'csv',
+          filePath: savePath,
+          dateRangeStart: state.filterStart,
+          dateRangeEnd: state.filterEnd,
+        );
+
+    if (mounted) {
+      setState(() => _lastExportPath = savePath);
+      await AppDialogService.success(context,
+          title: 'Export Complete',
+          message: 'CSV report saved successfully.');
+    }
   }
 
   Future<void> _exportToExcel(

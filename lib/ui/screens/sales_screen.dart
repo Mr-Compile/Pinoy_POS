@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/date_utils.dart';
 import 'package:pinoy_pos/core/spacing.dart';
+import 'package:pinoy_pos/data/models/reporting_period.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
@@ -16,6 +17,7 @@ import 'package:pinoy_pos/ui/widgets/app_section.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
+import 'package:pinoy_pos/ui/widgets/period_selector.dart';
 
 class SalesScreen extends ConsumerStatefulWidget {
   const SalesScreen({super.key});
@@ -33,6 +35,9 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
   String? _selectedPaymentMethod;
   String? _selectedPaymentStatus;
   String _searchQuery = '';
+  ReportingPeriod _selectedPeriod = ReportingPeriod.thisMonth;
+  DateTime? _customStart;
+  DateTime? _customEnd;
 
   final _searchController = TextEditingController();
 
@@ -48,14 +53,23 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     super.dispose();
   }
 
+  ReportingPeriodBounds _periodBounds() => periodBoundsFor(
+        _selectedPeriod,
+        customStart: _customStart,
+        customEnd: _customEnd,
+      );
+
   Future<void> _loadSales() async {
     setState(() {
       _isLoading = true;
       _error = null;
     });
 
+    final bounds = _periodBounds();
     final salesService = ref.read(salesServiceProvider);
     final sales = await salesService.getFilteredSales(
+      start: bounds.start,
+      end: bounds.end,
       paymentMethod: _selectedPaymentMethod,
       paymentStatus: _selectedPaymentStatus,
       search: _searchQuery.isEmpty ? null : _searchQuery,
@@ -68,6 +82,28 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  void _onPeriodSelected(ReportingPeriod period) {
+    if (period == _selectedPeriod) return;
+
+    setState(() {
+      _selectedPeriod = period;
+      if (period != ReportingPeriod.custom) {
+        _customStart = null;
+        _customEnd = null;
+      }
+    });
+    _loadSales();
+  }
+
+  void _onCustomRange(DateTimeRange range) {
+    setState(() {
+      _selectedPeriod = ReportingPeriod.custom;
+      _customStart = range.start;
+      _customEnd = range.end;
+    });
+    _loadSales();
   }
 
   Future<void> _voidSale(Sale sale) async {
@@ -245,6 +281,9 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
       _selectedPaymentMethod = null;
       _selectedPaymentStatus = null;
       _searchQuery = '';
+      _selectedPeriod = ReportingPeriod.thisMonth;
+      _customStart = null;
+      _customEnd = null;
     });
     _loadSales();
   }
@@ -274,9 +313,14 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
 
     final filtersActive = _selectedPaymentMethod != null ||
         _selectedPaymentStatus != null ||
-        _searchQuery.isNotEmpty;
+        _searchQuery.isNotEmpty ||
+        _selectedPeriod != ReportingPeriod.thisMonth;
 
     final grouped = _groupByDate(_sales);
+    final totalAmount = _sales.fold<double>(
+      0,
+      (sum, sale) => sum + sale.totalAmount,
+    );
 
     return Scaffold(
       appBar: AppHeader(
@@ -299,43 +343,158 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
           ),
         ],
       ),
-      body: _sales.isEmpty
-          ? EmptyState(
-              icon: Icons.receipt_long,
-              title: 'No Sales',
-              message: filtersActive
-                  ? 'No sales match the selected filters.'
-                  : 'Start selling to see sales history',
-              action: filtersActive
-                  ? AppButton.filled(
-                      onPressed: _clearFilters,
-                      icon: Icons.clear,
-                      label: 'Clear Filters',
-                      size: AppButtonSize.small,
-                    )
-                  : null,
-            )
-          : Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 800),
-                child: ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: grouped.length,
-                  itemBuilder: (context, index) {
-                    final group = grouped[index];
-                    return AppSection(
-                      title: group.label,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: group.sales
-                            .map((sale) => _buildSaleCard(sale, canVoid, context))
-                            .toList(),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: Column(
+            children: [
+              _buildPeriodHeader(context),
+              const Divider(height: 1),
+              _buildSummaryCard(context, totalAmount, _sales.length),
+              const SizedBox(height: Spacing.sm),
+              Expanded(
+                child: _sales.isEmpty
+                    ? EmptyState(
+                        icon: Icons.receipt_long,
+                        title: 'No Sales',
+                        message: filtersActive
+                            ? 'No sales match the selected filters.'
+                            : 'Start selling to see sales history',
+                        action: filtersActive
+                            ? AppButton.filled(
+                                onPressed: _clearFilters,
+                                icon: Icons.clear,
+                                label: 'Clear Filters',
+                                size: AppButtonSize.small,
+                              )
+                            : null,
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: grouped.length,
+                        itemBuilder: (context, index) {
+                          final group = grouped[index];
+                          final groupTotal = group.sales.fold<double>(
+                            0,
+                            (sum, sale) => sum + sale.totalAmount,
+                          );
+                          return AppSection(
+                            title: group.label,
+                            subtitle:
+                                '${group.sales.length} sale${group.sales.length == 1 ? '' : 's'} · ₱${groupTotal.toStringAsFixed(2)}',
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: group.sales
+                                  .map((sale) =>
+                                      _buildSaleCard(sale, canVoid, context))
+                                  .toList(),
+                            ),
+                          );
+                        },
                       ),
-                    );
-                  },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPeriodHeader(BuildContext context) {
+    final bounds = _periodBounds();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(Spacing.md, Spacing.md, Spacing.md, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  formatPeriodLabel(bounds),
+                  style: AppTypography.titleMediumBold(context),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-            ),
+              if (_selectedPaymentMethod != null ||
+                  _selectedPaymentStatus != null ||
+                  _searchQuery.isNotEmpty)
+                TextButton.icon(
+                  onPressed: _clearFilters,
+                  icon: const Icon(Icons.clear, size: 18),
+                  label: const Text('Clear'),
+                ),
+            ],
+          ),
+          const SizedBox(height: Spacing.sm),
+          PeriodSelector(
+            selected: _selectedPeriod,
+            onSelected: _onPeriodSelected,
+            customStart: _customStart,
+            customEnd: _customEnd,
+            onCustomRange: _onCustomRange,
+          ),
+          const SizedBox(height: Spacing.sm),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryCard(BuildContext context, double total, int count) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
+      child: Card(
+        color: cs.primaryContainer,
+        margin: EdgeInsets.zero,
+        child: Padding(
+          padding: const EdgeInsets.all(Spacing.md),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Total Sales',
+                      style: AppTypography.bodyMedium(context).copyWith(
+                        color: cs.onPrimaryContainer,
+                      ),
+                    ),
+                    const SizedBox(height: Spacing.xs),
+                    Text(
+                      '₱${total.toStringAsFixed(2)}',
+                      style: AppTypography.titleLargeBold(context).copyWith(
+                        color: cs.onPrimaryContainer,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      'Transactions',
+                      style: AppTypography.bodyMedium(context).copyWith(
+                        color: cs.onPrimaryContainer,
+                      ),
+                    ),
+                    const SizedBox(height: Spacing.xs),
+                    Text(
+                      '$count',
+                      style: AppTypography.titleLargeBold(context).copyWith(
+                        color: cs.onPrimaryContainer,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

@@ -11,7 +11,7 @@ import 'package:pinoy_pos/services/dashboard_service.dart';
 import 'package:pinoy_pos/ui/screens/ai_advisor_screen.dart';
 import 'package:pinoy_pos/ui/screens/pos_screen.dart';
 import 'package:pinoy_pos/ui/screens/products_screen.dart';
-import 'package:pinoy_pos/ui/screens/reports_screen.dart';
+import 'package:pinoy_pos/ui/screens/sales_analytics_screen.dart';
 import 'package:pinoy_pos/ui/screens/sales_screen.dart';
 import 'package:pinoy_pos/ui/screens/settings_screen.dart';
 import 'package:pinoy_pos/ui/screens/stock_screen.dart';
@@ -643,7 +643,7 @@ class _OwnerDashboard extends ConsumerWidget {
               icon: Icons.analytics_outlined,
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const ReportsScreen()),
+                MaterialPageRoute(builder: (_) => const SalesAnalyticsScreen()),
               ),
             ),
           if (authNotifier.hasPermission('view_ai_advisor'))
@@ -1280,7 +1280,7 @@ class _StaffDashboard extends ConsumerWidget {
               icon: Icons.analytics_outlined,
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const ReportsScreen()),
+                MaterialPageRoute(builder: (_) => const SalesAnalyticsScreen()),
               ),
             ),
         ],

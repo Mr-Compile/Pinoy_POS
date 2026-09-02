@@ -140,18 +140,13 @@ class ReportService {
         : null;
 
     return _saleItemRepository
-        .getTopProductsByQuantity(
+        .getTopProducts(
           since: start,
+          until: end,
           userId: userId,
           limit: limit,
         )
-        .then((rows) => rows
-            .map((r) => TopProductResult(
-                  productId: r['product_id'] as int,
-                  productName: r['product_name'] as String,
-                  totalQuantity: r['total_quantity'] as int,
-                ))
-            .toList());
+        .then((rows) => rows.map(TopProductResult.fromMap).toList());
   }
 
   /// Returns a per-day sales summary for the given date range.

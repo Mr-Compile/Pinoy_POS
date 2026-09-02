@@ -15,12 +15,20 @@ class SaleItemRepository {
   Future<List<SaleItem>> getBySaleIds(List<int> saleIds, {DatabaseExecutor? txn}) =>
       _saleItemDao.getBySaleIds(saleIds, txn: txn);
 
-  /// Analytics: top-selling products by total quantity sold. See
-  /// [SaleItemDao.getTopProductsByQuantity] for parameter semantics.
-  Future<List<Map<String, dynamic>>> getTopProductsByQuantity({
+  /// Analytics: top-selling products by quantity or revenue. See
+  /// [SaleItemDao.getTopProducts] for parameter semantics.
+  Future<List<Map<String, dynamic>>> getTopProducts({
     int limit = 5,
     DateTime? since,
+    DateTime? until,
     int? userId,
+    bool sortByRevenue = false,
   }) =>
-      _saleItemDao.getTopProductsByQuantity(limit: limit, since: since, userId: userId);
+      _saleItemDao.getTopProducts(
+        limit: limit,
+        since: since,
+        until: until,
+        userId: userId,
+        sortByRevenue: sortByRevenue,
+      );
 }

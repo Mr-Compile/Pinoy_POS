@@ -1,4 +1,8 @@
 import 'package:pinoy_pos/data/dao/sale_dao.dart';
+import 'package:pinoy_pos/data/models/calendar_day_sales.dart';
+import 'package:pinoy_pos/data/models/daily_sales_point.dart';
+import 'package:pinoy_pos/data/models/payment_breakdown.dart';
+import 'package:pinoy_pos/data/models/reporting_period.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/data/models/sales_by_hour_point.dart';
 import 'package:pinoy_pos/data/models/staff_sales_summary.dart';
@@ -76,4 +80,63 @@ class SaleRepository {
     int? userId,
   }) =>
       _saleDao.getSalesByHour(start, end, userId: userId);
+
+  // ── Centralised sales-analytics repository methods ───────────────────
+
+  Future<Map<String, dynamic>> getSalesSummary(
+    DateTime start,
+    DateTime end, {
+    int? userId,
+    DatabaseExecutor? txn,
+  }) =>
+      _saleDao.getSalesSummary(start, end, userId: userId, txn: txn);
+
+  Future<int> getItemsSold(
+    DateTime start,
+    DateTime end, {
+    int? userId,
+    DatabaseExecutor? txn,
+  }) =>
+      _saleDao.getItemsSold(start, end, userId: userId, txn: txn);
+
+  Future<List<DailySalesPoint>> getSalesTrend(
+    DateTime start,
+    DateTime end, {
+    required ReportGroupBy groupBy,
+    int? userId,
+  }) =>
+      _saleDao.getSalesTrend(start, end, groupBy: groupBy, userId: userId);
+
+  Future<List<PaymentBreakdown>> getPaymentBreakdown(
+    DateTime start,
+    DateTime end, {
+    int? userId,
+  }) =>
+      _saleDao.getPaymentBreakdown(start, end, userId: userId);
+
+  Future<List<CalendarDaySales>> getCalendarDaySales(
+    DateTime start,
+    DateTime end, {
+    int? userId,
+  }) =>
+      _saleDao.getCalendarDaySales(start, end, userId: userId);
+
+  Future<List<Sale>> getConfirmedSalesForRange(
+    DateTime start,
+    DateTime end, {
+    int? userId,
+    String? paymentMethod,
+    String? search,
+    int limit = 500,
+    DatabaseExecutor? txn,
+  }) =>
+      _saleDao.getConfirmedSalesForRange(
+        start,
+        end,
+        userId: userId,
+        paymentMethod: paymentMethod,
+        search: search,
+        limit: limit,
+        txn: txn,
+      );
 }

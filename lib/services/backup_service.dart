@@ -648,6 +648,27 @@ class BackupService {
           return BackupImportResult.incompatible;
         }
       }
+
+      // Run SQLite's built-in integrity check. A corrupted backup file
+      // can pass the header and table-name checks but still have torn
+      // pages or broken indexes.  Rejecting it here prevents restoring
+      // a broken database over the user's current data.
+      try {
+        final integrityRows = await testDb.rawQuery(
+          'PRAGMA integrity_check',
+        );
+        final integrityResult =
+            integrityRows.isEmpty ? '' : integrityRows.first.values.first;
+        if (integrityResult != 'ok') {
+          _log('Backup integrity_check failed: $integrityResult');
+          await testDb.close();
+          return BackupImportResult.invalidFile;
+        }
+      } catch (e) {
+        _log('Could not run integrity_check on backup: $e');
+        await testDb.close();
+        return BackupImportResult.invalidFile;
+      }
     } catch (e) {
       _log('Could not open backup file as SQLite database: $e');
       await _safeClose(testDb);
@@ -747,7 +768,19 @@ class BackupService {
 
     try {
       await File(backupPath).copy(dbPath);
-      await _dbHelper.database;
+      // Re-open the database and verify the restored file is structurally
+      // sound before declaring success.  A torn copy (e.g. the source was
+      // modified mid-copy) would otherwise leave the app running against
+      // a corrupt database.
+      final reopened = await _dbHelper.database;
+      final integrityRows = await reopened.rawQuery('PRAGMA integrity_check');
+      final integrityResult =
+          integrityRows.isEmpty ? '' : integrityRows.first.values.first;
+      if (integrityResult != 'ok') {
+        _log('Post-restore integrity_check failed: $integrityResult');
+        return (false,
+            'The restored database failed an integrity check: $integrityResult');
+      }
       return (true, null);
     } on FileSystemException catch (e) {
       _log('Failed to copy backup to database path: ${e.message}');
@@ -764,6 +797,14 @@ class BackupService {
     final db = await _dbHelper.database;
     final dbPath = db.path;
     final tempPath = await _tempPath('pinoy_pos_safety_backup.db');
+
+    // Flush WAL into the main file before copying so the safety backup
+    // captures the latest committed state.
+    try {
+      await db.execute('PRAGMA wal_checkpoint(TRUNCATE)');
+    } catch (e) {
+      _log('WAL checkpoint before safety backup failed (non-fatal): $e');
+    }
 
     await _dbHelper.close();
     try {
@@ -786,6 +827,16 @@ class BackupService {
     final db = await _dbHelper.database;
     final dbPath = db.path;
     final tempPath = await _tempPath('pinoy_pos_backup_${_timestamp()}.db');
+
+    // Checkpoint the WAL (if active) so all committed transactions are
+    // flushed into the main database file before we copy it.  Without
+    // this, a WAL-mode database could produce a backup that is missing
+    // the most recent writes stored only in the -wal file.
+    try {
+      await db.execute('PRAGMA wal_checkpoint(TRUNCATE)');
+    } catch (e) {
+      _log('WAL checkpoint before backup failed (non-fatal): $e');
+    }
 
     // Close the live connection before copying the file. On Windows the
     // open database file is locked while the connection is active, which

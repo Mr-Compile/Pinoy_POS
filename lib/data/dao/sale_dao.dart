@@ -1,5 +1,9 @@
 import 'package:pinoy_pos/core/date_utils.dart';
 import 'package:pinoy_pos/data/dao/base_dao.dart';
+import 'package:pinoy_pos/data/models/calendar_day_sales.dart';
+import 'package:pinoy_pos/data/models/daily_sales_point.dart';
+import 'package:pinoy_pos/data/models/payment_breakdown.dart';
+import 'package:pinoy_pos/data/models/reporting_period.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/data/models/sales_by_hour_point.dart';
 import 'package:pinoy_pos/data/models/staff_sales_summary.dart';
@@ -308,5 +312,238 @@ class SaleDao extends BaseDao<Sale> {
     ''', args);
 
     return result.map(SalesByHourPoint.fromMap).toList();
+  }
+
+  // ── Centralised sales-analytics queries ────────────────────────────────
+
+  /// Returns summary numbers for confirmed, non-deleted sales in a range.
+  ///
+  /// Result map keys: `total_sales`, `transaction_count`.
+  Future<Map<String, dynamic>> getSalesSummary(
+    DateTime start,
+    DateTime end, {
+    int? userId,
+    DatabaseExecutor? txn,
+  }) async {
+    final executor = txn ?? await db;
+    final conditions = _confirmedRangeConditions(start, end, userId);
+
+    final result = await executor.rawQuery('''
+      SELECT COALESCE(SUM(total_amount), 0) as total_sales,
+             COUNT(*) as transaction_count
+      FROM sales
+      WHERE ${conditions.where}
+    ''', conditions.args);
+
+    return result.first;
+  }
+
+  /// Returns the total quantity of items sold for confirmed sales in a range.
+  Future<int> getItemsSold(
+    DateTime start,
+    DateTime end, {
+    int? userId,
+    DatabaseExecutor? txn,
+  }) async {
+    final executor = txn ?? await db;
+    final conditions = _confirmedRangeConditions(start, end, userId);
+
+    final result = await executor.rawQuery('''
+      SELECT COALESCE(SUM(si.quantity), 0) as items_sold
+      FROM sale_items si
+      INNER JOIN sales s ON si.sale_id = s.id
+      WHERE ${conditions.where}
+    ''', conditions.args);
+
+    return (result.first['items_sold'] as num?)?.toInt() ?? 0;
+  }
+
+  /// Returns a sales trend grouped by [groupBy] for the given range.
+  ///
+  /// For [ReportGroupBy.hour] the date returned is the hour start of each day
+  /// in the period. For [ReportGroupBy.week] the SQL first groups by day and
+  /// the caller is expected to collapse days to week starts in Dart.
+  Future<List<DailySalesPoint>> getSalesTrend(
+    DateTime start,
+    DateTime end, {
+    required ReportGroupBy groupBy,
+    int? userId,
+  }) async {
+    final database = await db;
+    final conditions = _confirmedRangeConditions(start, end, userId);
+
+    late String select;
+    late String groupBySql;
+    late String pattern;
+
+    switch (groupBy) {
+      case ReportGroupBy.hour:
+        // Group by YYYY-MM-DDTHH so each hour of each day is a point.
+        select = "substr(created_at, 1, 13) as bucket";
+        groupBySql = 'bucket';
+        pattern = "yyyy-MM-ddTHH";
+      case ReportGroupBy.day:
+        select = "substr(created_at, 1, 10) as bucket";
+        groupBySql = 'bucket';
+        pattern = "yyyy-MM-dd";
+      case ReportGroupBy.week:
+        // Group by day first; week collapsing is done by the caller.
+        select = "substr(created_at, 1, 10) as bucket";
+        groupBySql = 'bucket';
+        pattern = "yyyy-MM-dd";
+      case ReportGroupBy.month:
+        select = "substr(created_at, 1, 7) as bucket";
+        groupBySql = 'bucket';
+        pattern = "yyyy-MM";
+    }
+
+    final result = await database.rawQuery('''
+      SELECT $select,
+             COALESCE(SUM(total_amount), 0) as total,
+             COUNT(*) as count
+      FROM sales
+      WHERE ${conditions.where}
+      GROUP BY $groupBySql
+      ORDER BY bucket
+    ''', conditions.args);
+
+    return result.map((row) {
+      final bucket = row['bucket'] as String;
+      final parsed = _parseBucket(bucket, pattern);
+      return DailySalesPoint(
+        date: parsed,
+        total: (row['total'] as num?)?.toDouble() ?? 0.0,
+        count: (row['count'] as num?)?.toInt() ?? 0,
+      );
+    }).toList();
+  }
+
+  /// Returns payment-method totals for confirmed sales in a range.
+  Future<List<PaymentBreakdown>> getPaymentBreakdown(
+    DateTime start,
+    DateTime end, {
+    int? userId,
+  }) async {
+    final database = await db;
+    final conditions = _confirmedRangeConditions(start, end, userId);
+
+    final result = await database.rawQuery('''
+      SELECT payment_method,
+             COALESCE(SUM(total_amount), 0) as total,
+             COUNT(*) as count
+      FROM sales
+      WHERE ${conditions.where}
+      GROUP BY payment_method
+      ORDER BY total DESC
+    ''', conditions.args);
+
+    return result.map(PaymentBreakdown.fromMap).toList();
+  }
+
+  /// Returns per-day totals for confirmed sales in a range, suitable for
+  /// populating a calendar view.
+  Future<List<CalendarDaySales>> getCalendarDaySales(
+    DateTime start,
+    DateTime end, {
+    int? userId,
+  }) async {
+    final database = await db;
+    final conditions = _confirmedRangeConditions(start, end, userId);
+
+    final result = await database.rawQuery('''
+      SELECT substr(created_at, 1, 10) as date,
+             COALESCE(SUM(total_amount), 0) as total_sales,
+             COUNT(*) as transaction_count
+      FROM sales
+      WHERE ${conditions.where}
+      GROUP BY date
+      ORDER BY date
+    ''', conditions.args);
+
+    return result.map(CalendarDaySales.fromMap).toList();
+  }
+
+  /// Confirmed sales in a range, newest first.
+  Future<List<Sale>> getConfirmedSalesForRange(
+    DateTime start,
+    DateTime end, {
+    int? userId,
+    String? paymentMethod,
+    String? search,
+    int limit = 500,
+    DatabaseExecutor? txn,
+  }) async {
+    final executor = txn ?? await db;
+    final conditions = _confirmedRangeConditions(start, end, userId);
+
+    if (paymentMethod != null && paymentMethod.isNotEmpty) {
+      conditions.add('payment_method = ?', paymentMethod);
+    }
+
+    if (search != null && search.trim().isNotEmpty) {
+      conditions.add(
+        '(receipt_number LIKE ? OR reference_number LIKE ? OR customer_name LIKE ?)',
+      );
+      final like = '%${search.trim()}%';
+      conditions.args.add(like);
+      conditions.args.add(like);
+      conditions.args.add(like);
+    }
+
+    final maps = await executor.query(
+      tableName,
+      where: conditions.where,
+      whereArgs: conditions.args,
+      orderBy: 'created_at DESC',
+      limit: limit,
+    );
+    return maps.map((map) => fromMap(map)).toList();
+  }
+
+  _WhereClause _confirmedRangeConditions(
+    DateTime start,
+    DateTime end,
+    int? userId,
+  ) {
+    final conditions = <String>[
+      'created_at >= ?',
+      'created_at < ?',
+      "deleted_at IS NULL",
+      "payment_status = 'confirmed'",
+    ];
+    final args = <Object?>[start.toIso8601String(), end.toIso8601String()];
+
+    if (userId != null) {
+      conditions.add('user_id = ?');
+      args.add(userId);
+    }
+
+    return _WhereClause(conditions.join(' AND '), args);
+  }
+
+  DateTime _parseBucket(String bucket, String pattern) {
+    switch (pattern) {
+      case 'yyyy-MM-ddTHH':
+        // 2026-08-31T14 -> 2026-08-31 14:00:00
+        return DateTime.parse('$bucket:00:00.000');
+      case 'yyyy-MM-dd':
+        return DateTime.parse('${bucket}T00:00:00.000');
+      case 'yyyy-MM':
+        return DateTime.parse('$bucket-01T00:00:00.000');
+    }
+    return DateTime.parse(bucket);
+  }
+}
+
+/// Simple WHERE clause builder for the DAO's raw queries.
+class _WhereClause {
+  String where;
+  final List<Object?> args;
+
+  _WhereClause(this.where, this.args);
+
+  void add(String condition, [Object? value]) {
+    where = '$where AND $condition';
+    if (value != null) args.add(value);
   }
 }

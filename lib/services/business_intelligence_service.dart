@@ -705,7 +705,7 @@ class BusinessIntelligenceService {
 
   Future<BusinessFacts> _gatherTopProducts(DetectedIntent d) async {
     final since = d.startDate;
-    final topProducts = await _saleItemRepository.getTopProductsByQuantity(
+    final topProducts = await _saleItemRepository.getTopProducts(
       limit: 10,
       since: since,
     );
@@ -733,7 +733,7 @@ class BusinessIntelligenceService {
   Future<BusinessFacts> _gatherLowSellingProducts(DetectedIntent d) async {
     // Get all active products, then cross-reference with sales data.
     final products = await _productRepository.getActiveProducts();
-    final topProducts = await _saleItemRepository.getTopProductsByQuantity(
+    final topProducts = await _saleItemRepository.getTopProducts(
       limit: 100,
       since: d.startDate,
     );
@@ -775,7 +775,7 @@ class BusinessIntelligenceService {
   }
 
   Future<BusinessFacts> _gatherProductPerformance(DetectedIntent d) async {
-    final topProducts = await _saleItemRepository.getTopProductsByQuantity(
+    final topProducts = await _saleItemRepository.getTopProducts(
       limit: 20,
       since: d.startDate,
     );
@@ -832,7 +832,7 @@ class BusinessIntelligenceService {
     final allProducts = await _productRepository.getActiveProducts();
 
     // Get recent sales velocity for low-stock products.
-    final recentSales = await _saleItemRepository.getTopProductsByQuantity(
+    final recentSales = await _saleItemRepository.getTopProducts(
       limit: 50,
       since: DateTime.now().subtract(const Duration(days: 7)),
     );
@@ -871,7 +871,7 @@ class BusinessIntelligenceService {
   Future<BusinessFacts> _gatherCategoryPerformance(DetectedIntent d) async {
     final categories = await _categoryRepository.getActiveCategories();
     final products = await _productRepository.getActiveProducts();
-    final topProducts = await _saleItemRepository.getTopProductsByQuantity(
+    final topProducts = await _saleItemRepository.getTopProducts(
       limit: 100,
       since: d.startDate,
     );
@@ -1030,7 +1030,7 @@ class BusinessIntelligenceService {
         yesterdayActive.fold<double>(0, (sum, s) => sum + s.totalAmount);
 
     // Top products (last 7 days).
-    final topProducts = await _saleItemRepository.getTopProductsByQuantity(
+    final topProducts = await _saleItemRepository.getTopProducts(
       limit: 5,
       since: now.subtract(const Duration(days: 7)),
     );
@@ -2085,7 +2085,7 @@ class BusinessIntelligenceService {
       return _noUserData(d);
     }
     // SQL-level filter: s.user_id = userId (passed to DAO)
-    final topProducts = await _saleItemRepository.getTopProductsByQuantity(
+    final topProducts = await _saleItemRepository.getTopProducts(
       limit: 10,
       since: d.startDate,
       userId: userId,
@@ -2208,7 +2208,7 @@ class BusinessIntelligenceService {
         todayActive.fold<double>(0, (sum, s) => sum + s.totalAmount);
 
     // My top products (last 7 days).
-    final myTopProducts = await _saleItemRepository.getTopProductsByQuantity(
+    final myTopProducts = await _saleItemRepository.getTopProducts(
       limit: 5,
       since: now.subtract(const Duration(days: 7)),
       userId: userId,

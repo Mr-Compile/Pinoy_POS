@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/services/product_service.dart';
 import 'package:pinoy_pos/services/category_service.dart';
 import 'package:pinoy_pos/services/sales_service.dart';
+import 'package:pinoy_pos/services/sales_analytics_service.dart';
 import 'package:pinoy_pos/services/stock_service.dart';
 import 'package:pinoy_pos/services/activity_log_service.dart';
 import 'package:pinoy_pos/services/notification_service.dart';
@@ -29,6 +30,10 @@ final categoryServiceProvider = Provider<CategoryService>((ref) {
 
 final salesServiceProvider = Provider<SalesService>((ref) {
   return SalesService();
+});
+
+final salesAnalyticsServiceProvider = Provider<SalesAnalyticsService>((ref) {
+  return SalesAnalyticsService();
 });
 
 final cartServiceProvider = Provider<CartService>((ref) {
@@ -99,4 +104,3 @@ final userServiceProvider = Provider<UserService>((ref) {
 final imageServiceProvider = Provider<ImageService>((ref) {
   return ImageService();
 });
-

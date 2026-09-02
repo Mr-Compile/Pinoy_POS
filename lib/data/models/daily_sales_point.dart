@@ -14,6 +14,16 @@ class DailySalesPoint {
   /// as a transaction count.
   int get transactionCount => count;
 
+  factory DailySalesPoint.fromMap(Map<String, dynamic> map) {
+    return DailySalesPoint(
+      date: map['date'] != null
+          ? DateTime.parse(map['date'] as String)
+          : DateTime(1970),
+      total: (map['total'] as num?)?.toDouble() ?? 0.0,
+      count: (map['count'] as num?)?.toInt() ?? 0,
+    );
+  }
+
   @override
   String toString() {
     return 'DailySalesPoint(date: $date, total: $total, count: $count)';

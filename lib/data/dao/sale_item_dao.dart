@@ -44,31 +44,41 @@ class SaleItemDao extends BaseDao<SaleItem> {
     return maps.map((map) => SaleItem.fromMap(map)).toList();
   }
 
-  /// Returns the top-selling products by total quantity sold, joining
-  /// `sale_items` with non-voided `sales` and active `products`.
+  /// Returns the top-selling products for confirmed, non-voided sales.
   ///
   /// Parameters:
   /// - [limit]: maximum number of rows to return.
-  /// - [since]: optional lower bound on `sales.created_at` (inclusive).
-  ///   When null, all history is considered.
+  /// - [since]: optional inclusive lower bound on `sales.created_at`.
+  /// - [until]: optional exclusive upper bound on `sales.created_at`.
+  ///   When null, all future dates are allowed (effectively now).
   /// - [userId]: optional filter restricting to sales made by [userId].
   ///   Used for Staff dashboards so a Staff member only sees their own
   ///   top products.  When null, all users' sales are aggregated.
+  /// - [sortByRevenue]: when true, order by revenue desc; otherwise by qty.
   ///
   /// Returns a list of maps with keys:
-  ///   `product_id` (int), `product_name` (String), `total_quantity` (int).
-  Future<List<Map<String, dynamic>>> getTopProductsByQuantity({
+  ///   `product_id`, `product_name`, `total_quantity`, `revenue`.
+  Future<List<Map<String, dynamic>>> getTopProducts({
     int limit = 5,
     DateTime? since,
+    DateTime? until,
     int? userId,
+    bool sortByRevenue = false,
   }) async {
     final database = await db;
     final args = <Object?>[];
-    final conditions = <String>['s.deleted_at IS NULL'];
+    final conditions = <String>[
+      's.deleted_at IS NULL',
+      "s.payment_status = 'confirmed'",
+    ];
 
     if (since != null) {
       conditions.add('s.created_at >= ?');
       args.add(since.toIso8601String());
+    }
+    if (until != null) {
+      conditions.add('s.created_at < ?');
+      args.add(until.toIso8601String());
     }
     if (userId != null) {
       conditions.add('s.user_id = ?');
@@ -76,16 +86,21 @@ class SaleItemDao extends BaseDao<SaleItem> {
     }
     args.add(limit);
 
+    final orderBy = sortByRevenue
+        ? 'COALESCE(SUM(si.total_price), 0) DESC'
+        : 'SUM(si.quantity) DESC';
+
     return database.rawQuery('''
       SELECT si.product_id AS product_id,
              p.name AS product_name,
-             SUM(si.quantity) AS total_quantity
+             SUM(si.quantity) AS total_quantity,
+             COALESCE(SUM(si.total_price), 0) AS revenue
       FROM sale_items si
       INNER JOIN sales s ON si.sale_id = s.id
       INNER JOIN products p ON si.product_id = p.id
       WHERE ${conditions.join(' AND ')}
       GROUP BY si.product_id, p.name
-      ORDER BY total_quantity DESC
+      ORDER BY $orderBy
       LIMIT ?
     ''', args);
   }

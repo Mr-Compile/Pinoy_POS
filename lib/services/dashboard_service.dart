@@ -232,7 +232,7 @@ class DashboardService {
 
     // Top products over the last 30 days (business-wide).
     final topSince = now.subtract(const Duration(days: 30));
-    final topRows = await _saleItemRepository.getTopProductsByQuantity(
+    final topRows = await _saleItemRepository.getTopProducts(
       limit: 5,
       since: topSince,
     );
@@ -464,11 +464,7 @@ class DashboardService {
   }
 
   TopProductResult _mapTopProduct(Map<String, dynamic> row) {
-    return TopProductResult(
-      productId: (row['product_id'] as num?)?.toInt() ?? 0,
-      productName: (row['product_name'] as String?) ?? 'Unknown',
-      totalQuantity: (row['total_quantity'] as num?)?.toInt() ?? 0,
-    );
+    return TopProductResult.fromMap(row);
   }
 
   // ── Empty states (returned when permission is missing) ─────────────

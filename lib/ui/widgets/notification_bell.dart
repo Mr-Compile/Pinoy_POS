@@ -33,13 +33,26 @@ class _NotificationBellState extends ConsumerState<NotificationBell> {
       orElse: () => 0,
     );
 
-    final brightness = Theme.of(context).brightness;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final brightness = theme.brightness;
+
+    // The bell icon uses onSurfaceVariant so it stays visible in both
+    // light and dark mode. The AppBar's IconTheme is also overridden
+    // here to guarantee contrast regardless of the inherited theme.
+    final iconColor = colorScheme.onSurfaceVariant;
+    final activeIconColor = colorScheme.primary;
+
     return IconButton(
       key: _iconKey,
+      tooltip: 'Notifications${
+          unreadCount > 0 ? ' ($unreadCount unread)' : ''}',
       icon: Badge(
         isLabelVisible: unreadCount > 0,
         backgroundColor:
             AppSemanticColors.resolve(AppSemanticColors.error, brightness),
+        textColor: AppSemanticColors.resolveOn(
+            AppSemanticColors.onError, brightness),
         label: Text(
           _formatBadge(unreadCount),
           style: const TextStyle(
@@ -47,6 +60,13 @@ class _NotificationBellState extends ConsumerState<NotificationBell> {
             fontWeight: FontWeight.bold,
           ),
           textScaler: TextScaler.noScaling,
+        ),
+        child: Icon(
+          unreadCount > 0
+              ? Icons.notifications_rounded
+              : Icons.notifications_outlined,
+          color: unreadCount > 0 ? activeIconColor : iconColor,
+          size: 24,
         ),
       ),
       onPressed: () => _onTap(unreadCount),

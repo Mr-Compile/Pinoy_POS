@@ -84,10 +84,12 @@ class _ThemeOption extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final selectedColor = cs.primary;
+    final unselectedColor = cs.onSurfaceVariant;
     return ListTile(
       leading: Icon(
         icon,
-        color: isSelected ? cs.onSurface : cs.onSurfaceVariant,
+        color: isSelected ? selectedColor : unselectedColor,
       ),
       title: Text(
         title,
@@ -98,8 +100,8 @@ class _ThemeOption extends StatelessWidget {
       ),
       subtitle: Text(subtitle),
       trailing: Icon(
-        isSelected ? Icons.check : Icons.radio_button_unchecked,
-        color: isSelected ? cs.onSurface : cs.onSurfaceVariant,
+        isSelected ? Icons.check_circle : Icons.radio_button_unchecked,
+        color: isSelected ? selectedColor : unselectedColor,
       ),
       onTap: onTap,
     );
