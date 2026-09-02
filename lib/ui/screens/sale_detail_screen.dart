@@ -382,7 +382,8 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
                   avatar: Icon(statusIcon, size: 16, color: statusColor),
                   label: Text(
                     receipt.statusLabel,
-                    style: TextStyle(color: statusColor, fontSize: 12),
+                    style: AppTypography.bodySmall(context)
+                        .copyWith(color: statusColor),
                   ),
                   side: BorderSide(color: statusColor),
                   backgroundColor: statusColor.withValues(alpha: 0.1),
@@ -470,27 +471,21 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
                           Expanded(
                             child: Text(
                               item.productName,
-                              style: const TextStyle(fontSize: 15),
+                              style: AppTypography.titleSmall(context),
                             ),
                           ),
                           const SizedBox(width: 12),
                           Text(
                             item.formattedTotal(receipt.currency),
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: AppTypography.titleSmallBold(context),
                           ),
                         ],
                       ),
                       const SizedBox(height: 2),
                       Text(
                         '${item.quantity} x ${item.formattedUnitPrice(receipt.currency)}',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurfaceVariant,
+                        style: AppTypography.bodySmall(context).copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],

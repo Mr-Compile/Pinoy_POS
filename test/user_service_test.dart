@@ -84,20 +84,20 @@ void main() {
     final userService = UserService();
 
     final result = await userService.createUser(
-      username: 'newadmin',
-      fullName: 'New Admin',
-      role: UserRole.admin,
+      username: 'newstaff',
+      fullName: 'New Staff',
+      role: UserRole.staff,
     );
 
     expect(result.success, isTrue, reason: result.message);
     expect(result.user, isNotNull);
-    expect(result.user!.username, 'newadmin');
+    expect(result.user!.username, 'newstaff');
     expect(result.user!.id, isNotNull);
     expect(result.user!.mustChangePassword, isTrue);
 
     // Verify it appears in the list.
     final users = await userService.getAllUsers();
-    expect(users.any((u) => u.username == 'newadmin'), isTrue);
+    expect(users.any((u) => u.username == 'newstaff'), isTrue);
   });
 
   test('CREATE: duplicate username is rejected', () async {
@@ -450,6 +450,34 @@ void main() {
       ),
       throwsA(isA<AuthorizationException>()),
     );
+  });
+
+  test('RBAC: admin cannot create an owner (privilege escalation)', () async {
+    await authenticateAsAdmin();
+    final userService = UserService();
+
+    final result = await userService.createUser(
+      username: 'badowner',
+      fullName: 'Bad Owner',
+      role: UserRole.owner,
+    );
+
+    expect(result.success, isFalse);
+    expect(result.message, contains('role'));
+  });
+
+  test('RBAC: admin cannot create another admin', () async {
+    await authenticateAsAdmin();
+    final userService = UserService();
+
+    final result = await userService.createUser(
+      username: 'badadmin',
+      fullName: 'Bad Admin',
+      role: UserRole.admin,
+    );
+
+    expect(result.success, isFalse);
+    expect(result.message, contains('role'));
   });
 
   test('ACTIVITY LOG: user creation logs USER_CREATED action', () async {

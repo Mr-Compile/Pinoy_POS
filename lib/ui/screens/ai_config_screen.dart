@@ -364,38 +364,13 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
       return;
     }
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.warning_amber),
-        iconColor: AppSemanticColors.resolve(
-          AppSemanticColors.warning,
-          Theme.of(context).brightness,
-        ),
-        title: const Text('Clear AI Configuration?'),
-        content: const Text(
-            'This will remove the Groq API key and model. The AI Advisor will be unavailable until reconfigured.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppSemanticColors.resolve(
-                AppSemanticColors.error,
-                Theme.of(context).brightness,
-              ),
-              foregroundColor: AppSemanticColors.resolveOn(
-                AppSemanticColors.onError,
-                Theme.of(context).brightness,
-              ),
-            ),
-            child: const Text('Clear'),
-          ),
-        ],
-      ),
+    final confirmed = await AppDialogService.confirmation(
+      context,
+      title: 'Clear AI Configuration?',
+      message:
+          'This will remove the Groq API key and model. The AI Advisor will be unavailable until reconfigured.',
+      confirmLabel: 'Clear',
+      destructive: true,
     );
 
     if (confirmed != true || !mounted) return;

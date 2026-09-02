@@ -104,37 +104,14 @@ class _ForceChangePasswordScreenState
   }
 
   Future<void> _handleSignOut() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.logout_rounded),
-        iconColor: AppSemanticColors.resolve(
-            AppSemanticColors.error, Theme.of(context).brightness),
-        title: const Text('Sign Out?'),
-        content: const Text(
+    final confirmed = await AppDialogService.confirmation(
+      context,
+      title: 'Sign Out?',
+      message:
           'You will need to log in again with your temporary password.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppSemanticColors.resolve(
-                AppSemanticColors.error,
-                Theme.of(context).brightness,
-              ),
-              foregroundColor: AppSemanticColors.resolveOn(
-                AppSemanticColors.onError,
-                Theme.of(context).brightness,
-              ),
-            ),
-            child: const Text('Sign Out'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Sign Out',
+      cancelLabel: 'Cancel',
+      destructive: true,
     );
 
     if (confirmed == true && mounted) {
@@ -296,16 +273,21 @@ class _ForceChangePasswordScreenState
                                   color: colorScheme.onPrimary,
                                 ),
                               )
-                            : const Text(
+                            : Text(
                                 'Continue',
-                                style: TextStyle(fontSize: 16),
+                                style: AppTypography.titleMedium(context).copyWith(
+                                  color: colorScheme.onPrimary,
+                                ),
                               ),
                       ),
                       const SizedBox(height: 12),
                       TextButton(
                         onPressed: _isSubmitting ? null : _handleSignOut,
                         style: TextButton.styleFrom(
-                          foregroundColor: AppSemanticColors.error,
+                          foregroundColor: AppSemanticColors.resolve(
+                            AppSemanticColors.error,
+                            Theme.of(context).brightness,
+                          ),
                         ),
                         child: const Text('Sign Out'),
                       ),

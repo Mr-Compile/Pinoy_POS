@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/validators.dart';
-import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 
 /// PIN settings sub-page — set or clear a login PIN.
 ///
@@ -81,15 +80,60 @@ class PinSettingsPage extends ConsumerWidget {
     final pinController = TextEditingController();
     final confirmController = TextEditingController();
     bool isSaving = false;
-    final screenContext = context;
 
     showDialog(
       context: context,
       useRootNavigator: true,
       builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Set PIN'),
-          content: SingleChildScrollView(
+        builder: (context, setState) => AppDialog(
+          type: AppDialogType.info,
+          title: 'Set PIN',
+          actions: [
+            AppDialogAction(
+              label: 'Cancel',
+              onPressed: (context) =>
+                  Navigator.of(context, rootNavigator: true).pop(),
+            ),
+            AppDialogAction(
+              label: 'Save',
+              isPrimary: true,
+              isLoading: isSaving,
+              onPressed: isSaving
+                  ? null
+                  : (context) async {
+                      if (!formKey.currentState!.validate()) return;
+                      setState(() => isSaving = true);
+                      final success = await ref
+                          .read(authStateProvider.notifier)
+                          .updateProfile(
+                            userId: user.id!,
+                            fullName: user.fullName,
+                            pin: pinController.text.trim(),
+                          );
+                      if (context.mounted) {
+                        setState(() => isSaving = false);
+                        if (success) {
+                          await AppDialogService.success(
+                            context,
+                            title: 'PIN Updated',
+                            message: 'Your PIN has been set successfully.',
+                          );
+                          if (!context.mounted) return;
+                          Navigator.of(context, rootNavigator: true).pop();
+                        } else {
+                          await AppDialogService.error(
+                            context,
+                            title: 'Update Failed',
+                            message: 'Failed to update PIN.',
+                          );
+                          if (!context.mounted) return;
+                          Navigator.of(context, rootNavigator: true).pop();
+                        }
+                      }
+                    },
+            ),
+          ],
+          child: SingleChildScrollView(
             child: Form(
               key: formKey,
               child: Column(
@@ -132,48 +176,6 @@ class PinSettingsPage extends ConsumerWidget {
               ),
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () =>
-                  Navigator.of(context, rootNavigator: true).pop(),
-              child: const Text('Cancel'),
-            ),
-            LoadingButton(
-              isLoading: isSaving,
-              onPressed: () async {
-                if (!formKey.currentState!.validate()) return;
-                setState(() => isSaving = true);
-                final success = await ref
-                    .read(authStateProvider.notifier)
-                    .updateProfile(
-                      userId: user.id!,
-                      fullName: user.fullName,
-                      pin: pinController.text.trim(),
-                    );
-                if (context.mounted) {
-                  setState(() => isSaving = false);
-                  if (success) {
-                    await AppDialogService.success(
-                      screenContext,
-                      title: 'PIN Updated',
-                      message: 'Your PIN has been set successfully.',
-                    );
-                    if (!context.mounted) return;
-                    Navigator.of(context, rootNavigator: true).pop();
-                  } else {
-                    await AppDialogService.error(
-                      screenContext,
-                      title: 'Update Failed',
-                      message: 'Failed to update PIN.',
-                    );
-                    if (!context.mounted) return;
-                    Navigator.of(context, rootNavigator: true).pop();
-                  }
-                }
-              },
-              label: 'Save',
-            ),
-          ],
         ),
       ),
     );
@@ -181,60 +183,60 @@ class PinSettingsPage extends ConsumerWidget {
 
   void _showRemovePinDialog(BuildContext context, WidgetRef ref, User user) {
     bool isSaving = false;
-    final screenContext = context;
 
     showDialog(
       context: context,
       useRootNavigator: true,
       builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          icon: const Icon(Icons.warning_amber),
-          iconColor: AppSemanticColors.warning,
-          title: const Text('Remove PIN'),
-          content: const Text(
-            'Are you sure you want to remove your PIN? '
-            'You will need to log in with your password each time.',
-          ),
+        builder: (context, setState) => AppDialog(
+          type: AppDialogType.warning,
+          title: 'Remove PIN',
+          message:
+              'Are you sure you want to remove your PIN? '
+              'You will need to log in with your password each time.',
           actions: [
-            TextButton(
-              onPressed: () =>
+            AppDialogAction(
+              label: 'Cancel',
+              onPressed: (context) =>
                   Navigator.of(context, rootNavigator: true).pop(),
-              child: const Text('Cancel'),
             ),
-            LoadingButton(
-              isLoading: isSaving,
-              isDanger: true,
-              onPressed: () async {
-                setState(() => isSaving = true);
-                final success = await ref
-                    .read(authStateProvider.notifier)
-                    .updateProfile(
-                      userId: user.id!,
-                      fullName: user.fullName,
-                      pin: '',
-                    );
-                if (context.mounted) {
-                  setState(() => isSaving = false);
-                  if (success) {
-                    await AppDialogService.success(
-                      screenContext,
-                      title: 'PIN Removed',
-                      message: 'Your PIN has been removed.',
-                    );
-                    if (!context.mounted) return;
-                    Navigator.of(context, rootNavigator: true).pop();
-                  } else {
-                    await AppDialogService.error(
-                      screenContext,
-                      title: 'Update Failed',
-                      message: 'Failed to remove PIN.',
-                    );
-                    if (!context.mounted) return;
-                    Navigator.of(context, rootNavigator: true).pop();
-                  }
-                }
-              },
+            AppDialogAction(
               label: 'Remove',
+              isPrimary: true,
+              isDestructive: true,
+              isLoading: isSaving,
+              onPressed: isSaving
+                  ? null
+                  : (context) async {
+                      setState(() => isSaving = true);
+                      final success = await ref
+                          .read(authStateProvider.notifier)
+                          .updateProfile(
+                            userId: user.id!,
+                            fullName: user.fullName,
+                            pin: '',
+                          );
+                      if (context.mounted) {
+                        setState(() => isSaving = false);
+                        if (success) {
+                          await AppDialogService.success(
+                            context,
+                            title: 'PIN Removed',
+                            message: 'Your PIN has been removed.',
+                          );
+                          if (!context.mounted) return;
+                          Navigator.of(context, rootNavigator: true).pop();
+                        } else {
+                          await AppDialogService.error(
+                            context,
+                            title: 'Update Failed',
+                            message: 'Failed to remove PIN.',
+                          );
+                          if (!context.mounted) return;
+                          Navigator.of(context, rootNavigator: true).pop();
+                        }
+                      }
+                    },
             ),
           ],
         ),

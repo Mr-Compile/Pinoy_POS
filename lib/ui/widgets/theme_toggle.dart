@@ -15,22 +15,14 @@ class ThemeToggle extends ConsumerWidget {
     final themeNotifier = ref.read(themeProvider.notifier);
 
     final (icon, label) = switch (themeState.themeMode) {
-      'light' => (Icons.light_mode_outlined, 'Light'),
       'dark' => (Icons.dark_mode_outlined, 'Dark'),
-      _ => (Icons.brightness_auto_outlined, 'System'),
+      _ => (Icons.light_mode_outlined, 'Light'),
     };
 
     return Tooltip(
-      message: 'Theme: $label. Tap to change.',
+      message: 'Theme: $label. Tap to switch.',
       child: IconButton(
-        onPressed: () {
-          final next = switch (themeState.themeMode) {
-            'system' => 'light',
-            'light' => 'dark',
-            _ => 'system',
-          };
-          themeNotifier.setThemeMode(next);
-        },
+        onPressed: themeNotifier.toggle,
         icon: Icon(icon, size: 20),
       ),
     );

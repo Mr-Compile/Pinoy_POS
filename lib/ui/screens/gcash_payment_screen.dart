@@ -419,9 +419,8 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
             padding: const EdgeInsets.only(top: 4),
             child: Text(
               'Payment proof is required',
-              style: TextStyle(
+              style: AppTypography.labelMedium(context).copyWith(
                 color: cs.onSurfaceVariant,
-                fontSize: 12,
               ),
             ),
           ),
@@ -491,7 +490,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                   const SizedBox(height: 4),
-                  Text(customer, style: const TextStyle(fontSize: 16)),
+                  Text(customer, style: AppTypography.bodyLarge(context)),
                 ],
                 const SizedBox(height: 12),
                 Text(

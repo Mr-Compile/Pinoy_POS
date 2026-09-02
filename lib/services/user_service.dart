@@ -68,6 +68,26 @@ class UserService {
     );
   }
 
+  /// Returns the current user's role, or null when not authenticated.
+  UserRole? get _currentUserRole => _sessionManager.currentUser?.role;
+
+  /// Whether the current user is allowed to create or manage an account
+  /// with [targetRole].  A user can only manage roles that are strictly
+  /// lower in privilege than their own role.
+  bool _canManageRole(UserRole targetRole) {
+    final callerRole = _currentUserRole;
+    if (callerRole == null) return false;
+    return targetRole.canBeManagedBy(callerRole);
+  }
+
+  /// Whether the current user is allowed to manage the existing [targetUser].
+  bool _canManageUser(User targetUser) {
+    final caller = _sessionManager.currentUser;
+    if (caller == null) return false;
+    if (caller.id == targetUser.id) return false;
+    return _canManageRole(targetUser.role);
+  }
+
   // ───────────────────────────────────────────────
   //  READ
   // ───────────────────────────────────────────────
@@ -121,6 +141,13 @@ class UserService {
   }) async {
     if (!_sessionManager.hasPermission('manage_users')) {
       throw AuthorizationException('manage_users');
+    }
+
+    if (!_canManageRole(role)) {
+      return UserOperationResult(
+        success: false,
+        message: 'You cannot create users with this role',
+      );
     }
 
     final trimmedUsername = username.trim();
@@ -210,6 +237,13 @@ class UserService {
       return UserOperationResult(success: false, message: 'User not found');
     }
 
+    if (!_canManageUser(user)) {
+      return UserOperationResult(
+        success: false,
+        message: 'You cannot update this user',
+      );
+    }
+
     final trimmedUsername = username?.trim();
     final trimmedFullName = fullName?.trim();
 
@@ -238,6 +272,13 @@ class UserService {
           message: 'Username already exists',
         );
       }
+    }
+
+    if (role != null && role != user.role && !_canManageRole(role)) {
+      return UserOperationResult(
+        success: false,
+        message: 'You cannot assign this role',
+      );
     }
 
     // Determine the new PIN value and length.
@@ -416,6 +457,13 @@ class UserService {
       return UserOperationResult(success: false, message: 'User not found');
     }
 
+    if (!_canManageUser(user)) {
+      return UserOperationResult(
+        success: false,
+        message: 'You cannot reset this user\'s password',
+      );
+    }
+
     final newPasswordHash =
         SecurityHelper.hashPassword(AppConstants.defaultTemporaryPassword);
     final updatedUser = user.copyWith(
@@ -453,6 +501,13 @@ class UserService {
       return UserOperationResult(success: false, message: 'User not found');
     }
 
+    if (!_canManageUser(user)) {
+      return UserOperationResult(
+        success: false,
+        message: 'You cannot activate this user',
+      );
+    }
+
     await _userRepository.toggleActive(userId, true);
 
     await _activityLogService.logActivity(
@@ -484,6 +539,13 @@ class UserService {
     final user = await _userRepository.getById(userId);
     if (user == null) {
       return UserOperationResult(success: false, message: 'User not found');
+    }
+
+    if (!_canManageUser(user)) {
+      return UserOperationResult(
+        success: false,
+        message: 'You cannot deactivate this user',
+      );
     }
 
     await _userRepository.toggleActive(userId, false);
@@ -523,6 +585,13 @@ class UserService {
       return UserOperationResult(success: false, message: 'User not found');
     }
 
+    if (!_canManageUser(user)) {
+      return UserOperationResult(
+        success: false,
+        message: 'You cannot delete this user',
+      );
+    }
+
     await _userRepository.softDelete(userId);
 
     await _activityLogService.logActivity(
@@ -554,6 +623,13 @@ class UserService {
     final user = await _userRepository.getByIdWithDeleted(userId);
     if (user == null) {
       return UserOperationResult(success: false, message: 'User not found');
+    }
+
+    if (!_canManageUser(user)) {
+      return UserOperationResult(
+        success: false,
+        message: 'You cannot restore this user',
+      );
     }
 
     if (user.deletedAt == null) {
@@ -600,6 +676,13 @@ class UserService {
     final user = await _userRepository.getByIdWithDeleted(userId);
     if (user == null) {
       return UserOperationResult(success: false, message: 'User not found');
+    }
+
+    if (!_canManageUser(user)) {
+      return UserOperationResult(
+        success: false,
+        message: 'You cannot permanently delete this user',
+      );
     }
 
     if (user.deletedAt == null) {

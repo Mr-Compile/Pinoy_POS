@@ -9,6 +9,7 @@ import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/services/image_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_button.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
@@ -16,7 +17,6 @@ import 'package:pinoy_pos/ui/widgets/app_list_item.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/validators.dart';
-import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 
 class ProductsScreen extends ConsumerStatefulWidget {
   const ProductsScreen({super.key});
@@ -269,7 +269,10 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
       statusIcon = Icons.error_outline;
     } else if (isLowStock) {
       statusLabel = 'Low stock';
-      statusColor = AppSemanticColors.warning;
+      statusColor = AppSemanticColors.resolve(
+        AppSemanticColors.warning,
+        Theme.of(context).brightness,
+      );
       statusIcon = Icons.warning_amber;
     } else {
       statusLabel = null;
@@ -336,9 +339,51 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
       context: context,
       useRootNavigator: true,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: Text(product == null ? 'Add Product' : 'Edit Product'),
-          content: SingleChildScrollView(
+        builder: (context, setState) => AppDialog(
+          type: AppDialogType.info,
+          title: product == null ? 'Add Product' : 'Edit Product',
+          actions: [
+            AppDialogAction(
+              label: 'Cancel',
+              isLoading: isSaving,
+              onPressed: isSaving
+                  ? null
+                  : (context) async {
+                      if (hasChanges) {
+                        final discard =
+                            await AppDialogService.unsavedChanges(context);
+                        if (discard == true && context.mounted) {
+                          Navigator.of(context, rootNavigator: true).pop(
+                            const ModalResult<void>.cancelled(),
+                          );
+                        }
+                      } else if (context.mounted) {
+                        Navigator.of(context, rootNavigator: true).pop(
+                          const ModalResult<void>.cancelled(),
+                        );
+                      }
+                    },
+            ),
+            AppDialogAction(
+              label: 'Save',
+              isPrimary: true,
+              isLoading: isSaving,
+              onPressed: isSaving
+                  ? null
+                  : (context) => _saveProduct(
+                        formKey,
+                        nameController,
+                        priceController,
+                        stockController,
+                        selectedCategoryId,
+                        selectedImagePath,
+                        product,
+                        (value) => setState(() => isSaving = value),
+                        context,
+                      ),
+            ),
+          ],
+          child: SingleChildScrollView(
             child: Form(
               key: formKey,
               child: Column(
@@ -524,44 +569,6 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
               ),
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: isSaving
-                  ? null
-                  : () async {
-                      if (hasChanges) {
-                        final discard = await AppDialogService.unsavedChanges(
-                          context,
-                        );
-                        if (discard == true && dialogContext.mounted) {
-                          Navigator.of(dialogContext, rootNavigator: true)
-                              .pop(const ModalResult<void>.cancelled());
-                        }
-                      } else if (dialogContext.mounted) {
-                        Navigator.of(dialogContext, rootNavigator: true)
-                            .pop(const ModalResult<void>.cancelled());
-                      }
-                    },
-              child: const Text('Cancel'),
-            ),
-            LoadingButton(
-              isLoading: isSaving,
-              onPressed: isSaving
-                  ? null
-                  : () => _saveProduct(
-                        formKey,
-                        nameController,
-                        priceController,
-                        stockController,
-                        selectedCategoryId,
-                        selectedImagePath,
-                        product,
-                        (value) => setState(() => isSaving = value),
-                        dialogContext,
-                      ),
-              label: 'Save',
-            ),
-          ],
         ),
       ),
     );

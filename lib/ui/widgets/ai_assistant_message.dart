@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/ai_response.dart';
 import 'package:pinoy_pos/providers/ai_advisor_provider.dart';
@@ -96,8 +97,7 @@ class _InstructionsList extends StatelessWidget {
                 ),
                 child: Text(
                   '$index',
-                  style: TextStyle(
-                    fontSize: 12,
+                  style: AppTypography.labelMedium(context).copyWith(
                     fontWeight: FontWeight.bold,
                     color: cs.onPrimaryContainer,
                   ),

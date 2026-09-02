@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
@@ -47,20 +48,29 @@ class KpiCard extends StatelessWidget {
     final cs = theme.colorScheme;
     final iconColor = this.iconColor ?? cs.primary;
 
-    final double valueFontSize;
+    final TextStyle valueStyle;
     final double iconSize;
     final EdgeInsets padding;
     switch (tier) {
       case KpiCardTier.primary:
-        valueFontSize = 28;
+        valueStyle = AppTypography.headlineMedium(context).copyWith(
+          color: cs.onSurface,
+          height: 1.1,
+        );
         iconSize = 28;
         padding = const EdgeInsets.all(Spacing.lg);
       case KpiCardTier.secondary:
-        valueFontSize = 22;
+        valueStyle = AppTypography.titleLarge(context).copyWith(
+          color: cs.onSurface,
+          height: 1.1,
+        );
         iconSize = 24;
         padding = const EdgeInsets.all(Spacing.md + 2);
       case KpiCardTier.compact:
-        valueFontSize = 18;
+        valueStyle = AppTypography.titleMedium(context).copyWith(
+          color: cs.onSurface,
+          height: 1.1,
+        );
         iconSize = 20;
         padding = const EdgeInsets.all(Spacing.md);
     }
@@ -92,12 +102,7 @@ class KpiCard extends StatelessWidget {
           const SizedBox(height: Spacing.sm),
           Text(
             value,
-            style: TextStyle(
-              fontSize: valueFontSize,
-              fontWeight: FontWeight.bold,
-              color: cs.onSurface,
-              height: 1.1,
-            ),
+            style: valueStyle.copyWith(fontWeight: FontWeight.bold),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),

@@ -249,8 +249,7 @@ class ReportExportService {
           color: toPdfColor(primary),
           child: pw.Text(
             text,
-            style: PdfFontService.style(
-              fontSize: 9,
+            style: PdfFontService.small(
               fontWeight: pw.FontWeight.bold,
               color: toPdfColor(onPrimary),
             ),
@@ -270,8 +269,7 @@ class ReportExportService {
           color: backgroundColor,
           child: pw.Text(
             text,
-            style: PdfFontService.style(
-              fontSize: 9,
+            style: PdfFontService.small(
               fontWeight: bold ? pw.FontWeight.bold : null,
               color: textColor,
             ),
@@ -283,8 +281,7 @@ class ReportExportService {
           children: [
             pw.Text(
               store.storeName,
-              style: PdfFontService.style(
-                fontSize: 24,
+              style: PdfFontService.display(
                 fontWeight: pw.FontWeight.bold,
                 color: toPdfColor(primary),
               ),
@@ -292,24 +289,21 @@ class ReportExportService {
             if (store.storeAddress.isNotEmpty)
               pw.Text(
                 store.storeAddress,
-                style: PdfFontService.style(
-                  fontSize: 10,
+                style: PdfFontService.body(
                   color: onSurfaceVariant,
                 ),
               ),
             if (store.storePhone.isNotEmpty)
               pw.Text(
                 'Contact: ${store.storePhone}',
-                style: PdfFontService.style(
-                  fontSize: 10,
+                style: PdfFontService.body(
                   color: onSurfaceVariant,
                 ),
               ),
             if (store.receiptFooter?.isNotEmpty == true)
               pw.Text(
                 store.receiptFooter!,
-                style: PdfFontService.style(
-                  fontSize: 10,
+                style: PdfFontService.body(
                   color: onSurfaceVariant,
                 ),
               ),
@@ -469,23 +463,20 @@ class ReportExportService {
           pw.SizedBox(height: 16),
           pw.Text(
             'Sales Report',
-            style: PdfFontService.style(
-              fontSize: 20,
+            style: PdfFontService.headline(
               fontWeight: pw.FontWeight.bold,
               color: toPdfColor(primary),
             ),
           ),
           pw.Text(
             'Generated: ${_formatDateTime(DateTime.now())}',
-            style: PdfFontService.style(
-              fontSize: 10,
+            style: PdfFontService.body(
               color: onSurfaceVariant,
             ),
           ),
           pw.Text(
             'Period: ${_formatPeriodLabel(analytics.bounds.start, analytics.bounds.end)}',
-            style: PdfFontService.style(
-              fontSize: 10,
+            style: PdfFontService.body(
               color: onSurfaceVariant,
             ),
           ),

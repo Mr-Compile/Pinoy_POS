@@ -93,9 +93,8 @@ class _HourBar extends StatelessWidget {
         children: [
           Text(
             _formatValue(point.total),
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            style: AppTypography.labelSmall(context).copyWith(
                   color: isZero ? cs.outline : cs.onSurface,
-                  fontSize: 9,
                   fontWeight: FontWeight.w600,
                 ),
             textAlign: TextAlign.center,

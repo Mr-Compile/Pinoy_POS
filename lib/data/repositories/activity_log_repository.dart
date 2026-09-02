@@ -11,6 +11,7 @@ class ActivityLogRepository {
   Future<ActivityLog?> getById(int id) => _activityLogDao.getById(id);
   Future<List<ActivityLog>> getAll() => _activityLogDao.getAll();
   Future<List<ActivityLog>> getByUserId(int userId) => _activityLogDao.getByUserId(userId);
+  Future<List<ActivityLog>> getByEntity(String entity, int entityId) => _activityLogDao.getByEntity(entity, entityId);
   Future<List<ActivityLog>> getRecentActivities({int limit = 50}) => _activityLogDao.getRecentActivities(limit: limit);
   Future<List<ActivityLog>> getByDateRange(DateTime start, DateTime end, {int limit = 500}) => _activityLogDao.getByDateRange(start, end, limit: limit);
 }

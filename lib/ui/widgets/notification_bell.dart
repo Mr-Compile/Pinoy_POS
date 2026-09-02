@@ -55,8 +55,7 @@ class _NotificationBellState extends ConsumerState<NotificationBell> {
             AppSemanticColors.onError, brightness),
         label: Text(
           _formatBadge(unreadCount),
-          style: const TextStyle(
-            fontSize: 10,
+          style: AppTypography.labelSmall(context).copyWith(
             fontWeight: FontWeight.bold,
           ),
           textScaler: TextScaler.noScaling,

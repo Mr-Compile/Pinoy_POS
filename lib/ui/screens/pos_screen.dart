@@ -16,6 +16,7 @@ import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_icon_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
@@ -628,9 +629,8 @@ class _ProductQuantityBadge extends ConsumerWidget {
         ),
         child: Text(
           '$quantity',
-          style: TextStyle(
+          style: AppTypography.labelMedium(context).copyWith(
             color: cs.onPrimary,
-            fontSize: 12,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -929,9 +929,17 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
     final paymentSettingsAsync = ref.watch(paymentSettingsProvider);
 
     return paymentSettingsAsync.when(
-      loading: () => AlertDialog(
-        title: const Text('Payment'),
-        content: SizedBox(
+      loading: () => AppDialog(
+        type: AppDialogType.info,
+        title: 'Payment',
+        actions: [
+          AppDialogAction(
+            label: 'Cancel',
+            onPressed: (context) =>
+                Navigator.of(context, rootNavigator: true).pop(),
+          ),
+        ],
+        child: SizedBox(
           height: 120,
           child: Center(
             child: CircularProgressIndicator(
@@ -942,22 +950,16 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
             ),
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-        ],
       ),
-      error: (error, stackTrace) => AlertDialog(
-        icon: const Icon(Icons.error_outline),
-        iconColor: Theme.of(context).colorScheme.error,
-        title: const Text('Payment'),
-        content: Text('Failed to load payment settings: $error'),
+      error: (error, stackTrace) => AppDialog(
+        type: AppDialogType.error,
+        title: 'Payment',
+        message: 'Failed to load payment settings: $error',
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+          AppDialogAction(
+            label: 'Cancel',
+            onPressed: (context) =>
+                Navigator.of(context, rootNavigator: true).pop(),
           ),
         ],
       ),
@@ -979,9 +981,60 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
       });
     }
 
-    return AlertDialog(
-      title: const Text('Payment'),
-      content: SingleChildScrollView(
+    final primaryLabel =
+        currentMethod == 'GCash' ? 'Continue with GCash' : 'Complete Sale';
+
+    void completePayment(BuildContext context) {
+      if (currentMethod == 'GCash') {
+        Navigator.of(context, rootNavigator: true).pop(
+          _PaymentResult(
+            cashReceived: 0.0,
+            paymentMethod: 'GCash',
+          ),
+        );
+        return;
+      }
+
+      if (!_formKey.currentState!.validate()) return;
+      Navigator.of(context, rootNavigator: true).pop(
+        _PaymentResult(
+          cashReceived: currentMethod == 'Cash'
+              ? _parseCash()
+              : widget.total,
+          paymentMethod: currentMethod,
+          notes: _notesController.text.trim().isEmpty
+              ? null
+              : _notesController.text.trim(),
+          referenceNumber:
+              (currentMethod == 'Card' || currentMethod == 'Other') &&
+                      _referenceController.text.trim().isNotEmpty
+                  ? _referenceController.text.trim()
+                  : null,
+          customerName:
+              (currentMethod == 'Card' || currentMethod == 'Other') &&
+                      _customerNameController.text.trim().isNotEmpty
+                  ? _customerNameController.text.trim()
+                  : null,
+        ),
+      );
+    }
+
+    return AppDialog(
+      type: AppDialogType.info,
+      title: 'Payment',
+      actions: [
+        AppDialogAction(
+          label: 'Cancel',
+          onPressed: (context) =>
+              Navigator.of(context, rootNavigator: true).pop(),
+        ),
+        AppDialogAction(
+          label: primaryLabel,
+          isPrimary: true,
+          onPressed: (context) => completePayment(context),
+        ),
+      ],
+      child: SingleChildScrollView(
         child: Form(
           key: _formKey,
           child: Column(
@@ -1124,54 +1177,6 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
           ),
         ),
       ),
-      actions: [
-        AppButton.text(
-          onPressed: () => Navigator.pop(context),
-          label: 'Cancel',
-        ),
-        if (currentMethod == 'GCash')
-          AppButton.filled(
-            onPressed: () {
-              Navigator.pop(
-                context,
-                _PaymentResult(
-                  cashReceived: 0.0,
-                  paymentMethod: 'GCash',
-                ),
-              );
-            },
-            label: 'Continue with GCash',
-          )
-        else
-          AppButton.filled(
-            onPressed: () {
-              if (!_formKey.currentState!.validate()) return;
-              Navigator.pop(
-                context,
-                _PaymentResult(
-                  cashReceived: currentMethod == 'Cash'
-                      ? _parseCash()
-                      : widget.total,
-                  paymentMethod: currentMethod,
-                  notes: _notesController.text.trim().isEmpty
-                      ? null
-                      : _notesController.text.trim(),
-                  referenceNumber:
-                      (currentMethod == 'Card' || currentMethod == 'Other') &&
-                              _referenceController.text.trim().isNotEmpty
-                          ? _referenceController.text.trim()
-                          : null,
-                  customerName:
-                      (currentMethod == 'Card' || currentMethod == 'Other') &&
-                              _customerNameController.text.trim().isNotEmpty
-                          ? _customerNameController.text.trim()
-                          : null,
-                ),
-              );
-            },
-            label: 'Complete Sale',
-          ),
-      ],
     );
   }
 

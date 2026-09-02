@@ -474,9 +474,8 @@ class _GradientFilledButton extends StatelessWidget {
                     color: cs.onPrimary,
                     fontWeight: FontWeight.w600,
                   ) ??
-                  TextStyle(
+                  AppTypography.labelLarge(context).copyWith(
                     color: cs.onPrimary,
-                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                   ),
               child: child,

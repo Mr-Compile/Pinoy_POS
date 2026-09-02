@@ -14,6 +14,7 @@ import 'package:pinoy_pos/ui/screens/products_screen.dart';
 import 'package:pinoy_pos/ui/screens/sales_analytics_screen.dart';
 import 'package:pinoy_pos/ui/screens/sales_screen.dart';
 import 'package:pinoy_pos/ui/screens/settings_screen.dart';
+import 'package:pinoy_pos/ui/screens/staff_management_screen.dart';
 import 'package:pinoy_pos/ui/screens/stock_screen.dart';
 import 'package:pinoy_pos/ui/screens/trash_screen.dart';
 import 'package:pinoy_pos/ui/screens/users_screen.dart';
@@ -644,6 +645,18 @@ class _OwnerDashboard extends ConsumerWidget {
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const SalesAnalyticsScreen()),
+              ),
+            ),
+          if (authNotifier.hasPermission('manage_staff'))
+            _QuickAction(
+              label: 'Manage Staff',
+              color: AppButtonColor.info,
+              icon: Icons.people,
+              onTap: () => RouteGuard.pushIfAuthorized(
+                context, ref,
+                screen: const StaffManagementScreen(),
+                permission: 'manage_staff',
+                routeName: 'staff_management',
               ),
             ),
           if (authNotifier.hasPermission('view_ai_advisor'))
@@ -1361,10 +1374,9 @@ class _RankedListTile extends StatelessWidget {
             alignment: Alignment.center,
             child: Text(
               '$rank',
-              style: TextStyle(
+              style: AppTypography.labelMedium(context).copyWith(
                 fontWeight: FontWeight.bold,
                 color: cs.onPrimaryContainer,
-                fontSize: 12,
               ),
             ),
           ),
@@ -1577,7 +1589,8 @@ class _QuickAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
+    final foregroundColor = _foregroundColor(context, brightness);
     return AppButton.filled(
       onPressed: onTap,
       color: color,
@@ -1586,12 +1599,12 @@ class _QuickAction extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 28, color: cs.onPrimary),
+            Icon(icon, size: 28, color: foregroundColor),
             const SizedBox(height: Spacing.xs),
             Text(
               label,
               style: AppTypography.labelMedium(context).copyWith(
-                color: cs.onPrimary,
+                color: foregroundColor,
                 fontWeight: FontWeight.w600,
               ),
               textAlign: TextAlign.center,
@@ -1600,6 +1613,23 @@ class _QuickAction extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Color _foregroundColor(BuildContext context, Brightness brightness) {
+    final cs = Theme.of(context).colorScheme;
+    return switch (color) {
+      AppButtonColor.primary => cs.onPrimary,
+      AppButtonColor.success =>
+        AppSemanticColors.resolveOn(AppSemanticColors.onSuccess, brightness),
+      AppButtonColor.warning =>
+        AppSemanticColors.resolveOn(AppSemanticColors.onWarning, brightness),
+      AppButtonColor.info =>
+        AppSemanticColors.resolveOn(AppSemanticColors.onInfo, brightness),
+      AppButtonColor.error =>
+        AppSemanticColors.resolveOn(AppSemanticColors.onError, brightness),
+      AppButtonColor.neutral =>
+        AppSemanticColors.resolveOn(AppSemanticColors.onNeutral, brightness),
+    };
   }
 }
 

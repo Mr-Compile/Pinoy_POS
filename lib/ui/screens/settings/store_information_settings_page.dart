@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
@@ -170,9 +171,23 @@ class _StoreInformationSettingsPageState
     final result = await showDialog<String>(
       context: context,
       useRootNavigator: true,
-      builder: (context) => AlertDialog(
-        title: const Text('Store Name'),
-        content: TextField(
+      builder: (context) => AppDialog(
+        type: AppDialogType.info,
+        title: 'Store Name',
+        actions: [
+          AppDialogAction(
+            label: 'Cancel',
+            onPressed: (context) =>
+                Navigator.of(context, rootNavigator: true).pop(),
+          ),
+          AppDialogAction(
+            label: 'Save',
+            isPrimary: true,
+            onPressed: (context) => Navigator.of(context, rootNavigator: true)
+                .pop(controller.text.trim()),
+          ),
+        ],
+        child: TextField(
           controller: controller,
           decoration: const InputDecoration(
             labelText: 'Store Name',
@@ -180,17 +195,6 @@ class _StoreInformationSettingsPageState
           ),
           autofocus: true,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context, rootNavigator: true)
-                .pop(controller.text.trim()),
-            child: const Text('Save'),
-          ),
-        ],
       ),
     );
 
@@ -238,9 +242,23 @@ class _StoreInformationSettingsPageState
     final result = await showDialog<String>(
       context: context,
       useRootNavigator: true,
-      builder: (context) => AlertDialog(
-        title: Text(label),
-        content: TextField(
+      builder: (context) => AppDialog(
+        type: AppDialogType.info,
+        title: label,
+        actions: [
+          AppDialogAction(
+            label: 'Cancel',
+            onPressed: (context) =>
+                Navigator.of(context, rootNavigator: true).pop(),
+          ),
+          AppDialogAction(
+            label: 'Save',
+            isPrimary: true,
+            onPressed: (context) => Navigator.of(context, rootNavigator: true)
+                .pop(controller.text.trim()),
+          ),
+        ],
+        child: TextField(
           controller: controller,
           decoration: InputDecoration(
             labelText: label,
@@ -249,17 +267,6 @@ class _StoreInformationSettingsPageState
           autofocus: true,
           maxLines: fieldKey == 'receipt_footer' ? 2 : 1,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context, rootNavigator: true)
-                .pop(controller.text.trim()),
-            child: const Text('Save'),
-          ),
-        ],
       ),
     );
 
@@ -292,9 +299,17 @@ class _StoreInformationSettingsPageState
     showDialog(
       context: context,
       useRootNavigator: true,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Currency'),
-        content: Column(
+      builder: (dialogContext) => AppDialog(
+        type: AppDialogType.info,
+        title: 'Currency',
+        actions: [
+          AppDialogAction(
+            label: 'Cancel',
+            onPressed: (context) =>
+                Navigator.of(context, rootNavigator: true).pop(),
+          ),
+        ],
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: currencies
               .map((currency) => ListTile(
@@ -329,13 +344,6 @@ class _StoreInformationSettingsPageState
                   ))
               .toList(),
         ),
-        actions: [
-          TextButton(
-            onPressed: () =>
-                Navigator.of(dialogContext, rootNavigator: true).pop(),
-            child: const Text('Cancel'),
-          ),
-        ],
       ),
     );
   }

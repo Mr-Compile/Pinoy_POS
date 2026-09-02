@@ -94,8 +94,7 @@ class _StaffSalesRow extends StatelessWidget {
             alignment: Alignment.center,
             child: Text(
               '$rank',
-              style: TextStyle(
-                fontSize: 12,
+              style: AppTypography.labelMedium(context).copyWith(
                 fontWeight: FontWeight.bold,
                 color: isTop
                     ? AppSemanticColors.resolveOn(

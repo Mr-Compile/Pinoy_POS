@@ -5,6 +5,7 @@ import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/ui/screens/announcements_screen.dart';
 import 'package:pinoy_pos/ui/screens/categories_screen.dart';
 import 'package:pinoy_pos/ui/screens/sales_analytics_screen.dart';
+import 'package:pinoy_pos/ui/screens/staff_management_screen.dart';
 import 'package:pinoy_pos/ui/screens/stock_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 
@@ -62,6 +63,13 @@ class MoreEntry {
       permission: 'view_announcements',
       routeName: 'announcements',
       screen: AnnouncementsScreen(),
+    ),
+    MoreEntry(
+      icon: Icons.people_outline,
+      title: 'Staff Management',
+      permission: 'manage_staff',
+      routeName: 'staff_management',
+      screen: StaffManagementScreen(),
     ),
   ];
 

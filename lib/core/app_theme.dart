@@ -17,39 +17,42 @@ class AppSemanticColors {
 
   /// The seed for the Material 3 dynamic palette. This is a semantic primary
   /// role, not a brand asset. The same value is used by every role and screen.
-  static const Color primary = Color(0xFF1565C0);
+  static const Color primary = Color(0xFF3B82F6); // Blue 500
+  static const Color primaryLight = Color(0xFF60A5FA); // Blue 400
+  static const Color primaryDark = Color(0xFF2563EB); // Blue 600
   static const Color onPrimary = Color(0xFFFFFFFF);
 
   // ── Status and feedback colors ───────────────────────────────────────
 
-  static const Color success = Color(0xFF2E7D32);
+  static const Color success = Color(0xFF10B981); // Emerald 500
   static const Color onSuccess = Color(0xFFFFFFFF);
-  static const Color successContainer = Color(0xFFC8E6C9);
-  static const Color onSuccessContainer = Color(0xFF00390A);
+  static const Color successContainer = Color(0xFFD1FAE5); // Emerald 100
+  static const Color onSuccessContainer = Color(0xFF065F46); // Emerald 800
 
-  static const Color warning = Color(0xFFE65100);
-  static const Color onWarning = Color(0xFFFFFFFF);
-  static const Color warningContainer = Color(0xFFFFE0B2);
-  static const Color onWarningContainer = Color(0xFF5A1A00);
+  static const Color warning = Color(0xFFF59E0B); // Amber 500
+  static const Color onWarning = Color(0xFF000000);
+  static const Color warningContainer = Color(0xFFFEF3C7); // Amber 100
+  static const Color onWarningContainer = Color(0xFF78350F); // Amber 900
 
-  static const Color error = Color(0xFFBA1A1A);
+  static const Color error = Color(0xFFEF4444); // Red 500
   static const Color onError = Color(0xFFFFFFFF);
-  static const Color errorContainer = Color(0xFFFFDAD6);
-  static const Color onErrorContainer = Color(0xFF410002);
+  static const Color errorContainer = Color(0xFFFEE2E2); // Red 100
+  static const Color onErrorContainer = Color(0xFF7F1D1D); // Red 900
+  static const Color danger = error; // Alias for red-500 danger actions
 
-  static const Color info = Color(0xFF0288D1);
-  static const Color onInfo = Color(0xFFFFFFFF);
-  static const Color infoContainer = Color(0xFFB3E5FC);
-  static const Color onInfoContainer = Color(0xFF001F3F);
+  static const Color info = Color(0xFF06B6D4); // Cyan 500
+  static const Color onInfo = Color(0xFF000000);
+  static const Color infoContainer = Color(0xFFCFFAFE); // Cyan 100
+  static const Color onInfoContainer = Color(0xFF164E63); // Cyan 900
 
   /// Neutral grey for non-emphasised actions and secondary surfaces.
-  static const Color neutral = Color(0xFF5F6368);
+  static const Color neutral = Color(0xFF6B7280); // Gray 500
   static const Color onNeutral = Color(0xFFFFFFFF);
-  static const Color neutralContainer = Color(0xFFE8EAED);
-  static const Color onNeutralContainer = Color(0xFF202124);
+  static const Color neutralContainer = Color(0xFFF3F4F6); // Gray 100
+  static const Color onNeutralContainer = Color(0xFF1F2937); // Gray 800
 
   /// A subtle, accessible grey for disabled / placeholder states.
-  static const Color disabled = Color(0xFF9E9E9E);
+  static const Color disabled = Color(0xFF9CA3AF); // Gray 400
 
   /// Returns the theme-aware variant of a [light] semantic color.
   ///
@@ -107,6 +110,10 @@ class AppColors {
       seedColor: AppSemanticColors.primary,
       brightness: brightness,
     ).copyWith(
+      // Pin the exact brand primary from the snippet while letting the rest
+      // of the Material 3 tonal palette derive from the same seed.
+      primary: AppSemanticColors.primary,
+      onPrimary: AppSemanticColors.onPrimary,
       // Keep the semantic error family in sync with the app palette.
       // Resolve each tone so the error role is readable in both modes.
       error: AppSemanticColors.resolve(AppSemanticColors.error, brightness),
@@ -365,22 +372,22 @@ class AppColors {
 
   // ── Premium button gradient ────────────────────────────────────────
 
-  /// Returns a subtle vertical gradient for a primary button, derived
-  /// from the theme's primary color. Light mode uses a very subtle lift;
-  /// dark mode uses a slightly deeper shade for depth.
+  /// Returns a subtle vertical gradient for a primary button using the
+  /// exact primary palette from the theme. Light mode uses the lighter blue
+  /// on top; dark mode uses the darker blue on the bottom for depth.
   static LinearGradient? premiumButtonGradient(
     ColorScheme colorScheme,
     Brightness brightness,
   ) {
-    final primary = colorScheme.primary;
-    final darkened = _darken(primary, 0.06);
-    final lightened = _darken(primary, -0.04);
+    final primary = AppSemanticColors.primary;
+    final primaryLight = AppSemanticColors.primaryLight;
+    final primaryDark = AppSemanticColors.primaryDark;
     return LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
       colors: brightness == Brightness.light
-          ? [lightened, primary]
-          : [primary, darkened],
+          ? [primaryLight, primary]
+          : [primary, primaryDark],
     );
   }
 }

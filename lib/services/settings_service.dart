@@ -153,12 +153,21 @@ class SettingsService {
 
   Future<String> getTheme() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('theme') ?? 'light';
+    final stored = prefs.getString('theme') ?? 'light';
+
+    // Migrate legacy 'system' values to the default light mode.
+    if (stored == 'system') {
+      await prefs.setString('theme', 'light');
+      return 'light';
+    }
+
+    return (stored == 'light' || stored == 'dark') ? stored : 'light';
   }
 
   Future<void> setTheme(String theme) async {
+    final validated = (theme == 'light' || theme == 'dark') ? theme : 'light';
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('theme', theme);
+    await prefs.setString('theme', validated);
   }
 
   // ── Groq AI configuration ────────────────────────────────────────────

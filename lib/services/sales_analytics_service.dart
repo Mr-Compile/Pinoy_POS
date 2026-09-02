@@ -56,6 +56,25 @@ class SalesAnalyticsService {
     return _analyticsForBounds(bounds);
   }
 
+  /// Complete analytics for a single staff member over the selected [period].
+  Future<SalesAnalytics> getStaffDetailAnalytics(
+    int staffUserId,
+    ReportingPeriod period, {
+    DateTime? customStart,
+    DateTime? customEnd,
+  }) async {
+    if (!_canViewReports) {
+      return _emptyAnalytics(period, customStart, customEnd);
+    }
+
+    final bounds = periodBoundsFor(
+      period,
+      customStart: customStart,
+      customEnd: customEnd,
+    );
+    return _analyticsForBounds(bounds, targetUserId: staffUserId);
+  }
+
   /// Sales list for a period, newest first.
   Future<List<Sale>> getSalesList(
     ReportingPeriod period, {
@@ -135,9 +154,10 @@ class SalesAnalyticsService {
   }
 
   Future<SalesAnalytics> _analyticsForBounds(
-    ReportingPeriodBounds bounds,
-  ) async {
-    final userId = _scopedUserId;
+    ReportingPeriodBounds bounds, {
+    int? targetUserId,
+  }) async {
+    final userId = targetUserId ?? _scopedUserId;
 
     final currentSummary = await _saleRepository.getSalesSummary(
       bounds.start,

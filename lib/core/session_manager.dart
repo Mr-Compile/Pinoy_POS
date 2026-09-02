@@ -98,6 +98,7 @@ class SessionManager {
     'use_ai_advisor',
     'view_settings',
     'edit_settings',
+    'manage_staff',
     'view_notifications',
     'view_profile',
     'view_more',

@@ -10,7 +10,7 @@ import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
-import 'package:pinoy_pos/ui/widgets/loading_button.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/spacing.dart';
@@ -570,8 +570,7 @@ class _StockScreenState extends ConsumerState<StockScreen> {
             const SizedBox(width: 4),
             Text(
               'Out of Stock',
-              style: TextStyle(
-                fontSize: 11,
+              style: AppTypography.labelSmall(context).copyWith(
                 fontWeight: FontWeight.w600,
                 color: cs.onErrorContainer,
               ),
@@ -594,8 +593,7 @@ class _StockScreenState extends ConsumerState<StockScreen> {
             const SizedBox(width: 4),
             Text(
               'Low Stock',
-              style: TextStyle(
-                fontSize: 11,
+              style: AppTypography.labelSmall(context).copyWith(
                 fontWeight: FontWeight.w600,
                 color: cs.onSecondaryContainer,
               ),
@@ -617,8 +615,7 @@ class _StockScreenState extends ConsumerState<StockScreen> {
           const SizedBox(width: 4),
           Text(
             'Normal',
-            style: TextStyle(
-              fontSize: 11,
+            style: AppTypography.labelSmall(context).copyWith(
               fontWeight: FontWeight.w600,
               color: cs.onTertiaryContainer,
             ),
@@ -901,8 +898,7 @@ class _StockScreenState extends ConsumerState<StockScreen> {
                     title: Text(product.name),
                     subtitle: Text(
                       'Stock: ${product.stock} · ${_categoryName(product.categoryId)}',
-                      style: TextStyle(
-                        fontSize: 12,
+                      style: AppTypography.bodySmall(context).copyWith(
                         color: _isOutOfStock(product)
                             ? Theme.of(context).colorScheme.error
                             : Theme.of(context).colorScheme.onSurfaceVariant,
@@ -978,9 +974,34 @@ class _StockOperationDialogState extends State<_StockOperationDialog> {
     final cs = Theme.of(context).colorScheme;
     final title = widget.isAdjust ? 'Adjust Stock' : 'Add Stock';
 
-    return AlertDialog(
-      title: Text(title),
-      content: SingleChildScrollView(
+    return AppDialog(
+      type: AppDialogType.info,
+      title: title,
+      actions: [
+        AppDialogAction(
+          label: 'Cancel',
+          onPressed: (context) =>
+              Navigator.of(context, rootNavigator: true).pop(),
+        ),
+        AppDialogAction(
+          label: widget.isAdjust ? 'Continue' : 'Add Stock',
+          isPrimary: true,
+          onPressed: (context) {
+            if (!_formKey.currentState!.validate()) return;
+            final qty = _parseInt();
+            Navigator.of(context, rootNavigator: true).pop(
+              _StockOperationResult(
+                quantity: widget.isAdjust ? qty - widget.product.stock : qty,
+                newStock: widget.isAdjust ? qty : widget.product.stock + qty,
+                reason: _reasonController.text.trim().isEmpty
+                    ? null
+                    : _reasonController.text.trim(),
+              ),
+            );
+          },
+        ),
+      ],
+      child: SingleChildScrollView(
         child: Form(
           key: _formKey,
           child: Column(
@@ -1020,9 +1041,10 @@ class _StockOperationDialogState extends State<_StockOperationDialog> {
                           ),
                           Text(
                             widget.category,
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: cs.onSurfaceVariant,
-                                ),
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(color: cs.onSurfaceVariant),
                           ),
                         ],
                       ),
@@ -1035,7 +1057,8 @@ class _StockOperationDialogState extends State<_StockOperationDialog> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Current Stock', style: Theme.of(context).textTheme.bodyMedium),
+                  Text('Current Stock',
+                      style: Theme.of(context).textTheme.bodyMedium),
                   Text(
                     '${widget.product.stock}',
                     style: AppTypography.titleMediumBold(context),
@@ -1047,7 +1070,9 @@ class _StockOperationDialogState extends State<_StockOperationDialog> {
               TextFormField(
                 controller: _quantityController,
                 decoration: InputDecoration(
-                  labelText: widget.isAdjust ? 'New Stock Quantity' : 'Quantity to Add',
+                  labelText: widget.isAdjust
+                      ? 'New Stock Quantity'
+                      : 'Quantity to Add',
                   prefixIcon: const Icon(Icons.inventory),
                   border: const OutlineInputBorder(),
                 ),
@@ -1109,30 +1134,6 @@ class _StockOperationDialogState extends State<_StockOperationDialog> {
           ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        LoadingButton(
-          isLoading: false,
-          onPressed: () {
-            if (!_formKey.currentState!.validate()) return;
-            final qty = _parseInt();
-            Navigator.pop(
-              context,
-              _StockOperationResult(
-                quantity: widget.isAdjust ? qty - widget.product.stock : qty,
-                newStock: widget.isAdjust ? qty : widget.product.stock + qty,
-                reason: _reasonController.text.trim().isEmpty
-                    ? null
-                    : _reasonController.text.trim(),
-              ),
-            );
-          },
-          label: widget.isAdjust ? 'Continue' : 'Add Stock',
-        ),
-      ],
     );
   }
 }
@@ -1180,9 +1181,17 @@ class _StockHistoryDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    return AlertDialog(
-      title: const Text('Stock History'),
-      content: SizedBox(
+    return AppDialog(
+      type: AppDialogType.info,
+      title: 'Stock History',
+      actions: [
+        AppDialogAction(
+          label: 'Close',
+          onPressed: (context) =>
+              Navigator.of(context, rootNavigator: true).pop(),
+        ),
+      ],
+      child: SizedBox(
         width: double.maxFinite,
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1221,9 +1230,10 @@ class _StockHistoryDialog extends StatelessWidget {
                         ),
                         Text(
                           'Current stock: ${product.stock}',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: cs.onSurfaceVariant,
-                              ),
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: cs.onSurfaceVariant),
                         ),
                       ],
                     ),
@@ -1272,8 +1282,7 @@ class _StockHistoryDialog extends StatelessWidget {
                       subtitle: Text(
                         '${entry.previousStock} → ${entry.newStock} · ${_formatDate(entry.createdAt)}'
                         '${entry.reason != null && entry.reason!.isNotEmpty ? '\n${entry.reason}' : ''}',
-                        style: TextStyle(
-                          fontSize: 12,
+                        style: AppTypography.bodySmall(context).copyWith(
                           color: cs.onSurfaceVariant,
                         ),
                       ),
@@ -1291,12 +1300,6 @@ class _StockHistoryDialog extends StatelessWidget {
           ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Close'),
-        ),
-      ],
     );
   }
 

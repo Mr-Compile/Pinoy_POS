@@ -34,15 +34,16 @@ class PaymentBreakdownList extends StatelessWidget {
     }
 
     final cs = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
     final sorted = List<PaymentBreakdown>.from(breakdown)
       ..sort((a, b) => b.total.compareTo(a.total));
 
     final colors = [
       cs.primary,
-      AppSemanticColors.success,
-      AppSemanticColors.info,
-      AppSemanticColors.warning,
-      AppSemanticColors.error,
+      AppSemanticColors.resolve(AppSemanticColors.success, brightness),
+      AppSemanticColors.resolve(AppSemanticColors.info, brightness),
+      AppSemanticColors.resolve(AppSemanticColors.warning, brightness),
+      AppSemanticColors.resolve(AppSemanticColors.error, brightness),
       cs.secondary,
     ];
 

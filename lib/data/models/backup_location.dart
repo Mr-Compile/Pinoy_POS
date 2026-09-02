@@ -43,6 +43,17 @@ class BackupLocation {
       type == BackupStorageType.fileSystem ||
       type == BackupStorageType.androidSaf;
 
+  /// Whether the [reference] format matches the [type].
+  ///
+  /// A [fileSystem] location must not be a URI (it should be a path).
+  /// An [androidSaf] location must be a `content://` URI.
+  /// A [webDownload] location is valid by convention.
+  bool get isReferenceValidForType => isNone || switch (type) {
+        BackupStorageType.fileSystem => !reference.contains('://'),
+        BackupStorageType.androidSaf => reference.startsWith('content://'),
+        BackupStorageType.webDownload => true,
+      };
+
   BackupLocation copyWith({
     BackupStorageType? type,
     String? reference,

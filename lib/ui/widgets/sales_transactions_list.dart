@@ -85,7 +85,10 @@ class _SaleRow extends StatelessWidget {
             ),
       ),
       statusLabel: _statusLabel(sale.paymentStatus),
-      statusColor: _statusColor(sale.paymentStatus, cs),
+      statusColor: _statusColor(
+        sale.paymentStatus,
+        Theme.of(context).brightness,
+      ),
       chips: [
         AppStatusChip(
           label: sale.paymentMethod,
@@ -111,17 +114,20 @@ class _SaleRow extends StatelessWidget {
     return null;
   }
 
-  Color _statusColor(String status, ColorScheme cs) {
+  Color _statusColor(String status, Brightness brightness) {
     switch (status) {
       case 'confirmed':
-        return AppSemanticColors.success;
+        return AppSemanticColors.resolve(AppSemanticColors.success, brightness);
       case 'pending':
-        return AppSemanticColors.warning;
+        return AppSemanticColors.resolve(AppSemanticColors.warning, brightness);
       case 'cancelled':
       case 'refunded':
-        return AppSemanticColors.error;
+        return AppSemanticColors.resolve(AppSemanticColors.error, brightness);
       default:
-        return cs.outline;
+        return AppSemanticColors.resolve(
+          AppSemanticColors.neutral,
+          brightness,
+        );
     }
   }
 }

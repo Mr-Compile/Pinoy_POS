@@ -20,6 +20,18 @@ class ActivityLogDao extends BaseDao<ActivityLog> {
     return maps.map((map) => fromMap(map)).toList();
   }
 
+  Future<List<ActivityLog>> getByEntity(String entity, int entityId) async {
+    final database = await db;
+    final maps = await database.query(
+      tableName,
+      where: 'entity = ? AND entity_id = ?',
+      whereArgs: [entity, entityId],
+      orderBy: 'created_at DESC',
+      limit: 100,
+    );
+    return maps.map((map) => fromMap(map)).toList();
+  }
+
   Future<List<ActivityLog>> getRecentActivities({int limit = 50}) async {
     final database = await db;
     final maps = await database.query(

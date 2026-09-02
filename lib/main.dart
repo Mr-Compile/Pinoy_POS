@@ -63,9 +63,8 @@ class _MyAppState extends ConsumerState<MyApp> {
     final themeState = ref.watch(themeProvider);
 
     final themeMode = switch (themeState.themeMode) {
-      'light' => ThemeMode.light,
       'dark' => ThemeMode.dark,
-      _ => ThemeMode.system,
+      _ => ThemeMode.light,
     };
 
     // Semantic theme derived from AppSemanticColors.primary.

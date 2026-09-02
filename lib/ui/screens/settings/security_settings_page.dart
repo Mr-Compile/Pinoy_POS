@@ -5,10 +5,10 @@ import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/user_provider.dart';
 import 'package:pinoy_pos/services/password_strength_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/validators.dart';
-import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 import 'package:pinoy_pos/ui/widgets/password_strength_meter.dart';
 
 /// Security settings sub-page — change password.
@@ -74,7 +74,6 @@ class SecuritySettingsPage extends ConsumerWidget {
     bool obscureConfirm = true;
     bool newPasswordTouched = false;
     bool confirmPasswordTouched = false;
-    final screenContext = context;
 
     showDialog(
       context: context,
@@ -86,9 +85,62 @@ class SecuritySettingsPage extends ConsumerWidget {
             username: user.username,
           );
 
-          return AlertDialog(
-            title: const Text('Change Password'),
-            content: SingleChildScrollView(
+          return AppDialog(
+            type: AppDialogType.info,
+            title: 'Change Password',
+            actions: [
+              AppDialogAction(
+                label: 'Cancel',
+                onPressed: (context) =>
+                    Navigator.of(context, rootNavigator: true).pop(),
+              ),
+              AppDialogAction(
+                label: 'Change',
+                isPrimary: true,
+                isLoading: isSaving,
+                onPressed: isSaving
+                    ? null
+                    : (context) async {
+                        setState(() {
+                          newPasswordTouched = true;
+                          confirmPasswordTouched = true;
+                        });
+                        if (!formKey.currentState!.validate()) return;
+                        setState(() => isSaving = true);
+                        final result = await ref
+                            .read(userControllerProvider.notifier)
+                            .changePassword(
+                              userId: user.id!,
+                              oldPassword: oldPasswordController.text,
+                              newPassword: newPasswordController.text,
+                            );
+                        if (context.mounted) {
+                          setState(() => isSaving = false);
+                          if (result.success) {
+                            oldPasswordController.clear();
+                            newPasswordController.clear();
+                            confirmPasswordController.clear();
+                            await AppDialogService.success(
+                              context,
+                              title: 'Password Changed',
+                              message: result.message,
+                            );
+                            if (!context.mounted) return;
+                            Navigator.of(context, rootNavigator: true).pop();
+                          } else {
+                            await AppDialogService.error(
+                              context,
+                              title: 'Change Failed',
+                              message: result.message,
+                            );
+                            if (!context.mounted) return;
+                            Navigator.of(context, rootNavigator: true).pop();
+                          }
+                        }
+                      },
+              ),
+            ],
+            child: SingleChildScrollView(
               child: Form(
                 key: formKey,
                 child: Column(
@@ -191,55 +243,6 @@ class SecuritySettingsPage extends ConsumerWidget {
                 ),
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () =>
-                    Navigator.of(context, rootNavigator: true).pop(),
-                child: const Text('Cancel'),
-              ),
-              LoadingButton(
-                isLoading: isSaving,
-                onPressed: () async {
-                  setState(() {
-                    newPasswordTouched = true;
-                    confirmPasswordTouched = true;
-                  });
-                  if (!formKey.currentState!.validate()) return;
-                  setState(() => isSaving = true);
-                  final result = await ref
-                      .read(userControllerProvider.notifier)
-                      .changePassword(
-                        userId: user.id!,
-                        oldPassword: oldPasswordController.text,
-                        newPassword: newPasswordController.text,
-                      );
-                  if (context.mounted) {
-                    setState(() => isSaving = false);
-                    if (result.success) {
-                      oldPasswordController.clear();
-                      newPasswordController.clear();
-                      confirmPasswordController.clear();
-                      await AppDialogService.success(
-                        screenContext,
-                        title: 'Password Changed',
-                        message: result.message,
-                      );
-                      if (!context.mounted) return;
-                      Navigator.of(context, rootNavigator: true).pop();
-                    } else {
-                      await AppDialogService.error(
-                        screenContext,
-                        title: 'Change Failed',
-                        message: result.message,
-                      );
-                      if (!context.mounted) return;
-                      Navigator.of(context, rootNavigator: true).pop();
-                    }
-                  }
-                },
-                label: 'Change',
-              ),
-            ],
           );
         },
       ),

@@ -21,15 +21,12 @@ import 'package:pinoy_pos/services/pdf_font_service.dart';
 class ReceiptService {
   final ImageService _imageService = ImageService();
 
-  /// Returns the base text style for the receipt, using Inter when
-  /// available.
+  /// Returns the body text style for the receipt, using Inter when available.
   pw.TextStyle _style({
-    double fontSize = 10,
     pw.FontWeight? fontWeight,
     PdfColor? color,
   }) {
-    return PdfFontService.style(
-      fontSize: fontSize,
+    return PdfFontService.body(
       fontWeight: fontWeight,
       color: color,
     );
@@ -108,8 +105,7 @@ class ReceiptService {
         pw.Center(
           child: pw.Text(
             receipt.storeName,
-            style: _style(
-              fontSize: 16,
+            style: PdfFontService.title(
               fontWeight: pw.FontWeight.bold,
             ),
             textAlign: pw.TextAlign.center,
@@ -120,7 +116,7 @@ class ReceiptService {
           pw.Center(
             child: pw.Text(
               receipt.storeAddress,
-              style: _style(fontSize: 9),
+              style: PdfFontService.small(),
               textAlign: pw.TextAlign.center,
               softWrap: true,
             ),
@@ -129,7 +125,7 @@ class ReceiptService {
           pw.Center(
             child: pw.Text(
               'Contact: ${receipt.storePhone}',
-              style: _style(fontSize: 9),
+              style: PdfFontService.small(),
               textAlign: pw.TextAlign.center,
               softWrap: true,
             ),
@@ -146,8 +142,7 @@ class ReceiptService {
         pw.Center(
           child: pw.Text(
             'OFFICIAL RECEIPT',
-            style: _style(
-              fontSize: 12,
+            style: PdfFontService.subhead(
               fontWeight: pw.FontWeight.bold,
             ),
           ),
@@ -156,19 +151,19 @@ class ReceiptService {
         pw.Center(
           child: pw.Text(
             'Receipt #${receipt.receiptNumber}',
-            style: _style(fontSize: 10),
+            style: PdfFontService.body(),
           ),
         ),
         pw.Center(
           child: pw.Text(
             receipt.date.toLocal().toString().split('.')[0],
-            style: _style(fontSize: 9),
+            style: PdfFontService.small(),
           ),
         ),
         pw.Center(
           child: pw.Text(
             'Cashier: ${receipt.cashierName}',
-            style: _style(fontSize: 9),
+            style: PdfFontService.small(),
           ),
         ),
         pw.SizedBox(height: 8),
@@ -213,20 +208,20 @@ class ReceiptService {
               pw.Expanded(
                 child: pw.Text(
                   item.productName,
-                  style: _style(fontSize: 10),
+                  style: PdfFontService.body(),
                   softWrap: true,
                 ),
               ),
               pw.SizedBox(width: 8),
               pw.Text(
                 item.formattedTotal(currency),
-                style: _style(fontSize: 10),
+                style: PdfFontService.body(),
               ),
             ],
           ),
           pw.Text(
             '${item.quantity} x ${item.formattedUnitPrice(currency)}',
-            style: _style(fontSize: 9),
+            style: PdfFontService.small(),
           ),
         ],
       ),
@@ -271,7 +266,7 @@ class ReceiptService {
   pw.Widget _buildNotes(ReceiptViewData receipt) {
     return pw.Text(
       'Notes: ${receipt.notes}',
-      style: _style(fontSize: 9),
+      style: PdfFontService.small(),
       softWrap: true,
     );
   }
@@ -284,7 +279,7 @@ class ReceiptService {
           pw.Center(
             child: pw.Text(
               receipt.receiptFooter!,
-              style: _style(fontSize: 9),
+              style: PdfFontService.small(),
               textAlign: pw.TextAlign.center,
               softWrap: true,
             ),

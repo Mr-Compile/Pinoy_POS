@@ -13,6 +13,7 @@ import 'package:pinoy_pos/ui/screens/receipt_screen.dart';
 import 'package:pinoy_pos/ui/screens/sales_analytics_screen.dart';
 import 'package:pinoy_pos/ui/screens/sale_detail_screen.dart';
 import 'package:pinoy_pos/ui/screens/sales_screen.dart';
+import 'package:pinoy_pos/ui/screens/staff_management_screen.dart';
 import 'package:pinoy_pos/ui/screens/activity_logs_screen.dart';
 import 'package:pinoy_pos/ui/screens/ai_config_screen.dart';
 import 'package:pinoy_pos/ui/screens/ai_quota_management_page.dart';
@@ -241,6 +242,20 @@ class AINavigationRegistry {
       relatedDestinations: ['settings', 'activity_logs'],
     ),
     const AIDestination(
+      id: 'staff_management',
+      displayName: 'Staff Management',
+      description: 'Manage staff accounts, review sales performance, and view activity.',
+      requiredPermission: 'manage_staff',
+      allowedRoles: [UserRole.owner],
+      builder: _staffManagementBuilder,
+      howToSteps: [
+        'Open Staff Management from the Dashboard or More screen.',
+        'Tap Add Staff to create a new staff account.',
+        'Tap a staff member to view their profile, sales, and activity.',
+      ],
+      relatedDestinations: ['users', 'settings', 'activity_logs'],
+    ),
+    const AIDestination(
       id: 'settings',
       displayName: 'Settings',
       description: 'Configure application preferences and store details.',
@@ -379,6 +394,7 @@ class AINavigationRegistry {
   static Widget _salesBuilder(BuildContext context) => const SalesScreen();
   static Widget _reportsBuilder(BuildContext context) => const SalesAnalyticsScreen();
   static Widget _usersBuilder(BuildContext context) => const UsersScreen();
+  static Widget _staffManagementBuilder(BuildContext context) => const StaffManagementScreen();
   static Widget _settingsBuilder(BuildContext context) => const SettingsScreen();
   static Widget _aiConfigBuilder(BuildContext context) => const AIConfigScreen();
   static Widget _aiQuotaBuilder(BuildContext context) => const AIQuotaManagementPage();

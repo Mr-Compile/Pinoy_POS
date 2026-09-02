@@ -266,7 +266,8 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
               const SizedBox(height: 4),
               Text(
                 receipt.storeAddress,
-                style: TextStyle(color: cs.onPrimaryContainer, fontSize: 13),
+                style: AppTypography.bodySmall(context)
+                    .copyWith(color: cs.onPrimaryContainer),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -274,7 +275,8 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
               const SizedBox(height: 2),
               Text(
                 'Contact: ${receipt.storePhone}',
-                style: TextStyle(color: cs.onPrimaryContainer, fontSize: 13),
+                style: AppTypography.bodySmall(context)
+                    .copyWith(color: cs.onPrimaryContainer),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -341,24 +343,20 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                           Expanded(
                             child: Text(
                               item.productName,
-                              style: const TextStyle(fontSize: 15),
+                              style: AppTypography.titleSmall(context),
                             ),
                           ),
                           const SizedBox(width: 12),
                           Text(
                             item.formattedTotal(receipt.currency),
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: AppTypography.titleSmallBold(context),
                           ),
                         ],
                       ),
                       const SizedBox(height: 2),
                       Text(
                         '${item.quantity} x ${item.formattedUnitPrice(receipt.currency)}',
-                        style: TextStyle(
-                          fontSize: 13,
+                        style: AppTypography.bodySmall(context).copyWith(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                       ),

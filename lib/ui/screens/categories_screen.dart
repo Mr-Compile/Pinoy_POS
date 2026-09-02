@@ -7,11 +7,11 @@ import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_button.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_list_item.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
-import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/validators.dart';
 
@@ -424,9 +424,47 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
         builder: (context, setState) {
           void setSaving(bool value) => setState(() => isSaving = value);
 
-          return AlertDialog(
-            title: Text(category == null ? 'Add Category' : 'Edit Category'),
-            content: Form(
+          return AppDialog(
+            type: AppDialogType.info,
+            title: category == null
+                ? 'Add Category'
+                : 'Edit Category',
+            actions: [
+              AppDialogAction(
+                label: 'Cancel',
+                isLoading: isSaving,
+                onPressed: isSaving
+                    ? null
+                    : (context) async {
+                        if (hasChanges) {
+                          final discard =
+                              await AppDialogService.unsavedChanges(context);
+                          if (discard == true && context.mounted) {
+                            Navigator.of(context, rootNavigator: true)
+                                .pop(const ModalResult<void>.cancelled());
+                          }
+                        } else if (context.mounted) {
+                          Navigator.of(context, rootNavigator: true)
+                              .pop(const ModalResult<void>.cancelled());
+                        }
+                      },
+              ),
+              AppDialogAction(
+                label: 'Save',
+                isPrimary: true,
+                isLoading: isSaving,
+                onPressed: isSaving
+                    ? null
+                    : (context) => _saveCategory(
+                          formKey,
+                          nameController,
+                          category,
+                          setSaving,
+                          context,
+                        ),
+              ),
+            ],
+            child: Form(
               key: formKey,
               child: TextFormField(
                 controller: nameController,
@@ -436,7 +474,8 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
                 ),
                 autofocus: true,
                 textInputAction: TextInputAction.done,
-                validator: (value) => Validators.required(value, 'Category name'),
+                validator: (value) =>
+                    Validators.required(value, 'Category name'),
                 onChanged: (value) {
                   if (!hasChanges) {
                     setState(() {
@@ -455,40 +494,6 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
                         ),
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: isSaving
-                    ? null
-                    : () async {
-                        if (hasChanges) {
-                          final discard = await AppDialogService.unsavedChanges(
-                            context,
-                          );
-                          if (discard == true && dialogContext.mounted) {
-                            Navigator.of(dialogContext, rootNavigator: true)
-                                .pop(const ModalResult<void>.cancelled());
-                          }
-                        } else if (dialogContext.mounted) {
-                          Navigator.of(dialogContext, rootNavigator: true)
-                              .pop(const ModalResult<void>.cancelled());
-                        }
-                      },
-                child: const Text('Cancel'),
-              ),
-              LoadingButton(
-                isLoading: isSaving,
-                onPressed: isSaving
-                    ? null
-                    : () => _saveCategory(
-                          formKey,
-                          nameController,
-                          category,
-                          setSaving,
-                          dialogContext,
-                        ),
-                label: 'Save',
-              ),
-            ],
           );
         },
       ),

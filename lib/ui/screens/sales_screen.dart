@@ -9,6 +9,7 @@ import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/screens/sale_detail_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_button.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_icon_button.dart';
@@ -156,9 +157,23 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     final result = await showDialog<String>(
       context: context,
       useRootNavigator: true,
-      builder: (context) => AlertDialog(
-        title: const Text('Search Sales'),
-        content: TextField(
+      builder: (context) => AppDialog(
+        type: AppDialogType.info,
+        title: 'Search Sales',
+        actions: [
+          AppDialogAction(
+            label: 'Cancel',
+            onPressed: (context) =>
+                Navigator.of(context, rootNavigator: true).pop(null),
+          ),
+          AppDialogAction(
+            label: 'Search',
+            isPrimary: true,
+            onPressed: (context) => Navigator.of(context, rootNavigator: true)
+                .pop(_searchController.text.trim()),
+          ),
+        ],
+        child: TextField(
           controller: _searchController,
           decoration: const InputDecoration(
             labelText: 'Receipt, customer, or reference',
@@ -166,17 +181,6 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
           ),
           autofocus: true,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context, rootNavigator: true).pop(null),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context, rootNavigator: true)
-                .pop(_searchController.text.trim()),
-            child: const Text('Search'),
-          ),
-        ],
       ),
     );
 
@@ -201,69 +205,70 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
       context: context,
       useRootNavigator: true,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          return AlertDialog(
-            title: const Text('Filter Sales'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  DropdownButtonFormField<String?>(
-                    key: ValueKey(selectedMethod),
-                    initialValue: selectedMethod,
-                    decoration: const InputDecoration(
-                      labelText: 'Payment Method',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: [
-                      const DropdownMenuItem(value: null, child: Text('All')),
-                      ...methods.map((m) => DropdownMenuItem(
-                            value: m,
-                            child: Text(m),
-                          )),
-                    ],
-                    onChanged: (value) =>
-                        setDialogState(() => selectedMethod = value),
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<String?>(
-                    key: ValueKey(selectedStatus),
-                    initialValue: selectedStatus,
-                    decoration: const InputDecoration(
-                      labelText: 'Status',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: [
-                      const DropdownMenuItem(
-                          value: null, child: Text('All active')),
-                      ...statuses.map((s) => DropdownMenuItem(
-                            value: s,
-                            child: Text(
-                              s[0].toUpperCase() + s.substring(1),
-                            ),
-                          )),
-                    ],
-                    onChanged: (value) =>
-                        setDialogState(() => selectedStatus = value),
-                  ),
-                ],
+        builder: (context, setDialogState) => AppDialog(
+          type: AppDialogType.info,
+          title: 'Filter Sales',
+          actions: [
+            AppDialogAction(
+              label: 'Cancel',
+              onPressed: (context) =>
+                  Navigator.of(context, rootNavigator: true).pop(null),
+            ),
+            AppDialogAction(
+              label: 'Apply',
+              isPrimary: true,
+              onPressed: (context) =>
+                  Navigator.of(context, rootNavigator: true).pop(
+                _SalesFilter(selectedMethod, selectedStatus),
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context, rootNavigator: true).pop(null),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(context, rootNavigator: true).pop(_SalesFilter(
-                  selectedMethod,
-                  selectedStatus,
-                )),
-                child: const Text('Apply'),
-              ),
-            ],
-          );
-        },
+          ],
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String?>(
+                  key: ValueKey(selectedMethod),
+                  initialValue: selectedMethod,
+                  decoration: const InputDecoration(
+                    labelText: 'Payment Method',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: [
+                    const DropdownMenuItem(value: null, child: Text('All')),
+                    ...methods.map((m) => DropdownMenuItem(
+                          value: m,
+                          child: Text(m),
+                        )),
+                  ],
+                  onChanged: (value) =>
+                      setDialogState(() => selectedMethod = value),
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String?>(
+                  key: ValueKey(selectedStatus),
+                  initialValue: selectedStatus,
+                  decoration: const InputDecoration(
+                    labelText: 'Status',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: [
+                    const DropdownMenuItem(
+                        value: null, child: Text('All active')),
+                    ...statuses.map((s) => DropdownMenuItem(
+                          value: s,
+                          child: Text(
+                            s[0].toUpperCase() + s.substring(1),
+                          ),
+                        )),
+                  ],
+                  onChanged: (value) =>
+                      setDialogState(() => selectedStatus = value),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
 
@@ -589,8 +594,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
       ),
       child: Text(
         label,
-        style: TextStyle(
-          fontSize: 12,
+        style: AppTypography.labelMedium(context).copyWith(
           color: cs.onSurfaceVariant,
         ),
       ),

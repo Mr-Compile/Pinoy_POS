@@ -52,14 +52,18 @@ class BackupStorageService {
     }
 
     // Desktop fallback (Windows / Linux / macOS).
-    final path = await FilePicker.platform.getDirectoryPath(
-      dialogTitle: 'Choose Backup Location',
-      initialDirectory: initial?.reference,
-    );
-    if (path == null || path.isEmpty) return null;
+    final initialDirectory = initial != null && initial.type == BackupStorageType.fileSystem
+        ? _toFilesystemPath(initial.reference)
+        : null;
 
-    final displayName = _displayNameFromPath(path);
-    final (writable, error) = await _isDirectoryWritable(path);
+    final picked = await FilePicker.platform.getDirectoryPath(
+      dialogTitle: 'Choose Backup Location',
+      initialDirectory: initialDirectory,
+    );
+    if (picked == null || picked.isEmpty) return null;
+
+    final displayName = _displayNameFromPath(picked);
+    final (writable, error) = await _isDirectoryWritable(picked);
     if (!writable) {
       throw BackupStorageException(
         'The selected folder cannot be written to. ${error ?? 'Please choose a different folder.'}',
@@ -68,7 +72,7 @@ class BackupStorageService {
 
     return BackupLocation(
       type: BackupStorageType.fileSystem,
-      reference: path,
+      reference: picked,
       displayName: displayName,
     );
   }
@@ -184,6 +188,12 @@ class BackupStorageService {
     BackupLocation? location,
     BackupLocation? defaultLocation,
   }) async {
+    // Reject a persisted location whose reference no longer matches its type
+    // (e.g. a v1 path that was actually a content URI or a web URL).
+    if (location != null && !location.isReferenceValidForType) {
+      location = null;
+    }
+
     if (Platform.isAndroid) {
       // A persisted fileSystem location on Android (e.g. from a v1 migration)
       // cannot be used with the SAF createDocument channel.  If the directory
@@ -234,6 +244,13 @@ class BackupStorageService {
       location = picked;
     }
 
+    if (!location.isReferenceValidForType) {
+      return const BackupWriteResult(
+        success: false,
+        error: 'The selected backup location is not a valid SAF folder.',
+      );
+    }
+
     try {
       final result = await _channel.invokeMapMethod<String, dynamic>(
         'createDocument',
@@ -259,6 +276,20 @@ class BackupStorageService {
       final uri = result['uri'] as String?;
       final displayName = result['displayName'] as String? ?? defaultFileName;
       final fileSize = result['size'] as int? ?? bytes.length;
+
+      if (uri == null || uri.isEmpty) {
+        return const BackupWriteResult(
+          success: false,
+          error: 'The backup file was not created.',
+        );
+      }
+
+      if (fileSize == 0) {
+        return const BackupWriteResult(
+          success: false,
+          error: 'The backup file was empty after writing.',
+        );
+      }
 
       return BackupWriteResult(
         success: true,
@@ -296,6 +327,16 @@ class BackupStorageService {
       if (targetPath == null || targetPath.isEmpty) {
         return const BackupWriteResult(success: false, error: null);
       }
+
+      final path = _toFilesystemPath(targetPath);
+      if (path == null) {
+        return const BackupWriteResult(
+          success: false,
+          error: 'The chosen save location is not a valid file path.',
+        );
+      }
+      targetPath = path;
+
       displayName = p.basename(targetPath);
       writtenTo = BackupLocation(
         type: BackupStorageType.fileSystem,
@@ -303,15 +344,31 @@ class BackupStorageService {
         displayName: _displayNameFromPath(p.dirname(targetPath)),
       );
     } else {
+      final path = _toFilesystemPath(location.reference);
+      if (path == null) {
+        return const BackupWriteResult(
+          success: false,
+          error: 'The selected location is not a valid folder path.',
+        );
+      }
+
       targetPath = p.join(
-        location.reference,
-        _makeUniqueFileName(defaultFileName, existingDir: Directory(location.reference)),
+        path,
+        _makeUniqueFileName(defaultFileName, existingDir: Directory(path)),
       );
 
       try {
         final file = File(targetPath);
         await file.parent.create(recursive: true);
         await file.writeAsBytes(bytes, flush: true);
+
+        // Verify the file was actually written and is non-empty.
+        if (!await file.exists() || await file.length() == 0) {
+          return const BackupWriteResult(
+            success: false,
+            error: 'The backup file could not be verified after writing.',
+          );
+        }
       } catch (e) {
         return BackupWriteResult(
           success: false,
@@ -380,8 +437,16 @@ class BackupStorageService {
     }
 
     // Desktop / file-system path.
+    final path = _toFilesystemPath(reference);
+    if (path == null) {
+      return const BackupReadResult(
+        success: false,
+        error: 'The saved backup reference is not a valid file path.',
+      );
+    }
+
     try {
-      final file = File(reference);
+      final file = File(path);
       if (!await file.exists()) {
         return const BackupReadResult(
           success: false,
@@ -391,7 +456,7 @@ class BackupStorageService {
       final bytes = await file.readAsBytes();
       return BackupReadResult(
         success: true,
-        displayName: p.basename(reference),
+        displayName: p.basename(path),
         fileSize: bytes.length,
         bytes: bytes,
       );
@@ -406,6 +471,7 @@ class BackupStorageService {
   /// Verifies the saved backup location is still accessible.
   Future<bool> isLocationValid(BackupLocation location) async {
     if (location.isNone) return false;
+    if (!location.isReferenceValidForType) return false;
 
     if (location.type == BackupStorageType.androidSaf) {
       try {
@@ -420,13 +486,16 @@ class BackupStorageService {
     }
 
     if (location.type == BackupStorageType.fileSystem) {
+      final path = _toFilesystemPath(location.reference);
+      if (path == null) return false;
+
       if (Platform.isAndroid) {
         // On Android a non-SAF path is rarely persistently writable across
         // sessions and should not count as a valid backup location.
-        final (writable, _) = await _isDirectoryWritable(location.reference);
+        final (writable, _) = await _isDirectoryWritable(path);
         return writable;
       }
-      final (valid, _) = await _isDirectoryWritable(location.reference);
+      final (valid, _) = await _isDirectoryWritable(path);
       return valid;
     }
 
@@ -477,7 +546,8 @@ class BackupStorageService {
         return _displayNameFromUri(reference);
       }
     }
-    return p.basename(reference);
+    final path = _toFilesystemPath(reference) ?? reference;
+    return p.basename(path);
   }
 
   /// Returns a human-readable label for a backup location folder.
@@ -504,8 +574,11 @@ class BackupStorageService {
       }
     }
 
+    final path = _toFilesystemPath(reference);
+    if (path == null) return false;
+
     try {
-      final file = File(reference);
+      final file = File(path);
       if (await file.exists()) await file.delete();
       return true;
     } catch (e) {
@@ -525,8 +598,9 @@ class BackupStorageService {
   }
 
   String _displayNameFromPath(String path) {
-    final parts = p.split(path);
-    if (parts.isEmpty) return path;
+    final resolved = _decodeFileUri(path);
+    final parts = p.split(resolved);
+    if (parts.isEmpty) return resolved;
     if (parts.length <= 3) return parts.join(' › ');
     return '... › ${parts.sublist(parts.length - 3).join(' › ')}';
   }
@@ -547,6 +621,34 @@ class BackupStorageService {
     return reference.startsWith('content://');
   }
 
+  bool _isFileUri(String reference) {
+    return reference.startsWith('file://');
+  }
+
+  /// Decodes a `file://` URI to a filesystem path. Returns the original
+  /// string unchanged if it cannot be decoded.
+  String _decodeFileUri(String reference) {
+    if (!_isFileUri(reference)) return reference;
+    try {
+      final uri = Uri.parse(reference);
+      if (uri.scheme == 'file') return uri.toFilePath();
+    } catch (e) {
+      debugPrint('[BackupStorageService] Could not decode file URI: $reference');
+    }
+    return reference;
+  }
+
+  /// Returns [reference] as a local path, decoding `file://` if present.
+  ///
+  /// Returns `null` if the reference is neither a path nor a decodable
+  /// `file://` URI, so callers can fail with a clear message instead of
+  /// passing a URL to Dart [File] APIs.
+  String? _toFilesystemPath(String reference) {
+    if (!reference.contains('://')) return reference;
+    if (_isFileUri(reference)) return _decodeFileUri(reference);
+    return null;
+  }
+
   String _makeUniqueFileName(String baseName, {Directory? existingDir}) {
     if (existingDir == null || !existingDir.existsSync()) return baseName;
 
@@ -561,7 +663,12 @@ class BackupStorageService {
     return '${name}_${DateTime.now().millisecondsSinceEpoch}$ext';
   }
 
-  Future<(bool, String?)> _isDirectoryWritable(String path) async {
+  Future<(bool, String?)> _isDirectoryWritable(String reference) async {
+    final path = _toFilesystemPath(reference);
+    if (path == null) {
+      return (false, 'The selected reference is not a valid folder path.');
+    }
+
     try {
       final dir = Directory(path);
       if (!await dir.exists()) {

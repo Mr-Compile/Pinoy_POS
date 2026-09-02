@@ -4,7 +4,7 @@ import 'package:pinoy_pos/providers/theme_provider.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 
-/// Appearance settings sub-page — theme mode (system / light / dark).
+/// Appearance settings sub-page — theme mode (light / dark only).
 ///
 /// Accessible from the Settings hub. Available to all authenticated
 /// users (appearance is a personal preference, not role-restricted).
@@ -26,21 +26,13 @@ class AppearanceSettingsPage extends ConsumerWidget {
             Text('Theme', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
             Text(
-              'Choose how the app looks. System follows your device setting.',
+              'Choose how the app looks.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 16),
             AppCard(
               child: Column(
                 children: [
-                  _ThemeOption(
-                    icon: Icons.brightness_auto_outlined,
-                    title: 'System Default',
-                    subtitle: 'Follow device setting',
-                    isSelected: themeState.themeMode == 'system',
-                    onTap: () => themeNotifier.setThemeMode('system'),
-                  ),
-                  const Divider(),
                   _ThemeOption(
                     icon: Icons.light_mode_outlined,
                     title: 'Light',

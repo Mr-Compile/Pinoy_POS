@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pinoy_pos/core/app_typography.dart';
 
 /// A compact status chip with a colored icon and label.
 ///
@@ -30,9 +31,7 @@ class AppStatusChip extends StatelessWidget {
         ],
         Text(
           label,
-          style: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 12,
+          style: AppTypography.labelMedium(context).copyWith(
             fontWeight: FontWeight.w600,
             color: color,
           ),

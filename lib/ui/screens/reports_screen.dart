@@ -709,10 +709,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           color: pdfColor(primary),
           child: pw.Text(
             text,
-            style: pw.TextStyle(
+            style: PdfFontService.small(
               color: pdfColor(onPrimary),
               fontWeight: pw.FontWeight.bold,
-              fontSize: 9,
             ),
           ),
         );
@@ -730,10 +729,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           color: backgroundColor,
           child: pw.Text(
             text,
-            style: pw.TextStyle(
+            style: PdfFontService.small(
               color: textColor,
               fontWeight: bold ? pw.FontWeight.bold : null,
-              fontSize: 9,
             ),
           ),
         );
@@ -950,19 +948,18 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           pw.SizedBox(height: 16),
           pw.Text(
             'Sales Report',
-            style: pw.TextStyle(
-              fontSize: 20,
+            style: PdfFontService.headline(
               fontWeight: pw.FontWeight.bold,
               color: pdfColor(primary),
             ),
           ),
           pw.Text(
             'Generated: ${_formatDateTime(DateTime.now())}',
-            style: pw.TextStyle(fontSize: 10, color: pdfColor(cs.onSurfaceVariant)),
+            style: PdfFontService.body(color: pdfColor(cs.onSurfaceVariant)),
           ),
           pw.Text(
             'Date Range: ${_formatRange(state.filterStart, state.filterEnd)}',
-            style: pw.TextStyle(fontSize: 10, color: pdfColor(cs.onSurfaceVariant)),
+            style: PdfFontService.body(color: pdfColor(cs.onSurfaceVariant)),
           ),
           pw.SizedBox(height: 20),
           pw.Header(level: 1, child: pw.Text('Summary')),
@@ -1024,21 +1021,20 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       children: [
         pw.Text(
           store.storeName,
-          style: pw.TextStyle(
-            fontSize: 24,
+          style: PdfFontService.display(
             fontWeight: pw.FontWeight.bold,
             color: primaryColor,
           ),
         ),
         if (store.storeAddress.isNotEmpty)
           pw.Text(store.storeAddress,
-              style: pw.TextStyle(fontSize: 10, color: bodyText)),
+              style: PdfFontService.body(color: bodyText)),
         if (store.storePhone.isNotEmpty)
           pw.Text('Contact: ${store.storePhone}',
-              style: pw.TextStyle(fontSize: 10, color: bodyText)),
+              style: PdfFontService.body(color: bodyText)),
         if (store.receiptFooter?.isNotEmpty == true)
           pw.Text(store.receiptFooter!,
-              style: pw.TextStyle(fontSize: 10, color: bodyText)),
+              style: PdfFontService.body(color: bodyText)),
       ],
     );
   }

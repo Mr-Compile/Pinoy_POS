@@ -259,38 +259,14 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
       context,
       displayName: defaultDisplayName,
       location: savedLocationLabel,
-      canChangeLocation: !kIsWeb,
     );
 
     if (!mounted) return;
 
-    BackupLocation? override;
-    bool setAsDefault = false;
+    if (confirm == BackupDestinationConfirmResult.cancel) return;
 
-    switch (confirm) {
-      case BackupDestinationConfirmResult.cancel:
-        return;
-      case BackupDestinationConfirmResult.save:
-        override = null;
-        setAsDefault = false;
-      case BackupDestinationConfirmResult.changeLocation:
-        // Web should never reach here because canChangeLocation is false.
-        if (kIsWeb) return;
-        override = await _chooseBackupLocation(persist: false);
-        if (override == null || override.isNone) return;
-        if (!mounted) return;
-
-        final setDefault = await AppDialogService.confirmation(
-          context,
-          title: 'Set as Default?',
-          message:
-              'Would you like to use this folder as the default backup location?',
-          confirmLabel: 'Yes',
-          cancelLabel: 'No',
-        );
-        if (!mounted) return;
-        setAsDefault = setDefault == true;
-    }
+    const override = null;
+    const setAsDefault = false;
 
     setState(() => _isExporting = true);
 
@@ -322,10 +298,6 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
               location: locationLabel,
               fileSize: _formatFileSize(result.fileSize),
             );
-            // If the override became the new default, refresh the card.
-            if (setAsDefault && override != null) {
-              setState(() => _backupLocation = override);
-            }
             await _loadBackups();
             return;
           case BackupExportResult.canceled:
@@ -340,16 +312,6 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
               case BackupExportFailedResult.close:
                 return;
               case BackupExportFailedResult.tryAgain:
-                continue;
-              case BackupExportFailedResult.changeLocation:
-                if (!mounted) return;
-                setState(() => _isExporting = false);
-                final newOverride = await _chooseBackupLocation(persist: false);
-                if (!mounted) return;
-                if (newOverride == null || newOverride.isNone) return;
-                override = newOverride;
-                setAsDefault = false;
-                if (mounted) setState(() => _isExporting = true);
                 continue;
             }
         }

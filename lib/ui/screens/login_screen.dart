@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/auth_navigation.dart';
 import 'package:pinoy_pos/core/constants.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
@@ -245,10 +246,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                             const Text('Signing in...'),
                                           ],
                                         )
-                                      : const Text(
+                                      : Text(
                                           'Sign In',
-                                          style: TextStyle(
-                                            fontSize: 16,
+                                          style: AppTypography.titleMedium(context).copyWith(
                                             fontWeight: FontWeight.w600,
                                           ),
                                         ),

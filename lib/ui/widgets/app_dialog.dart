@@ -128,12 +128,14 @@ class AppDialogAction {
   final void Function(BuildContext dialogContext)? onPressed;
   final bool isPrimary;
   final bool isDestructive;
+  final bool isLoading;
 
   const AppDialogAction({
     required this.label,
     this.onPressed,
     this.isPrimary = false,
     this.isDestructive = false,
+    this.isLoading = false,
   });
 }
 
@@ -144,6 +146,7 @@ class AppDialog extends StatelessWidget {
   final String? details;
   final List<AppDialogAction> actions;
   final bool dismissible;
+  final Widget? child;
 
   const AppDialog({
     super.key,
@@ -153,27 +156,24 @@ class AppDialog extends StatelessWidget {
     this.details,
     this.actions = const [],
     this.dismissible = true,
+    this.child,
   });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
     final screenWidth = MediaQuery.of(context).size.width;
     final isTablet = screenWidth >= 600;
-    final maxDialogWidth = isTablet ? 480.0 : double.infinity;
+    final maxDialogWidth = isTablet ? 480.0 : 320.0;
 
     return Semantics(
       label: type.semanticLabel,
       container: true,
       child: Dialog(
-        backgroundColor: cs.surface,
-        elevation: 3,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(28),
-        ),
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: maxDialogWidth),
+          constraints: BoxConstraints(
+            minWidth: 280,
+            maxWidth: maxDialogWidth,
+          ),
           child: Padding(
             padding: const EdgeInsets.all(Spacing.xxl),
             child: SingleChildScrollView(
@@ -191,6 +191,10 @@ class AppDialog extends StatelessWidget {
                   if (details != null) ...[
                     const SizedBox(height: Spacing.sm),
                     _buildDetails(context),
+                  ],
+                  if (child != null) ...[
+                    const SizedBox(height: Spacing.md),
+                    child!,
                   ],
                   if (actions.isNotEmpty) ...[
                     const SizedBox(height: Spacing.xxl),
@@ -275,7 +279,7 @@ class AppDialog extends StatelessWidget {
     final stackVertically = actions.length > 2 || !isTablet;
 
     Widget buildAction(AppDialogAction action, {required bool fullWidth}) {
-      final handler = action.onPressed == null
+      final handler = action.onPressed == null || action.isLoading
           ? null
           : () => action.onPressed!(context);
 
@@ -283,6 +287,7 @@ class AppDialog extends StatelessWidget {
         return AppButton.destructive(
           onPressed: handler,
           label: action.label,
+          isLoading: action.isLoading,
           fullWidth: fullWidth,
         );
       }
@@ -291,16 +296,16 @@ class AppDialog extends StatelessWidget {
         return AppButton.filled(
           onPressed: handler,
           label: action.label,
+          isLoading: action.isLoading,
           fullWidth: fullWidth,
         );
       }
 
-      return AppButton.text(
+      return AppButton.outlined(
         onPressed: handler,
         label: action.label,
-        color: action.isDestructive
-            ? AppButtonColor.error
-            : AppButtonColor.neutral,
+        color: AppButtonColor.neutral,
+        isLoading: action.isLoading,
         fullWidth: fullWidth,
       );
     }
@@ -329,7 +334,7 @@ class AppDialog extends StatelessWidget {
         final isLast = i == actions.length - 1;
 
         return Padding(
-          padding: EdgeInsets.only(left: isLast ? 0 : Spacing.sm),
+          padding: EdgeInsets.only(right: isLast ? 0 : Spacing.sm),
           child: buildAction(action, fullWidth: false),
         );
       }).toList(),

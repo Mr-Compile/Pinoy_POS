@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:pinoy_pos/core/app_theme.dart';
-import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_messages.dart';
 
 /// Possible user choices from the "Backup Export Failed" dialog.
-enum BackupExportFailedResult { close, tryAgain, changeLocation }
+enum BackupExportFailedResult { close, tryAgain }
 
-enum BackupDestinationConfirmResult { save, changeLocation, cancel }
+enum BackupDestinationConfirmResult { save, cancel }
 
 class AppDialogService {
   AppDialogService._();
@@ -18,6 +16,7 @@ class AppDialogService {
     required String title,
     String? message,
     String? details,
+    Widget? child,
     List<AppDialogAction> actions = const [],
     bool dismissible = true,
   }) {
@@ -37,6 +36,7 @@ class AppDialogService {
         details: details,
         actions: actions,
         dismissible: dismissible,
+        child: child,
       ),
     );
   }
@@ -377,124 +377,10 @@ class AppDialogService {
   // ── Void Sale ────────────────────────────────────────────────────────
 
   static Future<String?> voidSaleConfirm(BuildContext context) {
-    final reasonController = TextEditingController();
-    final cs = Theme.of(context).colorScheme;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isTablet = screenWidth >= 600;
-
     return showDialog<String>(
       context: context,
       useRootNavigator: true,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => Semantics(
-          label: 'Confirmation required',
-          container: true,
-          child: Dialog(
-            backgroundColor: cs.surface,
-            elevation: 3,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(28),
-            ),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: isTablet ? 480.0 : double.infinity),
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Container(
-                          width: 56,
-                          height: 56,
-                          decoration: BoxDecoration(
-                            color: AppSemanticColors.resolve(
-                                AppSemanticColors.warningContainer,
-                                Theme.of(context).brightness),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.warning,
-                            size: 32,
-                            color: AppSemanticColors.resolve(
-                                AppSemanticColors.warning,
-                                Theme.of(context).brightness),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text('Void Sale?',
-                        style: AppTypography.headlineSmallSemibold(context),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Voiding a sale reverses the transaction. This action cannot be undone.',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: cs.onSurfaceVariant,
-                            ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: reasonController,
-                        decoration: const InputDecoration(
-                          labelText: 'Reason',
-                          border: OutlineInputBorder(),
-                        ),
-                        autofocus: true,
-                        maxLines: 2,
-                        onChanged: (_) => setState(() {}),
-                      ),
-                      const SizedBox(height: 24),
-                      Builder(
-                        builder: (context) {
-                          final onVoidPressed = reasonController.text.trim().isEmpty
-                              ? null
-                              : () => Navigator.of(context, rootNavigator: true).pop(reasonController.text.trim());
-                          return isTablet
-                              ? Row(
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  children: [
-                                    AppButton.text(
-                                      onPressed: () => Navigator.of(context, rootNavigator: true).pop(null),
-                                      label: 'Cancel',
-                                      color: AppButtonColor.neutral,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    AppButton.destructive(
-                                      onPressed: onVoidPressed,
-                                      label: 'Void Sale',
-                                    ),
-                                  ],
-                                )
-                              : Column(
-                                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                                  children: [
-                                    AppButton.text(
-                                      onPressed: () => Navigator.of(context, rootNavigator: true).pop(null),
-                                      label: 'Cancel',
-                                      color: AppButtonColor.neutral,
-                                      fullWidth: true,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    AppButton.destructive(
-                                      onPressed: onVoidPressed,
-                                      label: 'Void Sale',
-                                      fullWidth: true,
-                                    ),
-                                  ],
-                                );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
+      builder: (context) => const _VoidSaleDialog(),
     );
   }
 
@@ -611,13 +497,12 @@ class AppDialogService {
   /// before the backup file is actually written.
   ///
   /// Returns [BackupDestinationConfirmResult.save] if the user wants to save
-  /// to the current location, [changeLocation] if they want to pick a
-  /// different destination for this backup, or [cancel] if they abort.
+  /// to the current location, or [cancel] if they abort. Location changes
+  /// are handled from the Backup & Restore screen, not inside this modal.
   static Future<BackupDestinationConfirmResult> backupDestinationConfirm(
     BuildContext context, {
     required String displayName,
     required String location,
-    bool canChangeLocation = true,
   }) {
     return _show<BackupDestinationConfirmResult>(
       context: context,
@@ -633,14 +518,6 @@ class AppDialogService {
             rootNavigator: true,
           ).pop(BackupDestinationConfirmResult.cancel),
         ),
-        if (canChangeLocation)
-          AppDialogAction(
-            label: 'Change Location',
-            onPressed: (context) => Navigator.of(
-              context,
-              rootNavigator: true,
-            ).pop(BackupDestinationConfirmResult.changeLocation),
-          ),
         AppDialogAction(
           label: 'Create Backup',
           isPrimary: true,
@@ -683,11 +560,6 @@ class AppDialogService {
       message: 'We couldn\'t create the backup.',
       details: reason,
       actions: [
-        AppDialogAction(
-          label: 'Change Location',
-          onPressed: (context) => Navigator.of(context, rootNavigator: true)
-              .pop(BackupExportFailedResult.changeLocation),
-        ),
         AppDialogAction(
           label: 'Close',
           onPressed: (context) => Navigator.of(context, rootNavigator: true)
@@ -1116,5 +988,60 @@ class AppDialogService {
         ),
       ],
     ).then((v) => v ?? false);
+  }
+}
+
+class _VoidSaleDialog extends StatefulWidget {
+  const _VoidSaleDialog();
+
+  @override
+  State<_VoidSaleDialog> createState() => _VoidSaleDialogState();
+}
+
+class _VoidSaleDialogState extends State<_VoidSaleDialog> {
+  final _reasonController = TextEditingController();
+
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reason = _reasonController.text.trim();
+    final voidEnabled = reason.isNotEmpty;
+
+    return AppDialog(
+      type: AppDialogType.warning,
+      title: 'Void Sale?',
+      message:
+          'Voiding a sale reverses the transaction. This action cannot be undone.',
+      actions: [
+        AppDialogAction(
+          label: 'Cancel',
+          onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(),
+        ),
+        AppDialogAction(
+          label: 'Void Sale',
+          isPrimary: true,
+          isDestructive: true,
+          onPressed: voidEnabled
+              ? (context) => Navigator.of(context, rootNavigator: true)
+                  .pop(_reasonController.text.trim())
+              : null,
+        ),
+      ],
+      child: TextField(
+        controller: _reasonController,
+        decoration: const InputDecoration(
+          labelText: 'Reason',
+          border: OutlineInputBorder(),
+        ),
+        autofocus: true,
+        maxLines: 2,
+        onChanged: (_) => setState(() {}),
+      ),
+    );
   }
 }

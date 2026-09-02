@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/modal_result.dart';
+import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/ai_quota.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/services/ai_quota_service.dart';
 import 'package:pinoy_pos/services/super_admin_verification_service.dart';
 import 'package:pinoy_pos/services/user_service.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 
 /// Admin page for managing per-user AI quotas and the default daily quota.
@@ -94,59 +96,58 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
       context: context,
       useRootNavigator: true,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          return AlertDialog(
-            icon: const Icon(Icons.settings_outlined),
-            iconColor: AppSemanticColors.info,
-            title: const Text('Change Default AI Quota'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: controller,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'New default daily quota',
-                    helperText: 'Applies to new users unless overridden',
-                  ),
-                  autofocus: true,
-                ),
-                const SizedBox(height: 8),
-                CheckboxListTile(
-                  title: const Text('Apply to all existing users'),
-                  value: applyToExisting,
-                  onChanged: (value) {
-                    setDialogState(() => applyToExisting = value ?? false);
-                  },
-                  controlAffinity: ListTileControlAffinity.leading,
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context, rootNavigator: true).pop(
-                  const ModalResult<({int value, bool applyToExisting})>
-                      .cancelled(),
-                ),
-                child: const Text('Cancel'),
+        builder: (context, setDialogState) => AppDialog(
+          type: AppDialogType.info,
+          title: 'Change Default AI Quota',
+          actions: [
+            AppDialogAction(
+              label: 'Cancel',
+              onPressed: (context) => Navigator.of(context, rootNavigator: true)
+                  .pop(
+                const ModalResult<({int value, bool applyToExisting})>
+                    .cancelled(),
               ),
-              FilledButton(
-                onPressed: () {
-                  final value = int.tryParse(controller.text.trim());
-                  if (value == null) return;
-                  Navigator.of(context, rootNavigator: true).pop(
-                    ModalResult<({int value, bool applyToExisting})>.saved(
-                      (value: value, applyToExisting: applyToExisting),
-                    ),
-                  );
+            ),
+            AppDialogAction(
+              label: 'Save',
+              isPrimary: true,
+              onPressed: (context) {
+                final value = int.tryParse(controller.text.trim());
+                if (value == null) return;
+                Navigator.of(context, rootNavigator: true).pop(
+                  ModalResult<({int value, bool applyToExisting})>.saved(
+                    (value: value, applyToExisting: applyToExisting),
+                  ),
+                );
+              },
+            ),
+          ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: controller,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'New default daily quota',
+                  helperText: 'Applies to new users unless overridden',
+                ),
+                autofocus: true,
+              ),
+              const SizedBox(height: Spacing.sm),
+              CheckboxListTile(
+                title: const Text('Apply to all existing users'),
+                value: applyToExisting,
+                onChanged: (value) {
+                  setDialogState(() => applyToExisting = value ?? false);
                 },
-                child: const Text('Save'),
+                controlAffinity: ListTileControlAffinity.leading,
+                contentPadding: EdgeInsets.zero,
               ),
             ],
-          );
-        },
+          ),
+        ),
       ),
     );
 
@@ -184,11 +185,27 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
     final result = await showDialog<ModalResult<int>>(
       context: context,
       useRootNavigator: true,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.person_outline),
-        iconColor: AppSemanticColors.info,
-        title: Text('Edit Quota for ${user.fullName}'),
-        content: TextField(
+      builder: (context) => AppDialog(
+        type: AppDialogType.info,
+        title: 'Edit Quota for ${user.fullName}',
+        actions: [
+          AppDialogAction(
+            label: 'Cancel',
+            onPressed: (context) => Navigator.of(context, rootNavigator: true)
+                .pop(const ModalResult<int>.cancelled()),
+          ),
+          AppDialogAction(
+            label: 'Save',
+            isPrimary: true,
+            onPressed: (context) {
+              final value = int.tryParse(controller.text.trim());
+              if (value == null) return;
+              Navigator.of(context, rootNavigator: true)
+                  .pop(ModalResult<int>.saved(value));
+            },
+          ),
+        ],
+        child: TextField(
           controller: controller,
           keyboardType: TextInputType.number,
           decoration: const InputDecoration(
@@ -196,22 +213,6 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
           ),
           autofocus: true,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context, rootNavigator: true)
-                .pop(const ModalResult<int>.cancelled()),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final value = int.tryParse(controller.text.trim());
-              if (value == null) return;
-              Navigator.of(context, rootNavigator: true)
-                  .pop(ModalResult<int>.saved(value));
-            },
-            child: const Text('Save'),
-          ),
-        ],
       ),
     );
 
@@ -242,26 +243,13 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
   }
 
   Future<void> _resetUserUsage(User user) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.restart_alt),
-        iconColor: AppSemanticColors.warning,
-        title: Text('Reset usage for ${user.fullName}?'),
-        content: const Text(
+    final confirmed = await AppDialogService.confirmation(
+      context,
+      title: 'Reset usage for ${user.fullName}?',
+      message:
           "This will reset today's AI usage to 0. The daily quota remains unchanged.",
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Reset'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Reset',
+      cancelLabel: 'Cancel',
     );
 
     if (confirmed != true || user.id == null) return;
@@ -284,26 +272,13 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
   }
 
   Future<void> _resetAllUsage() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.restart_alt),
-        iconColor: AppSemanticColors.warning,
-        title: const Text("Reset all users' usage?"),
-        content: const Text(
+    final confirmed = await AppDialogService.confirmation(
+      context,
+      title: "Reset all users' usage?",
+      message:
           "This will reset today's AI usage to 0 for every active user.",
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Reset All'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Reset All',
+      cancelLabel: 'Cancel',
     );
 
     if (confirmed != true) return;
@@ -517,13 +492,13 @@ class _SuperAdminVerificationDialogState
   bool _obscure = true;
   String? _errorText;
 
-  void _verify() {
+  void _verify(BuildContext context) {
     final password = _controller.text;
     final isValid = SuperAdminVerificationService()
         .verifySuperAdminPassword(password);
 
     if (isValid) {
-      Navigator.of(context).pop(true);
+      Navigator.of(context, rootNavigator: true).pop(true);
     } else {
       setState(() => _errorText = 'Incorrect SuperAdmin password');
     }
@@ -535,16 +510,27 @@ class _SuperAdminVerificationDialogState
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      icon: const Icon(Icons.lock_outline),
-      iconColor: AppSemanticColors.warning,
-      title: const Text('SuperAdmin Verification'),
-      content: TextField(
+    return AppDialog(
+      type: AppDialogType.warning,
+      title: 'SuperAdmin Verification',
+      actions: [
+        AppDialogAction(
+          label: 'Cancel',
+          onPressed: (context) =>
+              Navigator.of(context, rootNavigator: true).pop(false),
+        ),
+        AppDialogAction(
+          label: 'Verify',
+          isPrimary: true,
+          onPressed: (context) => _verify(context),
+        ),
+      ],
+      child: TextField(
         controller: _controller,
         obscureText: _obscure,
         autofocus: true,
         textInputAction: TextInputAction.done,
-        onSubmitted: (_) => _verify(),
+        onSubmitted: (_) => _verify(context),
         onChanged: (_) => _clearError(),
         decoration: InputDecoration(
           labelText: 'SuperAdmin password',
@@ -555,16 +541,6 @@ class _SuperAdminVerificationDialogState
           ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: _verify,
-          child: const Text('Verify'),
-        ),
-      ],
     );
   }
 

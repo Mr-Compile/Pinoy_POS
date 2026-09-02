@@ -140,7 +140,7 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
       child: Center(
         child: Chip(
           avatar: Icon(Icons.circle, size: 10, color: color),
-          label: Text(label, style: const TextStyle(fontSize: 12)),
+          label: Text(label, style: AppTypography.labelMedium(context)),
           visualDensity: VisualDensity.compact,
           padding: EdgeInsets.zero,
         ),

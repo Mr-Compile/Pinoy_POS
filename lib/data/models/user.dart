@@ -11,6 +11,18 @@ enum UserRole {
       };
 }
 
+extension UserRoleManagement on UserRole {
+  /// Whether a user with [managerRole] is allowed to create or manage
+  /// accounts with this role.  A role can only be managed by a strictly
+  /// higher-privileged role, preventing privilege escalation (e.g. an Admin
+  /// creating an Owner, or an Admin creating another Admin).
+  bool canBeManagedBy(UserRole managerRole) => index > managerRole.index;
+
+  /// The roles that a user with [managerRole] is allowed to create or assign.
+  static List<UserRole> manageableBy(UserRole managerRole) =>
+      UserRole.values.where((role) => role.canBeManagedBy(managerRole)).toList();
+}
+
 class User {
   final int? id;
   final String username;

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/data/models/product.dart';
 import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/data/models/user.dart';
@@ -83,22 +82,9 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
       return;
     }
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Restore Product'),
-        content: Text('Restore "${product.name}" from trash?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Restore'),
-          ),
-        ],
-      ),
+    final confirmed = await AppDialogService.restoreConfirm(
+      context,
+      itemName: product.name,
     );
 
     if (confirmed == true && mounted) {
@@ -126,32 +112,9 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
       return;
     }
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.warning_amber),
-        iconColor: AppSemanticColors.warning,
-        title: const Text('Permanently Delete Product?'),
-        content: Text(
-          'Are you sure you want to permanently delete '
-          '"${product.name}"?\n\n'
-          'This action cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppSemanticColors.error,
-              foregroundColor: AppSemanticColors.onError,
-            ),
-            child: const Text('Delete Permanently'),
-          ),
-        ],
-      ),
+    final confirmed = await AppDialogService.permanentDeleteConfirm(
+      context,
+      itemName: product.name,
     );
 
     if (confirmed == true && mounted) {
@@ -179,22 +142,9 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
       return;
     }
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Restore Category'),
-        content: Text('Restore "${category.name}" from trash?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Restore'),
-          ),
-        ],
-      ),
+    final confirmed = await AppDialogService.restoreConfirm(
+      context,
+      itemName: category.name,
     );
 
     if (confirmed == true && mounted) {
@@ -222,32 +172,9 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
       return;
     }
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.warning_amber),
-        iconColor: AppSemanticColors.warning,
-        title: const Text('Permanently Delete Category?'),
-        content: Text(
-          'Are you sure you want to permanently delete '
-          '"${category.name}"?\n\n'
-          'This action cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppSemanticColors.error,
-              foregroundColor: AppSemanticColors.onError,
-            ),
-            child: const Text('Delete Permanently'),
-          ),
-        ],
-      ),
+    final confirmed = await AppDialogService.permanentDeleteConfirm(
+      context,
+      itemName: category.name,
     );
 
     if (confirmed == true && mounted) {
@@ -275,25 +202,9 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
       return;
     }
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Restore User?'),
-        content: Text(
-          '${user.fullName} (@${user.username}) will become active '
-          'in User Management again.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Restore'),
-          ),
-        ],
-      ),
+    final confirmed = await AppDialogService.restoreConfirm(
+      context,
+      itemName: '${user.fullName} (@${user.username})',
     );
 
     if (confirmed == true && mounted) {
@@ -320,32 +231,9 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
       return;
     }
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.warning_amber),
-        iconColor: AppSemanticColors.warning,
-        title: const Text('Permanently Delete User?'),
-        content: Text(
-          'Are you sure you want to permanently delete '
-          '${user.fullName} (@${user.username})?\n\n'
-          'This action cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppSemanticColors.error,
-              foregroundColor: AppSemanticColors.onError,
-            ),
-            child: const Text('Delete Permanently'),
-          ),
-        ],
-      ),
+    final confirmed = await AppDialogService.permanentDeleteConfirm(
+      context,
+      itemName: '${user.fullName} (@${user.username})',
     );
 
     if (confirmed == true && mounted) {

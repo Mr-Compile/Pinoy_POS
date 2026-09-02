@@ -7,13 +7,13 @@ import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/user_provider.dart';
 import 'package:pinoy_pos/ui/widgets/app_button.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_icon_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
 import 'package:pinoy_pos/ui/widgets/app_list_item.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
-import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/core/modal_result.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
@@ -158,51 +158,48 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Reset Password?'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'This will reset the password for ${user.fullName} (@${user.username}) to the default temporary password.',
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.info_outline,
-                    size: 20,
-                    color: AppSemanticColors.info,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'The user will be required to change it on next login.',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+      builder: (context) => AppDialog(
+        type: AppDialogType.warning,
+        title: 'Reset Password?',
+        message:
+            'This will reset the password for ${user.fullName} (@${user.username}) to the default temporary password.',
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+          AppDialogAction(
+            label: 'Cancel',
+            onPressed: (context) => Navigator.pop(context, false),
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Reset'),
+          AppDialogAction(
+            label: 'Reset',
+            isPrimary: true,
+            onPressed: (context) => Navigator.pop(context, true),
           ),
         ],
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.info_outline,
+                size: 20,
+                color: AppSemanticColors.resolve(
+                  AppSemanticColors.info,
+                  Theme.of(context).brightness,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'The user will be required to change it on next login.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
 
@@ -241,6 +238,12 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     final usernameController = TextEditingController(text: user.username);
     final fullNameController = TextEditingController(text: user.fullName);
     final pinController = TextEditingController();
+    final currentUser = ref.read(authStateProvider).user;
+    final manageableRoles =
+        UserRoleManagement.manageableBy(currentUser?.role ?? UserRole.staff);
+    final roleItems = manageableRoles.contains(user.role)
+        ? manageableRoles
+        : [user.role, ...manageableRoles];
     UserRole selectedRole = user.role;
     bool hasChanges = false;
     bool isSaving = false;
@@ -274,9 +277,62 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
           onPopInvokedWithResult: (didPop, _) {
             if (!didPop) cancel(dialogContext);
           },
-          child: AlertDialog(
-            title: Text('Edit User: ${user.username}'),
-            content: SingleChildScrollView(
+          child: AppDialog(
+            type: AppDialogType.info,
+            title: 'Edit User: ${user.username}',
+            actions: [
+              AppDialogAction(
+                label: 'Cancel',
+                isLoading: isSaving,
+                onPressed: isSaving
+                    ? null
+                    : (context) => cancel(context),
+              ),
+              AppDialogAction(
+                label: 'Save',
+                isPrimary: true,
+                isLoading: isSaving,
+                onPressed: isSaving
+                    ? null
+                    : (context) async {
+                        if (!formKey.currentState!.validate()) return;
+                        setState(() => isSaving = true);
+                        final pinValue = pinController.text.trim();
+                        try {
+                          final res = await ref
+                              .read(userControllerProvider.notifier)
+                              .updateUser(
+                                userId: user.id!,
+                                username: usernameController.text.trim(),
+                                fullName: fullNameController.text.trim(),
+                                role: selectedRole,
+                                pin: pinValue.isEmpty ? null : pinValue,
+                              );
+                          if (context.mounted) {
+                            setState(() => isSaving = false);
+                            if (res.success) {
+                              Navigator.of(context, rootNavigator: true)
+                                  .pop(const ModalResult<void>.saved());
+                            } else {
+                              Navigator.of(context, rootNavigator: true).pop(
+                                ModalResult<void>.failed(error: res.message),
+                              );
+                            }
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            setState(() => isSaving = false);
+                            Navigator.of(context, rootNavigator: true).pop(
+                              ModalResult<void>.failed(
+                                error: 'Failed to update user',
+                              ),
+                            );
+                          }
+                        }
+                      },
+              ),
+            ],
+            child: SingleChildScrollView(
               child: Form(
                 key: formKey,
                 child: Column(
@@ -289,7 +345,8 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                         border: OutlineInputBorder(),
                       ),
                       autofocus: true,
-                      validator: (value) => Validators.required(value, 'Username'),
+                      validator: (value) =>
+                          Validators.required(value, 'Username'),
                       onChanged: (_) {
                         if (!hasChanges) setState(() => hasChanges = true);
                       },
@@ -301,7 +358,8 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                         labelText: 'Full Name',
                         border: OutlineInputBorder(),
                       ),
-                      validator: (value) => Validators.required(value, 'Full Name'),
+                      validator: (value) =>
+                          Validators.required(value, 'Full Name'),
                       onChanged: (_) {
                         if (!hasChanges) setState(() => hasChanges = true);
                       },
@@ -331,14 +389,12 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                         labelText: 'Role',
                         border: OutlineInputBorder(),
                       ),
-                      items: const [
-                        DropdownMenuItem(
-                            value: UserRole.owner, child: Text('Owner')),
-                        DropdownMenuItem(
-                            value: UserRole.admin, child: Text('System Admin')),
-                        DropdownMenuItem(
-                            value: UserRole.staff, child: Text('Staff')),
-                      ],
+                      items: roleItems
+                          .map((role) => DropdownMenuItem(
+                                value: role,
+                                child: Text(role.displayName),
+                              ))
+                          .toList(),
                       initialValue: selectedRole,
                       onChanged: (value) {
                         if (value != null) {
@@ -353,52 +409,6 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                 ),
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: isSaving ? null : () => cancel(context),
-                child: const Text('Cancel'),
-              ),
-              LoadingButton(
-                isLoading: isSaving,
-                onPressed: () async {
-                  if (!formKey.currentState!.validate()) return;
-                  setState(() => isSaving = true);
-                  final pinValue = pinController.text.trim();
-                  try {
-                    final res = await ref
-                        .read(userControllerProvider.notifier)
-                        .updateUser(
-                      userId: user.id!,
-                      username: usernameController.text.trim(),
-                      fullName: fullNameController.text.trim(),
-                      role: selectedRole,
-                      pin: pinValue.isEmpty ? null : pinValue,
-                    );
-                    if (context.mounted) {
-                      setState(() => isSaving = false);
-                      if (res.success) {
-                        Navigator.of(context, rootNavigator: true)
-                            .pop(const ModalResult<void>.saved());
-                      } else {
-                        Navigator.of(context, rootNavigator: true).pop(
-                          ModalResult<void>.failed(error: res.message),
-                        );
-                      }
-                    }
-                  } catch (e) {
-                    if (context.mounted) {
-                      setState(() => isSaving = false);
-                      Navigator.of(context, rootNavigator: true).pop(
-                        ModalResult<void>.failed(
-                          error: 'Failed to update user',
-                        ),
-                      );
-                    }
-                  }
-                },
-                label: 'Save',
-              ),
-            ],
           ),
         ),
       ),
@@ -436,16 +446,85 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     final usernameController = TextEditingController();
     final fullNameController = TextEditingController();
     final pinController = TextEditingController();
-    UserRole? selectedRole = UserRole.staff;
+    final currentUser = ref.read(authStateProvider).user;
+    final manageableRoles =
+        UserRoleManagement.manageableBy(currentUser?.role ?? UserRole.staff);
+    UserRole? selectedRole = manageableRoles.contains(UserRole.staff)
+        ? UserRole.staff
+        : (manageableRoles.isNotEmpty ? manageableRoles.first : null);
     bool hasChanges = false;
     bool isSaving = false;
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Add User'),
-          content: SingleChildScrollView(
+        builder: (context, setState) => AppDialog(
+          type: AppDialogType.info,
+          title: 'Add User',
+          actions: [
+            AppDialogAction(
+              label: 'Cancel',
+              isLoading: isSaving,
+              onPressed: isSaving
+                  ? null
+                  : (context) async {
+                      if (hasChanges) {
+                        final discard =
+                            await AppDialogService.unsavedChanges(context);
+                        if (discard == true && context.mounted) {
+                          Navigator.of(context, rootNavigator: true).pop();
+                        }
+                      } else if (context.mounted) {
+                        Navigator.of(context, rootNavigator: true).pop();
+                      }
+                    },
+            ),
+            AppDialogAction(
+              label: 'Save',
+              isPrimary: true,
+              isLoading: isSaving,
+              onPressed: isSaving
+                  ? null
+                  : (context) async {
+                      if (!formKey.currentState!.validate()) return;
+                      setState(() => isSaving = true);
+                      final pinValue = pinController.text.trim();
+                      final res = await ref
+                          .read(userControllerProvider.notifier)
+                          .createUser(
+                            username: usernameController.text.trim(),
+                            fullName: fullNameController.text.trim(),
+                            role: selectedRole ?? UserRole.staff,
+                            pin: pinValue.isEmpty ? null : pinValue,
+                          );
+                      if (context.mounted) {
+                        setState(() => isSaving = false);
+                      }
+                      if (res.success) {
+                        if (context.mounted) {
+                          await AppDialogService.success(
+                            context,
+                            title: 'User Created',
+                            message:
+                                '${res.message} The temporary password is ${AppConstants.defaultTemporaryPassword}.',
+                          );
+                        }
+                        if (context.mounted) {
+                          Navigator.of(context, rootNavigator: true).pop();
+                        }
+                      } else {
+                        if (context.mounted) {
+                          AppDialogService.error(
+                            context,
+                            title: 'Create Failed',
+                            message: res.message,
+                          );
+                        }
+                      }
+                    },
+            ),
+          ],
+          child: SingleChildScrollView(
             child: Form(
               key: formKey,
               child: Column(
@@ -536,14 +615,12 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                       labelText: 'Role',
                       border: OutlineInputBorder(),
                     ),
-                    items: const [
-                      DropdownMenuItem(
-                          value: UserRole.owner, child: Text('Owner')),
-                      DropdownMenuItem(
-                          value: UserRole.admin, child: Text('System Admin')),
-                      DropdownMenuItem(
-                          value: UserRole.staff, child: Text('Staff')),
-                    ],
+                    items: manageableRoles
+                        .map((role) => DropdownMenuItem(
+                              value: role,
+                              child: Text(role.displayName),
+                            ))
+                        .toList(),
                     initialValue: selectedRole,
                     onChanged: (value) {
                       if (value != null) {
@@ -562,60 +639,6 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
               ),
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () async {
-                if (hasChanges) {
-                  final discard =
-                      await AppDialogService.unsavedChanges(context);
-                  if (discard == true && context.mounted) {
-                    Navigator.pop(context);
-                  }
-                } else {
-                  Navigator.pop(context);
-                }
-              },
-              child: const Text('Cancel'),
-            ),
-            LoadingButton(
-              isLoading: isSaving,
-              onPressed: () async {
-                if (!formKey.currentState!.validate()) return;
-                setState(() => isSaving = true);
-                final pinValue = pinController.text.trim();
-                final res = await ref
-                    .read(userControllerProvider.notifier)
-                    .createUser(
-                  username: usernameController.text.trim(),
-                  fullName: fullNameController.text.trim(),
-                  role: selectedRole ?? UserRole.staff,
-                  pin: pinValue.isEmpty ? null : pinValue,
-                );
-                if (context.mounted) {
-                  setState(() => isSaving = false);
-                }
-                if (res.success) {
-                  if (context.mounted) {
-                    await AppDialogService.success(
-                      context,
-                      title: 'User Created',
-                      message: '${res.message} The temporary password is ${AppConstants.defaultTemporaryPassword}.',
-                    );
-                  }
-                  if (context.mounted) Navigator.pop(context);
-                } else {
-                  if (context.mounted) {
-                    AppDialogService.error(
-                      context,
-                      title: 'Create Failed',
-                      message: res.message,
-                    );
-                  }
-                }
-              },
-              label: 'Save',
-            ),
-          ],
         ),
       ),
     );

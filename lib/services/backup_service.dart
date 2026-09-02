@@ -115,16 +115,10 @@ class BackupService {
     // Migrate from the v1 plain-path key.
     final legacy = prefs.getString(_legacyBackupLocationKey);
     if (legacy != null && legacy.isNotEmpty) {
-      final migrated = BackupLocation(
-        type: BackupStorageType.fileSystem,
-        reference: legacy,
-        displayName: _storage.getLocationDisplayName(
-          const BackupLocation(type: BackupStorageType.fileSystem, reference: '', displayName: ''),
-        ),
-      );
+      final migrated = _migrateLegacyLocation(legacy);
       await _setBackupLocation(migrated);
       await prefs.remove(_legacyBackupLocationKey);
-      return migrated;
+      if (!migrated.isNone) return migrated;
     }
 
     // Use a default writable desktop folder when nothing is configured.
@@ -186,10 +180,14 @@ class BackupService {
     if (_isContentUri(backup.filePath)) {
       return 'Selected folder';
     }
+
+    final localPath = _toLocalPath(backup.filePath);
+    if (localPath == null) return 'Selected folder';
+
     return _storage.getLocationDisplayName(
       BackupLocation(
         type: BackupStorageType.fileSystem,
-        reference: p.dirname(backup.filePath),
+        reference: p.dirname(localPath),
         displayName: '',
       ),
     );
@@ -451,7 +449,15 @@ class BackupService {
           read.displayName ?? 'backup.db',
         );
       } else {
-        tempPath = backup.filePath;
+        tempPath = _toLocalPath(backup.filePath);
+        if (tempPath == null) {
+          return BackupImportRecord(
+            result: BackupImportResult.failed,
+            displayName: backup.displayName,
+            fileSize: backup.fileSize,
+            error: 'The backup file could not be opened.',
+          );
+        }
       }
 
       if (tempPath == null || tempPath.isEmpty) {
@@ -556,13 +562,18 @@ class BackupService {
         _isContentUri(backup.filePath)) {
       await _storage.deleteBackup(backup.filePath);
     } else if (storageType != BackupStorageType.webDownload) {
+      final localPath = _toLocalPath(backup.filePath);
+      if (localPath == null) {
+        _log('Could not delete backup file "${backup.filePath}": not a valid path.');
+        return false;
+      }
       try {
-        final file = File(backup.filePath);
+        final file = File(localPath);
         if (await file.exists()) {
           await file.delete();
         }
       } catch (e) {
-        _log('Could not delete backup file "${backup.filePath}": $e');
+        _log('Could not delete backup file "$localPath": $e');
       }
     }
 
@@ -584,7 +595,9 @@ class BackupService {
   // ── Validation ───────────────────────────────────────────────────────
 
   Future<BackupImportResult> _validateBackupFile(String path) async {
-    final file = File(path);
+    final localPath = _toLocalPath(path);
+    if (localPath == null) return BackupImportResult.invalidFile;
+    final file = File(localPath);
 
     if (!await file.exists()) {
       return BackupImportResult.invalidFile;
@@ -1012,6 +1025,65 @@ class BackupService {
 
   bool _isContentUri(String reference) {
     return reference.startsWith('content://');
+  }
+
+  bool _isFileUri(String reference) {
+    return reference.startsWith('file://');
+  }
+
+  /// Decodes a `file://` URI into a local path, or returns [reference]
+  /// unchanged if it is already a plain path.
+  ///
+  /// Returns `null` for any other URI scheme because it cannot be passed
+  /// safely to Dart [File] operations.
+  String? _toLocalPath(String reference) {
+    if (!reference.contains('://')) return reference;
+    if (!_isFileUri(reference)) return null;
+    try {
+      final uri = Uri.parse(reference);
+      if (uri.scheme == 'file') return uri.toFilePath();
+    } catch (e) {
+      _log('Could not decode file URI: $reference');
+    }
+    return null;
+  }
+
+  /// Migrates a v1 plain-path stored reference into a typed [BackupLocation].
+  ///
+  /// The legacy value could be an absolute path, a `file://` URI, or a
+  /// content URI from an older Android build, so we normalise it before
+  /// storing it as the canonical v2 location.
+  BackupLocation _migrateLegacyLocation(String legacy) {
+    if (_isContentUri(legacy)) {
+      return BackupLocation(
+        type: BackupStorageType.androidSaf,
+        reference: legacy,
+        displayName: _storage.getLocationDisplayName(
+          BackupLocation(
+            type: BackupStorageType.androidSaf,
+            reference: legacy,
+            displayName: '',
+          ),
+        ),
+      );
+    }
+
+    final path = _toLocalPath(legacy);
+    if (path != null && path.isNotEmpty) {
+      return BackupLocation(
+        type: BackupStorageType.fileSystem,
+        reference: path,
+        displayName: _storage.getLocationDisplayName(
+          BackupLocation(
+            type: BackupStorageType.fileSystem,
+            reference: path,
+            displayName: '',
+          ),
+        ),
+      );
+    }
+
+    return const BackupLocation.none();
   }
 
   void _log(String message) {

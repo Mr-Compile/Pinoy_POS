@@ -72,6 +72,43 @@ class PdfFontService {
       color: color,
     );
   }
+
+  /// Pre-defined PDF typography sizes. Use these instead of ad-hoc values.
+  static pw.TextStyle display({
+    pw.FontWeight? fontWeight,
+    PdfColorValue? color,
+  }) =>
+      style(fontSize: 24, fontWeight: fontWeight, color: color);
+
+  static pw.TextStyle headline({
+    pw.FontWeight? fontWeight,
+    PdfColorValue? color,
+  }) =>
+      style(fontSize: 20, fontWeight: fontWeight, color: color);
+
+  static pw.TextStyle title({
+    pw.FontWeight? fontWeight,
+    PdfColorValue? color,
+  }) =>
+      style(fontSize: 16, fontWeight: fontWeight, color: color);
+
+  static pw.TextStyle subhead({
+    pw.FontWeight? fontWeight,
+    PdfColorValue? color,
+  }) =>
+      style(fontSize: 12, fontWeight: fontWeight, color: color);
+
+  static pw.TextStyle body({
+    pw.FontWeight? fontWeight,
+    PdfColorValue? color,
+  }) =>
+      style(fontSize: 10, fontWeight: fontWeight, color: color);
+
+  static pw.TextStyle small({
+    pw.FontWeight? fontWeight,
+    PdfColorValue? color,
+  }) =>
+      style(fontSize: 9, fontWeight: fontWeight, color: color);
 }
 
 /// Re-export of [PdfColor] so callers can reference [PdfColorValue]
