@@ -322,7 +322,7 @@ class ReceiptService {
   /// Generates a filename such as `PinoyPOS_Receipt_000123_2026-08-28.pdf`.
   String buildFileName(ReceiptViewData receipt) {
     final date = receipt.date.toLocal().toString().split(' ')[0];
-    final raw = 'PinoyPOS_Receipt_${receipt.receiptNumber}_$date';
+    final raw = 'PinoyPOS_Receipt_${receipt.receiptNumber}_$date.pdf';
     // Sanitize Windows/Android/Linux invalid filename characters.
     return raw
         .replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1f]'), '_')

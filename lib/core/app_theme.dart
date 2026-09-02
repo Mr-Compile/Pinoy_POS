@@ -10,6 +10,10 @@ export 'app_typography.dart';
 /// so the full Material 3 palette stays consistent in both light and dark mode.
 /// Status colors are intentionally hardcoded because they carry universal
 /// meaning and must remain consistent across themes.
+///
+/// Every role has an explicit dark-mode variant returned by [resolve]. The
+/// light constants below are the canonical values used in light mode;
+/// [resolve] maps each one to a tested dark-mode counterpart.
 class AppSemanticColors {
   AppSemanticColors._();
 
@@ -54,19 +58,58 @@ class AppSemanticColors {
   /// A subtle, accessible grey for disabled / placeholder states.
   static const Color disabled = Color(0xFF9CA3AF); // Gray 400
 
+  /// Explicit dark-mode counterpart for each light semantic role.
+  ///
+  /// Using a map avoids brittle runtime inversion and keeps the analyzer fast.
+  static final Map<Color, Color> _darkForLight = {
+    // Primary family
+    primary: const Color(0xFF93C5FD),
+    primaryLight: const Color(0xFFBFDBFE),
+    primaryDark: const Color(0xFF60A5FA),
+
+    // Success family
+    success: const Color(0xFF6EE7B7),
+    successContainer: const Color(0xFF065F46),
+    onSuccessContainer: const Color(0xFF6EE7B7),
+
+    // Warning family
+    warning: const Color(0xFFFCD34D),
+    warningContainer: const Color(0xFF92400E),
+    onWarningContainer: const Color(0xFFFEF3C7),
+
+    // Error / danger family (danger is an alias for error)
+    error: const Color(0xFFFCA5A5),
+    errorContainer: const Color(0xFF991B1B),
+    onErrorContainer: const Color(0xFFFEE2E2),
+
+    // Info family
+    info: const Color(0xFF67E8F9),
+    infoContainer: const Color(0xFF155E75),
+    onInfoContainer: const Color(0xFFCFFAFE),
+
+    // Neutral family
+    neutral: const Color(0xFFD1D5DB),
+    neutralContainer: const Color(0xFF374151),
+    onNeutralContainer: const Color(0xFFF3F4F6),
+
+    // On-colors. Several light roles share pure white or black, so the map
+    // uses a single representative for each value. The resolved tone is a
+    // high-contrast neutral that works on every resolved semantic surface.
+    onNeutral: const Color(0xFF1F2937),
+    onWarning: const Color(0xFF000000),
+
+    // Disabled
+    disabled: const Color(0xFF6B7280),
+  };
+
   /// Returns the theme-aware variant of a [light] semantic color.
   ///
   /// In light mode the original [light] color is returned unchanged. In dark
-  /// mode the lightness is inverted (and clamped) so that foreground icons and
-  /// text stay visible on a dark surface, and filled containers keep enough
-  /// contrast against their on-color text.
+  /// mode the color is looked up against an explicit palette designed to keep
+  /// filled surfaces visible on a dark scaffold and on-color text contrasted.
   static Color resolve(Color light, Brightness brightness) {
     if (brightness == Brightness.light) return light;
-
-    final hsl = HSLColor.fromColor(light);
-    final inverted = 1.0 - hsl.lightness;
-    final clamped = inverted.clamp(0.18, 0.78);
-    return hsl.withLightness(clamped).toColor();
+    return _darkForLight[light] ?? light;
   }
 
   /// Convenience for resolving an on-color (white in light) to its dark
@@ -110,10 +153,9 @@ class AppColors {
       seedColor: AppSemanticColors.primary,
       brightness: brightness,
     ).copyWith(
-      // Pin the exact brand primary from the snippet while letting the rest
-      // of the Material 3 tonal palette derive from the same seed.
-      primary: AppSemanticColors.primary,
-      onPrimary: AppSemanticColors.onPrimary,
+      // Resolve the brand primary so it stays visible on dark surfaces.
+      primary: AppSemanticColors.resolve(AppSemanticColors.primary, brightness),
+      onPrimary: AppSemanticColors.resolveOn(AppSemanticColors.onPrimary, brightness),
       // Keep the semantic error family in sync with the app palette.
       // Resolve each tone so the error role is readable in both modes.
       error: AppSemanticColors.resolve(AppSemanticColors.error, brightness),
@@ -379,15 +421,12 @@ class AppColors {
     ColorScheme colorScheme,
     Brightness brightness,
   ) {
-    final primary = AppSemanticColors.primary;
-    final primaryLight = AppSemanticColors.primaryLight;
-    final primaryDark = AppSemanticColors.primaryDark;
+    final primary = AppSemanticColors.resolve(AppSemanticColors.primary, brightness);
+    final primaryLight = AppSemanticColors.resolve(AppSemanticColors.primaryLight, brightness);
     return LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
-      colors: brightness == Brightness.light
-          ? [primaryLight, primary]
-          : [primary, primaryDark],
+      colors: [primaryLight, primary],
     );
   }
 }

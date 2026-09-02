@@ -271,6 +271,8 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(user: _authService.currentUser);
   }
 
+  User? get currentUser => state.user;
+
   bool hasPermission(String permission) {
     return _authService.hasPermission(permission);
   }

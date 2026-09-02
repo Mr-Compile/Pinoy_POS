@@ -65,7 +65,7 @@ class PaymentMethodChart extends StatelessWidget {
         radius: size / 2 - 16,
         title: '${(pct * 100).toStringAsFixed(0)}%',
         titleStyle: TextStyle(
-          color: _contrastColor(color),
+          color: _contrastColor(cs, color),
           fontSize: 10,
           fontWeight: FontWeight.bold,
         ),
@@ -107,9 +107,9 @@ class PaymentMethodChart extends StatelessWidget {
     );
   }
 
-  Color _contrastColor(Color color) {
+  Color _contrastColor(ColorScheme colorScheme, Color color) {
     final brightness = color.computeLuminance();
-    return brightness > 0.5 ? Colors.black : Colors.white;
+    return brightness > 0.5 ? colorScheme.surface : colorScheme.onSurface;
   }
 
   String _formatMoney(double v) {

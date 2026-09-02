@@ -92,14 +92,14 @@ class SaleItemDao extends BaseDao<SaleItem> {
 
     return database.rawQuery('''
       SELECT si.product_id AS product_id,
-             p.name AS product_name,
+             COALESCE(si.product_name, p.name, 'Product #' || si.product_id) AS product_name,
              SUM(si.quantity) AS total_quantity,
              COALESCE(SUM(si.total_price), 0) AS revenue
       FROM sale_items si
       INNER JOIN sales s ON si.sale_id = s.id
-      INNER JOIN products p ON si.product_id = p.id
+      LEFT JOIN products p ON si.product_id = p.id
       WHERE ${conditions.join(' AND ')}
-      GROUP BY si.product_id, p.name
+      GROUP BY si.product_id, COALESCE(si.product_name, p.name, 'Product #' || si.product_id)
       ORDER BY $orderBy
       LIMIT ?
     ''', args);

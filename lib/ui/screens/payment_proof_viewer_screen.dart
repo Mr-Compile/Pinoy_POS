@@ -12,10 +12,10 @@ import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 
-/// Full-screen payment evidence viewer. Requires `view_payment_evidence`.
+/// Full-screen GCash payment evidence viewer. Requires `view_payment_evidence`.
 ///
-/// Supports both image and PDF proofs, shows the detected file type, and
-/// provides Refresh, Download, and Replace actions.
+/// GCash payment proofs are always images. The viewer shows the detected
+/// file type and provides Refresh, Download Image, and Replace actions.
 class PaymentProofViewerScreen extends ConsumerStatefulWidget {
   final Sale sale;
 

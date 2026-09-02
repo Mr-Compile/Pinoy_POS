@@ -1,6 +1,7 @@
 import 'package:pinoy_pos/data/models/category_sales_result.dart';
 import 'package:pinoy_pos/data/models/daily_sales_point.dart';
 import 'package:pinoy_pos/data/models/payment_breakdown.dart';
+import 'package:pinoy_pos/data/models/peak_sales_period.dart';
 import 'package:pinoy_pos/data/models/reporting_period.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/data/models/staff_sales_summary.dart';
@@ -61,6 +62,7 @@ class SalesAnalytics {
   final List<TopProductResult> topProducts;
   final List<CategorySalesResult> categorySales;
   final List<StaffSalesSummary> staffSummaries;
+  final PeakSalesPeriod peakSalesPeriod;
   final List<Sale> sales;
 
   const SalesAnalytics({
@@ -76,6 +78,7 @@ class SalesAnalytics {
     required this.topProducts,
     required this.categorySales,
     required this.staffSummaries,
+    this.peakSalesPeriod = const PeakSalesPeriod(),
     required this.sales,
   });
 
@@ -93,6 +96,7 @@ class SalesAnalytics {
         topProducts: const [],
         categorySales: const [],
         staffSummaries: const [],
+        peakSalesPeriod: const PeakSalesPeriod(),
         sales: const [],
       );
 

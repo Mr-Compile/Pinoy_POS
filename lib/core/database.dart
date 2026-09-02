@@ -392,6 +392,12 @@ class DatabaseHelper {
     if (oldVersion < 17) {
       await _backfillPaymentProofTypes(db);
     }
+
+    // Migration from v17 → v18: extend export_history for the report
+    // submission / owner inbox workflow.
+    if (oldVersion < 18) {
+      await _migrateExportHistoryV18(db);
+    }
   }
 
   /// Backfills payment_proof_type for existing sales by detecting the actual
@@ -443,6 +449,40 @@ class DatabaseHelper {
       }
     } catch (_) {
       // Do not block the app upgrade if the backfill cannot complete.
+    }
+  }
+
+  /// Migration from v17 → v18: extend export_history for report submissions.
+  ///
+  /// Adds status/submission/viewed metadata, soft-delete, file size,
+  /// thumbnail path and a human-readable report number. Existing rows default
+  /// to status 'generated' and retain their original created_at date.
+  Future<void> _migrateExportHistoryV18(Database db) async {
+    const newColumns = [
+      'status',
+      'submitted_at',
+      'viewed_at',
+      'file_size',
+      'thumbnail_path',
+      'report_number',
+      'deleted_at',
+    ];
+
+    for (final column in newColumns) {
+      try {
+        await db.execute('ALTER TABLE export_history ADD COLUMN $column TEXT');
+      } catch (_) {
+        // Column may already exist; continue with the rest.
+      }
+    }
+
+    // Backfill existing rows without a status so the UI never sees null.
+    try {
+      await db.execute(
+        "UPDATE export_history SET status = 'generated' WHERE status IS NULL",
+      );
+    } catch (_) {
+      // Ignore; the column may not have been added.
     }
   }
 
@@ -699,6 +739,13 @@ class DatabaseHelper {
         date_range_end TEXT,
         created_by INTEGER,
         created_at TEXT NOT NULL,
+        status TEXT,
+        submitted_at TEXT,
+        viewed_at TEXT,
+        file_size INTEGER,
+        thumbnail_path TEXT,
+        report_number TEXT,
+        deleted_at TEXT,
         FOREIGN KEY (created_by) REFERENCES users(id)
       )
     ''');

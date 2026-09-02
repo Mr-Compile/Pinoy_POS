@@ -17,6 +17,11 @@ class SalesSummaryCards extends StatelessWidget {
 
   String get _currency => storeInfo?.currency ?? 'PHP';
 
+  String get _currencySymbol {
+    if (_currency == 'PHP') return '₱';
+    return _currency;
+  }
+
   @override
   Widget build(BuildContext context) {
     final comparison = analytics.comparison;
@@ -101,7 +106,7 @@ class SalesSummaryCards extends StatelessWidget {
   }
 
   String _formatMoney(double value) {
-    return '$_currency ${value.toStringAsFixed(2)}';
+    return '$_currencySymbol${value.toStringAsFixed(2)}';
   }
 
   String _changeText(double? percent, String suffix) {

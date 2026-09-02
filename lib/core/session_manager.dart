@@ -99,9 +99,11 @@ class SessionManager {
     'view_settings',
     'edit_settings',
     'manage_staff',
+    'view_staff_performance',
     'view_notifications',
     'view_profile',
     'view_more',
+    'view_report_submissions',
   ];
 
   /// System Admin (Technical Administrator) — maintains the application,
@@ -115,6 +117,8 @@ class SessionManager {
   /// [AICapabilityPolicy].
   static const List<String> _systemAdminPermissions = [
     'view_dashboard',
+    'view_reports',
+    'view_staff_performance',
     'manage_users',
     'edit_users',
     'delete_users',

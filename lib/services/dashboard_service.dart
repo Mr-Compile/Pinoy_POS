@@ -1,21 +1,18 @@
-import 'package:pinoy_pos/core/date_utils.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/activity_log.dart';
 import 'package:pinoy_pos/data/models/announcement.dart';
-import 'package:pinoy_pos/data/models/daily_sales_point.dart';
 import 'package:pinoy_pos/data/models/product.dart';
+import 'package:pinoy_pos/data/models/reporting_period.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
-import 'package:pinoy_pos/data/models/staff_sales_summary.dart';
-import 'package:pinoy_pos/data/models/top_product_result.dart';
+import 'package:pinoy_pos/data/models/sales_analytics.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/data/repositories/activity_log_repository.dart';
 import 'package:pinoy_pos/data/repositories/announcement_repository.dart';
 import 'package:pinoy_pos/data/repositories/backup_history_repository.dart';
 import 'package:pinoy_pos/data/repositories/product_repository.dart';
-import 'package:pinoy_pos/data/repositories/sale_item_repository.dart';
-import 'package:pinoy_pos/data/repositories/sale_repository.dart';
 import 'package:pinoy_pos/data/repositories/trash_repository.dart';
 import 'package:pinoy_pos/data/repositories/user_repository.dart';
+import 'package:pinoy_pos/services/sales_analytics_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Analytics DTOs
@@ -65,37 +62,31 @@ class BackupSummary {
 
 /// Aggregated Owner dashboard data. All values come from real SQLite rows.
 class OwnerDashboardData {
-  final double todaySales;
-  final int todayTransactions;
+  final SalesAnalytics analytics;
   final int lowStockCount;
   final int outOfStockCount;
-  final List<DailySalesPoint> salesTrend;
-  final List<TopProductResult> topProducts;
   final InventoryStatus inventoryStatus;
   final List<Sale> recentSales;
   final List<ActivityLog> recentActivities;
   final List<Announcement> announcements;
   final List<Product> lowStockProducts;
-  final List<StaffSalesSummary> staffSales;
+
   const OwnerDashboardData({
-    required this.todaySales,
-    required this.todayTransactions,
+    required this.analytics,
     required this.lowStockCount,
     required this.outOfStockCount,
-    required this.salesTrend,
-    required this.topProducts,
     required this.inventoryStatus,
     required this.recentSales,
     required this.recentActivities,
     required this.announcements,
     required this.lowStockProducts,
-    required this.staffSales,
   });
 }
 
 /// Aggregated System Admin dashboard data. All values come from real
 /// SQLite rows.
 class AdminDashboardData {
+  final SalesAnalytics? analytics;
   final int activeUsers;
   final int inactiveUsers;
   final int recentActivityCount;
@@ -103,8 +94,9 @@ class AdminDashboardData {
   final BackupSummary backupStatus;
   final int trashCount;
   final List<ActivityLog> recentActivities;
-  final List<StaffSalesSummary> staffSales;
+
   const AdminDashboardData({
+    this.analytics,
     required this.activeUsers,
     required this.inactiveUsers,
     required this.recentActivityCount,
@@ -112,30 +104,24 @@ class AdminDashboardData {
     required this.backupStatus,
     required this.trashCount,
     required this.recentActivities,
-    required this.staffSales,
   });
 }
 
 /// Aggregated Staff dashboard data. Sales figures are filtered to the
 /// current user only (sales.user_id = currentUser.id).
 class StaffDashboardData {
-  final double mySalesToday;
-  final int myTransactionsToday;
+  final SalesAnalytics analytics;
   final int lowStockCount;
   final int outOfStockCount;
-  final List<DailySalesPoint> mySalesTrend;
   final InventoryStatus inventoryStatus;
-  final List<Sale> myRecentSales;
   final List<ActivityLog> recentActivities;
   final List<Product> lowStockProducts;
+
   const StaffDashboardData({
-    required this.mySalesToday,
-    required this.myTransactionsToday,
+    required this.analytics,
     required this.lowStockCount,
     required this.outOfStockCount,
-    required this.mySalesTrend,
     required this.inventoryStatus,
-    required this.myRecentSales,
     required this.recentActivities,
     required this.lowStockProducts,
   });
@@ -156,8 +142,6 @@ class StaffDashboardData {
 /// UI hiding is NOT a security mechanism; the service enforces the same
 /// RBAC as [SessionManager] and filters Staff data at the query level.
 class DashboardService {
-  final SaleRepository _saleRepository = SaleRepository();
-  final SaleItemRepository _saleItemRepository = SaleItemRepository();
   final ProductRepository _productRepository = ProductRepository();
   final UserRepository _userRepository = UserRepository();
   final ActivityLogRepository _activityLogRepository = ActivityLogRepository();
@@ -165,22 +149,29 @@ class DashboardService {
   final BackupHistoryRepository _backupHistoryRepository = BackupHistoryRepository();
   final TrashRepository _trashRepository = TrashRepository();
   final SessionManager _sessionManager = SessionManager();
+  final SalesAnalyticsService _salesAnalyticsService = SalesAnalyticsService();
 
-  /// Dispatches to the correct role-scoped loader. Returns null when the
-  /// current user lacks `view_dashboard` (defence in depth — the UI should
-  /// also be hidden, but this prevents any data leak if it is not).
-  Future<Object?> getDashboard() async {
+  /// Dispatches to the correct role-scoped loader for the selected period.
+  ///
+  /// Returns null when the current user lacks `view_dashboard` (defence in
+  /// depth — the UI should also be hidden, but this prevents any data leak
+  /// if it is not).
+  Future<Object?> getDashboard(
+    ReportingPeriod period, {
+    DateTime? customStart,
+    DateTime? customEnd,
+  }) async {
     if (!_sessionManager.hasPermission('view_dashboard')) {
       return null;
     }
     final role = _sessionManager.currentUser?.role;
     switch (role) {
       case UserRole.owner:
-        return getOwnerDashboard();
+        return getOwnerDashboard(period, customStart: customStart, customEnd: customEnd);
       case UserRole.admin:
-        return getAdminDashboard();
+        return getAdminDashboard(period, customStart: customStart, customEnd: customEnd);
       case UserRole.staff:
-        return getStaffDashboard();
+        return getStaffDashboard(period, customStart: customStart, customEnd: customEnd);
       case null:
         return null;
     }
@@ -188,29 +179,21 @@ class DashboardService {
 
   // ── Owner ──────────────────────────────────────────────────────────
 
-  Future<OwnerDashboardData> getOwnerDashboard() async {
+  Future<OwnerDashboardData> getOwnerDashboard(
+    ReportingPeriod period, {
+    DateTime? customStart,
+    DateTime? customEnd,
+  }) async {
     if (!_sessionManager.hasPermission('view_dashboard')) {
       return _emptyOwner();
     }
 
-    final now = DateTime.now();
-    final trendStart = startOfDay(now)
-        .subtract(const Duration(days: 6));
-    final trendEnd = trendStart.add(const Duration(days: 7));
-
-    // Fetch non-voided sales across the last 7 days for the trend + today's
-    // totals + recent sales list. A single query feeds multiple metrics.
-    final trendSales = await _saleRepository.getByDateRange(trendStart, trendEnd);
-    final salesTrend = _buildDailySalesTrend(trendSales, trendStart);
-
-    final todayStart = startOfDay(now);
-    final todayEnd = todayStart.add(const Duration(days: 1));
-    final todaySales = trendSales
-        .where((s) => !s.createdAt.isBefore(todayStart) && s.createdAt.isBefore(todayEnd))
-        .fold<double>(0.0, (sum, s) => sum + s.totalAmount);
-    final todayTransactions = trendSales
-        .where((s) => !s.createdAt.isBefore(todayStart) && s.createdAt.isBefore(todayEnd))
-        .length;
+    final bounds = periodBoundsFor(
+      period,
+      customStart: customStart,
+      customEnd: customEnd,
+    );
+    final analytics = await _salesAnalyticsService.getAnalyticsForBounds(bounds);
 
     // Inventory status from active products.
     final products = await _productRepository.getActiveProducts();
@@ -220,17 +203,6 @@ class DashboardService {
         .toList()
       ..sort((a, b) => a.stock.compareTo(b.stock));
 
-    // Top products over the last 30 days (business-wide).
-    final topSince = now.subtract(const Duration(days: 30));
-    final topRows = await _saleItemRepository.getTopProducts(
-      limit: 5,
-      since: topSince,
-    );
-    final topProducts = topRows.map(_mapTopProduct).toList();
-
-    // Recent sales (newest first, already ordered DESC by the DAO).
-    final recentSales = trendSales.take(5).toList();
-
     // Recent activity (Owner sees all).
     final activities = await _activityLogRepository.getRecentActivities();
     final recentActivities = activities.take(5).toList();
@@ -238,31 +210,25 @@ class DashboardService {
     // Active announcements, pinned first.
     final announcements = await _loadAnnouncements();
 
-    // Staff performance and hourly sales for the same 7-day window.
-    final staffSales = await _saleRepository.getStaffSalesSummary(
-      trendStart,
-      trendEnd,
-      role: UserRole.staff,
-    );
     return OwnerDashboardData(
-      todaySales: todaySales,
-      todayTransactions: todayTransactions,
+      analytics: analytics,
       lowStockCount: inventory.lowStock,
       outOfStockCount: inventory.outOfStock,
-      salesTrend: salesTrend,
-      topProducts: topProducts,
       inventoryStatus: inventory,
-      recentSales: recentSales,
+      recentSales: analytics.sales.take(5).toList(),
       recentActivities: recentActivities,
       announcements: announcements,
       lowStockProducts: lowStockProducts,
-      staffSales: staffSales,
     );
   }
 
   // ── Admin ──────────────────────────────────────────────────────────
 
-  Future<AdminDashboardData> getAdminDashboard() async {
+  Future<AdminDashboardData> getAdminDashboard(
+    ReportingPeriod period, {
+    DateTime? customStart,
+    DateTime? customEnd,
+  }) async {
     if (!_sessionManager.hasPermission('view_dashboard')) {
       return _emptyAdmin();
     }
@@ -299,13 +265,19 @@ class DashboardService {
     // Trash count.
     final trashItems = await _trashRepository.getAll();
 
-    // Staff performance and hourly sales for the last 7 days.
-    final staffSales = await _saleRepository.getStaffSalesSummary(
-      weekAgo,
-      now,
-      role: UserRole.staff,
-    );
+    // Operational sales analytics when the role is permitted to view reports.
+    SalesAnalytics? analytics;
+    if (_sessionManager.hasPermission('view_reports')) {
+      final bounds = periodBoundsFor(
+        period,
+        customStart: customStart,
+        customEnd: customEnd,
+      );
+      analytics = await _salesAnalyticsService.getAnalyticsForBounds(bounds);
+    }
+
     return AdminDashboardData(
+      analytics: analytics,
       activeUsers: activeUsers.length,
       inactiveUsers: inactiveCount < 0 ? 0 : inactiveCount,
       recentActivityCount: weekActivities.length,
@@ -317,40 +289,28 @@ class DashboardService {
       backupStatus: backupSummary,
       trashCount: trashItems.length,
       recentActivities: recentActivities,
-      staffSales: staffSales,
     );
   }
 
   // ── Staff ──────────────────────────────────────────────────────────
 
-  Future<StaffDashboardData> getStaffDashboard() async {
+  Future<StaffDashboardData> getStaffDashboard(
+    ReportingPeriod period, {
+    DateTime? customStart,
+    DateTime? customEnd,
+  }) async {
     final user = _sessionManager.currentUser;
     if (!_sessionManager.hasPermission('view_dashboard') || user == null) {
       return _emptyStaff();
     }
-    final userId = user.id!;
 
-    final now = DateTime.now();
-    final trendStart = startOfDay(now)
-        .subtract(const Duration(days: 6));
-    final trendEnd = trendStart.add(const Duration(days: 7));
-
-    // Staff: only own sales (filtered at the DAO query level).
-    final trendSales = await _saleRepository.getByDateRangeAndUser(
-      trendStart,
-      trendEnd,
-      userId,
+    final bounds = periodBoundsFor(
+      period,
+      customStart: customStart,
+      customEnd: customEnd,
     );
-    final salesTrend = _buildDailySalesTrend(trendSales, trendStart);
-
-    final todayStart = startOfDay(now);
-    final todayEnd = todayStart.add(const Duration(days: 1));
-    final myTodaySales = trendSales
-        .where((s) => !s.createdAt.isBefore(todayStart) && s.createdAt.isBefore(todayEnd))
-        .fold<double>(0.0, (sum, s) => sum + s.totalAmount);
-    final myTodayTransactions = trendSales
-        .where((s) => !s.createdAt.isBefore(todayStart) && s.createdAt.isBefore(todayEnd))
-        .length;
+    // SalesAnalyticsService automatically scopes Staff to the current user.
+    final analytics = await _salesAnalyticsService.getAnalyticsForBounds(bounds);
 
     // Inventory status (Staff may view products/stock).
     final products = await _productRepository.getActiveProducts();
@@ -360,51 +320,21 @@ class DashboardService {
         .toList()
       ..sort((a, b) => a.stock.compareTo(b.stock));
 
-    // Staff recent sales (own only).
-    final myRecentSales = trendSales.take(5).toList();
-
     // Staff recent activity (own only — DAO filters by user_id).
-    final activities = await _activityLogRepository.getByUserId(userId);
+    final activities = await _activityLogRepository.getByUserId(user.id!);
     final recentActivities = activities.take(5).toList();
 
     return StaffDashboardData(
-      mySalesToday: myTodaySales,
-      myTransactionsToday: myTodayTransactions,
+      analytics: analytics,
       lowStockCount: inventory.lowStock,
       outOfStockCount: inventory.outOfStock,
-      mySalesTrend: salesTrend,
       inventoryStatus: inventory,
-      myRecentSales: myRecentSales,
       recentActivities: recentActivities,
       lowStockProducts: lowStockProducts,
     );
   }
 
   // ── Helpers ────────────────────────────────────────────────────────
-
-  /// Builds a 7-point daily sales trend starting at [start] (inclusive),
-  /// one point per day, aggregating [sales] by calendar day. Days with no
-  /// sales produce a zero point so the chart axis stays consistent.
-  List<DailySalesPoint> _buildDailySalesTrend(List<Sale> sales, DateTime start) {
-    final byDay = <int, List<Sale>>{};
-    for (final s in sales) {
-      final key = DateTime(s.createdAt.year, s.createdAt.month, s.createdAt.day)
-          .millisecondsSinceEpoch;
-      byDay.putIfAbsent(key, () => []).add(s);
-    }
-    final points = <DailySalesPoint>[];
-    for (int i = 0; i < 7; i++) {
-      final day = start.add(Duration(days: i));
-      final key = day.millisecondsSinceEpoch;
-      final daySales = byDay[key] ?? const [];
-      points.add(DailySalesPoint(
-        date: day,
-        total: daySales.fold<double>(0.0, (sum, s) => sum + s.totalAmount),
-        count: daySales.length,
-      ));
-    }
-    return points;
-  }
 
   /// Computes inventory status from a list of active products.
   ///
@@ -439,25 +369,26 @@ class DashboardService {
     return items;
   }
 
-  TopProductResult _mapTopProduct(Map<String, dynamic> row) {
-    return TopProductResult.fromMap(row);
-  }
-
   // ── Empty states (returned when permission is missing) ─────────────
 
-  OwnerDashboardData _emptyOwner() => const OwnerDashboardData(
-        todaySales: 0,
-        todayTransactions: 0,
+  OwnerDashboardData _emptyOwner() => OwnerDashboardData(
+        analytics: SalesAnalytics.empty(
+          ReportingPeriodBounds(
+            start: DateTime.now(),
+            end: DateTime.now(),
+            previousStart: DateTime.now(),
+            previousEnd: DateTime.now(),
+            groupBy: ReportGroupBy.day,
+          ),
+        ),
         lowStockCount: 0,
         outOfStockCount: 0,
-        salesTrend: [],
-        topProducts: [],
-        inventoryStatus: InventoryStatus(normal: 0, lowStock: 0, outOfStock: 0),
-        recentSales: [],
-        recentActivities: [],
-        announcements: [],
-        lowStockProducts: [],
-        staffSales: [],
+        inventoryStatus:
+            const InventoryStatus(normal: 0, lowStock: 0, outOfStock: 0),
+        recentSales: const [],
+        recentActivities: const [],
+        announcements: const [],
+        lowStockProducts: const [],
       );
 
   AdminDashboardData _emptyAdmin() => const AdminDashboardData(
@@ -468,18 +399,23 @@ class DashboardService {
         backupStatus: BackupSummary(hasBackup: false),
         trashCount: 0,
         recentActivities: [],
-        staffSales: [],
       );
 
-  StaffDashboardData _emptyStaff() => const StaffDashboardData(
-        mySalesToday: 0,
-        myTransactionsToday: 0,
+  StaffDashboardData _emptyStaff() => StaffDashboardData(
+        analytics: SalesAnalytics.empty(
+          ReportingPeriodBounds(
+            start: DateTime.now(),
+            end: DateTime.now(),
+            previousStart: DateTime.now(),
+            previousEnd: DateTime.now(),
+            groupBy: ReportGroupBy.day,
+          ),
+        ),
         lowStockCount: 0,
         outOfStockCount: 0,
-        mySalesTrend: [],
-        inventoryStatus: InventoryStatus(normal: 0, lowStock: 0, outOfStock: 0),
-        myRecentSales: [],
-        recentActivities: [],
-        lowStockProducts: [],
+        inventoryStatus:
+            const InventoryStatus(normal: 0, lowStock: 0, outOfStock: 0),
+        recentActivities: const [],
+        lowStockProducts: const [],
       );
 }

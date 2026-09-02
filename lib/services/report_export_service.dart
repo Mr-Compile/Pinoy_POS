@@ -1,11 +1,14 @@
 import 'dart:convert';
-import 'dart:typed_data';
+import 'dart:io';
 
 import 'package:csv/csv.dart';
 import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
@@ -19,6 +22,7 @@ import 'package:pinoy_pos/data/repositories/user_repository.dart';
 import 'package:pinoy_pos/services/file_export_service.dart';
 import 'package:pinoy_pos/services/pdf_font_service.dart';
 import 'package:pinoy_pos/services/report_service.dart';
+import 'package:pinoy_pos/services/sales_service.dart';
 
 /// Supported report export formats.
 enum ExportFormat {
@@ -91,18 +95,27 @@ class ReportExportService {
 
   /// Exports the provided [analytics] as a PDF, Excel, or CSV report.
   ///
-  /// Returns `true` when the file was saved and the export was recorded,
-  /// `false` when the user cancelled the save dialog or the report bytes
-  /// could not be built.
-  Future<bool> exportSalesReport({
+  /// Returns the saved file path when the file was saved and the export was
+  /// recorded, or `null` when the user cancelled the save dialog or the report
+  /// bytes could not be built.
+  Future<String?> exportSalesReport({
     required SalesAnalytics analytics,
     required Settings store,
     required ExportFormat format,
   }) async {
-    final bundles = await _buildBundles(analytics.sales);
+    // Load all confirmed sales for the period so the export is not capped at
+    // the 100-row preview limit used by the analytics UI.
+    final allSales = await SalesService().getFilteredSales(
+      start: analytics.bounds.start,
+      end: analytics.bounds.end,
+      paymentStatus: 'confirmed',
+      limit: null,
+    );
+
+    final bundles = await _buildBundles(allSales);
     final userNames = await _buildUserNames();
 
-    Uint8List? bytes;
+    var bytes = Uint8List(0);
     try {
       bytes = await switch (format) {
         ExportFormat.pdf => _buildPdf(analytics, store, bundles, userNames),
@@ -111,10 +124,10 @@ class ReportExportService {
       };
     } catch (e, st) {
       debugPrint('[ReportExportService] Failed to build report bytes: $e\n$st');
-      return false;
+      return null;
     }
 
-    if (bytes.isEmpty) return false;
+    if (bytes.isEmpty) return null;
 
     final timestamp = DateFormat('yyyy-MM-dd_HH-mm-ss').format(DateTime.now());
     final fileName = 'pinoy_pos_sales_$timestamp.${format.fileExtension}';
@@ -131,19 +144,106 @@ class ReportExportService {
       );
     } catch (e, st) {
       debugPrint('[ReportExportService] Save dialog failed: $e\n$st');
-      return false;
+      return null;
     }
 
-    if (savePath == null || savePath.isEmpty) return false;
+    if (savePath == null || savePath.isEmpty) return null;
 
+    int? fileSize;
+    if (!kIsWeb && !savePath.startsWith('content://')) {
+      try {
+        fileSize = await File(savePath).length();
+      } catch (_) {
+        fileSize = null;
+      }
+    }
+
+    final reportNumber = await ReportService().nextReportNumber();
     await ReportService().recordExport(
       fileFormat: format.fileFormat,
       filePath: savePath,
       dateRangeStart: analytics.bounds.start,
       dateRangeEnd: analytics.bounds.end,
+      fileSize: fileSize,
+      reportNumber: reportNumber,
     );
 
-    return true;
+    return savePath;
+  }
+
+  /// Generates a report for the current user and stores it in the app's
+  /// reports directory as a submission to the Owner.
+  ///
+  /// Returns the saved report file path, or `null` if the report could not be
+  /// generated or saved. On web this returns `null` because there is no
+  /// persistent local report storage.
+  Future<String?> submitSalesReport({
+    required SalesAnalytics analytics,
+    required Settings store,
+    ExportFormat format = ExportFormat.pdf,
+  }) async {
+    if (kIsWeb) return null;
+
+    final allSales = await SalesService().getFilteredSales(
+      start: analytics.bounds.start,
+      end: analytics.bounds.end,
+      paymentStatus: 'confirmed',
+      limit: null,
+    );
+
+    final bundles = await _buildBundles(allSales);
+    final userNames = await _buildUserNames();
+
+    var bytes = Uint8List(0);
+    try {
+      bytes = await switch (format) {
+        ExportFormat.pdf => _buildPdf(analytics, store, bundles, userNames),
+        ExportFormat.excel => _buildExcel(analytics, store, bundles, userNames),
+        ExportFormat.csv => _buildCsv(analytics, store, bundles, userNames),
+      };
+    } catch (e, st) {
+      debugPrint('[ReportExportService] Failed to build report bytes: $e\n$st');
+      return null;
+    }
+
+    if (bytes.isEmpty) return null;
+
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final reportsDir = Directory(p.join(appDir.path, 'reports'));
+      if (!await reportsDir.exists()) {
+        await reportsDir.create(recursive: true);
+      }
+
+      final reportNumber = await ReportService().nextReportNumber();
+      final timestamp = DateFormat('yyyy-MM-dd_HH-mm-ss').format(DateTime.now());
+      final fileName = 'sales_report_${reportNumber}_$timestamp.${format.fileExtension}';
+      final filePath = p.join(reportsDir.path, fileName);
+
+      final file = File(filePath);
+      await file.writeAsBytes(bytes, flush: true);
+
+      // Store the relative path so backups can relocate the file directory.
+      final storedPath = p.join('reports', fileName);
+
+      final exportId = await ReportService().recordExport(
+        fileFormat: format.fileFormat,
+        filePath: storedPath,
+        dateRangeStart: analytics.bounds.start,
+        dateRangeEnd: analytics.bounds.end,
+        fileSize: bytes.length,
+        reportNumber: reportNumber,
+      );
+
+      if (exportId != null) {
+        await ReportService().submitReport(exportId);
+      }
+
+      return storedPath;
+    } catch (e, st) {
+      debugPrint('[ReportExportService] Submit report failed: $e\n$st');
+      return null;
+    }
   }
 
   Future<List<ExportSaleBundle>> _buildBundles(List<Sale> sales) async {

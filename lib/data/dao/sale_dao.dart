@@ -6,6 +6,7 @@ import 'package:pinoy_pos/data/models/daily_sales_point.dart';
 import 'package:pinoy_pos/data/models/payment_breakdown.dart';
 import 'package:pinoy_pos/data/models/reporting_period.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
+import 'package:pinoy_pos/data/models/sales_by_hour_point.dart';
 import 'package:pinoy_pos/data/models/staff_sales_summary.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:sqflite/sqflite.dart';
@@ -196,7 +197,7 @@ class SaleDao extends BaseDao<Sale> {
     String? paymentStatus,
     String? search,
     int? userId,
-    int limit = 500,
+    int? limit = 500,
     DatabaseExecutor? txn,
   }) async {
     final executor = txn ?? await db;
@@ -295,12 +296,17 @@ class SaleDao extends BaseDao<Sale> {
     DatabaseExecutor? txn,
   }) async {
     final executor = txn ?? await db;
-    final conditions = _confirmedRangeConditions(start, end, userId);
+    final conditions = _confirmedRangeConditions(
+      start,
+      end,
+      userId,
+      tableAlias: 's',
+    );
 
     final result = await executor.rawQuery('''
-      SELECT COALESCE(SUM(total_amount), 0) as total_sales,
+      SELECT COALESCE(SUM(s.total_amount), 0) as total_sales,
              COUNT(*) as transaction_count
-      FROM sales
+      FROM sales s
       WHERE ${conditions.where}
     ''', conditions.args);
 
@@ -315,7 +321,12 @@ class SaleDao extends BaseDao<Sale> {
     DatabaseExecutor? txn,
   }) async {
     final executor = txn ?? await db;
-    final conditions = _confirmedRangeConditions(start, end, userId);
+    final conditions = _confirmedRangeConditions(
+      start,
+      end,
+      userId,
+      tableAlias: 's',
+    );
 
     final result = await executor.rawQuery('''
       SELECT COALESCE(SUM(si.quantity), 0) as items_sold
@@ -338,7 +349,12 @@ class SaleDao extends BaseDao<Sale> {
     int? userId,
   }) async {
     final database = await db;
-    final conditions = _confirmedRangeConditions(start, end, userId);
+    final conditions = _confirmedRangeConditions(
+      start,
+      end,
+      userId,
+      tableAlias: 's',
+    );
 
     late String select;
     late String groupBySql;
@@ -346,29 +362,29 @@ class SaleDao extends BaseDao<Sale> {
 
     switch (groupBy) {
       case ReportGroupBy.hour:
-        select = "substr(created_at, 1, 13) as bucket";
+        select = "substr(s.created_at, 1, 13) as bucket";
         groupBySql = 'bucket';
         pattern = "yyyy-MM-ddTHH";
       case ReportGroupBy.day:
-        select = "substr(created_at, 1, 10) as bucket";
+        select = "substr(s.created_at, 1, 10) as bucket";
         groupBySql = 'bucket';
         pattern = "yyyy-MM-dd";
       case ReportGroupBy.week:
         // Group by day first; week collapsing is done by the caller.
-        select = "substr(created_at, 1, 10) as bucket";
+        select = "substr(s.created_at, 1, 10) as bucket";
         groupBySql = 'bucket';
         pattern = "yyyy-MM-dd";
       case ReportGroupBy.month:
-        select = "substr(created_at, 1, 7) as bucket";
+        select = "substr(s.created_at, 1, 7) as bucket";
         groupBySql = 'bucket';
         pattern = "yyyy-MM";
     }
 
     final result = await database.rawQuery('''
       SELECT $select,
-             COALESCE(SUM(total_amount), 0) as total,
+             COALESCE(SUM(s.total_amount), 0) as total,
              COUNT(*) as count
-      FROM sales
+      FROM sales s
       WHERE ${conditions.where}
       GROUP BY $groupBySql
       ORDER BY bucket
@@ -385,6 +401,34 @@ class SaleDao extends BaseDao<Sale> {
     }).toList();
   }
 
+  /// Returns sales and transaction count for each hour of the day (0-23)
+  /// across the given range, aggregated from confirmed sales.
+  Future<List<SalesByHourPoint>> getSalesByHourOfDay(
+    DateTime start,
+    DateTime end, {
+    int? userId,
+  }) async {
+    final database = await db;
+    final conditions = _confirmedRangeConditions(
+      start,
+      end,
+      userId,
+      tableAlias: 's',
+    );
+
+    final result = await database.rawQuery('''
+      SELECT CAST(substr(s.created_at, 12, 2) AS INTEGER) as hour,
+             COALESCE(SUM(s.total_amount), 0) as total,
+             COUNT(*) as count
+      FROM sales s
+      WHERE ${conditions.where}
+      GROUP BY hour
+      ORDER BY hour
+    ''', conditions.args);
+
+    return result.map(SalesByHourPoint.fromMap).toList();
+  }
+
   /// Returns payment-method totals for confirmed sales in a range.
   Future<List<PaymentBreakdown>> getPaymentBreakdown(
     DateTime start,
@@ -392,15 +436,20 @@ class SaleDao extends BaseDao<Sale> {
     int? userId,
   }) async {
     final database = await db;
-    final conditions = _confirmedRangeConditions(start, end, userId);
+    final conditions = _confirmedRangeConditions(
+      start,
+      end,
+      userId,
+      tableAlias: 's',
+    );
 
     final result = await database.rawQuery('''
-      SELECT payment_method,
-             COALESCE(SUM(total_amount), 0) as total,
+      SELECT s.payment_method,
+             COALESCE(SUM(s.total_amount), 0) as total,
              COUNT(*) as count
-      FROM sales
+      FROM sales s
       WHERE ${conditions.where}
-      GROUP BY payment_method
+      GROUP BY s.payment_method
       ORDER BY total DESC
     ''', conditions.args);
 
@@ -416,7 +465,12 @@ class SaleDao extends BaseDao<Sale> {
     int? userId,
   }) async {
     final database = await db;
-    final conditions = _confirmedRangeConditions(start, end, userId);
+    final conditions = _confirmedRangeConditions(
+      start,
+      end,
+      userId,
+      tableAlias: 's',
+    );
 
     final result = await database.rawQuery('''
       SELECT c.id AS category_id,
@@ -444,13 +498,18 @@ class SaleDao extends BaseDao<Sale> {
     int? userId,
   }) async {
     final database = await db;
-    final conditions = _confirmedRangeConditions(start, end, userId);
+    final conditions = _confirmedRangeConditions(
+      start,
+      end,
+      userId,
+      tableAlias: 's',
+    );
 
     final result = await database.rawQuery('''
-      SELECT substr(created_at, 1, 10) as date,
-             COALESCE(SUM(total_amount), 0) as total_sales,
+      SELECT substr(s.created_at, 1, 10) as date,
+             COALESCE(SUM(s.total_amount), 0) as total_sales,
              COUNT(*) as transaction_count
-      FROM sales
+      FROM sales s
       WHERE ${conditions.where}
       GROUP BY date
       ORDER BY date
@@ -466,7 +525,7 @@ class SaleDao extends BaseDao<Sale> {
     int? userId,
     String? paymentMethod,
     String? search,
-    int limit = 500,
+    int? limit = 500,
     DatabaseExecutor? txn,
   }) async {
     final executor = txn ?? await db;
@@ -499,18 +558,20 @@ class SaleDao extends BaseDao<Sale> {
   _WhereClause _confirmedRangeConditions(
     DateTime start,
     DateTime end,
-    int? userId,
-  ) {
+    int? userId, {
+    String? tableAlias,
+  }) {
+    final prefix = tableAlias == null ? '' : '$tableAlias.';
     final conditions = <String>[
-      'created_at >= ?',
-      'created_at < ?',
-      "deleted_at IS NULL",
-      "payment_status = 'confirmed'",
+      '${prefix}created_at >= ?',
+      '${prefix}created_at < ?',
+      '${prefix}deleted_at IS NULL',
+      "${prefix}payment_status = 'confirmed'",
     ];
     final args = <Object?>[start.toIso8601String(), end.toIso8601String()];
 
     if (userId != null) {
-      conditions.add('user_id = ?');
+      conditions.add('${prefix}user_id = ?');
       args.add(userId);
     }
 

@@ -76,7 +76,11 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
       customEnd: current.customEnd,
     );
     try {
-      final data = await _service.getDashboard();
+      final data = await _service.getDashboard(
+        current.period,
+        customStart: current.customStart,
+        customEnd: current.customEnd,
+      );
       switch (data) {
         case OwnerDashboardData():
           state = DashboardLoaded(

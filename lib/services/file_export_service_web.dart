@@ -42,7 +42,10 @@ class FileExportService {
               : null) ??
           _defaultMime;
 
-      final data = bytes.buffer.toJS;
+      // Copy to a fresh buffer so the Blob cannot include trailing bytes from a
+      // larger underlying buffer.
+      final safeBytes = bytes.sublist(0);
+      final data = safeBytes.buffer.toJS;
       final blobParts = [data].toJS as JSArray<web.BlobPart>;
       final blob = web.Blob(
         blobParts,
@@ -57,7 +60,12 @@ class FileExportService {
       web.document.body?.append(anchor);
       anchor.click();
       anchor.remove();
-      web.URL.revokeObjectURL(url);
+
+      // Wait long enough for the browser to start the download before
+      // revoking the object URL.
+      Future.delayed(const Duration(seconds: 2), () {
+        web.URL.revokeObjectURL(url);
+      });
 
       return safeFileName;
     } catch (e) {

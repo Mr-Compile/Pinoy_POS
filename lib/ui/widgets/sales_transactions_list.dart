@@ -11,12 +11,14 @@ import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 class SalesTransactionsList extends StatelessWidget {
   final List<Sale> sales;
   final Settings? storeInfo;
+  final Map<int, String>? staffNames;
   final void Function(Sale sale)? onTap;
 
   const SalesTransactionsList({
     super.key,
     required this.sales,
     this.storeInfo,
+    this.staffNames,
     this.onTap,
   });
 
@@ -39,6 +41,7 @@ class SalesTransactionsList extends StatelessWidget {
           _SaleRow(
             sale: sales[i],
             currency: _currency,
+            staffNames: staffNames,
             onTap: onTap,
           ),
           if (i < sales.length - 1) const SizedBox(height: Spacing.sm),
@@ -51,11 +54,13 @@ class SalesTransactionsList extends StatelessWidget {
 class _SaleRow extends StatelessWidget {
   final Sale sale;
   final String currency;
+  final Map<int, String>? staffNames;
   final void Function(Sale sale)? onTap;
 
   const _SaleRow({
     required this.sale,
     required this.currency,
+    this.staffNames,
     this.onTap,
   });
 
@@ -64,7 +69,8 @@ class _SaleRow extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final dateTime = _formatDateTime(sale.createdAt);
     final title = sale.receiptNumber ?? 'Sale #${sale.id}';
-    final subtitle = '$dateTime • Cashier: User ${sale.userId}';
+    final cashierName = staffNames?[sale.userId] ?? 'User ${sale.userId}';
+    final subtitle = '$dateTime • Cashier: $cashierName';
 
     return AppListItem(
       title: title,

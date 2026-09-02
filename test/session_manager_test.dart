@@ -44,7 +44,8 @@ void main() {
     expect(SessionManager().hasPermission('use_ai_advisor'), isTrue);
     expect(SessionManager().hasPermission('manage_ai_config'), isTrue);
     expect(SessionManager().hasPermission('view_pos'), isFalse);
-    expect(SessionManager().hasPermission('view_reports'), isFalse);
+    expect(SessionManager().hasPermission('view_reports'), isTrue);
+    expect(SessionManager().hasPermission('view_staff_performance'), isTrue);
   });
 
   test('Staff has view and use AI advisor but not manage_ai_config', () {

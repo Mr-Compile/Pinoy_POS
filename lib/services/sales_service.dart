@@ -91,7 +91,7 @@ class SalesService {
     String? paymentMethod,
     String? paymentStatus,
     String? search,
-    int limit = 500,
+    int? limit = 500,
   }) async {
     if (!_sessionManager.hasPermission('view_sales')) {
       return [];
@@ -745,8 +745,21 @@ class SalesService {
     final oldPath = sale.paymentProofPath;
     final proofType = await _detectPaymentProofType(newRelativePath);
 
+    // Move the replacement proof from the transient tmp directory into the
+    // sale-owned directory, matching how new sales are stored.
+    final fileName = newRelativePath.split('/').last;
+    final saleProofDir = 'payment_evidence/sale_$saleId';
+    final targetPath = '$saleProofDir/$fileName';
+    final movedPath = await _imageService.moveImage(newRelativePath, targetPath);
+    if (movedPath == null) {
+      throw PaymentValidationException(
+        'Unable to save payment proof',
+        details: 'The replacement evidence could not be moved to the sale directory.',
+      );
+    }
+
     final updated = sale.copyWith(
-      paymentProofPath: newRelativePath,
+      paymentProofPath: movedPath,
       paymentProofType: proofType,
     );
     await _saleRepository.update(updated, txn: txn);
@@ -762,7 +775,7 @@ class SalesService {
       txn: txn,
     );
 
-    return newRelativePath;
+    return movedPath;
   }
 
   /// Void a sale within a single atomic transaction.

@@ -4,6 +4,13 @@ import 'package:intl/intl.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/route_guard.dart';
 import 'package:pinoy_pos/core/spacing.dart';
+import 'package:pinoy_pos/data/models/activity_log.dart';
+import 'package:pinoy_pos/data/models/announcement.dart';
+import 'package:pinoy_pos/data/models/product.dart';
+import 'package:pinoy_pos/data/models/sale.dart';
+import 'package:pinoy_pos/data/models/sales_analytics.dart';
+import 'package:pinoy_pos/data/models/staff_sales_summary.dart';
+import 'package:pinoy_pos/data/models/peak_sales_period.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/dashboard_provider.dart';
@@ -24,12 +31,18 @@ import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_section.dart';
+import 'package:pinoy_pos/ui/widgets/category_sales_bar_chart.dart';
 import 'package:pinoy_pos/ui/widgets/donut_chart.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/kpi_card.dart';
-import 'package:pinoy_pos/ui/widgets/mini_bar_chart.dart';
-import 'package:pinoy_pos/ui/widgets/staff_performance_card.dart';
-import 'package:pinoy_pos/ui/widgets/staff_sales_list.dart';
+import 'package:pinoy_pos/ui/widgets/peak_sales_card.dart';
+import 'package:pinoy_pos/ui/widgets/payment_breakdown_view.dart';
+import 'package:pinoy_pos/ui/widgets/period_selector.dart';
+import 'package:pinoy_pos/ui/widgets/sales_line_chart.dart';
+import 'package:pinoy_pos/ui/widgets/sales_summary_cards.dart';
+import 'package:pinoy_pos/ui/widgets/sales_transactions_list.dart';
+import 'package:pinoy_pos/ui/widgets/staff_performance_list.dart';
+import 'package:pinoy_pos/ui/widgets/top_products_bar_chart.dart';
 
 /// Role-based dashboard screen.
 ///
@@ -105,7 +118,9 @@ class _DashboardLoadedView extends ConsumerWidget {
       return const Center(child: Text('Not authenticated'));
     }
 
+    final state = ref.watch(dashboardProvider);
     final role = user!.role;
+
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(Spacing.lg),
@@ -113,6 +128,20 @@ class _DashboardLoadedView extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _WelcomeHeader(user: user!),
+          const SizedBox(height: Spacing.md),
+          PeriodSelector(
+            selected: state.period,
+            customStart: state.customStart,
+            customEnd: state.customEnd,
+            onSelected: (period) {
+              ref.read(dashboardProvider.notifier).selectPeriod(period);
+            },
+            onCustomRange: (range) {
+              ref
+                  .read(dashboardProvider.notifier)
+                  .setCustomRange(range.start, range.end);
+            },
+          ),
           const SizedBox(height: Spacing.xl),
           switch (role) {
             UserRole.owner => _OwnerDashboard(data: owner!),
@@ -229,16 +258,24 @@ class _WelcomeHeader extends StatelessWidget {
   }
 }
 
-/// Formats a currency value in PHP.
-String _peso(double value) => '₱${value.toStringAsFixed(2)}';
+/// Returns the display symbol for a currency code.
+///
+/// Defaults to the Peso sign for Philippine Peso and returns the code
+/// itself for all other currencies.
+String _currencySymbol(String? currency) {
+  if (currency == 'PHP') return '₱';
+  return currency ?? '';
+}
+
+/// Formats a [value] as currency using the default Peso symbol.
+String _formatMoney(double value) {
+  return '${_currencySymbol('PHP')}${value.toStringAsFixed(2)}';
+}
 
 /// Formats a DateTime for compact recent-activity display.
 String _formatDateTime(DateTime dt) {
-  return DateFormat('MMM d · h:mm a').format(dt.toLocal());
+  return DateFormat('MMM d \u00b7 h:mm a').format(dt.toLocal());
 }
-
-/// Formats a day label for the sales trend chart (e.g. "Mon").
-String _dayLabel(DateTime dt) => DateFormat('E').format(dt);
 
 // ─────────────────────────────────────────────────────────────────────────
 // Owner Dashboard
@@ -250,7 +287,8 @@ class _OwnerDashboard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cs = Theme.of(context).colorScheme;
+    final analytics = data.analytics;
+    final currencySymbol = _currencySymbol('PHP');
     final authNotifier = ref.read(authStateProvider.notifier);
 
     return Column(
@@ -260,38 +298,9 @@ class _OwnerDashboard extends ConsumerWidget {
         AppSection(
           title: 'Key Performance Indicators',
           padding: const EdgeInsets.only(bottom: Spacing.md),
-          child: KpiGrid(
-            children: [
-              KpiCard(
-                label: "Today's Sales",
-                value: _peso(data.todaySales),
-                icon: Icons.payments_outlined,
-                iconColor: cs.primary,
-                subtitle: '${data.todayTransactions} transactions',
-                tier: KpiCardTier.primary,
-              ),
-              KpiCard(
-                label: 'Transactions',
-                value: '${data.todayTransactions}',
-                icon: Icons.receipt_long_outlined,
-                iconColor: cs.tertiary,
-                tier: KpiCardTier.secondary,
-              ),
-              KpiCard(
-                label: 'Low Stock',
-                value: '${data.lowStockCount}',
-                icon: Icons.warning_amber,
-                iconColor: AppSemanticColors.resolve(AppSemanticColors.warning, Theme.of(context).brightness),
-                tier: KpiCardTier.secondary,
-              ),
-              KpiCard(
-                label: 'Out of Stock',
-                value: '${data.outOfStockCount}',
-                icon: Icons.error_outline,
-                iconColor: AppSemanticColors.resolve(AppSemanticColors.error, Theme.of(context).brightness),
-                tier: KpiCardTier.secondary,
-              ),
-            ],
+          child: SalesSummaryCards(
+            analytics: analytics,
+            storeInfo: null,
           ),
         ),
         const SizedBox(height: Spacing.xxl),
@@ -300,33 +309,49 @@ class _OwnerDashboard extends ConsumerWidget {
         _buildOwnerQuickActions(context, ref, authNotifier),
         const SizedBox(height: Spacing.xxl),
 
-        // ── Staff performance (top performer + ranked list) ──
-        _buildStaffPerformanceSection(context),
+        // ── Sales trend ──
+        _buildSalesTrendCard(context, analytics, currencySymbol),
         const SizedBox(height: Spacing.xxl),
 
-
-        // ── Sales trend chart ──
-        _buildSalesTrendCard(context),
+        // ── Period comparison ──
+        _buildComparisonChart(context, analytics, currencySymbol),
         const SizedBox(height: Spacing.xxl),
 
-        // ── Two-column area on tablet/desktop: top products + inventory ──
-        _ResponsiveTwoColumn(
-          left: _buildTopProductsCard(context),
-          right: _buildInventoryCard(context),
-        ),
+        // ── Two-column: payment breakdown + top products ──
+        _buildPaymentAndTopProducts(context, analytics),
+        const SizedBox(height: Spacing.xxl),
+
+        // ── Category sales ──
+        _buildCategorySalesCard(context, analytics),
+        const SizedBox(height: Spacing.xxl),
+
+        // ── Staff performance ──
+        if (analytics.staffSummaries.isNotEmpty) ...[
+          _buildStaffPerformanceSection(context, analytics.staffSummaries),
+          const SizedBox(height: Spacing.xxl),
+        ],
+
+        // ── Peak sales ──
+        _buildPeakSalesCard(context, analytics.peakSalesPeriod),
         const SizedBox(height: Spacing.xxl),
 
         // ── Low stock alert ──
-        _buildLowStockAlert(context, data.lowStockProducts, authNotifier),
+        _buildLowStockAlert(context, ref, data.lowStockProducts),
         const SizedBox(height: Spacing.xxl),
 
         // ── Recent sales ──
-        _buildRecentSalesCard(context),
+        _buildRecentSalesCard(
+          context,
+          data.recentSales.isNotEmpty
+              ? data.recentSales
+              : data.analytics.sales.take(5).toList(),
+          title: 'Recent Sales',
+        ),
         const SizedBox(height: Spacing.xxl),
 
         // ── Announcements ──
         if (data.announcements.isNotEmpty) ...[
-          _buildAnnouncementsCard(context),
+          _buildAnnouncementsCard(context, data.announcements),
           const SizedBox(height: Spacing.xxl),
         ],
 
@@ -343,99 +368,121 @@ class _OwnerDashboard extends ConsumerWidget {
     );
   }
 
-  Widget _buildSalesTrendCard(BuildContext context) {
-    final hasData = data.salesTrend.any((p) => p.total > 0);
+  Widget _buildSalesTrendCard(
+    BuildContext context,
+    SalesAnalytics analytics,
+    String currencySymbol,
+  ) {
     return AppSection(
-      title: 'Sales (Last 7 Days)',
+      title: 'Sales Trend',
       padding: const EdgeInsets.only(bottom: Spacing.md),
       child: AppCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (hasData)
-              MiniBarChart(
-                points: data.salesTrend
-                    .map((p) => BarChartPoint(
-                          label: _dayLabel(p.date),
-                          value: p.total,
-                        ))
-                    .toList(),
-                valuePrefix: '₱',
+        child: analytics.trend.isEmpty
+            ? const _ChartEmptyState(
+                message: 'No sales data available for this period.',
               )
-            else
-              const _ChartEmptyState(message: 'No sales data available yet.'),
-          ],
+            : SalesLineChart(
+                points: analytics.trend,
+                groupBy: analytics.bounds.groupBy,
+                valuePrefix: currencySymbol,
+              ),
+      ),
+    );
+  }
+
+  Widget _buildComparisonChart(
+    BuildContext context,
+    SalesAnalytics analytics,
+    String currencySymbol,
+  ) {
+    return AppSection(
+      title: 'Period Comparison',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: AppCard(
+        child: analytics.trend.isEmpty && analytics.previousTrend.isEmpty
+            ? const _ChartEmptyState(
+                message: 'No comparison data available.',
+              )
+            : SalesComparisonChart(
+                current: analytics.trend,
+                previous: analytics.previousTrend,
+                groupBy: analytics.bounds.groupBy,
+                valuePrefix: currencySymbol,
+              ),
+      ),
+    );
+  }
+
+  Widget _buildPaymentAndTopProducts(
+    BuildContext context,
+    SalesAnalytics analytics,
+  ) {
+    return AppSection(
+      title: 'Payment & Top Products',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: _ResponsiveTwoColumn(
+        left: AppCard(
+          child: PaymentBreakdownView(
+            breakdown: analytics.paymentBreakdown,
+            grandTotal: analytics.totalSales,
+          ),
+        ),
+        right: AppCard(
+          child: TopProductsBarChart(
+            products: analytics.topProducts,
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildTopProductsCard(BuildContext context) {
+  Widget _buildCategorySalesCard(
+    BuildContext context,
+    SalesAnalytics analytics,
+  ) {
     return AppSection(
-      title: 'Top Products',
+      title: 'Sales by Category',
       padding: const EdgeInsets.only(bottom: Spacing.md),
       child: AppCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (data.topProducts.isEmpty)
-              const _ChartEmptyState(message: 'No sales recorded yet.')
-            else
-              Column(
-                children: data.topProducts.asMap().entries.map((entry) {
-                  final i = entry.key;
-                  final p = entry.value;
-                  return _RankedListTile(
-                    rank: i + 1,
-                    title: p.name,
-                    trailing: '${p.totalQuantity} sold',
-                  );
-                }).toList(),
-              ),
-          ],
+        child: CategorySalesBarChart(
+          categorySales: analytics.categorySales,
         ),
       ),
     );
   }
 
-  Widget _buildInventoryCard(BuildContext context) {
+  Widget _buildStaffPerformanceSection(
+    BuildContext context,
+    List<StaffSalesSummary> summaries,
+  ) {
     return AppSection(
-      title: 'Inventory Status',
+      title: 'Staff Performance',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: StaffPerformanceList(
+        staff: summaries,
+        storeInfo: null,
+      ),
+    );
+  }
+
+  Widget _buildPeakSalesCard(
+    BuildContext context,
+    PeakSalesPeriod peak,
+  ) {
+    return AppSection(
+      title: 'Peak Sales',
       padding: const EdgeInsets.only(bottom: Spacing.md),
       child: AppCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (data.inventoryStatus.total == 0)
-              const _ChartEmptyState(message: 'No products yet.')
-            else
-              DonutChart(
-                segments: [
-                  DonutSegment(
-                    label: 'Normal',
-                    value: data.inventoryStatus.normal,
-                    color: AppSemanticColors.resolve(AppSemanticColors.success, Theme.of(context).brightness),
-                  ),
-                  DonutSegment(
-                    label: 'Low Stock',
-                    value: data.inventoryStatus.lowStock,
-                    color: AppSemanticColors.resolve(AppSemanticColors.warning, Theme.of(context).brightness),
-                  ),
-                  DonutSegment(
-                    label: 'Out of Stock',
-                    value: data.inventoryStatus.outOfStock,
-                    color: AppSemanticColors.resolve(AppSemanticColors.error, Theme.of(context).brightness),
-                  ),
-                ],
-              ),
-          ],
-        ),
+        child: PeakSalesCard(peak: peak),
       ),
     );
   }
 
   Widget _buildLowStockAlert(
-      BuildContext context, List<dynamic> products, dynamic authNotifier) {
+    BuildContext context,
+    WidgetRef ref,
+    List<Product> products,
+  ) {
     if (products.isEmpty) {
       return AppSection(
         title: 'Low Stock Alert',
@@ -443,7 +490,10 @@ class _OwnerDashboard extends ConsumerWidget {
         child: AppCard(
           child: Row(
             children: [
-              Icon(Icons.check_circle, color: AppSemanticColors.resolve(AppSemanticColors.success, Theme.of(context).brightness)),
+              Icon(Icons.check_circle,
+                  color: AppSemanticColors.resolve(
+                      AppSemanticColors.success,
+                      Theme.of(context).brightness)),
               const SizedBox(width: Spacing.md),
               const Expanded(child: Text('Inventory is healthy')),
             ],
@@ -459,10 +509,12 @@ class _OwnerDashboard extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ...products.take(5).map((p) => _LowStockTile(
-                  name: (p as dynamic).name as String,
-                  remaining: (p as dynamic).stock as int,
+                  name: p.name,
+                  remaining: p.stock,
                 )),
-            if (authNotifier.hasPermission('add_stock')) ...[
+            if (ref
+                .read(authStateProvider.notifier)
+                .hasPermission('add_stock')) ...[
               const SizedBox(height: Spacing.sm),
               Align(
                 alignment: Alignment.centerRight,
@@ -483,31 +535,33 @@ class _OwnerDashboard extends ConsumerWidget {
     );
   }
 
-  Widget _buildRecentSalesCard(BuildContext context) {
+  Widget _buildRecentSalesCard(
+    BuildContext context,
+    List<Sale> sales,
+    {required String title}
+  ) {
     return AppSection(
-      title: 'Recent Sales',
+      title: title,
       padding: const EdgeInsets.only(bottom: Spacing.md),
       child: AppCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (data.recentSales.isEmpty)
-              const _ChartEmptyState(message: 'No sales recorded yet.')
-            else
-              Column(
-                children: data.recentSales.map((s) => _RecentSaleTile(
+        child: sales.isEmpty
+            ? const _ChartEmptyState(message: 'No sales recorded yet.')
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: sales.take(5).map((s) => _RecentSaleTile(
                       receipt: '#${s.receiptNumber ?? s.id}',
-                      amount: _peso(s.totalAmount),
+                      amount: _formatMoney(s.totalAmount),
                       time: _formatDateTime(s.createdAt),
                     )).toList(),
               ),
-          ],
-        ),
       ),
     );
   }
 
-  Widget _buildAnnouncementsCard(BuildContext context) {
+  Widget _buildAnnouncementsCard(
+    BuildContext context,
+    List<Announcement> announcements,
+  ) {
     return AppSection(
       title: 'Announcements',
       padding: const EdgeInsets.only(bottom: Spacing.md),
@@ -515,7 +569,7 @@ class _OwnerDashboard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ...data.announcements.take(3).map((a) => _AnnouncementTile(
+            ...announcements.take(3).map((a) => _AnnouncementTile(
                   title: a.title,
                   content: a.content,
                   isPinned: a.isPinned,
@@ -526,29 +580,24 @@ class _OwnerDashboard extends ConsumerWidget {
     );
   }
 
-  Widget _buildRecentActivityCard(BuildContext context, List<dynamic> activities) {
+  Widget _buildRecentActivityCard(
+    BuildContext context,
+    List<ActivityLog> activities,
+  ) {
     return AppSection(
       title: 'Recent Activity',
       padding: const EdgeInsets.only(bottom: Spacing.md),
       child: AppCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (activities.isEmpty)
-              const _ChartEmptyState(message: 'No activity yet.')
-            else
-              Column(
-                children: activities.take(5).map((a) {
-                  final log = a as dynamic;
-                  return _ActivityTile(
-                    action: _humanizeAction(log.action as String),
-                    details: log.details as String?,
-                    time: _formatDateTime(log.createdAt as DateTime),
-                  );
-                }).toList(),
+        child: activities.isEmpty
+            ? const _ChartEmptyState(message: 'No activity yet.')
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: activities.take(5).map((a) => _ActivityTile(
+                      action: _humanizeAction(a.action),
+                      details: a.details,
+                      time: _formatDateTime(a.createdAt),
+                    )).toList(),
               ),
-          ],
-        ),
       ),
     );
   }
@@ -668,25 +717,6 @@ class _OwnerDashboard extends ConsumerWidget {
       ),
     );
   }
-
-  Widget _buildStaffPerformanceSection(BuildContext context) {
-    return AppSection(
-      title: 'Staff Performance',
-      padding: const EdgeInsets.only(bottom: Spacing.md),
-      child: _ResponsiveTwoColumn(
-        left: StaffPerformanceCard(summaries: data.staffSales),
-        right: AppCard(
-          child: data.staffSales.isEmpty
-              ? const _ChartEmptyState(message: 'No staff sales yet.')
-              : StaffSalesList(
-                  summaries: data.staffSales,
-                  valuePrefix: '₱',
-                ),
-        ),
-      ),
-    );
-  }
-
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -699,15 +729,16 @@ class _AdminDashboard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cs = Theme.of(context).colorScheme;
+    final analytics = data.analytics;
+    final currencySymbol = _currencySymbol('PHP');
     final authNotifier = ref.read(authStateProvider.notifier);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── Primary KPIs ──
+        // ── System KPIs ──
         AppSection(
-          title: 'Key Performance Indicators',
+          title: 'System Overview',
           padding: const EdgeInsets.only(bottom: Spacing.md),
           child: KpiGrid(
             children: [
@@ -715,21 +746,24 @@ class _AdminDashboard extends ConsumerWidget {
                 label: 'Active Users',
                 value: '${data.activeUsers}',
                 icon: Icons.person_outline,
-                iconColor: AppSemanticColors.resolve(AppSemanticColors.success, Theme.of(context).brightness),
+                iconColor: AppSemanticColors.resolve(
+                  AppSemanticColors.success,
+                  Theme.of(context).brightness,
+                ),
                 tier: KpiCardTier.primary,
               ),
               KpiCard(
                 label: 'Inactive Users',
                 value: '${data.inactiveUsers}',
                 icon: Icons.person_off_outlined,
-                iconColor: cs.onSurfaceVariant,
+                iconColor: Theme.of(context).colorScheme.onSurfaceVariant,
                 tier: KpiCardTier.secondary,
               ),
               KpiCard(
                 label: 'Recent Activity',
                 value: '${data.recentActivityCount}',
                 icon: Icons.history,
-                iconColor: cs.tertiary,
+                iconColor: Theme.of(context).colorScheme.tertiary,
                 subtitle: 'last 7 days',
                 tier: KpiCardTier.secondary,
               ),
@@ -737,7 +771,10 @@ class _AdminDashboard extends ConsumerWidget {
                 label: 'Trash Items',
                 value: '${data.trashCount}',
                 icon: Icons.delete_outline,
-                iconColor: AppSemanticColors.resolve(AppSemanticColors.warning, Theme.of(context).brightness),
+                iconColor: AppSemanticColors.resolve(
+                  AppSemanticColors.warning,
+                  Theme.of(context).brightness,
+                ),
                 tier: KpiCardTier.secondary,
               ),
             ],
@@ -749,10 +786,49 @@ class _AdminDashboard extends ConsumerWidget {
         _buildAdminQuickActions(context, ref, authNotifier),
         const SizedBox(height: Spacing.xxl),
 
-        // ── Staff performance (top performer + ranked list) ──
-        _buildStaffPerformanceSection(context),
-        const SizedBox(height: Spacing.xxl),
-
+        // ── Sales analytics (when permitted) ──
+        if (analytics != null) ...[
+          AppSection(
+            title: 'Sales Performance',
+            padding: const EdgeInsets.only(bottom: Spacing.md),
+            child: SalesSummaryCards(
+              analytics: analytics,
+              storeInfo: null,
+            ),
+          ),
+          const SizedBox(height: Spacing.xxl),
+          _buildSalesTrendCard(context, analytics, currencySymbol),
+          const SizedBox(height: Spacing.xxl),
+          _buildComparisonChart(context, analytics, currencySymbol),
+          const SizedBox(height: Spacing.xxl),
+          _buildPaymentAndTopProducts(context, analytics),
+          const SizedBox(height: Spacing.xxl),
+          _buildCategorySalesCard(context, analytics),
+          const SizedBox(height: Spacing.xxl),
+          if (analytics.staffSummaries.isNotEmpty) ...[
+            _buildStaffPerformanceSection(context, analytics.staffSummaries),
+            const SizedBox(height: Spacing.xxl),
+          ],
+          _buildPeakSalesCard(context, analytics.peakSalesPeriod),
+          const SizedBox(height: Spacing.xxl),
+          _buildRecentSalesCard(
+            context,
+            analytics.sales.take(5).toList(),
+            title: 'Recent Transactions',
+          ),
+          const SizedBox(height: Spacing.xxl),
+        ] else ...[
+          AppSection(
+            title: 'Sales Analytics',
+            padding: const EdgeInsets.only(bottom: Spacing.md),
+            child: AppCard(
+              child: _ChartEmptyState(
+                message: 'Sales analytics are not available for this role.',
+              ),
+            ),
+          ),
+          const SizedBox(height: Spacing.xxl),
+        ],
 
         // ── Two-column: user distribution + backup status ──
         _ResponsiveTwoColumn(
@@ -764,6 +840,135 @@ class _AdminDashboard extends ConsumerWidget {
         // ── Recent activity ──
         _buildRecentActivityCard(context, data.recentActivities),
       ],
+    );
+  }
+
+  Widget _buildSalesTrendCard(
+    BuildContext context,
+    SalesAnalytics analytics,
+    String currencySymbol,
+  ) {
+    return AppSection(
+      title: 'Sales Trend',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: AppCard(
+        child: analytics.trend.isEmpty
+            ? const _ChartEmptyState(
+                message: 'No sales data available for this period.',
+              )
+            : SalesLineChart(
+                points: analytics.trend,
+                groupBy: analytics.bounds.groupBy,
+                valuePrefix: currencySymbol,
+              ),
+      ),
+    );
+  }
+
+  Widget _buildComparisonChart(
+    BuildContext context,
+    SalesAnalytics analytics,
+    String currencySymbol,
+  ) {
+    return AppSection(
+      title: 'Period Comparison',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: AppCard(
+        child: analytics.trend.isEmpty && analytics.previousTrend.isEmpty
+            ? const _ChartEmptyState(
+                message: 'No comparison data available.',
+              )
+            : SalesComparisonChart(
+                current: analytics.trend,
+                previous: analytics.previousTrend,
+                groupBy: analytics.bounds.groupBy,
+                valuePrefix: currencySymbol,
+              ),
+      ),
+    );
+  }
+
+  Widget _buildPaymentAndTopProducts(
+    BuildContext context,
+    SalesAnalytics analytics,
+  ) {
+    return AppSection(
+      title: 'Payment & Top Products',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: _ResponsiveTwoColumn(
+        left: AppCard(
+          child: PaymentBreakdownView(
+            breakdown: analytics.paymentBreakdown,
+            grandTotal: analytics.totalSales,
+          ),
+        ),
+        right: AppCard(
+          child: TopProductsBarChart(
+            products: analytics.topProducts,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategorySalesCard(
+    BuildContext context,
+    SalesAnalytics analytics,
+  ) {
+    return AppSection(
+      title: 'Sales by Category',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: AppCard(
+        child: CategorySalesBarChart(
+          categorySales: analytics.categorySales,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStaffPerformanceSection(
+    BuildContext context,
+    List<StaffSalesSummary> summaries,
+  ) {
+    return AppSection(
+      title: 'Staff Performance',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: StaffPerformanceList(
+        staff: summaries,
+        storeInfo: null,
+      ),
+    );
+  }
+
+  Widget _buildPeakSalesCard(
+    BuildContext context,
+    PeakSalesPeriod peak,
+  ) {
+    return AppSection(
+      title: 'Peak Sales',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: AppCard(
+        child: PeakSalesCard(peak: peak),
+      ),
+    );
+  }
+
+  Widget _buildRecentSalesCard(
+    BuildContext context,
+    List<Sale> sales,
+    {required String title}
+  ) {
+    return AppSection(
+      title: title,
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: AppCard(
+        child: sales.isEmpty
+            ? const _ChartEmptyState(message: 'No transactions recorded yet.')
+            : SalesTransactionsList(
+                sales: sales,
+                storeInfo: null,
+              ),
+      ),
     );
   }
 
@@ -793,7 +998,10 @@ class _AdminDashboard extends ConsumerWidget {
                   DonutSegment(
                     label: 'Staff',
                     value: data.usersByRole.staff,
-                    color: AppSemanticColors.resolve(AppSemanticColors.info, Theme.of(context).brightness),
+                    color: AppSemanticColors.resolve(
+                      AppSemanticColors.info,
+                      Theme.of(context).brightness,
+                    ),
                   ),
                 ],
               ),
@@ -812,14 +1020,18 @@ class _AdminDashboard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (data.backupStatus.hasBackup && data.backupStatus.lastBackupDate != null)
+            if (data.backupStatus.hasBackup &&
+                data.backupStatus.lastBackupDate != null)
               Row(
                 children: [
-                  Icon(Icons.check_circle, color: AppSemanticColors.resolve(AppSemanticColors.success, Theme.of(context).brightness)),
+                  Icon(Icons.check_circle,
+                      color: AppSemanticColors.resolve(
+                          AppSemanticColors.success,
+                          Theme.of(context).brightness)),
                   const SizedBox(width: Spacing.sm),
                   Expanded(
                     child: Text(
-                      'Latest: ${DateFormat('MMM d, y · h:mm a').format(data.backupStatus.lastBackupDate!.toLocal())}',
+                      'Latest: ${DateFormat('MMM d, y \u00b7 h:mm a').format(data.backupStatus.lastBackupDate!.toLocal())}',
                       style: AppTypography.bodyMedium(context),
                     ),
                   ),
@@ -844,29 +1056,24 @@ class _AdminDashboard extends ConsumerWidget {
     );
   }
 
-  Widget _buildRecentActivityCard(BuildContext context, List<dynamic> activities) {
+  Widget _buildRecentActivityCard(
+    BuildContext context,
+    List<ActivityLog> activities,
+  ) {
     return AppSection(
       title: 'Recent System Activity',
       padding: const EdgeInsets.only(bottom: Spacing.md),
       child: AppCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (activities.isEmpty)
-              const _ChartEmptyState(message: 'No activity yet.')
-            else
-              Column(
-                children: activities.take(5).map((a) {
-                  final log = a as dynamic;
-                  return _ActivityTile(
-                    action: _humanizeAction(log.action as String),
-                    details: log.details as String?,
-                    time: _formatDateTime(log.createdAt as DateTime),
-                  );
-                }).toList(),
+        child: activities.isEmpty
+            ? const _ChartEmptyState(message: 'No activity yet.')
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: activities.take(5).map((a) => _ActivityTile(
+                      action: _humanizeAction(a.action),
+                      details: a.details,
+                      time: _formatDateTime(a.createdAt),
+                    )).toList(),
               ),
-          ],
-        ),
       ),
     );
   }
@@ -944,25 +1151,6 @@ class _AdminDashboard extends ConsumerWidget {
       ),
     );
   }
-
-  Widget _buildStaffPerformanceSection(BuildContext context) {
-    return AppSection(
-      title: 'Staff Performance',
-      padding: const EdgeInsets.only(bottom: Spacing.md),
-      child: _ResponsiveTwoColumn(
-        left: StaffPerformanceCard(summaries: data.staffSales),
-        right: AppCard(
-          child: data.staffSales.isEmpty
-              ? const _ChartEmptyState(message: 'No staff sales yet.')
-              : StaffSalesList(
-                  summaries: data.staffSales,
-                  valuePrefix: '₱',
-                ),
-        ),
-      ),
-    );
-  }
-
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -975,7 +1163,8 @@ class _StaffDashboard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cs = Theme.of(context).colorScheme;
+    final analytics = data.analytics;
+    final currencySymbol = _currencySymbol('PHP');
     final authNotifier = ref.read(authStateProvider.notifier);
 
     return Column(
@@ -983,40 +1172,11 @@ class _StaffDashboard extends ConsumerWidget {
       children: [
         // ── Primary KPIs (own sales only) ──
         AppSection(
-          title: 'Key Performance Indicators',
+          title: 'My Performance',
           padding: const EdgeInsets.only(bottom: Spacing.md),
-          child: KpiGrid(
-            children: [
-              KpiCard(
-                label: 'My Sales Today',
-                value: _peso(data.mySalesToday),
-                icon: Icons.payments_outlined,
-                iconColor: cs.primary,
-                subtitle: '${data.myTransactionsToday} transactions',
-                tier: KpiCardTier.primary,
-              ),
-              KpiCard(
-                label: 'My Transactions',
-                value: '${data.myTransactionsToday}',
-                icon: Icons.receipt_long_outlined,
-                iconColor: cs.tertiary,
-                tier: KpiCardTier.secondary,
-              ),
-              KpiCard(
-                label: 'Low Stock',
-                value: '${data.lowStockCount}',
-                icon: Icons.warning_amber,
-                iconColor: AppSemanticColors.resolve(AppSemanticColors.warning, Theme.of(context).brightness),
-                tier: KpiCardTier.secondary,
-              ),
-              KpiCard(
-                label: 'Out of Stock',
-                value: '${data.outOfStockCount}',
-                icon: Icons.error_outline,
-                iconColor: AppSemanticColors.resolve(AppSemanticColors.error, Theme.of(context).brightness),
-                tier: KpiCardTier.secondary,
-              ),
-            ],
+          child: SalesSummaryCards(
+            analytics: analytics,
+            storeInfo: null,
           ),
         ),
         const SizedBox(height: Spacing.xxl),
@@ -1026,20 +1186,32 @@ class _StaffDashboard extends ConsumerWidget {
         const SizedBox(height: Spacing.xxl),
 
         // ── My sales trend ──
-        _buildMySalesTrendCard(context),
+        _buildSalesTrendCard(
+          context,
+          analytics,
+          currencySymbol,
+          title: 'My Sales Trend',
+        ),
         const SizedBox(height: Spacing.xxl),
 
+        // ── Top products ──
+        _buildTopProductsCard(context, analytics),
+        const SizedBox(height: Spacing.xxl),
+
+        // ── Payment breakdown ──
+        _buildPaymentBreakdown(context, analytics),
+        const SizedBox(height: Spacing.xxl),
+
+        // ── Peak sales ──
+        _buildPeakSalesCard(context, analytics.peakSalesPeriod),
+        const SizedBox(height: Spacing.xxl),
 
         // ── Inventory status ──
         _buildInventoryCard(context),
         const SizedBox(height: Spacing.xxl),
 
         // ── Low stock alert ──
-        _buildLowStockAlert(context, ref, data.lowStockProducts, authNotifier),
-        const SizedBox(height: Spacing.xxl),
-
-        // ── My recent sales ──
-        _buildMyRecentSalesCard(context),
+        _buildLowStockAlert(context, ref, data.lowStockProducts),
         const SizedBox(height: Spacing.xxl),
 
         // ── Recent activity (own) ──
@@ -1048,29 +1220,69 @@ class _StaffDashboard extends ConsumerWidget {
     );
   }
 
-  Widget _buildMySalesTrendCard(BuildContext context) {
-    final hasData = data.mySalesTrend.any((p) => p.total > 0);
+  Widget _buildSalesTrendCard(
+    BuildContext context,
+    SalesAnalytics analytics,
+    String currencySymbol, {
+    required String title,
+  }) {
     return AppSection(
-      title: 'My Sales (Last 7 Days)',
+      title: title,
       padding: const EdgeInsets.only(bottom: Spacing.md),
       child: AppCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (hasData)
-              MiniBarChart(
-                points: data.mySalesTrend
-                    .map((p) => BarChartPoint(
-                          label: _dayLabel(p.date),
-                          value: p.total,
-                        ))
-                    .toList(),
-                valuePrefix: '₱',
+        child: analytics.trend.isEmpty
+            ? const _ChartEmptyState(
+                message: 'No sales data available for this period.',
               )
-            else
-              const _ChartEmptyState(message: 'No sales data available yet.'),
-          ],
+            : SalesLineChart(
+                points: analytics.trend,
+                groupBy: analytics.bounds.groupBy,
+                valuePrefix: currencySymbol,
+              ),
+      ),
+    );
+  }
+
+  Widget _buildTopProductsCard(
+    BuildContext context,
+    SalesAnalytics analytics,
+  ) {
+    return AppSection(
+      title: 'Top Products',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: AppCard(
+        child: TopProductsBarChart(
+          products: analytics.topProducts,
         ),
+      ),
+    );
+  }
+
+  Widget _buildPaymentBreakdown(
+    BuildContext context,
+    SalesAnalytics analytics,
+  ) {
+    return AppSection(
+      title: 'Payment Breakdown',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: AppCard(
+        child: PaymentBreakdownView(
+          breakdown: analytics.paymentBreakdown,
+          grandTotal: analytics.totalSales,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPeakSalesCard(
+    BuildContext context,
+    PeakSalesPeriod peak,
+  ) {
+    return AppSection(
+      title: 'Peak Sales',
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: AppCard(
+        child: PeakSalesCard(peak: peak),
       ),
     );
   }
@@ -1091,17 +1303,23 @@ class _StaffDashboard extends ConsumerWidget {
                   DonutSegment(
                     label: 'Normal',
                     value: data.inventoryStatus.normal,
-                    color: AppSemanticColors.resolve(AppSemanticColors.success, Theme.of(context).brightness),
+                    color: AppSemanticColors.resolve(
+                        AppSemanticColors.success,
+                        Theme.of(context).brightness),
                   ),
                   DonutSegment(
                     label: 'Low Stock',
                     value: data.inventoryStatus.lowStock,
-                    color: AppSemanticColors.resolve(AppSemanticColors.warning, Theme.of(context).brightness),
+                    color: AppSemanticColors.resolve(
+                        AppSemanticColors.warning,
+                        Theme.of(context).brightness),
                   ),
                   DonutSegment(
                     label: 'Out of Stock',
                     value: data.inventoryStatus.outOfStock,
-                    color: AppSemanticColors.resolve(AppSemanticColors.error, Theme.of(context).brightness),
+                    color: AppSemanticColors.resolve(
+                        AppSemanticColors.error,
+                        Theme.of(context).brightness),
                   ),
                 ],
               ),
@@ -1112,7 +1330,10 @@ class _StaffDashboard extends ConsumerWidget {
   }
 
   Widget _buildLowStockAlert(
-      BuildContext context, WidgetRef ref, List<dynamic> products, dynamic authNotifier) {
+    BuildContext context,
+    WidgetRef ref,
+    List<Product> products,
+  ) {
     if (products.isEmpty) {
       return AppSection(
         title: 'Low Stock Alert',
@@ -1120,7 +1341,10 @@ class _StaffDashboard extends ConsumerWidget {
         child: AppCard(
           child: Row(
             children: [
-              Icon(Icons.check_circle, color: AppSemanticColors.resolve(AppSemanticColors.success, Theme.of(context).brightness)),
+              Icon(Icons.check_circle,
+                  color: AppSemanticColors.resolve(
+                      AppSemanticColors.success,
+                      Theme.of(context).brightness)),
               const SizedBox(width: Spacing.md),
               const Expanded(child: Text('Inventory is healthy')),
             ],
@@ -1136,10 +1360,12 @@ class _StaffDashboard extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ...products.take(5).map((p) => _LowStockTile(
-                  name: (p as dynamic).name as String,
-                  remaining: (p as dynamic).stock as int,
+                  name: p.name,
+                  remaining: p.stock,
                 )),
-            if (authNotifier.hasPermission('add_stock')) ...[
+            if (ref
+                .read(authStateProvider.notifier)
+                .hasPermission('add_stock')) ...[
               const SizedBox(height: Spacing.sm),
               Align(
                 alignment: Alignment.centerRight,
@@ -1162,53 +1388,24 @@ class _StaffDashboard extends ConsumerWidget {
     );
   }
 
-  Widget _buildMyRecentSalesCard(BuildContext context) {
-    return AppSection(
-      title: 'My Recent Sales',
-      padding: const EdgeInsets.only(bottom: Spacing.md),
-      child: AppCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (data.myRecentSales.isEmpty)
-              const _ChartEmptyState(message: 'No sales recorded yet.')
-            else
-              Column(
-                children: data.myRecentSales.map((s) => _RecentSaleTile(
-                      receipt: '#${s.receiptNumber ?? s.id}',
-                      amount: _peso(s.totalAmount),
-                      time: _formatDateTime(s.createdAt),
-                    )).toList(),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRecentActivityCard(BuildContext context, List<dynamic> activities) {
+  Widget _buildRecentActivityCard(
+    BuildContext context,
+    List<ActivityLog> activities,
+  ) {
     return AppSection(
       title: 'Recent Activity',
       padding: const EdgeInsets.only(bottom: Spacing.md),
       child: AppCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (activities.isEmpty)
-              const _ChartEmptyState(message: 'No activity yet.')
-            else
-              Column(
-                children: activities.take(5).map((a) {
-                  final log = a as dynamic;
-                  return _ActivityTile(
-                    action: _humanizeAction(log.action as String),
-                    details: log.details as String?,
-                    time: _formatDateTime(log.createdAt as DateTime),
-                  );
-                }).toList(),
+        child: activities.isEmpty
+            ? const _ChartEmptyState(message: 'No activity yet.')
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: activities.take(5).map((a) => _ActivityTile(
+                      action: _humanizeAction(a.action),
+                      details: a.details,
+                      time: _formatDateTime(a.createdAt),
+                    )).toList(),
               ),
-          ],
-        ),
       ),
     );
   }
@@ -1268,7 +1465,6 @@ class _StaffDashboard extends ConsumerWidget {
       ),
     );
   }
-
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -1303,62 +1499,6 @@ class _ChartEmptyState extends StatelessWidget {
   }
 }
 
-class _RankedListTile extends StatelessWidget {
-  final int rank;
-  final String title;
-  final String trailing;
-
-  const _RankedListTile({
-    required this.rank,
-    required this.title,
-    required this.trailing,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: Spacing.xs),
-      child: Row(
-        children: [
-          Container(
-            width: 24,
-            height: 24,
-            decoration: BoxDecoration(
-              color: cs.primaryContainer,
-              shape: BoxShape.circle,
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              '$rank',
-              style: AppTypography.labelMedium(context).copyWith(
-                fontWeight: FontWeight.bold,
-                color: cs.onPrimaryContainer,
-              ),
-            ),
-          ),
-          const SizedBox(width: Spacing.md),
-          Expanded(
-            child: Text(
-              title,
-              style: Theme.of(context).textTheme.bodyMedium,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          Text(
-            trailing,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: cs.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
-                ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _LowStockTile extends StatelessWidget {
   final String name;
   final int remaining;
@@ -1371,7 +1511,11 @@ class _LowStockTile extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: Spacing.xs),
       child: Row(
         children: [
-          Icon(Icons.circle, size: 8, color: AppSemanticColors.resolve(AppSemanticColors.warning, Theme.of(context).brightness)),
+          Icon(Icons.circle,
+              size: 8,
+              color: AppSemanticColors.resolve(
+                  AppSemanticColors.warning,
+                  Theme.of(context).brightness)),
           const SizedBox(width: Spacing.md),
           Expanded(
             child: Text(
@@ -1384,7 +1528,9 @@ class _LowStockTile extends StatelessWidget {
           Text(
             '$remaining remaining',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppSemanticColors.resolve(AppSemanticColors.warning, Theme.of(context).brightness),
+                  color: AppSemanticColors.resolve(
+                      AppSemanticColors.warning,
+                      Theme.of(context).brightness),
                   fontWeight: FontWeight.w600,
                 ),
           ),

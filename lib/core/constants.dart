@@ -4,7 +4,7 @@ class AppConstants {
 
   // Database
   static const String databaseName = 'pinoy_pos.db';
-  static const int databaseVersion = 17;
+  static const int databaseVersion = 18;
 
   // App Info
   static const String appName = 'Pinoy POS';

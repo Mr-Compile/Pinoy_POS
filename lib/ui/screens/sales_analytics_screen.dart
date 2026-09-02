@@ -3,22 +3,26 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/reporting_period.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
+import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/sales_analytics_provider.dart';
 import 'package:pinoy_pos/services/report_export_service.dart';
 import 'package:pinoy_pos/ui/screens/sale_detail_screen.dart';
 import 'package:pinoy_pos/ui/screens/settings/store_information_settings_page.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_section.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
-import 'package:pinoy_pos/ui/widgets/payment_breakdown_list.dart';
+import 'package:pinoy_pos/ui/widgets/category_sales_bar_chart.dart';
+import 'package:pinoy_pos/ui/widgets/payment_breakdown_view.dart';
+import 'package:pinoy_pos/ui/widgets/peak_sales_card.dart';
 import 'package:pinoy_pos/ui/widgets/period_selector.dart';
-import 'package:pinoy_pos/ui/widgets/product_performance_list.dart';
+import 'package:pinoy_pos/ui/widgets/sales_line_chart.dart';
 import 'package:pinoy_pos/ui/widgets/sales_summary_cards.dart';
 import 'package:pinoy_pos/ui/widgets/sales_transactions_list.dart';
-import 'package:pinoy_pos/ui/widgets/sales_trend_chart.dart';
 import 'package:pinoy_pos/ui/widgets/staff_performance_list.dart';
+import 'package:pinoy_pos/ui/widgets/top_products_bar_chart.dart';
 
 /// Sales Analytics screen (the new Reports / Sales Analytics hub).
 class SalesAnalyticsScreen extends ConsumerStatefulWidget {
@@ -119,10 +123,24 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
               child: AppSection(
                 title: 'Sales Trend',
                 subtitle: _trendSubtitle(analytics.bounds),
-                child: SalesTrendChart(
-                  trend: analytics.trend,
+                child: SalesLineChart(
+                  points: analytics.trend,
                   groupBy: analytics.bounds.groupBy,
-                  valuePrefix: state.storeInfo?.currency,
+                  valuePrefix: _currencySymbol(state.storeInfo?.currency),
+                ),
+              ),
+            ),
+            const SizedBox(height: Spacing.lg),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
+              child: AppSection(
+                title: 'Sales vs Previous Period',
+                subtitle: _trendSubtitle(analytics.bounds),
+                child: SalesComparisonChart(
+                  current: analytics.trend,
+                  previous: analytics.previousTrend,
+                  groupBy: analytics.bounds.groupBy,
+                  valuePrefix: _currencySymbol(state.storeInfo?.currency),
                 ),
               ),
             ),
@@ -132,7 +150,7 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
               child: _ResponsiveTwoColumn(
                 left: AppSection(
                   title: 'Payment Methods',
-                  child: PaymentBreakdownList(
+                  child: PaymentBreakdownView(
                     breakdown: analytics.paymentBreakdown,
                     grandTotal: analytics.totalSales,
                     storeInfo: state.storeInfo,
@@ -140,10 +158,21 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
                 ),
                 right: AppSection(
                   title: 'Top Products',
-                  child: ProductPerformanceList(
+                  child: TopProductsBarChart(
                     products: analytics.topProducts,
                     storeInfo: state.storeInfo,
                   ),
+                ),
+              ),
+            ),
+            const SizedBox(height: Spacing.lg),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
+              child: AppSection(
+                title: 'Sales by Category',
+                child: CategorySalesBarChart(
+                  categorySales: analytics.categorySales,
+                  storeInfo: state.storeInfo,
                 ),
               ),
             ),
@@ -164,11 +193,22 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
               child: AppSection(
+                title: 'Peak Sales Period',
+                child: PeakSalesCard(peak: analytics.peakSalesPeriod),
+              ),
+            ),
+            const SizedBox(height: Spacing.lg),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
+              child: AppSection(
                 title: 'Recent Transactions',
                 subtitle: 'Confirmed sales for the selected period',
                 child: SalesTransactionsList(
                   sales: analytics.sales,
                   storeInfo: state.storeInfo,
+                  staffNames: {
+                    for (final s in analytics.staffSummaries) s.userId: s.fullName,
+                  },
                   onTap: _openSale,
                 ),
               ),
@@ -224,6 +264,11 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
     };
   }
 
+  String _currencySymbol(String? currency) {
+    if (currency == 'PHP') return '₱';
+    return currency ?? 'PHP';
+  }
+
   String _formatDate(DateTime date) {
     return '${date.month}/${date.day}/${date.year}';
   }
@@ -250,6 +295,9 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
     final analytics = ref.read(salesAnalyticsProvider).analytics;
     if (analytics == null) return;
 
+    final isStaff =
+        ref.read(authStateProvider.notifier).currentUser?.role == UserRole.staff;
+
     showModalBottomSheet(
       context: context,
       builder: (context) => SafeArea(
@@ -259,7 +307,7 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Export Report',
+                isStaff ? 'Report' : 'Export Report',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: Spacing.md),
@@ -278,11 +326,66 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
                 label: 'CSV',
                 onTap: () => _export(ExportFormat.csv),
               ),
+              if (isStaff) ...[
+                const Divider(),
+                _ExportFormatTile(
+                  icon: Icons.send,
+                  label: 'Submit to Owner',
+                  onTap: _submit,
+                ),
+              ],
             ],
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _submit() async {
+    Navigator.pop(context);
+    if (_isExporting) return;
+
+    final analytics = ref.read(salesAnalyticsProvider).analytics;
+    final store = ref.read(salesAnalyticsProvider).storeInfo;
+    if (analytics == null || store == null) return;
+
+    setState(() => _isExporting = true);
+    try {
+      final savedPath = await ReportExportService().submitSalesReport(
+        analytics: analytics,
+        store: store,
+        format: ExportFormat.pdf,
+      );
+
+      if (mounted) {
+        if (savedPath != null && savedPath.isNotEmpty) {
+          await AppDialogService.success(
+            context,
+            title: 'Report Submitted',
+            message: 'The report has been submitted to the Owner.',
+            details: savedPath,
+            primaryLabel: 'Done',
+          );
+        } else {
+          await AppDialogService.warning(
+            context,
+            title: 'Submission Cancelled',
+            message: 'No file was saved.',
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        await AppDialogService.error(
+          context,
+          title: 'Submission Failed',
+          message: 'The report could not be submitted.',
+          details: e.toString(),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
   }
 
   Future<void> _export(ExportFormat format) async {
@@ -295,24 +398,35 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
 
     setState(() => _isExporting = true);
     try {
-      final ok = await ReportExportService().exportSalesReport(
+      final savedPath = await ReportExportService().exportSalesReport(
         analytics: analytics,
         store: store,
         format: format,
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(ok
-                ? 'Report exported successfully.'
-                : 'Export cancelled or failed.'),
-          ),
-        );
+        if (savedPath != null && savedPath.isNotEmpty) {
+          await AppDialogService.success(
+            context,
+            title: 'Report Exported',
+            message: 'The report was saved to:',
+            details: savedPath,
+            primaryLabel: 'Done',
+          );
+        } else {
+          await AppDialogService.warning(
+            context,
+            title: 'Export Cancelled',
+            message: 'No file was saved.',
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Export failed: $e')),
+        await AppDialogService.error(
+          context,
+          title: 'Export Failed',
+          message: 'The report could not be exported.',
+          details: e.toString(),
         );
       }
     } finally {

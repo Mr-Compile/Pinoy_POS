@@ -14,6 +14,18 @@ class DailySalesPoint {
   /// as a transaction count.
   int get transactionCount => count;
 
+  DailySalesPoint copyWith({
+    DateTime? date,
+    double? total,
+    int? count,
+  }) {
+    return DailySalesPoint(
+      date: date ?? this.date,
+      total: total ?? this.total,
+      count: count ?? this.count,
+    );
+  }
+
   factory DailySalesPoint.fromMap(Map<String, dynamic> map) {
     return DailySalesPoint(
       date: map['date'] != null

@@ -31,23 +31,22 @@ class FileExportService {
 
     if (picked == null || picked.isEmpty) return null;
 
+    // On mobile the plugin returns a content:// URI or a platform path that
+    // must not be modified or passed to dart:io. Return it as-is.
+    if (isMobile) return picked;
+
     final extension = FileExportCommon.primaryExtension(fileName, allowedExtensions);
     final path = FileExportCommon.ensureExtension(picked, extension);
 
-    if (!isMobile) {
-      // On desktop the returned string is a real filesystem path. On Android
-      // it may be a content:// URI or a simplified display path, so never
-      // pass it to dart:io File operations.
-      try {
-        final file = File(path);
-        await file.parent.create(recursive: true);
-        await file.writeAsBytes(bytes, flush: true);
-      } on FileSystemException catch (e) {
-        debugPrint('[FileExportService] Could not write to $path: $e');
-        return null;
-      }
+    // On desktop the returned string is a real filesystem path.
+    try {
+      final file = File(path);
+      await file.parent.create(recursive: true);
+      await file.writeAsBytes(bytes, flush: true);
+      return path;
+    } on Exception catch (e) {
+      debugPrint('[FileExportService] Could not write to $path: $e');
+      return null;
     }
-
-    return path;
   }
 }

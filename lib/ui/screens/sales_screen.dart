@@ -66,22 +66,31 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
       _error = null;
     });
 
-    final bounds = _periodBounds();
-    final salesService = ref.read(salesServiceProvider);
-    final sales = await salesService.getFilteredSales(
-      start: bounds.start,
-      end: bounds.end,
-      paymentMethod: _selectedPaymentMethod,
-      paymentStatus: _selectedPaymentStatus,
-      search: _searchQuery.isEmpty ? null : _searchQuery,
-      limit: 500,
-    );
+    try {
+      final bounds = _periodBounds();
+      final salesService = ref.read(salesServiceProvider);
+      final sales = await salesService.getFilteredSales(
+        start: bounds.start,
+        end: bounds.end,
+        paymentMethod: _selectedPaymentMethod,
+        paymentStatus: _selectedPaymentStatus,
+        search: _searchQuery.isEmpty ? null : _searchQuery,
+        limit: 500,
+      );
 
-    if (mounted) {
-      setState(() {
-        _sales = sales;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _sales = sales;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = 'Failed to load sales: $e';
+          _isLoading = false;
+        });
+      }
     }
   }
 

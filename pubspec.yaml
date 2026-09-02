@@ -60,6 +60,9 @@ dependencies:
 
   # File / directory picker for backup & restore (cross-platform)
   file_picker: ^8.1.2
+
+  # Archive support for zip backup/restore
+  archive: ^3.6.1
   
   # PDF/CSV Export
   pdf: ^3.11.1
@@ -80,6 +83,7 @@ dev_dependencies:
   riverpod_generator: ^2.4.0
   mockito: ^5.4.4
   flutter_lints: ^6.0.0
+  path_provider_platform_interface: ^2.1.3
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

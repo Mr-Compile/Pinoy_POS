@@ -1,9 +1,11 @@
 import 'package:pinoy_pos/data/dao/sale_dao.dart';
 import 'package:pinoy_pos/data/models/calendar_day_sales.dart';
+import 'package:pinoy_pos/data/models/category_sales_result.dart';
 import 'package:pinoy_pos/data/models/daily_sales_point.dart';
 import 'package:pinoy_pos/data/models/payment_breakdown.dart';
 import 'package:pinoy_pos/data/models/reporting_period.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
+import 'package:pinoy_pos/data/models/sales_by_hour_point.dart';
 import 'package:pinoy_pos/data/models/staff_sales_summary.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:sqflite/sqflite.dart';
@@ -52,7 +54,7 @@ class SaleRepository {
     String? paymentStatus,
     String? search,
     int? userId,
-    int limit = 500,
+    int? limit = 500,
     DatabaseExecutor? txn,
   }) =>
       _saleDao.getFilteredSales(
@@ -106,6 +108,20 @@ class SaleRepository {
   }) =>
       _saleDao.getPaymentBreakdown(start, end, userId: userId);
 
+  Future<List<CategorySalesResult>> getCategorySales(
+    DateTime start,
+    DateTime end, {
+    int? userId,
+  }) =>
+      _saleDao.getCategorySales(start, end, userId: userId);
+
+  Future<List<SalesByHourPoint>> getSalesByHourOfDay(
+    DateTime start,
+    DateTime end, {
+    int? userId,
+  }) =>
+      _saleDao.getSalesByHourOfDay(start, end, userId: userId);
+
   Future<List<CalendarDaySales>> getCalendarDaySales(
     DateTime start,
     DateTime end, {
@@ -119,7 +135,7 @@ class SaleRepository {
     int? userId,
     String? paymentMethod,
     String? search,
-    int limit = 500,
+    int? limit = 500,
     DatabaseExecutor? txn,
   }) =>
       _saleDao.getConfirmedSalesForRange(

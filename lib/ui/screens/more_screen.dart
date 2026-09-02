@@ -8,6 +8,7 @@ import 'package:pinoy_pos/ui/screens/activity_logs_screen.dart';
 import 'package:pinoy_pos/ui/screens/ai_config_screen.dart';
 import 'package:pinoy_pos/ui/screens/announcements_screen.dart';
 import 'package:pinoy_pos/ui/screens/categories_screen.dart';
+import 'package:pinoy_pos/ui/screens/report_submissions_screen.dart';
 import 'package:pinoy_pos/ui/screens/sales_analytics_screen.dart';
 import 'package:pinoy_pos/ui/screens/staff_management_screen.dart';
 import 'package:pinoy_pos/ui/screens/stock_screen.dart';
@@ -60,6 +61,20 @@ class MoreEntry {
       permission: 'view_reports',
       routeName: 'reports',
       screen: SalesAnalyticsScreen(),
+    ),
+    MoreEntry(
+      icon: Icons.inbox_outlined,
+      title: 'Submitted Reports',
+      permission: 'view_report_submissions',
+      routeName: 'report_submissions',
+      screen: ReportSubmissionsScreen(submissionsOnly: true),
+    ),
+    MoreEntry(
+      icon: Icons.folder_copy_outlined,
+      title: 'My Reports',
+      permission: 'view_reports',
+      routeName: 'my_reports',
+      screen: ReportSubmissionsScreen(submissionsOnly: false),
     ),
     MoreEntry(
       icon: Icons.campaign_outlined,

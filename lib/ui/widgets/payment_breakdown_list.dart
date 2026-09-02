@@ -20,6 +20,11 @@ class PaymentBreakdownList extends StatelessWidget {
 
   String get _currency => storeInfo?.currency ?? 'PHP';
 
+  String get _currencySymbol {
+    if (_currency == 'PHP') return '₱';
+    return _currency;
+  }
+
   @override
   Widget build(BuildContext context) {
     final total = grandTotal ??
@@ -55,7 +60,7 @@ class PaymentBreakdownList extends StatelessWidget {
             breakdown: sorted[i],
             total: total,
             color: colors[i % colors.length],
-            currency: _currency,
+            currency: _currencySymbol,
           ),
           if (i < sorted.length - 1) const SizedBox(height: Spacing.md),
         ],
@@ -105,7 +110,7 @@ class _PaymentMethodRow extends StatelessWidget {
               ),
             ),
             Text(
-              '$currency ${breakdown.total.toStringAsFixed(2)}',
+              '$currency${breakdown.total.toStringAsFixed(2)}',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),

@@ -49,8 +49,12 @@ Additionally, `BackupService` only copied the SQLite database, so a restore on a
   - Receipt remains "Download PDF".
   - Removed PDF-specific proof UI paths.
 
+- `lib/services/sales_service.dart`
+  - `replacePaymentProof` now moves the replacement proof from the transient `payment_evidence/tmp/` directory into the sale-owned `payment_evidence/sale_$saleId/` directory, detects the image type, and updates `payment_proof_path` and `payment_proof_type` in one transaction.
+
 - `lib/services/receipt_service.dart`
   - Receipt export now passes `mimeType: 'application/pdf'`, preserving the PDF pipeline.
+  - `buildFileName` now returns the filename with the `.pdf` extension already included, so the save dialog shows a complete filename.
 
 - `lib/core/database.dart`
   - Database version bumped to 17.
@@ -64,6 +68,7 @@ Additionally, `BackupService` only copied the SQLite database, so a restore on a
 - Tests added
   - `test/file_type_utils_test.dart` - 34 unit tests covering extension/MIME mapping and magic-byte detection for all supported formats.
   - `test/payment_proof_service_test.dart` - 9 unit tests for `PaymentProofService.resolveImageExtension` and `PaymentProofInfo` flags.
+  - `test/payment_proof_integration_test.dart` - 3 integration tests that write real JPEG and PNG proof files with no extension, then resolve the type from magic bytes and produce the correct canonical extension.
   - `test/backup_service_test.dart` - compile/construct smoke test for the updated `BackupService`.
 
 ### Verification
@@ -71,13 +76,148 @@ Additionally, `BackupService` only copied the SQLite database, so a restore on a
 Run the focused test suite:
 
 ```powershell
-flutter test test/file_type_utils_test.dart test/payment_proof_service_test.dart test/gcash_payment_service_test.dart
+flutter test test/file_type_utils_test.dart test/payment_proof_service_test.dart test/payment_proof_integration_test.dart test/gcash_payment_service_test.dart
 ```
 
-Result: 52/52 tests passed.
+Result: 55/55 tests passed.
 
-`flutter analyze` still reports 12 pre-existing errors in `lib/providers/dashboard_provider.dart`, `lib/services/dashboard_service.dart`, `lib/services/sales_analytics_service.dart`, and `lib/ui/screens/dashboard_screen.dart` (missing parameters/getters and an unused import). These are unrelated to the GCash payment proof flow and were present before this work.
+`flutter analyze` reports no issues.
 
 ### Receipt PDF Regression Check
 
 `gcash_payment_service_test.dart` includes `receipt PDF is generated with non-zero bytes` and passes. `ReceiptService.saveReceiptToFile` still uses `FileType.custom` / `allowedExtensions: ['pdf']` and now passes `mimeType: 'application/pdf'`, so the PDF export pipeline remains separate from the image proof pipeline.
+
+## Reports, Sales, Dark Mode, and Export Repair Pass
+
+### Root Cause
+
+Several functional and visual issues surfaced during the analytics/receipt audit:
+
+1. `FileExportService` on web created the download `Blob` from the full backing buffer, which could include trailing bytes for a `Uint8List` sub-view, and it revoked the object URL before the browser had time to start the download.
+2. `FileExportService` on mobile returned `FileExportCommon.ensureExtension(picked, ...)` for `content://` URIs, producing a misleading path string and possibly corrupting the platform-given URI.
+3. `ReportExportService` exported only the 100-row sale preview in `SalesAnalytics.sales`, so reports were missing transactions on busy periods.
+4. `SaleItemDao.getTopProducts` used `INNER JOIN products`, which dropped sales of products that were later deleted, and it ignored the historical `sale_items.product_name`.
+5. `SalesTransactionsList` showed `Cashier: User N` instead of the staff member's name.
+6. `AppSemanticColors.resolve` inverted the HSL lightness of light colors, which does not produce usable dark-mode surfaces and made many status backgrounds appear muddy.
+7. `ColorScheme.primary` and `onPrimary` were pinned to the light-mode brand blue in both themes, so primary text/backgrounds did not adapt.
+8. `PaymentMethodChart` and `ProfileMenu` used hardcoded `Colors.black`/`Colors.white` or raw `AppSemanticColors.error` instead of theme-aware colors.
+9. `SalesAnalyticsScreen` reported export success/failure through `ScaffoldMessenger` instead of the project's `AppDialogService`.
+
+### Changes Made
+
+- `lib/services/file_export_service_web.dart`
+  - Copies `bytes.sublist(0)` into a fresh `Uint8List` before building the `Blob` so trailing buffer bytes are not included.
+  - Delays `web.URL.revokeObjectURL` by two seconds so the anchor click has time to start the download.
+
+- `lib/services/file_export_service_io.dart`
+  - On mobile (Android/iOS) returns the `FilePicker` result unchanged and never appends an extension to a `content://` URI.
+  - On desktop still runs `ensureExtension`, creates parent directories, and writes the file.
+  - Catches general `Exception` instead of only `FileSystemException`.
+
+- `lib/services/report_export_service.dart`
+  - `exportSalesReport` now returns `String?` (the saved path or `null`).
+  - Fetches all confirmed sales for the period through `SalesService().getFilteredSales(..., limit: null)` instead of using the 100-row UI preview.
+
+- `lib/services/sales_service.dart` / `lib/data/repositories/sale_repository.dart` / `lib/data/dao/sale_dao.dart`
+  - `getFilteredSales` and `getConfirmedSalesForRange` now accept `int? limit = 500`, allowing `null` to disable the cap.
+
+- `lib/data/dao/sale_item_dao.dart`
+  - `getTopProducts` uses `LEFT JOIN products` and `COALESCE(si.product_name, p.name, 'Product #' || si.product_id)` for the product name, and groups by the same `COALESCE` expression.
+
+- `lib/ui/widgets/sales_transactions_list.dart` / `lib/ui/screens/sales_analytics_screen.dart`
+  - `SalesTransactionsList` accepts a `Map<int, String>? staffNames` and shows the cashier's full name instead of `User N`.
+  - `SalesAnalyticsScreen` builds the map from `analytics.staffSummaries`.
+
+- `lib/core/app_theme.dart`
+  - `AppSemanticColors.resolve` now uses a `switch` on `Color` with explicit dark-mode variants for every semantic role.
+  - `ColorScheme` primary/onPrimary and error family are resolved per brightness.
+  - `premiumButtonGradient` resolves `primary` and `primaryLight` so the dark-mode gradient is lighter, not darker.
+
+- `lib/ui/widgets/payment_method_chart.dart`
+  - `_contrastColor` uses `colorScheme.surface` and `colorScheme.onSurface` instead of `Colors.black`/`Colors.white`.
+
+- `lib/ui/widgets/profile_menu.dart`
+  - Logout icon/text now use `AppSemanticColors.resolve(AppSemanticColors.error, brightness)`.
+
+- `lib/ui/screens/sales_analytics_screen.dart`
+  - Export feedback now goes through `AppDialogService.success`, `AppDialogService.warning`, and `AppDialogService.error`, and displays the saved path on success.
+
+### Verification
+
+```powershell
+flutter analyze
+flutter test
+```
+
+Result: `flutter analyze` reports no issues; `flutter test` passes 232/232 tests.
+
+### Remaining Known Gaps
+
+- Currency display is still hardcoded to `₱` in several screens (`pos_screen.dart`, `sales_screen.dart`, `products_screen.dart`, `trash_screen.dart`, etc.). A central `CurrencyUtils` helper and a pass through the POS/product flows is still needed.
+- `lib/ui/screens/reports_screen.dart` is dead code and should be removed or rewired.
+- The Settings > Reports hub filters (date, staff, payment method) are not yet wired to real filtered export queries.
+- Responsive/tablet/desktop break points and visual regressions should be smoke-tested on actual devices after the color palette change.
+
+## Reports Module Staff-to-Owner Workflow
+
+### What Changed
+
+- `lib/core/database.dart`
+  - Bumped schema version to 18.
+  - Added `status`, `submitted_at`, `viewed_at`, `file_size`, `thumbnail_path`, `report_number`, and `deleted_at` columns to `export_history`.
+  - Backfilled old rows to `status = 'generated'`.
+
+- `lib/data/models/export_history.dart`
+  - Extended `ExportHistory` to carry status/lifecycle fields.
+  - Added `ReportStatus` constants: `generated`, `submitted`, `viewed`, `archived`, `imported`.
+
+- `lib/data/dao/export_history_dao.dart` / `lib/data/repositories/export_history_repository.dart`
+  - Added status/creator queries and ordered active results by `created_at DESC`.
+  - Fixed `getAllActive` so it no longer crashes on the missing `deleted_at` column.
+
+- `lib/core/session_manager.dart`
+  - Added `view_report_submissions` to the Owner permission set.
+
+- `lib/services/report_service.dart`
+  - `recordExport` now returns the inserted `export_history` id.
+  - Added `submitReport`, `markReportViewed`, `archiveReport`, `getReportById`, `getSubmittedReports`, `getMyReports`, `getReportCreatorName`, and `importReport`.
+
+- `lib/services/report_export_service.dart`
+  - `exportSalesReport` records `fileSize` and `reportNumber`.
+  - Added `submitSalesReport` for Staff: it generates the report, writes it to the app `reports/` directory, records `export_history`, and marks it as `submitted`.
+
+- `lib/ui/screens/sales_analytics_screen.dart`
+  - Staff see a **Submit to Owner** option in the export menu.
+  - Export feedback goes through `AppDialogService`.
+
+- `lib/ui/screens/report_submissions_screen.dart` (new)
+  - Owner sees staff-submitted reports.
+  - Staff see their own report history.
+  - Owner can import external PDF/Excel/CSV reports.
+  - Supports pull-to-refresh, empty/error/loading states, and status chips.
+
+- `lib/ui/screens/report_preview_screen.dart` (new)
+  - Renders PDFs with `PdfPreview`.
+  - Renders Excel/CSV as a `DataTable` from the first sheet/first 50 rows.
+  - Provides Export and Share actions.
+
+- `lib/ui/screens/more_screen.dart`
+  - Added **Submitted Reports** and **My Reports** entries.
+
+- `lib/core/ai_navigation_registry.dart`
+  - Added a `report_submissions` AI destination.
+
+### Verification
+
+```powershell
+flutter analyze
+flutter test
+```
+
+Result: `flutter analyze` reports no issues; `flutter test` passes 232/232 tests.
+
+### Remaining Gaps
+
+- `lib/ui/screens/reports_screen.dart` and `lib/providers/reports_provider.dart` remain as dead code. They duplicate the PDF/Excel/CSV logic that now lives in `ReportExportService`. Removing them needs explicit confirmation because the `owner_screens_test` `ReportsScreen builds for owner` test still references the old screen.
+- Report thumbnails are not yet generated. `thumbnail_path` is persisted but left `null`.
+- The owner export for the owner's own sales only is not a separate filter. Owner exports in `SalesAnalyticsScreen` already cover the selected period and use `SalesAnalyticsService`, which scopes Staff to their own sales and gives Owner the full store view.

@@ -10,6 +10,7 @@ import 'package:pinoy_pos/ui/screens/pos_screen.dart';
 import 'package:pinoy_pos/ui/screens/products_screen.dart';
 import 'package:pinoy_pos/ui/screens/profile_screen.dart';
 import 'package:pinoy_pos/ui/screens/receipt_screen.dart';
+import 'package:pinoy_pos/ui/screens/report_submissions_screen.dart';
 import 'package:pinoy_pos/ui/screens/sales_analytics_screen.dart';
 import 'package:pinoy_pos/ui/screens/sale_detail_screen.dart';
 import 'package:pinoy_pos/ui/screens/sales_screen.dart';
@@ -227,6 +228,18 @@ class AINavigationRegistry {
       relatedDestinations: ['sales', 'products', 'dashboard'],
     ),
     const AIDestination(
+      id: 'report_submissions',
+      displayName: 'Submitted Reports',
+      description: 'Review reports submitted by staff.',
+      requiredPermission: 'view_report_submissions',
+      builder: _reportSubmissionsBuilder,
+      howToSteps: [
+        'Open Submitted Reports from the More screen.',
+        'Tap a report to preview it.',
+      ],
+      relatedDestinations: ['reports', 'staff_management'],
+    ),
+    const AIDestination(
       id: 'users',
       displayName: 'User Management',
       description: 'Add, edit, and manage staff and admin accounts.',
@@ -393,6 +406,8 @@ class AINavigationRegistry {
   static Widget _stockBuilder(BuildContext context) => const StockScreen();
   static Widget _salesBuilder(BuildContext context) => const SalesScreen();
   static Widget _reportsBuilder(BuildContext context) => const SalesAnalyticsScreen();
+  static Widget _reportSubmissionsBuilder(BuildContext context) =>
+      const ReportSubmissionsScreen();
   static Widget _usersBuilder(BuildContext context) => const UsersScreen();
   static Widget _staffManagementBuilder(BuildContext context) => const StaffManagementScreen();
   static Widget _settingsBuilder(BuildContext context) => const SettingsScreen();
