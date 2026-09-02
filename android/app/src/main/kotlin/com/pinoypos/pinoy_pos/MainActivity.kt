@@ -223,8 +223,8 @@ class MainActivity : FlutterFragmentActivity() {
                 }
 
                 // Verify the provider actually persisted the bytes.
-                val actualSize = contentResolver.openFileDescriptor(docUri, "r")?.use { pfd ->
-                    pfd.statSize()
+                val actualSize = (contentResolver.openFileDescriptor(docUri, "r")?.use { pfd ->
+                    pfd.statSize
                 } ?: contentResolver.query(docUri, null, null, null, null)?.use { cursor ->
                     if (cursor.moveToFirst()) {
                         val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
@@ -234,7 +234,7 @@ class MainActivity : FlutterFragmentActivity() {
                     } else {
                         -1L
                     }
-                }
+                }) ?: -1L
 
                 if (actualSize >= 0 && actualSize != bytes.size.toLong()) {
                     runOnUiThread {
