@@ -61,8 +61,6 @@ class ImageService {
   final ImagePicker _picker = ImagePicker();
   static const int _maxFileSizeBytes = 5 * 1024 * 1024; // 5 MB
 
-  static const List<String> _allowedExtensions = ['.jpg', '.jpeg', '.png', '.webp'];
-
   /// Picks an image from the gallery, validates it, copies it into
   /// app-controlled storage, and returns the relative path.
   ///
@@ -73,8 +71,8 @@ class ImageService {
   /// is generated.
   ///
   /// Returns [ImagePickResult.failure] with a user-friendly message if
-  /// the user cancels, the file is too large, the extension is not
-  /// supported, or the file cannot be read.
+  /// the user cancels, the file is too large, the type is not a supported
+  /// image, or the file cannot be read.
   Future<ImagePickResult> pickAndStoreImage({
     ImageSource source = ImageSource.gallery,
     String directory = 'images',
@@ -94,11 +92,13 @@ class ImageService {
         return ImagePickResult.failure('No image selected');
       }
 
-      // Validate extension
-      final extension = p.extension(xFile.name).toLowerCase();
-      if (!_allowedExtensions.contains(extension)) {
+      // Detect the actual image type from its bytes (and filename as a
+      // fallback). This preserves the format even when the source file has
+      // no extension or a misleading one.
+      final fileType = await _detectType(xFile);
+      if (fileType == null || !fileType.isImage) {
         return ImagePickResult.failure(
-          'Unsupported file format. Please use JPG, PNG, or WebP.',
+          'Unsupported file format. Please use a common image such as JPG, PNG, or WebP.',
         );
       }
 
@@ -116,10 +116,12 @@ class ImageService {
         }
       }
 
-      // Store the image in the requested app-controlled directory
+      // Store the image using the canonical extension so the saved file
+      // always has a recognised image extension.
+      final canonicalExtension = '.${fileType.extension}';
       final storedPath = await _storeImage(
         xFile,
-        extension,
+        canonicalExtension,
         directory: directory,
         fileName: fileName,
       );
@@ -127,11 +129,10 @@ class ImageService {
         return ImagePickResult.failure('Failed to save image. Please try again.');
       }
 
-      final fileType = await _detectType(xFile);
       return ImagePickResult.success(
         storedPath,
-        mediaType: fileType?.mime,
-        extension: fileType?.extension,
+        mediaType: fileType.mime,
+        extension: fileType.extension,
       );
     } catch (e) {
       return ImagePickResult.failure('Failed to pick image: $e');
@@ -140,6 +141,8 @@ class ImageService {
 
   /// Stores the picked image in the app documents directory under
   /// [directory] with a UUID-based filename unless [fileName] is given.
+  ///
+  /// [extension] must include the leading dot (e.g. `.jpg`).
   /// Returns the **relative** path from the app documents directory,
   /// or null on failure.
   Future<String?> _storeImage(
@@ -156,8 +159,9 @@ class ImageService {
         await targetDir.create(recursive: true);
       }
 
+      final safeExtension = extension.startsWith('.') ? extension : '.$extension';
       final baseName = fileName ?? const Uuid().v4();
-      final filename = '$baseName$extension';
+      final filename = '$baseName$safeExtension';
       final destPath = p.join(targetDir.path, filename);
 
       if (kIsWeb) {
@@ -179,9 +183,12 @@ class ImageService {
 
   /// Detects the actual file type of a picked image using magic bytes and
   /// filename fallback.
+  ///
+  /// Reads a larger initial chunk so HEIC/AVIF brands and SVG/XML headers are
+  /// available for detection.
   Future<FileType?> _detectType(XFile xFile) async {
     try {
-      final chunk = await xFile.openRead(0, 64).first;
+      final chunk = await xFile.openRead(0, 512).first;
       final fromBytes = FileTypeUtils.detect(chunk, fileName: xFile.name);
       if (fromBytes != null) return fromBytes;
       return FileType.fromExtension(xFile.name);
@@ -191,13 +198,16 @@ class ImageService {
   }
 
   /// Detects the actual file type of a stored file from its relative path.
+  ///
+  /// Reads a larger initial chunk so HEIC/AVIF/SVG signatures can be detected
+  /// from files that have no extension.
   Future<FileType?> detectFileType(String? relativePath) async {
     final file = await resolveImageFile(relativePath);
     if (file == null) return null;
 
     try {
       final raf = await file.open();
-      final bytes = await raf.read(64);
+      final bytes = await raf.read(512);
       await raf.close();
       return FileTypeUtils.detect(bytes, fileName: file.path);
     } catch (_) {

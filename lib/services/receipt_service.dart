@@ -342,6 +342,7 @@ class ReceiptService {
       dialogTitle: dialogTitle,
       type: FileType.custom,
       allowedExtensions: ['pdf'],
+      mimeType: 'application/pdf',
     );
   }
 

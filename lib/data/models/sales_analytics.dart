@@ -1,3 +1,4 @@
+import 'package:pinoy_pos/data/models/category_sales_result.dart';
 import 'package:pinoy_pos/data/models/daily_sales_point.dart';
 import 'package:pinoy_pos/data/models/payment_breakdown.dart';
 import 'package:pinoy_pos/data/models/reporting_period.dart';
@@ -55,8 +56,10 @@ class SalesAnalytics {
   final int itemsSold;
   final SalesPeriodComparison comparison;
   final List<DailySalesPoint> trend;
+  final List<DailySalesPoint> previousTrend;
   final List<PaymentBreakdown> paymentBreakdown;
   final List<TopProductResult> topProducts;
+  final List<CategorySalesResult> categorySales;
   final List<StaffSalesSummary> staffSummaries;
   final List<Sale> sales;
 
@@ -68,8 +71,10 @@ class SalesAnalytics {
     required this.itemsSold,
     required this.comparison,
     required this.trend,
+    required this.previousTrend,
     required this.paymentBreakdown,
     required this.topProducts,
+    required this.categorySales,
     required this.staffSummaries,
     required this.sales,
   });
@@ -83,8 +88,10 @@ class SalesAnalytics {
         itemsSold: 0,
         comparison: SalesPeriodComparison.empty(),
         trend: const [],
+        previousTrend: const [],
         paymentBreakdown: const [],
         topProducts: const [],
+        categorySales: const [],
         staffSummaries: const [],
         sales: const [],
       );

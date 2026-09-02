@@ -40,7 +40,12 @@ class RouteGuard {
     }
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => screen),
+      MaterialPageRoute(
+        builder: (_) => screen,
+        settings: RouteSettings(
+          name: routeName ?? screen.runtimeType.toString(),
+        ),
+      ),
     );
   }
 
@@ -58,7 +63,12 @@ class RouteGuard {
     }
     await Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => screen),
+      MaterialPageRoute(
+        builder: (_) => screen,
+        settings: RouteSettings(
+          name: routeName ?? screen.runtimeType.toString(),
+        ),
+      ),
     );
   }
 

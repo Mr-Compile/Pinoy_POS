@@ -1,5 +1,6 @@
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/calendar_day_sales.dart';
+import 'package:pinoy_pos/data/models/category_sales_result.dart';
 import 'package:pinoy_pos/data/models/daily_sales_point.dart';
 import 'package:pinoy_pos/data/models/payment_breakdown.dart';
 import 'package:pinoy_pos/data/models/reporting_period.dart';
@@ -207,6 +208,21 @@ class SalesAnalyticsService {
     );
     final trend = _fillTrendGaps(rawTrend, bounds);
 
+    final rawPreviousTrend = await _saleRepository.getSalesTrend(
+      bounds.previousStart,
+      bounds.previousEnd,
+      groupBy: bounds.groupBy,
+      userId: userId,
+    );
+    final previousBounds = ReportingPeriodBounds(
+      start: bounds.previousStart,
+      end: bounds.previousEnd,
+      previousStart: bounds.previousStart,
+      previousEnd: bounds.previousEnd,
+      groupBy: bounds.groupBy,
+    );
+    final previousTrend = _fillTrendGaps(rawPreviousTrend, previousBounds);
+
     final paymentBreakdown = await _saleRepository.getPaymentBreakdown(
       bounds.start,
       bounds.end,
@@ -218,9 +234,11 @@ class SalesAnalyticsService {
       until: bounds.end,
       userId: userId,
       limit: 10,
-      sortByRevenue: false,
+      sortByRevenue: true,
     );
     final topProducts = topProductRows.map(TopProductResult.fromMap).toList();
+
+    final categorySales = <CategorySalesResult>[];
 
     final staffSummaries = userId == null
         ? await _saleRepository.getStaffSalesSummary(
@@ -245,8 +263,10 @@ class SalesAnalyticsService {
       itemsSold: currentItemsSold,
       comparison: comparison,
       trend: trend,
+      previousTrend: previousTrend,
       paymentBreakdown: paymentBreakdown,
       topProducts: topProducts,
+      categorySales: categorySales,
       staffSummaries: staffSummaries,
       sales: sales,
     );

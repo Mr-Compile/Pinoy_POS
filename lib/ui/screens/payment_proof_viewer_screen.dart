@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:printing/printing.dart';
 
 import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
@@ -72,11 +71,11 @@ class _PaymentProofViewerScreenState
           _info = info;
           _isLoading = false;
           if (info == null) {
-            _error = 'Payment proof not found.';
+            _error = 'No payment proof is available for this transaction.';
           } else if (info.fileType == null) {
-            _error = 'Unable to determine the proof file type.';
-          } else if (!info.isImage && !info.isPdf) {
-            _error = 'Unsupported payment proof type.';
+            _error = 'Unable to determine the proof image type.';
+          } else if (!info.isImage) {
+            _error = 'Unable to open the payment proof. The file is not a supported image.';
           }
         });
       }
@@ -90,14 +89,14 @@ class _PaymentProofViewerScreenState
     }
   }
 
-  Future<void> _downloadProof() async {
+  Future<void> _downloadImage() async {
     if (_info == null) return;
 
     setState(() => _isExporting = true);
 
     try {
       final paymentProofService = ref.read(paymentProofServiceProvider);
-      final saved = await paymentProofService.exportPaymentProof(_sale);
+      final saved = await paymentProofService.exportGcashProofAsImage(_sale);
 
       if (!mounted) return;
 
@@ -110,16 +109,16 @@ class _PaymentProofViewerScreenState
 
       await AppDialogService.success(
         context,
-        title: 'Saved',
-        message: 'Payment proof saved to $saved.',
+        title: 'Image Saved',
+        message: 'GCash proof image saved to $saved.',
       );
     } catch (e) {
       if (mounted) {
         setState(() => _isExporting = false);
         AppDialogService.error(
           context,
-          title: 'Export Failed',
-          message: 'Unable to export payment proof: $e',
+          title: 'Download Failed',
+          message: 'Unable to save the GCash proof image: $e',
         );
       }
     }
@@ -209,13 +208,15 @@ class _PaymentProofViewerScreenState
         title: 'Payment Proof',
         showBackButton: true,
         actions: [
-          if (_info != null && _info!.fileType != null)
+          if (_info != null && _info!.isImage)
             IconButton(
               icon: const Icon(Icons.download),
-              onPressed: _isExporting ? null : _downloadProof,
+              tooltip: 'Download Image',
+              onPressed: _isExporting ? null : _downloadImage,
             ),
           IconButton(
             icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh',
             onPressed: _isLoading ? null : _loadFile,
           ),
         ],
@@ -266,6 +267,8 @@ class _PaymentProofViewerScreenState
   }
 
   Widget _buildPreview(PaymentProofInfo info) {
+    final cs = Theme.of(context).colorScheme;
+
     if (info.isImage) {
       return InteractiveViewer(
         minScale: 0.5,
@@ -275,8 +278,22 @@ class _PaymentProofViewerScreenState
             info.file,
             fit: BoxFit.contain,
             errorBuilder: (context, error, stackTrace) {
-              return const Center(
-                child: Text('Unable to display this image.'),
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.broken_image, size: 64, color: cs.outline),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Unable to display this image.',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ],
+                  ),
+                ),
               );
             },
           ),
@@ -284,28 +301,29 @@ class _PaymentProofViewerScreenState
       );
     }
 
-    if (info.isPdf) {
-      return PdfPreview(
-        build: (_) => info.readBytes(),
-        allowPrinting: false,
-        allowSharing: false,
-        canChangePageFormat: false,
-        maxPageWidth: 800,
-        onError: (context, error) => Center(
-          child: Text('Unable to display this PDF: $error'),
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.broken_image, size: 64, color: cs.outline),
+            const SizedBox(height: 16),
+            Text(
+              'Unable to open the payment proof.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ],
         ),
-      );
-    }
-
-    return const Center(
-      child: Text('Unsupported payment proof type.'),
+      ),
     );
   }
 
   Widget _buildMetadata(PaymentProofInfo info) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final typeLabel = info.fileType?.label ?? 'Unknown';
+    final typeLabel = info.fileType?.label ?? 'Image';
     final size = _formatFileSize(info.sizeBytes);
     final name = info.originalName ?? 'Unknown file';
 
@@ -334,6 +352,18 @@ class _PaymentProofViewerScreenState
               style: theme.textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: _isExporting ? null : _downloadImage,
+              icon: _isExporting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.download),
+              label: const Text('Download Image'),
             ),
           ],
         ),

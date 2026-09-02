@@ -228,7 +228,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<String?>(
-                  key: ValueKey(selectedMethod),
+                  key: const ValueKey('filter_payment_method'),
                   initialValue: selectedMethod,
                   decoration: const InputDecoration(
                     labelText: 'Payment Method',
@@ -246,7 +246,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String?>(
-                  key: ValueKey(selectedStatus),
+                  key: const ValueKey('filter_payment_status'),
                   initialValue: selectedStatus,
                   decoration: const InputDecoration(
                     labelText: 'Status',

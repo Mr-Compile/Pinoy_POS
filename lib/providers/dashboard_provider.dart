@@ -1,21 +1,40 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pinoy_pos/core/session_manager.dart';
-import 'package:pinoy_pos/data/models/user.dart';
+import 'package:pinoy_pos/data/models/reporting_period.dart';
 import 'package:pinoy_pos/services/dashboard_service.dart';
 
-/// Dashboard UI state. The UI matches on these three subtypes only — it
+/// Dashboard UI state. The UI matches on these three subtypes only - it
 /// never computes analytics itself.
 sealed class DashboardState {
-  const DashboardState();
+  final ReportingPeriod period;
+  final DateTime? customStart;
+  final DateTime? customEnd;
+
+  const DashboardState({
+    this.period = ReportingPeriod.today,
+    this.customStart,
+    this.customEnd,
+  });
+
+  bool get hasCustomRange =>
+      customStart != null && customEnd != null && period == ReportingPeriod.custom;
 }
 
 class DashboardLoading extends DashboardState {
-  const DashboardLoading();
+  const DashboardLoading({
+    super.period,
+    super.customStart,
+    super.customEnd,
+  });
 }
 
 class DashboardError extends DashboardState {
   final String message;
-  const DashboardError(this.message);
+  const DashboardError(
+    this.message, {
+    super.period,
+    super.customStart,
+    super.customEnd,
+  });
 }
 
 class DashboardLoaded extends DashboardState {
@@ -23,58 +42,99 @@ class DashboardLoaded extends DashboardState {
   final AdminDashboardData? admin;
   final StaffDashboardData? staff;
 
-  const DashboardLoaded({this.owner, this.admin, this.staff});
+  const DashboardLoaded({
+    super.period,
+    super.customStart,
+    super.customEnd,
+    this.owner,
+    this.admin,
+    this.staff,
+  });
 }
 
 /// Holds dashboard analytics state and triggers loads.
 ///
-/// The notifier reads the current role from [SessionManager] (the single
-/// source of truth for the authenticated user) and dispatches to the
-/// role-scoped [DashboardService] method.  The service enforces RBAC and
-/// role-based data filtering (e.g. Staff sees only own sales), so the
-/// provider never has to interpret business data.
+/// The service enforces RBAC and role-based data filtering (e.g. Staff sees
+/// only own sales), so the provider never has to interpret business data.
 ///
-/// Lifecycle notes:
-///   - `load()` is called once from the constructor to populate the
-///     initial state.  This is safe because state is only set after an
-///     `await`, never synchronously during construction.
-///   - The UI calls `load()` again to refresh (pull-to-refresh / AppBar
-///     refresh button).  No `ref.listen` is used in `initState`.
-///   - On logout, [AuthProvider] invalidates this provider so the next
-///     login starts with a fresh load.
+/// The selected [ReportingPeriod] and optional custom range are part of the
+/// state so the UI can keep the date filter in sync while data reloads.
 class DashboardNotifier extends StateNotifier<DashboardState> {
   final DashboardService _service;
-  final SessionManager _sessionManager;
 
-  DashboardNotifier(this._service, this._sessionManager)
+  DashboardNotifier(this._service)
       : super(const DashboardLoading()) {
     load();
   }
 
-  /// Reloads dashboard data for the current user. Sets [DashboardLoading]
-  /// first so the UI can show skeletons, then replaces with the result.
+  /// Reloads dashboard data for the current user and selected period.
   Future<void> load() async {
-    state = const DashboardLoading();
+    final current = state;
+    state = DashboardLoading(
+      period: current.period,
+      customStart: current.customStart,
+      customEnd: current.customEnd,
+    );
     try {
-      final role = _sessionManager.currentUser?.role;
-      switch (role) {
-        case UserRole.owner:
-          final data = await _service.getOwnerDashboard();
-          state = DashboardLoaded(owner: data);
-        case UserRole.admin:
-          final data = await _service.getAdminDashboard();
-          state = DashboardLoaded(admin: data);
-        case UserRole.staff:
-          final data = await _service.getStaffDashboard();
-          state = DashboardLoaded(staff: data);
+      final data = await _service.getDashboard();
+      switch (data) {
+        case OwnerDashboardData():
+          state = DashboardLoaded(
+            period: current.period,
+            customStart: current.customStart,
+            customEnd: current.customEnd,
+            owner: data,
+          );
+        case AdminDashboardData():
+          state = DashboardLoaded(
+            period: current.period,
+            customStart: current.customStart,
+            customEnd: current.customEnd,
+            admin: data,
+          );
+        case StaffDashboardData():
+          state = DashboardLoaded(
+            period: current.period,
+            customStart: current.customStart,
+            customEnd: current.customEnd,
+            staff: data,
+          );
         case null:
-          state = const DashboardError('Not authenticated');
+          state = DashboardError(
+            'Not authenticated',
+            period: current.period,
+            customStart: current.customStart,
+            customEnd: current.customEnd,
+          );
       }
     } catch (_) {
-      state = const DashboardError(
+      state = DashboardError(
         'Unable to load dashboard. Please try again.',
+        period: current.period,
+        customStart: current.customStart,
+        customEnd: current.customEnd,
       );
     }
+  }
+
+  /// Selects a preset [period] and reloads dashboard data.
+  Future<void> selectPeriod(ReportingPeriod period) async {
+    state = DashboardLoading(
+      period: period,
+      customStart: null,
+      customEnd: null,
+    );
+    await load();
+  }
+
+  /// Sets a custom [DateTimeRange] and reloads dashboard data.
+  Future<void> setCustomRange(DateTime start, DateTime end) async {
+    state = DashboardLoading(
+      period: ReportingPeriod.custom,
+      customStart: start,
+      customEnd: end,
+    );
+    await load();
   }
 }
 
@@ -86,6 +146,5 @@ final dashboardProvider =
     StateNotifierProvider<DashboardNotifier, DashboardState>((ref) {
   return DashboardNotifier(
     ref.watch(dashboardServiceProvider),
-    SessionManager(),
   );
 });

@@ -1,7 +1,7 @@
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:pinoy_pos/services/file_export_service_common.dart';
 
@@ -35,9 +35,17 @@ class FileExportService {
     final path = FileExportCommon.ensureExtension(picked, extension);
 
     if (!isMobile) {
-      final file = File(path);
-      await file.parent.create(recursive: true);
-      await file.writeAsBytes(bytes, flush: true);
+      // On desktop the returned string is a real filesystem path. On Android
+      // it may be a content:// URI or a simplified display path, so never
+      // pass it to dart:io File operations.
+      try {
+        final file = File(path);
+        await file.parent.create(recursive: true);
+        await file.writeAsBytes(bytes, flush: true);
+      } on FileSystemException catch (e) {
+        debugPrint('[FileExportService] Could not write to $path: $e');
+        return null;
+      }
     }
 
     return path;

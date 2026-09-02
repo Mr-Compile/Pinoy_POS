@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart' as fp;
@@ -77,41 +77,79 @@ class PaymentProofService {
     }
   }
 
-  /// Presents a save dialog for the payment proof and writes it in its
-  /// original format.
+  /// Presents a save dialog for the GCash payment proof and writes it as an
+  /// image in its original format.
   ///
-  /// The filename is `payment_proof_<saleId>.<actualExt>` and the exported
-  /// bytes are the original file contents. The extension matches the detected
-  /// type, not an arbitrary label.
+  /// The filename is `gcash_proof_sale_<saleId>_<timestamp>.<actualExt>`
+  /// (e.g. `gcash_proof_sale_10245_20260902_143522.jpg`). The exported bytes
+  /// are the original image contents; the extension is derived from the
+  /// detected image type, never from a generic export pipeline.
   ///
-  /// Returns the saved path, or `null` if the user cancels or the file cannot
-  /// be read.
-  Future<String?> exportPaymentProof(Sale sale) async {
-    return exportPaymentProofFromPath(sale.paymentProofPath, sale.id);
+  /// Returns the saved path or filename, or `null` if the user cancels or the
+  /// file cannot be read.
+  Future<String?> exportGcashProofAsImage(Sale sale) async {
+    return exportGcashProofAsImageFromPath(sale.paymentProofPath, sale.id);
   }
 
-  /// Exports a payment proof given its relative [path] and optional [saleId].
-  Future<String?> exportPaymentProofFromPath(
+  /// Exports a GCash payment proof image given its relative [path] and
+  /// optional [saleId].
+  Future<String?> exportGcashProofAsImageFromPath(
     String? path,
     int? saleId,
   ) async {
     final info = await resolveProofFromPath(path);
     if (info == null) return null;
 
-    final ext = info.fileType?.extension ??
-        p.extension(info.originalName ?? '').replaceAll('.', '');
-    final safeExt = ext.isNotEmpty ? ext : 'bin';
-    final idSuffix = saleId != null ? '_$saleId' : '';
-    final fileName = 'payment_proof$idSuffix.$safeExt';
+    final ext = resolveImageExtension(info);
+    final mime = info.fileType?.mime ?? FileTypeUtils.mimeForExtension(ext) ?? 'image/jpeg';
+    final timestamp = _formatTimestamp(DateTime.now());
+    final idSuffix = saleId != null ? '_sale_$saleId' : '';
+    final fileName = 'gcash_proof${idSuffix}_$timestamp.$ext';
 
     final bytes = await info.readBytes();
 
     return FileExportService.saveBytes(
       bytes: bytes,
       fileName: fileName,
-      dialogTitle: 'Save Payment Proof',
-      type: fp.FileType.custom,
-      allowedExtensions: [safeExt],
+      dialogTitle: 'Download GCash Proof Image',
+      type: fp.FileType.image,
+      allowedExtensions: [ext],
+      mimeType: mime,
     );
+  }
+
+  /// Returns the canonical image extension for [info].
+  ///
+  /// GCash proofs are always images, so the final fallback is `.jpg` rather
+  /// than `.bin` or a generic type. If a better image type can be derived from
+  /// the original filename or from the actual file bytes, that is used first.
+  static String resolveImageExtension(PaymentProofInfo info) {
+    if (info.fileType?.isImage == true) {
+      return info.fileType!.extension;
+    }
+
+    final fromName = p.extension(info.originalName ?? '').replaceAll('.', '');
+    final fileType = FileType.fromExtension(fromName);
+    if (fileType?.isImage == true) {
+      return fileType!.extension;
+    }
+
+    // GCash payment proof is an image by definition; a `.jpg` fallback is
+    // safer for the user than an extensionless or `.bin` file. The bytes are
+    // not converted; only the filename gets the most common image extension.
+    return 'jpg';
+  }
+
+  /// Formats a timestamp for a filesystem-safe filename.
+  static String _formatTimestamp(DateTime date) {
+    final local = date.toLocal();
+    final year = local.year.toString().padLeft(4, '0');
+    final month = local.month.toString().padLeft(2, '0');
+    final day = local.day.toString().padLeft(2, '0');
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    final second = local.second.toString().padLeft(2, '0');
+    final ms = local.millisecond.toString().padLeft(3, '0');
+    return '$year$month${day}_$hour$minute${second}_$ms';
   }
 }

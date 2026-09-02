@@ -1064,7 +1064,7 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
               const SizedBox(height: Spacing.lg),
               // Payment method
               DropdownButtonFormField<String>(
-                key: ValueKey(currentMethod),
+                key: const ValueKey('pos_payment_method'),
                 initialValue: currentMethod,
                 decoration: const InputDecoration(
                   labelText: 'Payment Method',

@@ -231,7 +231,7 @@ class AINavigationRegistry {
       displayName: 'User Management',
       description: 'Add, edit, and manage staff and admin accounts.',
       requiredPermission: 'manage_users',
-      allowedRoles: [UserRole.owner, UserRole.admin],
+      allowedRoles: [UserRole.admin],
       builder: _usersBuilder,
       howToSteps: [
         'Open User Management.',
@@ -300,7 +300,7 @@ class AINavigationRegistry {
       displayName: 'Backup & Restore',
       description: 'Create and restore database backups.',
       requiredPermission: 'backup_restore',
-      allowedRoles: [UserRole.owner, UserRole.admin],
+      allowedRoles: [UserRole.admin],
       builder: _backupRestoreBuilder,
       howToSteps: [
         'Open Settings and select Backup & Restore.',

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
@@ -55,7 +55,7 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
               icon: const Icon(Icons.more_vert),
               onSelected: (value) => _onMenuSelected(value, state.staff!),
               itemBuilder: (context) => [
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'edit',
                   child: Row(
                     children: [
@@ -65,7 +65,7 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
                     ],
                   ),
                 ),
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'reset_password',
                   child: Row(
                     children: [
@@ -76,7 +76,7 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
                   ),
                 ),
                 if (state.staff!.isActive)
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'deactivate',
                     child: Row(
                       children: [
@@ -87,7 +87,7 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
                     ),
                   )
                 else
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'activate',
                     child: Row(
                       children: [
@@ -97,13 +97,13 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
                       ],
                     ),
                   ),
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'delete',
                   child: Row(
                     children: [
-                      Icon(Icons.delete, size: 20, color: Colors.red),
+                      Icon(Icons.delete, size: 20, color: Theme.of(context).colorScheme.error),
                       SizedBox(width: 8),
-                      Text('Delete', style: TextStyle(color: Colors.red)),
+                      Text('Delete', style: TextStyle(color: Theme.of(context).colorScheme.error)),
                     ],
                   ),
                 ),
@@ -335,8 +335,9 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
 
   String _trendSubtitle(ReportingPeriodBounds bounds) {
     return switch (bounds.groupBy) {
-      ReportGroupBy.hour => 'Hourly',
+
       ReportGroupBy.day => 'Daily',
+      ReportGroupBy.hour => 'Hourly',
       ReportGroupBy.week => 'Weekly',
       ReportGroupBy.month => 'Monthly',
     };
@@ -684,3 +685,4 @@ class _ResponsiveTwoColumn extends StatelessWidget {
     );
   }
 }
+

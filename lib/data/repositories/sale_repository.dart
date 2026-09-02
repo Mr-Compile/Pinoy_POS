@@ -4,7 +4,6 @@ import 'package:pinoy_pos/data/models/daily_sales_point.dart';
 import 'package:pinoy_pos/data/models/payment_breakdown.dart';
 import 'package:pinoy_pos/data/models/reporting_period.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
-import 'package:pinoy_pos/data/models/sales_by_hour_point.dart';
 import 'package:pinoy_pos/data/models/staff_sales_summary.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:sqflite/sqflite.dart';
@@ -73,13 +72,6 @@ class SaleRepository {
     UserRole? role,
   }) =>
       _saleDao.getStaffSalesSummary(start, end, role: role);
-
-  Future<List<SalesByHourPoint>> getSalesByHour(
-    DateTime start,
-    DateTime end, {
-    int? userId,
-  }) =>
-      _saleDao.getSalesByHour(start, end, userId: userId);
 
   // ── Centralised sales-analytics repository methods ───────────────────
 

@@ -1,11 +1,11 @@
-import 'package:pinoy_pos/core/date_utils.dart';
+﻿import 'package:pinoy_pos/core/date_utils.dart';
 import 'package:pinoy_pos/data/dao/base_dao.dart';
 import 'package:pinoy_pos/data/models/calendar_day_sales.dart';
+import 'package:pinoy_pos/data/models/category_sales_result.dart';
 import 'package:pinoy_pos/data/models/daily_sales_point.dart';
 import 'package:pinoy_pos/data/models/payment_breakdown.dart';
 import 'package:pinoy_pos/data/models/reporting_period.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
-import 'package:pinoy_pos/data/models/sales_by_hour_point.dart';
 import 'package:pinoy_pos/data/models/staff_sales_summary.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:sqflite/sqflite.dart';
@@ -33,7 +33,9 @@ class SaleDao extends BaseDao<Sale> {
     final database = await db;
     final maps = await database.query(
       tableName,
-      where: 'created_at BETWEEN ? AND ? AND deleted_at IS NULL',
+      where:
+          'created_at BETWEEN ? AND ? AND deleted_at IS NULL '
+          "AND payment_status = 'confirmed'",
       whereArgs: [start.toIso8601String(), end.toIso8601String()],
       orderBy: 'created_at DESC',
       limit: limit,
@@ -50,7 +52,9 @@ class SaleDao extends BaseDao<Sale> {
     final database = await db;
     final maps = await database.query(
       tableName,
-      where: 'created_at BETWEEN ? AND ? AND user_id = ? AND deleted_at IS NULL',
+      where:
+          'created_at BETWEEN ? AND ? AND user_id = ? AND deleted_at IS NULL '
+          "AND payment_status = 'confirmed'",
       whereArgs: [start.toIso8601String(), end.toIso8601String(), userId],
       orderBy: 'created_at DESC',
       limit: limit,
@@ -200,7 +204,7 @@ class SaleDao extends BaseDao<Sale> {
     final args = <Object?>[];
 
     if (start != null && end != null) {
-      conditions.add('created_at BETWEEN ? AND ?');
+      conditions.add('created_at >= ? AND created_at < ?');
       args.add(start.toIso8601String());
       args.add(end.toIso8601String());
     }
@@ -279,42 +283,7 @@ class SaleDao extends BaseDao<Sale> {
     return result.map(StaffSalesSummary.fromMap).toList();
   }
 
-  /// Sales totals grouped by hour of day (0-23) over a date range.
-  ///
-  /// Optionally filtered to a single [userId]. Missing hours are not returned,
-  /// so callers should fill gaps if a complete 24-hour chart is required.
-  Future<List<SalesByHourPoint>> getSalesByHour(
-    DateTime start,
-    DateTime end, {
-    int? userId,
-  }) async {
-    final database = await db;
-    final conditions = <String>[
-      "created_at >= ? AND created_at < ?",
-      "deleted_at IS NULL",
-      "payment_status = 'confirmed'",
-    ];
-    final args = <Object?>[start.toIso8601String(), end.toIso8601String()];
-
-    if (userId != null) {
-      conditions.add('user_id = ?');
-      args.add(userId);
-    }
-
-    final result = await database.rawQuery('''
-      SELECT CAST(strftime('%H', created_at) AS INTEGER) as hour,
-             COALESCE(SUM(total_amount), 0) as total,
-             COUNT(*) as count
-      FROM sales
-      WHERE ${conditions.join(' AND ')}
-      GROUP BY hour
-      ORDER BY hour
-    ''', args);
-
-    return result.map(SalesByHourPoint.fromMap).toList();
-  }
-
-  // ── Centralised sales-analytics queries ────────────────────────────────
+  // â”€â”€ Centralised sales-analytics queries â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   /// Returns summary numbers for confirmed, non-deleted sales in a range.
   ///
@@ -360,9 +329,8 @@ class SaleDao extends BaseDao<Sale> {
 
   /// Returns a sales trend grouped by [groupBy] for the given range.
   ///
-  /// For [ReportGroupBy.hour] the date returned is the hour start of each day
-  /// in the period. For [ReportGroupBy.week] the SQL first groups by day and
-  /// the caller is expected to collapse days to week starts in Dart.
+  /// For [ReportGroupBy.week] the SQL first groups by day and the caller is
+  /// expected to collapse days to week starts in Dart.
   Future<List<DailySalesPoint>> getSalesTrend(
     DateTime start,
     DateTime end, {
@@ -378,7 +346,6 @@ class SaleDao extends BaseDao<Sale> {
 
     switch (groupBy) {
       case ReportGroupBy.hour:
-        // Group by YYYY-MM-DDTHH so each hour of each day is a point.
         select = "substr(created_at, 1, 13) as bucket";
         groupBySql = 'bucket';
         pattern = "yyyy-MM-ddTHH";
@@ -438,6 +405,35 @@ class SaleDao extends BaseDao<Sale> {
     ''', conditions.args);
 
     return result.map(PaymentBreakdown.fromMap).toList();
+  }
+
+  /// Returns total confirmed sales grouped by product category.
+  ///
+  /// Products with no category are reported under 'Uncategorized'.
+  Future<List<CategorySalesResult>> getCategorySales(
+    DateTime start,
+    DateTime end, {
+    int? userId,
+  }) async {
+    final database = await db;
+    final conditions = _confirmedRangeConditions(start, end, userId);
+
+    final result = await database.rawQuery('''
+      SELECT c.id AS category_id,
+             COALESCE(c.name, 'Uncategorized') AS category_name,
+             COALESCE(SUM(s.total_amount), 0) AS total_sales,
+             COUNT(DISTINCT s.id) AS transaction_count,
+             COALESCE(SUM(si.quantity), 0) AS items_sold
+      FROM sales s
+      INNER JOIN sale_items si ON si.sale_id = s.id
+      LEFT JOIN products p ON p.id = si.product_id
+      LEFT JOIN categories c ON c.id = p.category_id
+      WHERE ${conditions.where}
+      GROUP BY COALESCE(c.name, 'Uncategorized')
+      ORDER BY total_sales DESC
+    ''', conditions.args);
+
+    return result.map(CategorySalesResult.fromMap).toList();
   }
 
   /// Returns per-day totals for confirmed sales in a range, suitable for
@@ -524,7 +520,6 @@ class SaleDao extends BaseDao<Sale> {
   DateTime _parseBucket(String bucket, String pattern) {
     switch (pattern) {
       case 'yyyy-MM-ddTHH':
-        // 2026-08-31T14 -> 2026-08-31 14:00:00
         return DateTime.parse('$bucket:00:00.000');
       case 'yyyy-MM-dd':
         return DateTime.parse('${bucket}T00:00:00.000');

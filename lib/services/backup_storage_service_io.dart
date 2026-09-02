@@ -638,6 +638,15 @@ class BackupStorageService {
     return reference;
   }
 
+  /// Throws if [path] looks like a URI rather than a local filesystem path.
+  void _assertFilesystemPath(String path) {
+    if (path.trim().contains('://')) {
+      throw BackupStorageException(
+        'Refusing to use a URI as a local path: $path',
+      );
+    }
+  }
+
   /// Returns [reference] as a local path, decoding `file://` if present.
   ///
   /// Returns `null` if the reference is neither a path nor a decodable
@@ -668,6 +677,8 @@ class BackupStorageService {
     if (path == null) {
       return (false, 'The selected reference is not a valid folder path.');
     }
+
+    _assertFilesystemPath(path);
 
     try {
       final dir = Directory(path);

@@ -1,12 +1,17 @@
+// ignore_for_file: unused_import
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/route_guard.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/ui/screens/activity_logs_screen.dart';
+import 'package:pinoy_pos/ui/screens/ai_config_screen.dart';
 import 'package:pinoy_pos/ui/screens/announcements_screen.dart';
 import 'package:pinoy_pos/ui/screens/categories_screen.dart';
 import 'package:pinoy_pos/ui/screens/sales_analytics_screen.dart';
 import 'package:pinoy_pos/ui/screens/staff_management_screen.dart';
 import 'package:pinoy_pos/ui/screens/stock_screen.dart';
+import 'package:pinoy_pos/ui/screens/trash_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 
 /// A single entry shown on the "More" screen.
@@ -33,8 +38,7 @@ class MoreEntry {
   /// Every possible More entry, in display order.
   ///
   /// AI Advisor is accessed via the floating chat bubble (not here).
-  /// Activity Logs is accessed via Settings → Activity Logs.
-  /// Trash Bin has been moved to Settings → System / Management.
+  /// Activity Logs and Trash may also be reached through Settings.
   static const List<MoreEntry> all = [
     MoreEntry(
       icon: Icons.category_outlined,
@@ -70,6 +74,27 @@ class MoreEntry {
       permission: 'manage_staff',
       routeName: 'staff_management',
       screen: StaffManagementScreen(),
+    ),
+    MoreEntry(
+      icon: Icons.list_alt_outlined,
+      title: 'Activity Logs',
+      permission: 'view_activity_logs',
+      routeName: 'activity_logs',
+      screen: ActivityLogsScreen(),
+    ),
+    MoreEntry(
+      icon: Icons.delete_outline,
+      title: 'Trash',
+      permission: 'view_trash',
+      routeName: 'trash',
+      screen: TrashScreen(),
+    ),
+    MoreEntry(
+      icon: Icons.psychology_outlined,
+      title: 'AI Configuration',
+      permission: 'manage_ai_config',
+      routeName: 'ai_config',
+      screen: AIConfigScreen(),
     ),
   ];
 

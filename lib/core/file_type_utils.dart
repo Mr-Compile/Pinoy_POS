@@ -35,13 +35,60 @@ class FileType {
     label: 'WebP Image',
   );
 
+  static const FileType gif = FileType(
+    mime: 'image/gif',
+    extension: 'gif',
+    label: 'GIF Image',
+  );
+
+  static const FileType bmp = FileType(
+    mime: 'image/bmp',
+    extension: 'bmp',
+    label: 'BMP Image',
+  );
+
+  static const FileType tiff = FileType(
+    mime: 'image/tiff',
+    extension: 'tiff',
+    label: 'TIFF Image',
+  );
+
+  static const FileType heic = FileType(
+    mime: 'image/heic',
+    extension: 'heic',
+    label: 'HEIC Image',
+  );
+
+  static const FileType avif = FileType(
+    mime: 'image/avif',
+    extension: 'avif',
+    label: 'AVIF Image',
+  );
+
+  static const FileType svg = FileType(
+    mime: 'image/svg+xml',
+    extension: 'svg',
+    label: 'SVG Image',
+  );
+
   static const FileType pdf = FileType(
     mime: 'application/pdf',
     extension: 'pdf',
     label: 'PDF Document',
   );
 
-  static const List<FileType> knownTypes = [jpeg, png, webp, pdf];
+  static const List<FileType> knownTypes = [
+    jpeg,
+    png,
+    webp,
+    gif,
+    bmp,
+    tiff,
+    heic,
+    avif,
+    svg,
+    pdf,
+  ];
 
   static FileType? fromMime(String? mime) {
     if (mime == null) return null;
@@ -54,7 +101,29 @@ class FileType {
 
   static FileType? fromExtension(String? extension) {
     if (extension == null) return null;
-    final ext = p.extension(extension).toLowerCase().replaceAll('.', '');
+    final raw = extension.toLowerCase().trim();
+    if (raw.isEmpty) return null;
+
+    // Accept either a bare extension (e.g. 'jpg') or a filename
+    // (e.g. 'proof.jpg'). For filenames we extract the extension using
+    // path.package; otherwise we use the value directly.
+    final ext = raw.contains('.') ? p.extension(raw).replaceAll('.', '') : raw;
+
+    // JPEG has several common extensions; canonicalise them all.
+    if (ext == 'jpeg' || ext == 'jpe' || ext == 'jfif') {
+      return jpeg;
+    }
+
+    // TIFF may use the three-letter form.
+    if (ext == 'tif') {
+      return tiff;
+    }
+
+    // HEIF/HEIC are usually interchangeable in Flutter apps.
+    if (ext == 'heif') {
+      return heic;
+    }
+
     for (final type in knownTypes) {
       if (type.extension == ext) return type;
     }
@@ -80,6 +149,10 @@ class FileTypeUtils {
   ];
   static const List<int> _riffSignature = [0x52, 0x49, 0x46, 0x46];
   static const List<int> _pdfSignature = [0x25, 0x50, 0x44, 0x46, 0x2D];
+  static const List<int> _gifSignature = [0x47, 0x49, 0x46];
+  static const List<int> _bmpSignature = [0x42, 0x4D];
+  static const List<int> _tiffLittleSignature = [0x49, 0x49, 0x2A, 0x00];
+  static const List<int> _tiffBigSignature = [0x4D, 0x4D, 0x00, 0x2A];
 
   /// Detects the file type from the first bytes of a file.
   ///
@@ -136,8 +209,49 @@ class FileTypeUtils {
       }
     }
 
+    if (_matchesSignature(bytes, _gifSignature)) {
+      return FileType.gif;
+    }
+
+    if (_matchesSignature(bytes, _bmpSignature)) {
+      return FileType.bmp;
+    }
+
+    if (_matchesSignature(bytes, _tiffLittleSignature) ||
+        _matchesSignature(bytes, _tiffBigSignature)) {
+      return FileType.tiff;
+    }
+
     if (_matchesSignature(bytes, _pdfSignature)) {
       return FileType.pdf;
+    }
+
+    // HEIC/HEIF and AVIF use the ISO Base Media File Format (ISOBMFF).
+    // The `ftyp` box starts at offset 4 and the brand follows at offset 8.
+    if (bytes.length >= 16) {
+      final ftyp = bytes.sublist(4, 8);
+      if (_listEquals(ftyp, [0x66, 0x74, 0x79, 0x70])) {
+        final brand = String.fromCharCodes(bytes.sublist(8, 12)).toLowerCase();
+        if (brand == 'heic' ||
+            brand == 'heix' ||
+            brand == 'hevc' ||
+            brand == 'heim' ||
+            brand == 'heis' ||
+            brand == 'hevm' ||
+            brand == 'hevs' ||
+            brand == 'mif1' ||
+            brand == 'msf1') {
+          return FileType.heic;
+        }
+        if (brand == 'avif') {
+          return FileType.avif;
+        }
+      }
+    }
+
+    // SVG is text-based, so check the start of the file.
+    if (_looksLikeSvg(bytes)) {
+      return FileType.svg;
     }
 
     return null;
@@ -149,6 +263,27 @@ class FileTypeUtils {
       if (bytes[i] != signature[i]) return false;
     }
     return true;
+  }
+
+  static bool _listEquals(List<int> a, List<int> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  static bool _looksLikeSvg(Uint8List bytes) {
+    if (bytes.isEmpty) return false;
+    try {
+      final ascii = String.fromCharCodes(bytes.take(256).toList());
+      final trimmed = ascii.trim().toLowerCase();
+      return trimmed.startsWith('<?xml') ||
+          trimmed.startsWith('<svg') ||
+          trimmed.startsWith('<!doctype svg');
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Canonical extension for a MIME type, or `null` if unknown.

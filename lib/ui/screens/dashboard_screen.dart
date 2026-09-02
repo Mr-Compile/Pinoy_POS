@@ -26,7 +26,6 @@ import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_section.dart';
 import 'package:pinoy_pos/ui/widgets/donut_chart.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
-import 'package:pinoy_pos/ui/widgets/hourly_sales_chart.dart';
 import 'package:pinoy_pos/ui/widgets/kpi_card.dart';
 import 'package:pinoy_pos/ui/widgets/mini_bar_chart.dart';
 import 'package:pinoy_pos/ui/widgets/staff_performance_card.dart';
@@ -305,9 +304,6 @@ class _OwnerDashboard extends ConsumerWidget {
         _buildStaffPerformanceSection(context),
         const SizedBox(height: Spacing.xxl),
 
-        // ── Sales by hour ──
-        _buildSalesByHourCard(context),
-        const SizedBox(height: Spacing.xxl),
 
         // ── Sales trend chart ──
         _buildSalesTrendCard(context),
@@ -691,17 +687,6 @@ class _OwnerDashboard extends ConsumerWidget {
     );
   }
 
-  Widget _buildSalesByHourCard(BuildContext context) {
-    return AppSection(
-      title: 'Sales by Hour',
-      padding: const EdgeInsets.only(bottom: Spacing.md),
-      child: AppCard(
-        child: data.salesByHour.isEmpty
-            ? const _ChartEmptyState(message: 'No hourly sales data yet.')
-            : HourlySalesChart(points: data.salesByHour),
-      ),
-    );
-  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -768,9 +753,6 @@ class _AdminDashboard extends ConsumerWidget {
         _buildStaffPerformanceSection(context),
         const SizedBox(height: Spacing.xxl),
 
-        // ── Sales by hour ──
-        _buildSalesByHourCard(context),
-        const SizedBox(height: Spacing.xxl),
 
         // ── Two-column: user distribution + backup status ──
         _ResponsiveTwoColumn(
@@ -981,17 +963,6 @@ class _AdminDashboard extends ConsumerWidget {
     );
   }
 
-  Widget _buildSalesByHourCard(BuildContext context) {
-    return AppSection(
-      title: 'Sales by Hour',
-      padding: const EdgeInsets.only(bottom: Spacing.md),
-      child: AppCard(
-        child: data.salesByHour.isEmpty
-            ? const _ChartEmptyState(message: 'No hourly sales data yet.')
-            : HourlySalesChart(points: data.salesByHour),
-      ),
-    );
-  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -1058,9 +1029,6 @@ class _StaffDashboard extends ConsumerWidget {
         _buildMySalesTrendCard(context),
         const SizedBox(height: Spacing.xxl),
 
-        // ── My sales by hour ──
-        _buildMySalesByHourCard(context),
-        const SizedBox(height: Spacing.xxl),
 
         // ── Inventory status ──
         _buildInventoryCard(context),
@@ -1301,17 +1269,6 @@ class _StaffDashboard extends ConsumerWidget {
     );
   }
 
-  Widget _buildMySalesByHourCard(BuildContext context) {
-    return AppSection(
-      title: 'My Sales by Hour',
-      padding: const EdgeInsets.only(bottom: Spacing.md),
-      child: AppCard(
-        child: data.mySalesByHour.isEmpty
-            ? const _ChartEmptyState(message: 'No hourly sales data yet.')
-            : HourlySalesChart(points: data.mySalesByHour),
-      ),
-    );
-  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────

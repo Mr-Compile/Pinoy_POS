@@ -122,11 +122,11 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
     );
   }
 
-  Future<void> _downloadPaymentProof(ReceiptViewData receipt) async {
+  Future<void> _downloadGcashProofImage(ReceiptViewData receipt) async {
     setState(() => _isExportingProof = true);
     try {
       final paymentProofService = ref.read(paymentProofServiceProvider);
-      final saved = await paymentProofService.exportPaymentProofFromPath(
+      final saved = await paymentProofService.exportGcashProofAsImageFromPath(
         receipt.paymentProofPath,
         receipt.saleId,
       );
@@ -136,8 +136,8 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
         if (saved != null) {
           await AppDialogService.success(
             context,
-            title: 'Payment Proof Saved',
-            message: 'Saved to $saved',
+            title: 'Image Saved',
+            message: 'GCash proof image saved to $saved',
           );
         } else {
           AppDialogService.error(
@@ -153,7 +153,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
         AppDialogService.error(
           context,
           title: 'Download Failed',
-          message: 'Unable to export payment proof: $e',
+          message: 'Unable to save the GCash proof image: $e',
         );
       }
     }
@@ -500,26 +500,22 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
             builder: (context, snapshot) {
               final info = snapshot.data;
               final hasProof = info != null;
-              final isPdf = info?.isPdf ?? false;
-              final icon =
-                  isPdf ? Icons.picture_as_pdf : Icons.image_outlined;
-              final label = isPdf ? 'View PDF' : 'View Payment Proof';
 
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   OutlinedButton.icon(
                     onPressed: hasProof ? () => _viewPaymentProof(receipt) : null,
-                    icon: Icon(icon),
-                    label: Text(label),
+                    icon: const Icon(Icons.image_outlined),
+                    label: const Text('View Image'),
                   ),
                   const SizedBox(height: 12),
                   LoadingButton(
                     isLoading: _isExportingProof,
                     onPressed: _isExportingProof
                         ? null
-                        : () => _downloadPaymentProof(receipt),
-                    label: 'Download Payment Proof',
+                        : () => _downloadGcashProofImage(receipt),
+                    label: 'Download Image',
                   ),
                 ],
               );

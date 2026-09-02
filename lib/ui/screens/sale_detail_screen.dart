@@ -201,19 +201,19 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
     }
   }
 
-  Future<void> _downloadPaymentProof() async {
+  Future<void> _downloadGcashProofImage() async {
     setState(() => _isExportingProof = true);
     try {
       final paymentProofService = ref.read(paymentProofServiceProvider);
-      final saved = await paymentProofService.exportPaymentProof(_sale);
+      final saved = await paymentProofService.exportGcashProofAsImage(_sale);
 
       if (mounted) {
         setState(() => _isExportingProof = false);
         if (saved != null) {
           await AppDialogService.success(
             context,
-            title: 'Payment Proof Saved',
-            message: 'Saved to $saved',
+            title: 'Image Saved',
+            message: 'GCash proof image saved to $saved',
           );
         } else {
           AppDialogService.error(
@@ -229,7 +229,7 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
         AppDialogService.error(
           context,
           title: 'Download Failed',
-          message: 'Unable to export payment proof: $e',
+          message: 'Unable to save the GCash proof image: $e',
         );
       }
     }
@@ -596,16 +596,7 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
                   );
                 }
 
-                if (info.isPdf) {
-                  return ListTile(
-                    leading: const Icon(Icons.picture_as_pdf),
-                    title: Text(info.fileType?.label ?? 'PDF Document'),
-                    subtitle: Text(info.originalName ?? 'Unknown file'),
-                    onTap: _viewPaymentProof,
-                  );
-                }
-
-                return const Text('Unsupported payment proof type.');
+                return const Text('Unable to open the payment proof.');
               },
             ),
           ],
@@ -635,13 +626,13 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
           OutlinedButton.icon(
             onPressed: _viewPaymentProof,
             icon: const Icon(Icons.image_outlined),
-            label: const Text('View Payment Proof'),
+            label: const Text('View Image'),
           ),
           const SizedBox(height: 12),
           LoadingButton(
             isLoading: _isExportingProof,
-            onPressed: _isExportingProof ? null : _downloadPaymentProof,
-            label: 'Download Payment Proof',
+            onPressed: _isExportingProof ? null : _downloadGcashProofImage,
+            label: 'Download Image',
           ),
         ],
       ],

@@ -48,11 +48,21 @@ class BackupLocation {
   /// A [fileSystem] location must not be a URI (it should be a path).
   /// An [androidSaf] location must be a `content://` URI.
   /// A [webDownload] location is valid by convention.
-  bool get isReferenceValidForType => isNone || switch (type) {
-        BackupStorageType.fileSystem => !reference.contains('://'),
-        BackupStorageType.androidSaf => reference.startsWith('content://'),
-        BackupStorageType.webDownload => true,
-      };
+  ///
+  /// References with leading/trailing/embedded whitespace or that contain
+  /// a scheme for the wrong type are rejected.
+  bool get isReferenceValidForType {
+    if (isNone) return true;
+    final trimmed = reference.trim();
+    if (trimmed != reference) return false;
+    return switch (type) {
+      BackupStorageType.fileSystem =>
+        !reference.contains('://') && !reference.contains(' '),
+      BackupStorageType.androidSaf =>
+        reference.startsWith('content://') && !reference.contains(' '),
+      BackupStorageType.webDownload => true,
+    };
+  }
 
   BackupLocation copyWith({
     BackupStorageType? type,
@@ -76,8 +86,8 @@ class BackupLocation {
     final typeName = json['type'] as String? ?? 'fileSystem';
     return BackupLocation(
       type: BackupStorageType.values.byName(typeName),
-      reference: (json['reference'] as String?) ?? '',
-      displayName: (json['displayName'] as String?) ?? '',
+      reference: ((json['reference'] as String?) ?? '').trim(),
+      displayName: ((json['displayName'] as String?) ?? '').trim(),
     );
   }
 
@@ -147,4 +157,3 @@ class BackupReadResult {
     this.fileSize,
   });
 }
-

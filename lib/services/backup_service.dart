@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:archive/archive_io.dart';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
@@ -594,6 +595,12 @@ class BackupService {
 
   // ── Validation ───────────────────────────────────────────────────────
 
+  /// Validates a backup file.
+  ///
+  /// Supports the current zip backup format (which contains the database and
+  /// the `payment_evidence` directory) and legacy plain SQLite `.db` backups.
+  /// Returns `incompatible` or `invalidFile` for files that do not contain a
+  /// valid Pinoy POS database.
   Future<BackupImportResult> _validateBackupFile(String path) async {
     final localPath = _toLocalPath(path);
     if (localPath == null) return BackupImportResult.invalidFile;
@@ -608,8 +615,112 @@ class BackupService {
       return BackupImportResult.invalidFile;
     }
 
+    final isZip = await _isZipFile(localPath);
+
+    String? dbPath;
+    String? extractedDir;
+    if (isZip) {
+      extractedDir = await _extractBackupZip(localPath);
+      if (extractedDir == null) {
+        _log('Could not extract backup zip: $localPath');
+        return BackupImportResult.invalidFile;
+      }
+      dbPath = await _findDbFileInDirectory(extractedDir);
+      if (dbPath == null) {
+        await _safeDeleteDir(Directory(extractedDir));
+        return BackupImportResult.invalidFile;
+      }
+    } else {
+      dbPath = localPath;
+    }
+
+    final result = await _validateDbFile(dbPath);
+
+    if (extractedDir != null) {
+      await _safeDeleteDir(Directory(extractedDir));
+    }
+
+    return result;
+  }
+
+  /// Returns `true` when [path] starts with the PK zip signature.
+  Future<bool> _isZipFile(String path) async {
     try {
-      final raf = await file.open();
+      final raf = await File(path).open();
+      final header = await raf.read(4);
+      await raf.close();
+      return header.length >= 4 &&
+          header[0] == 0x50 &&
+          header[1] == 0x4B &&
+          header[2] == 0x03 &&
+          header[3] == 0x04;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Extracts a backup zip to a temp directory and returns its path.
+  Future<String?> _extractBackupZip(String zipPath) async {
+    String? tempDir;
+    try {
+      tempDir = await _tempDir('pinoy_pos_import_${_timestamp()}');
+      final input = InputFileStream(zipPath);
+      final archive = ZipDecoder().decodeBuffer(input);
+      await input.close();
+
+      for (final file in archive) {
+        final outPath = p.join(tempDir, file.name);
+        if (file.isFile) {
+          final outFile = File(outPath);
+          await outFile.parent.create(recursive: true);
+          final content = file.content;
+          if (content is List<int>) {
+            await outFile.writeAsBytes(content);
+          } else if (content is String) {
+            await outFile.writeAsString(content);
+          } else {
+            _log('Unknown content type for archive file "${file.name}"');
+          }
+        } else {
+          await Directory(outPath).create(recursive: true);
+        }
+      }
+
+      return tempDir;
+    } catch (e) {
+      _log('Zip extraction failed: $e');
+      if (tempDir != null) await _safeDeleteDir(Directory(tempDir));
+      return null;
+    }
+  }
+
+  /// Finds the SQLite database file in an extracted backup directory.
+  ///
+  /// Prefers `pinoy_pos.db` if present, otherwise returns the first `.db` file.
+  Future<String?> _findDbFileInDirectory(String dir) async {
+    try {
+      final root = Directory(dir);
+      if (!await root.exists()) return null;
+
+      final preferred = File(p.join(dir, 'pinoy_pos.db'));
+      if (await preferred.exists()) return preferred.path;
+
+      final files = await root.list(recursive: false).toList();
+      for (final entity in files) {
+        if (entity is File && p.extension(entity.path).toLowerCase() == '.db') {
+          return entity.path;
+        }
+      }
+    } catch (e) {
+      _log('Could not find database in backup directory: $e');
+    }
+    return null;
+  }
+
+  /// Validates that [dbPath] is a valid Pinoy POS SQLite database.
+  Future<BackupImportResult> _validateDbFile(String dbPath) async {
+    try {
+      final raf = await File(dbPath).open();
       final header = await raf.read(16);
       await raf.close();
       final headerStr = String.fromCharCodes(header);
@@ -617,13 +728,13 @@ class BackupService {
         return BackupImportResult.invalidFile;
       }
     } catch (e) {
-      _log('Could not read backup file header "$path": $e');
+      _log('Could not read backup file header "$dbPath": $e');
       return BackupImportResult.invalidFile;
     }
 
     Database? testDb;
     try {
-      testDb = await openDatabase(path, readOnly: true);
+      testDb = await openDatabase(dbPath, readOnly: true);
       final tables = await testDb.query(
         'sqlite_master',
         where: "type = 'table'",
@@ -775,12 +886,50 @@ class BackupService {
   }
 
   Future<(bool, String?)> _performRestore(String backupPath) async {
+    final isZip = await _isZipFile(backupPath);
+
+    // For zip backups, extract the database and payment_evidence into a temp
+    // directory first. Legacy .db backups are restored directly.
+    String? sourceDbPath;
+    String? evidenceSourceDir;
+    String? extractedDir;
+
+    if (isZip) {
+      extractedDir = await _extractBackupZip(backupPath);
+      if (extractedDir == null) {
+        return (false, 'Could not extract the backup package.');
+      }
+      sourceDbPath = await _findDbFileInDirectory(extractedDir);
+      if (sourceDbPath == null) {
+        await _safeDeleteDir(Directory(extractedDir));
+        return (false, 'The backup package does not contain a database file.');
+      }
+      final evidenceDir = Directory(p.join(extractedDir, 'payment_evidence'));
+      if (await evidenceDir.exists()) {
+        evidenceSourceDir = evidenceDir.path;
+      }
+    } else {
+      sourceDbPath = backupPath;
+    }
+
     final db = await _dbHelper.database;
     final dbPath = db.path;
     await _dbHelper.close();
 
     try {
-      await File(backupPath).copy(dbPath);
+      await File(sourceDbPath).copy(dbPath);
+
+      // Restore payment evidence if the backup contains it. Replace the
+      // current evidence directory so the database and files stay consistent.
+      if (evidenceSourceDir != null) {
+        final appDir = await getApplicationDocumentsDirectory();
+        final evidenceTarget = Directory(p.join(appDir.path, 'payment_evidence'));
+        if (await evidenceTarget.exists()) {
+          await evidenceTarget.delete(recursive: true);
+        }
+        await _copyDirectory(Directory(evidenceSourceDir), evidenceTarget);
+      }
+
       // Re-open the database and verify the restored file is structurally
       // sound before declaring success.  A torn copy (e.g. the source was
       // modified mid-copy) would otherwise leave the app running against
@@ -803,6 +952,10 @@ class BackupService {
       _log('Failed to copy backup to database path: $e');
       await _dbHelper.database;
       return (false, 'Could not copy backup to the database location: $e');
+    } finally {
+      if (extractedDir != null) {
+        await _safeDeleteDir(Directory(extractedDir));
+      }
     }
   }
 
@@ -839,7 +992,6 @@ class BackupService {
   Future<String?> _prepareBackupFile() async {
     final db = await _dbHelper.database;
     final dbPath = db.path;
-    final tempPath = await _tempPath('pinoy_pos_backup_${_timestamp()}.db');
 
     // Checkpoint the WAL (if active) so all committed transactions are
     // flushed into the main database file before we copy it.  Without
@@ -855,29 +1007,36 @@ class BackupService {
     // open database file is locked while the connection is active, which
     // causes the copy to fail.
     await _dbHelper.close();
+
+    String? tempDbPath;
+    String? zipPath;
     try {
-      await File(dbPath).copy(tempPath);
+      tempDbPath = await _tempPath('pinoy_pos_backup_${_timestamp()}.db');
+      await File(dbPath).copy(tempDbPath);
+      await _writeBackupMetadata(tempDbPath);
+
+      zipPath = await _tempPath('pinoy_pos_backup_${_timestamp()}.zip');
+      await _packageBackupZip(tempDbPath, zipPath);
+
+      final tempFile = File(zipPath);
+      final stat = await tempFile.stat();
+      if (stat.size == 0) {
+        await _safeDelete(tempFile);
+        return null;
+      }
+
+      return zipPath;
     } on FileSystemException catch (e) {
-      _log('Failed to copy database to temp file: ${e.message}');
+      _log('Failed to prepare backup package: ${e.message}');
       return null;
     } catch (e) {
-      _log('Failed to copy database to temp file: $e');
+      _log('Failed to prepare backup package: $e');
       return null;
     } finally {
+      if (tempDbPath != null) await _safeDelete(File(tempDbPath));
       // Reopen the database so the app can keep using it.
       await _dbHelper.database;
     }
-
-    await _writeBackupMetadata(tempPath);
-
-    final tempFile = File(tempPath);
-    final stat = await tempFile.stat();
-    if (stat.size == 0) {
-      await _safeDelete(tempFile);
-      return null;
-    }
-
-    return tempPath;
   }
 
   Future<void> _writeBackupMetadata(String backupPath) async {
@@ -911,11 +1070,66 @@ class BackupService {
     }
   }
 
+  /// Packages the database and the payment_evidence directory into a zip file.
+  ///
+  /// The returned zip contains `pinoy_pos.db` at the root and a
+  /// `payment_evidence/` directory. This preserves GCash payment proof images
+  /// alongside the database so restore does not leave broken image references.
+  Future<void> _packageBackupZip(String dbPath, String zipPath) async {
+    final stagingDir = await _tempDir('pinoy_pos_backup_staging_${_timestamp()}');
+    final staging = Directory(stagingDir);
+    await staging.create(recursive: true);
+
+    try {
+      // Copy DB to the staging root as pinoy_pos.db.
+      final stagedDb = File(p.join(staging.path, 'pinoy_pos.db'));
+      await File(dbPath).copy(stagedDb.path);
+
+      // Copy payment_evidence into the staging directory.
+      final appDir = await getApplicationDocumentsDirectory();
+      final evidenceDir = Directory(p.join(appDir.path, 'payment_evidence'));
+      if (await evidenceDir.exists()) {
+        final stagedEvidence = Directory(p.join(staging.path, 'payment_evidence'));
+        await _copyDirectory(evidenceDir, stagedEvidence);
+      }
+
+      final encoder = ZipFileEncoder();
+      await encoder.zipDirectoryAsync(staging, filename: zipPath, level: ZipFileEncoder.STORE);
+    } finally {
+      await _safeDeleteDir(staging);
+    }
+  }
+
+  Future<void> _copyDirectory(Directory source, Directory target) async {
+    if (!await source.exists()) return;
+    await target.create(recursive: true);
+
+    await for (final entity in source.list(recursive: false, followLinks: false)) {
+      final name = p.basename(entity.path);
+      final dest = p.join(target.path, name);
+      if (entity is Directory) {
+        await _copyDirectory(entity, Directory(dest));
+      } else if (entity is File) {
+        await entity.copy(dest);
+      }
+    }
+  }
+
+  Future<void> _safeDeleteDir(Directory dir) async {
+    try {
+      if (await dir.exists()) {
+        await dir.delete(recursive: true);
+      }
+    } catch (e) {
+      _log('Could not delete temp directory "${dir.path}": $e');
+    }
+  }
+
   String _generateBackupFileName() {
     final now = DateTime.now();
     // Include milliseconds so rapid consecutive backups do not collide.
     final stamp = DateFormat('yyyy-MM-dd_HH-mm-ss-SSS').format(now);
-    return 'pinoy_pos_backup_$stamp.db';
+    return 'pinoy_pos_backup_$stamp.zip';
   }
 
   String _timestamp() {
@@ -930,6 +1144,17 @@ class BackupService {
     }
     final tempDir = await getTemporaryDirectory();
     return p.join(tempDir.path, fileName);
+  }
+
+  Future<String> _tempDir(String dirName) async {
+    if (kIsWeb) {
+      final dbDir = await getDatabasesPath();
+      return p.join(dbDir, dirName);
+    }
+    final tempDir = await getTemporaryDirectory();
+    final dir = Directory(p.join(tempDir.path, dirName));
+    await dir.create(recursive: true);
+    return dir.path;
   }
 
   Future<String?> _writeTempImportFile(Uint8List bytes, String displayName) async {

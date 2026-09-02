@@ -92,6 +92,15 @@ class MainActivity : FlutterFragmentActivity() {
                 return@registerForActivityResult
             }
 
+            // Persist read access so restore-from-history still works
+            // after the app is restarted.
+            val takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+            try {
+                contentResolver.takePersistableUriPermission(uri, takeFlags)
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not take persistable permission for $uri", e)
+            }
+
             Thread {
                 try {
                     contentResolver.openInputStream(uri)?.use { input ->
@@ -213,13 +222,38 @@ class MainActivity : FlutterFragmentActivity() {
                     it.flush()
                 }
 
+                // Verify the provider actually persisted the bytes.
+                val actualSize = contentResolver.openFileDescriptor(docUri, "r")?.use { pfd ->
+                    pfd.statSize()
+                } ?: contentResolver.query(docUri, null, null, null, null)?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+                            .takeIf { it >= 0 }
+                            ?: -1
+                        if (sizeIndex >= 0) cursor.getLong(sizeIndex) else -1L
+                    } else {
+                        -1L
+                    }
+                }
+
+                if (actualSize >= 0 && actualSize != bytes.size.toLong()) {
+                    runOnUiThread {
+                        result.error(
+                            "WRITE_FAILED",
+                            "The backup file size does not match the expected size.",
+                            null,
+                        )
+                    }
+                    return@Thread
+                }
+
                 val finalName = getDisplayName(docUri) ?: displayName
                 runOnUiThread {
                     result.success(
                         mapOf(
                             "uri" to docUri.toString(),
                             "displayName" to finalName,
-                            "size" to bytes.size,
+                            "size" to if (actualSize >= 0) actualSize else bytes.size.toLong(),
                         )
                     )
                 }
@@ -285,8 +319,14 @@ class MainActivity : FlutterFragmentActivity() {
 
         Thread {
             try {
-                val hasPermission = contentResolver.persistedUriPermissions.any {
-                    it.uri == uri && it.isWritePermission
+                val hasPermission = if (DocumentsContract.isTreeUri(uri)) {
+                    contentResolver.persistedUriPermissions.any {
+                        it.uri == uri && it.isWritePermission
+                    }
+                } else {
+                    contentResolver.persistedUriPermissions.any {
+                        it.uri == uri && it.isReadPermission
+                    }
                 }
 
                 if (!hasPermission) {

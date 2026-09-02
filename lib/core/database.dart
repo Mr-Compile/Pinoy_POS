@@ -384,6 +384,14 @@ class DatabaseHelper {
     if (oldVersion < 16) {
       await _backfillPaymentProofTypes(db);
     }
+
+    // Migration from v16 → v17: re-detect payment proof types with the
+    // expanded image signature set and larger read buffer so files that
+    // previously failed detection (no extension, HEIC, AVIF, etc.) get a
+    // correct MIME value.
+    if (oldVersion < 17) {
+      await _backfillPaymentProofTypes(db);
+    }
   }
 
   /// Backfills payment_proof_type for existing sales by detecting the actual
@@ -419,7 +427,7 @@ class DatabaseHelper {
           }
 
           final raf = await file.open();
-          final bytes = await raf.read(64);
+          final bytes = await raf.read(512);
           await raf.close();
 
           final fileType = FileTypeUtils.detect(bytes, fileName: file.path);
