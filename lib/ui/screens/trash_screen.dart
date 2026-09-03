@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/data/models/product.dart';
 import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/data/models/user.dart';
@@ -323,7 +324,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
           child: ListTile(
             title: Text(product.name),
             subtitle: Text(
-              '₱${product.price.toStringAsFixed(2)} • Stock: ${product.stock}',
+              '${CurrencyUtils.format(product.price)} • Stock: ${product.stock}',
             ),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,

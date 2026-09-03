@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/modal_result.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/product.dart';
@@ -126,38 +127,14 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     final isTablet = screenWidth >= 600;
 
     if (_isLoading) {
-      return Scaffold(
-        appBar: AppHeader(
-          title: 'Products',
-        ),
-        body: const LoadingState(),
+      return const Scaffold(
+        appBar: AppHeader(title: 'Products'),
+        body: LoadingState(),
       );
     }
 
-    // Primary create action. On tablet/desktop a visible labeled
-    // FilledButton.icon is placed in the AppBar; on mobile a FAB.extended
-    // is used so the action is always reachable and clearly labeled.
-    final Widget? createAction = canEdit
-        ? (isTablet
-            ? Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: AppButton.filled(
-                  size: AppButtonSize.small,
-                  icon: Icons.add,
-                  label: 'Add Product',
-                  onPressed: () => _showProductDialog(),
-                ),
-              )
-            : null)
-        : null;
-
     return Scaffold(
-      appBar: AppHeader(
-        title: 'Products',
-        actions: [
-          ?createAction,
-        ],
-      ),
+      appBar: const AppHeader(title: 'Products'),
       floatingActionButton: canEdit && !isTablet
           ? FloatingActionButton.extended(
               icon: const Icon(Icons.add),
@@ -210,6 +187,15 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                     },
                   ),
                 ),
+                if (canEdit && isTablet) ...[
+                  const SizedBox(width: 12),
+                  AppButton.filled(
+                    size: AppButtonSize.small,
+                    icon: Icons.add,
+                    label: 'Add Product',
+                    onPressed: _showProductDialog,
+                  ),
+                ],
               ],
             ),
           ),
@@ -312,7 +298,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
         title: product.name,
         subtitle: '${category.name} • Stock: ${product.stock}',
         trailing: Text(
-          '₱${product.price.toStringAsFixed(2)}',
+          CurrencyUtils.format(product.price),
           style: AppTypography.titleMediumBold(context)
               .copyWith(color: cs.primary),
         ),

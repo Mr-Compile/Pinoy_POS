@@ -97,8 +97,10 @@ class StaffController extends StateNotifier<StaffListState> {
         sortBy: state.sortBy,
         activeOnly: activeOnly,
       );
+      if (!mounted) return;
       state = state.copyWith(staff: staff, isLoading: false);
     } catch (e) {
+      if (!mounted) return;
       state = state.copyWith(
         isLoading: false,
         error: _friendlyError(e),
@@ -205,9 +207,11 @@ class StaffController extends StateNotifier<StaffListState> {
       if (result.success) {
         await onSuccess?.call();
       }
+      if (!mounted) return UserOperationResult(success: false, message: 'Cancelled');
       state = state.copyWith(isSubmitting: false);
       return result;
     } catch (e) {
+      if (!mounted) return UserOperationResult(success: false, message: 'Cancelled');
       final message = _friendlyError(e);
       state = state.copyWith(isSubmitting: false, error: message);
       return UserOperationResult(success: false, message: message);

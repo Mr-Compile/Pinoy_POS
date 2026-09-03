@@ -68,8 +68,14 @@ class TrashService {
   }
 
   Future<bool> permanentDelete(int trashId, String entityType, int entityId) async {
-    if (!_sessionManager.hasPermission('restore_trash')) {
-      throw AuthorizationException('restore_trash');
+    final requiredPermission = switch (entityType) {
+      'product' => 'delete_products',
+      'category' => 'delete_categories',
+      'user' => 'delete_users',
+      _ => 'restore_trash',
+    };
+    if (!_sessionManager.hasPermission(requiredPermission)) {
+      throw AuthorizationException(requiredPermission);
     }
 
     switch (entityType) {
@@ -94,8 +100,12 @@ class TrashService {
   }
 
   Future<bool> emptyTrash() async {
-    if (!_sessionManager.hasPermission('restore_trash')) {
-      throw AuthorizationException('restore_trash');
+    final required = ['delete_products', 'delete_categories', 'delete_users'];
+    final missing = required
+        .where((p) => !_sessionManager.hasPermission(p))
+        .toList();
+    if (missing.isNotEmpty) {
+      throw AuthorizationException(missing.first);
     }
 
     final items = await _trashRepository.getAll();

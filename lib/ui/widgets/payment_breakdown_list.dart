@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/payment_breakdown.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
@@ -19,11 +20,6 @@ class PaymentBreakdownList extends StatelessWidget {
   });
 
   String get _currency => storeInfo?.currency ?? 'PHP';
-
-  String get _currencySymbol {
-    if (_currency == 'PHP') return '₱';
-    return _currency;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -60,7 +56,7 @@ class PaymentBreakdownList extends StatelessWidget {
             breakdown: sorted[i],
             total: total,
             color: colors[i % colors.length],
-            currency: _currencySymbol,
+            currency: _currency,
           ),
           if (i < sorted.length - 1) const SizedBox(height: Spacing.md),
         ],
@@ -110,7 +106,7 @@ class _PaymentMethodRow extends StatelessWidget {
               ),
             ),
             Text(
-              '$currency${breakdown.total.toStringAsFixed(2)}',
+              CurrencyUtils.format(breakdown.total, currency: currency),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),

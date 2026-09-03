@@ -2,6 +2,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/activity_log.dart';
 import 'package:pinoy_pos/data/models/reporting_period.dart';
@@ -12,6 +13,7 @@ import 'package:pinoy_pos/ui/screens/sale_detail_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
+import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
 import 'package:pinoy_pos/ui/widgets/app_section.dart';
@@ -46,70 +48,9 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
     final state = ref.watch(staffDetailProvider(widget.staffId));
 
     return Scaffold(
-      appBar: AppHeader(
+      appBar: const AppHeader(
         title: 'Staff Details',
         showBackButton: true,
-        actions: [
-          if (state.staff != null)
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert),
-              onSelected: (value) => _onMenuSelected(value, state.staff!),
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  value: 'edit',
-                  child: Row(
-                    children: [
-                      Icon(Icons.edit, size: 20),
-                      SizedBox(width: 8),
-                      Text('Edit'),
-                    ],
-                  ),
-                ),
-                PopupMenuItem(
-                  value: 'reset_password',
-                  child: Row(
-                    children: [
-                      Icon(Icons.lock_reset, size: 20),
-                      SizedBox(width: 8),
-                      Text('Reset Password'),
-                    ],
-                  ),
-                ),
-                if (state.staff!.isActive)
-                  PopupMenuItem(
-                    value: 'deactivate',
-                    child: Row(
-                      children: [
-                        Icon(Icons.person_off, size: 20),
-                        SizedBox(width: 8),
-                        Text('Deactivate'),
-                      ],
-                    ),
-                  )
-                else
-                  PopupMenuItem(
-                    value: 'activate',
-                    child: Row(
-                      children: [
-                        Icon(Icons.person, size: 20),
-                        SizedBox(width: 8),
-                        Text('Activate'),
-                      ],
-                    ),
-                  ),
-                PopupMenuItem(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete, size: 20, color: Theme.of(context).colorScheme.error),
-                      SizedBox(width: 8),
-                      Text('Delete', style: TextStyle(color: Theme.of(context).colorScheme.error)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-        ],
       ),
       body: _buildBody(context, state),
     );
@@ -149,6 +90,11 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
               padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
               child: _buildProfileCard(context, staff),
             ),
+            const SizedBox(height: Spacing.sm),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
+              child: _buildActionBar(context, staff),
+            ),
             const SizedBox(height: Spacing.lg),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
@@ -187,7 +133,7 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
                   child: SalesTrendChart(
                     trend: state.analytics!.trend,
                     groupBy: state.analytics!.bounds.groupBy,
-                    valuePrefix: state.storeInfo?.currency,
+                    valuePrefix: CurrencyUtils.symbol(currency: state.storeInfo?.currency),
                   ),
                 ),
               ),
@@ -240,6 +186,50 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildActionBar(BuildContext context, User staff) {
+    return Wrap(
+      spacing: Spacing.sm,
+      runSpacing: Spacing.sm,
+      children: [
+        AppButton.outlined(
+          size: AppButtonSize.small,
+          icon: Icons.edit,
+          label: 'Edit',
+          onPressed: () => _showEditStaffDialog(staff),
+        ),
+        AppButton.outlined(
+          size: AppButtonSize.small,
+          icon: Icons.lock_reset,
+          label: 'Reset Password',
+          onPressed: () => _resetStaffPassword(staff),
+        ),
+        if (staff.isActive)
+          AppButton.outlined(
+            size: AppButtonSize.small,
+            icon: Icons.person_off,
+            label: 'Deactivate',
+            color: AppButtonColor.warning,
+            onPressed: () => _deactivateStaff(staff),
+          )
+        else
+          AppButton.outlined(
+            size: AppButtonSize.small,
+            icon: Icons.person,
+            label: 'Activate',
+            color: AppButtonColor.success,
+            onPressed: () => _activateStaff(staff),
+          ),
+        AppButton.outlined(
+          size: AppButtonSize.small,
+          icon: Icons.delete,
+          label: 'Delete',
+          color: AppButtonColor.error,
+          onPressed: () => _deleteStaff(staff),
+        ),
+      ],
     );
   }
 
@@ -351,21 +341,6 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
         builder: (_) => SaleDetailScreen(saleId: sale.id!),
       ),
     );
-  }
-
-  Future<void> _onMenuSelected(String value, User staff) async {
-    switch (value) {
-      case 'edit':
-        await _showEditStaffDialog(staff);
-      case 'reset_password':
-        await _resetStaffPassword(staff);
-      case 'activate':
-        await _activateStaff(staff);
-      case 'deactivate':
-        await _deactivateStaff(staff);
-      case 'delete':
-        await _deleteStaff(staff);
-    }
   }
 
   Future<void> _resetStaffPassword(User staff) async {

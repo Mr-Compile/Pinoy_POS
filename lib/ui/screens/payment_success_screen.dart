@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/ui/screens/receipt_screen.dart';
 import 'package:pinoy_pos/ui/screens/sale_detail_screen.dart';
@@ -39,9 +40,9 @@ class PaymentSuccessScreen extends StatelessWidget {
                           .copyWith(color: cs.onPrimaryContainer),
                     ),
                     const SizedBox(height: 24),
-                    _buildRow('Amount', '₱${sale.totalAmount.toStringAsFixed(2)}'),
+                    _buildRow('Amount', CurrencyUtils.format(sale.totalAmount)),
                     if (sale.change > 0)
-                      _buildRow('Change', '₱${sale.change.toStringAsFixed(2)}'),
+                      _buildRow('Change', CurrencyUtils.format(sale.change)),
                     _buildRow('Method', sale.paymentMethod),
                     if (sale.referenceNumber != null && sale.referenceNumber!.isNotEmpty)
                       _buildRow('Reference', sale.referenceNumber!),

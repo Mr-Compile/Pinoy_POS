@@ -1,4 +1,5 @@
 import 'package:pinoy_pos/core/authorization_exception.dart';
+import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/database.dart';
 import 'package:pinoy_pos/core/payment_validation_exception.dart';
 import 'package:pinoy_pos/core/security.dart';
@@ -91,6 +92,7 @@ class SalesService {
     String? paymentMethod,
     String? paymentStatus,
     String? search,
+    int? userId,
     int? limit = 500,
   }) async {
     if (!_sessionManager.hasPermission('view_sales')) {
@@ -98,9 +100,9 @@ class SalesService {
     }
 
     final currentUser = _sessionManager.currentUser;
-    final userId = currentUser?.role == UserRole.staff
+    final scopedUserId = currentUser?.role == UserRole.staff
         ? _currentUserId('view_sales')
-        : null;
+        : userId;
 
     return _saleRepository.getFilteredSales(
       start: start,
@@ -108,7 +110,7 @@ class SalesService {
       paymentMethod: paymentMethod,
       paymentStatus: paymentStatus,
       search: search,
-      userId: userId,
+      userId: scopedUserId,
       limit: limit,
     );
   }
@@ -330,7 +332,7 @@ class SalesService {
       if (received < totalAmount) {
         throw PaymentValidationException(
           'Insufficient cash received',
-          details: 'Received ₱${received.toStringAsFixed(2)} but total is ₱${totalAmount.toStringAsFixed(2)}.',
+          details: 'Received ${CurrencyUtils.format(received)} but total is ${CurrencyUtils.format(totalAmount)}.',
         );
       }
     } else {
@@ -483,7 +485,7 @@ class SalesService {
           action: 'create_sale',
           entity: 'sale',
           entityId: saleId,
-          details: 'Sale $receiptNumber created for ₱${totalAmount.toStringAsFixed(2)}',
+          details: 'Sale $receiptNumber created for ${CurrencyUtils.format(totalAmount)}',
           txn: txn,
         );
 

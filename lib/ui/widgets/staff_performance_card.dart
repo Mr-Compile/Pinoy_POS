@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/staff_sales_summary.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
@@ -10,19 +11,20 @@ import 'package:pinoy_pos/ui/widgets/app_card.dart';
 /// full ranked list lives in [StaffSalesList].
 class StaffPerformanceCard extends StatelessWidget {
   final List<StaffSalesSummary> summaries;
-  final String valuePrefix;
+  final String? valuePrefix;
   final int runnerUpCount;
 
   const StaffPerformanceCard({
     super.key,
     required this.summaries,
-    this.valuePrefix = '₱',
+    this.valuePrefix,
     this.runnerUpCount = 2,
   });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final prefix = valuePrefix ?? CurrencyUtils.symbol();
 
     if (summaries.isEmpty) {
       return const SizedBox.shrink();
@@ -66,7 +68,7 @@ class StaffPerformanceCard extends StatelessWidget {
           ),
           const SizedBox(height: Spacing.xs),
           Text(
-            '$valuePrefix${top.totalSales.toStringAsFixed(2)} · ${top.transactionCount} sales',
+            '$prefix${top.totalSales.toStringAsFixed(2)} · ${top.transactionCount} sales',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: cs.onSurfaceVariant,
                 ),
@@ -96,7 +98,7 @@ class StaffPerformanceCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      '$valuePrefix${s.totalSales.toStringAsFixed(0)}',
+                      '$prefix${s.totalSales.toStringAsFixed(0)}',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             fontWeight: FontWeight.w600,
                             color: cs.onSurfaceVariant,

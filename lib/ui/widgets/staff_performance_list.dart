@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
 import 'package:pinoy_pos/data/models/staff_sales_summary.dart';
@@ -85,7 +86,7 @@ class StaffPerformanceList extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          '$_currency ${staff[i].totalSales.toStringAsFixed(2)}',
+                          CurrencyUtils.format(staff[i].totalSales, currency: _currency),
                           style: Theme.of(context)
                               .textTheme
                               .bodyMedium
@@ -93,7 +94,7 @@ class StaffPerformanceList extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          'Avg $_currency ${staff[i].averageTransaction.toStringAsFixed(2)}',
+                          'Avg ${CurrencyUtils.format(staff[i].averageTransaction, currency: _currency)}',
                           style:
                               Theme.of(context).textTheme.bodySmall?.copyWith(
                                     color: cs.onSurfaceVariant,

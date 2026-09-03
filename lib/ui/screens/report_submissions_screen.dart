@@ -106,16 +106,14 @@ class _ReportSubmissionsScreenState
       appBar: AppHeader(
         title: title,
         showBackButton: true,
-        actions: isOwner
-            ? [
-                IconButton(
-                  icon: const Icon(Icons.file_upload_outlined),
-                  tooltip: 'Import report',
-                  onPressed: _importReport,
-                ),
-              ]
-            : null,
       ),
+      floatingActionButton: isOwner
+          ? FloatingActionButton.extended(
+              icon: const Icon(Icons.file_upload_outlined),
+              label: const Text('Import'),
+              onPressed: _isLoading ? null : _importReport,
+            )
+          : null,
       body: _buildBody(context, isOwner),
     );
   }

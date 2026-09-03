@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/data/models/payment_breakdown.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
 import 'package:pinoy_pos/ui/widgets/payment_breakdown_list.dart';
@@ -20,11 +21,6 @@ class PaymentBreakdownView extends StatelessWidget {
 
   String get _currency => storeInfo?.currency ?? 'PHP';
 
-  String get _currencySymbol {
-    if (_currency == 'PHP') return '₱';
-    return _currency;
-  }
-
   @override
   Widget build(BuildContext context) {
     final total = grandTotal ??
@@ -41,7 +37,7 @@ class PaymentBreakdownView extends StatelessWidget {
       return PaymentMethodChart(
         breakdown: breakdown,
         grandTotal: total,
-        valuePrefix: _currencySymbol,
+        valuePrefix: CurrencyUtils.symbol(currency: _currency),
       );
     }
 

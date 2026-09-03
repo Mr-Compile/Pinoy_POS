@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/staff_sales_summary.dart';
 
@@ -9,17 +10,18 @@ import 'package:pinoy_pos/data/models/staff_sales_summary.dart';
 /// by the caller; this widget should not be shown when [summaries] is empty.
 class StaffSalesList extends StatelessWidget {
   final List<StaffSalesSummary> summaries;
-  final String valuePrefix;
+  final String? valuePrefix;
 
   const StaffSalesList({
     super.key,
     required this.summaries,
-    this.valuePrefix = '₱',
+    this.valuePrefix,
   });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final prefix = valuePrefix ?? CurrencyUtils.symbol();
     final maxTotal = summaries.isEmpty
         ? 0.0
         : summaries.map((s) => s.totalSales).reduce((a, b) => a > b ? a : b);
@@ -33,7 +35,7 @@ class StaffSalesList extends StatelessWidget {
             summary: summaries[i],
             rank: i + 1,
             maxTotal: maxTotal,
-            valuePrefix: valuePrefix,
+            valuePrefix: prefix,
             isTop: i == 0,
             barColor: _rankColor(context, cs, i),
           ),

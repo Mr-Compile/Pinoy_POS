@@ -201,8 +201,24 @@ class SaleDao extends BaseDao<Sale> {
     DatabaseExecutor? txn,
   }) async {
     final executor = txn ?? await db;
-    final conditions = <String>['deleted_at IS NULL'];
+    final conditions = <String>[];
     final args = <Object?>[];
+
+    final isCancelledOrRefunded =
+        paymentStatus == 'cancelled' || paymentStatus == 'refunded';
+    if (isCancelledOrRefunded) {
+      conditions.add('payment_status = ?');
+      args.add(paymentStatus);
+    } else {
+      conditions.add('deleted_at IS NULL');
+      if (paymentStatus != null && paymentStatus.isNotEmpty) {
+        conditions.add('payment_status = ?');
+        args.add(paymentStatus);
+      } else {
+        // By default, hide cancelled/refunded sales from the sales list.
+        conditions.add("payment_status NOT IN ('cancelled', 'refunded')");
+      }
+    }
 
     if (start != null && end != null) {
       conditions.add('created_at >= ? AND created_at < ?');
@@ -213,14 +229,6 @@ class SaleDao extends BaseDao<Sale> {
     if (paymentMethod != null && paymentMethod.isNotEmpty) {
       conditions.add('payment_method = ?');
       args.add(paymentMethod);
-    }
-
-    if (paymentStatus != null && paymentStatus.isNotEmpty) {
-      conditions.add('payment_status = ?');
-      args.add(paymentStatus);
-    } else {
-      // By default, hide cancelled/refunded sales from the sales list.
-      conditions.add("payment_status NOT IN ('cancelled', 'refunded')");
     }
 
     if (userId != null) {

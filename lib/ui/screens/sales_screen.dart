@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/date_utils.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/reporting_period.dart';
@@ -161,44 +162,10 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     }
   }
 
-  Future<void> _showSearchDialog() async {
-    _searchController.text = _searchQuery;
-    final result = await showDialog<String>(
-      context: context,
-      useRootNavigator: true,
-      builder: (context) => AppDialog(
-        type: AppDialogType.info,
-        title: 'Search Sales',
-        actions: [
-          AppDialogAction(
-            label: 'Cancel',
-            onPressed: (context) =>
-                Navigator.of(context, rootNavigator: true).pop(null),
-          ),
-          AppDialogAction(
-            label: 'Search',
-            isPrimary: true,
-            onPressed: (context) => Navigator.of(context, rootNavigator: true)
-                .pop(_searchController.text.trim()),
-          ),
-        ],
-        child: TextField(
-          controller: _searchController,
-          decoration: const InputDecoration(
-            labelText: 'Receipt, customer, or reference',
-            border: OutlineInputBorder(),
-          ),
-          autofocus: true,
-        ),
-      ),
-    );
-
-    if (result != null && mounted) {
-      setState(() {
-        _searchQuery = result;
-      });
-      await _loadSales();
-    }
+  void _clearSearch() {
+    _searchController.clear();
+    setState(() => _searchQuery = '');
+    _loadSales();
   }
 
   Future<void> _showFilterDialog() async {
@@ -337,26 +304,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     );
 
     return Scaffold(
-      appBar: AppHeader(
-        title: 'My Sales',
-        actions: [
-          AppIconButton(
-            icon: Icons.search,
-            onPressed: _isProcessing ? null : _showSearchDialog,
-            tooltip: 'Search',
-          ),
-          AppIconButton(
-            icon: Icons.filter_list,
-            onPressed: _isProcessing ? null : _showFilterDialog,
-            tooltip: 'Filters',
-          ),
-          AppIconButton(
-            icon: Icons.refresh,
-            onPressed: _isProcessing ? null : _loadSales,
-            tooltip: 'Refresh',
-          ),
-        ],
-      ),
+      appBar: const AppHeader(title: 'My Sales'),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 800),
@@ -383,28 +331,31 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                               )
                             : null,
                       )
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: grouped.length,
-                        itemBuilder: (context, index) {
-                          final group = grouped[index];
-                          final groupTotal = group.sales.fold<double>(
-                            0,
-                            (sum, sale) => sum + sale.totalAmount,
-                          );
-                          return AppSection(
-                            title: group.label,
-                            subtitle:
-                                '${group.sales.length} sale${group.sales.length == 1 ? '' : 's'} · ₱${groupTotal.toStringAsFixed(2)}',
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: group.sales
-                                  .map((sale) =>
-                                      _buildSaleCard(sale, canVoid, context))
-                                  .toList(),
-                            ),
-                          );
-                        },
+                    : RefreshIndicator(
+                        onRefresh: _loadSales,
+                        child: ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: grouped.length,
+                          itemBuilder: (context, index) {
+                            final group = grouped[index];
+                            final groupTotal = group.sales.fold<double>(
+                              0,
+                              (sum, sale) => sum + sale.totalAmount,
+                            );
+                            return AppSection(
+                              title: group.label,
+                              subtitle:
+                                  '${group.sales.length} sale${group.sales.length == 1 ? '' : 's'} · ${CurrencyUtils.format(groupTotal)}',
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: group.sales
+                                    .map((sale) =>
+                                        _buildSaleCard(sale, canVoid, context))
+                                    .toList(),
+                              ),
+                            );
+                          },
+                        ),
                       ),
               ),
             ],
@@ -421,6 +372,42 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search receipt, customer, or reference...',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 18),
+                            onPressed: _clearSearch,
+                          )
+                        : null,
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  textInputAction: TextInputAction.search,
+                  onChanged: (value) => setState(() => _searchQuery = value),
+                  onSubmitted: (_) => _loadSales(),
+                ),
+              ),
+              const SizedBox(width: Spacing.sm),
+              AppIconButton(
+                icon: Icons.filter_list,
+                tooltip: 'Filters',
+                onPressed: _isProcessing ? null : _showFilterDialog,
+              ),
+              AppIconButton(
+                icon: Icons.refresh,
+                tooltip: 'Refresh',
+                onPressed: _isProcessing ? null : _loadSales,
+              ),
+            ],
+          ),
+          const SizedBox(height: Spacing.sm),
           Row(
             children: [
               Expanded(
@@ -477,7 +464,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                     ),
                     const SizedBox(height: Spacing.xs),
                     Text(
-                      '₱${total.toStringAsFixed(2)}',
+                      CurrencyUtils.format(total),
                       style: AppTypography.titleLargeBold(context).copyWith(
                         color: cs.onPrimaryContainer,
                       ),
@@ -574,7 +561,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
       title: 'Sale #${sale.receiptNumber ?? sale.id}',
       subtitle: time,
       trailing: Text(
-        '₱${sale.totalAmount.toStringAsFixed(2)}',
+        CurrencyUtils.format(sale.totalAmount),
         style: AppTypography.titleMediumBold(context)
             .copyWith(color: cs.primary),
       ),

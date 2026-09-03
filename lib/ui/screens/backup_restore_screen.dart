@@ -10,7 +10,6 @@ import 'package:pinoy_pos/providers/notification_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/providers/user_provider.dart';
 import 'package:pinoy_pos/providers/dashboard_provider.dart';
-import 'package:pinoy_pos/providers/reports_provider.dart';
 import 'package:pinoy_pos/providers/cart_provider.dart';
 import 'package:pinoy_pos/providers/payment_settings_provider.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
@@ -491,7 +490,6 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
     // restore the underlying data has changed, so they must be
     // invalidated to force a fresh load on next access.
     ref.invalidate(dashboardProvider);
-    ref.invalidate(reportsProvider);
     ref.invalidate(cartProvider);
     ref.invalidate(paymentSettingsProvider);
     ref.invalidate(authStateProvider);
@@ -531,16 +529,9 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
     final isTablet = screenWidth >= 600;
 
     return Scaffold(
-      appBar: AppHeader(
+      appBar: const AppHeader(
         title: 'Backup & Restore',
         showBackButton: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _isLoading ? null : _loadBackups,
-            tooltip: 'Refresh',
-          ),
-        ],
       ),
       body: _isLoading
           ? const LoadingState(message: 'Loading backup history...')

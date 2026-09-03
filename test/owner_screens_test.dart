@@ -17,7 +17,7 @@ import 'package:pinoy_pos/ui/screens/products_screen.dart';
 import 'package:pinoy_pos/ui/screens/categories_screen.dart';
 import 'package:pinoy_pos/ui/screens/stock_screen.dart';
 import 'package:pinoy_pos/ui/screens/sales_screen.dart';
-import 'package:pinoy_pos/ui/screens/reports_screen.dart';
+import 'package:pinoy_pos/ui/screens/sales_analytics_screen.dart';
 import 'package:pinoy_pos/ui/screens/announcements_screen.dart';
 import 'package:pinoy_pos/ui/screens/trash_screen.dart';
 import 'package:pinoy_pos/ui/screens/activity_logs_screen.dart';
@@ -161,9 +161,9 @@ void main() {
     expect(find.text('My Sales'), findsWidgets);
   });
 
-  testWidgets('ReportsScreen builds for owner', (tester) async {
+  testWidgets('SalesAnalyticsScreen builds for owner', (tester) async {
     final owner = await authenticateAsOwner();
-    await pumpOwnerScreen(tester, const ReportsScreen(), owner: owner);
+    await pumpOwnerScreen(tester, const SalesAnalyticsScreen(), owner: owner);
     expect(find.text('Reports'), findsWidgets);
   });
 

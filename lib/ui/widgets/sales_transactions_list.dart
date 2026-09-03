@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
@@ -85,7 +86,7 @@ class _SaleRow extends StatelessWidget {
         ),
       ),
       trailing: Text(
-        '$currency ${sale.totalAmount.toStringAsFixed(2)}',
+        CurrencyUtils.format(sale.totalAmount, currency: currency),
         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
               fontWeight: FontWeight.bold,
             ),

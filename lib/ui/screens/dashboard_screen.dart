@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/route_guard.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/activity_log.dart';
@@ -63,16 +64,7 @@ class DashboardScreen extends ConsumerWidget {
     final dashboardState = ref.watch(dashboardProvider);
 
     return Scaffold(
-      appBar: AppHeader(
-        title: 'Dashboard',
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => ref.read(dashboardProvider.notifier).load(),
-            tooltip: 'Refresh',
-          ),
-        ],
-      ),
+      appBar: const AppHeader(title: 'Dashboard'),
       body: RefreshIndicator(
         onRefresh: () => ref.read(dashboardProvider.notifier).load(),
         child: switch (dashboardState) {
@@ -258,19 +250,7 @@ class _WelcomeHeader extends StatelessWidget {
   }
 }
 
-/// Returns the display symbol for a currency code.
-///
-/// Defaults to the Peso sign for Philippine Peso and returns the code
-/// itself for all other currencies.
-String _currencySymbol(String? currency) {
-  if (currency == 'PHP') return '₱';
-  return currency ?? '';
-}
 
-/// Formats a [value] as currency using the default Peso symbol.
-String _formatMoney(double value) {
-  return '${_currencySymbol('PHP')}${value.toStringAsFixed(2)}';
-}
 
 /// Formats a DateTime for compact recent-activity display.
 String _formatDateTime(DateTime dt) {
@@ -288,7 +268,7 @@ class _OwnerDashboard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final analytics = data.analytics;
-    final currencySymbol = _currencySymbol('PHP');
+    final currencySymbol = CurrencyUtils.symbol();
     final authNotifier = ref.read(authStateProvider.notifier);
 
     return Column(
@@ -550,7 +530,7 @@ class _OwnerDashboard extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: sales.take(5).map((s) => _RecentSaleTile(
                       receipt: '#${s.receiptNumber ?? s.id}',
-                      amount: _formatMoney(s.totalAmount),
+                      amount: CurrencyUtils.format(s.totalAmount),
                       time: _formatDateTime(s.createdAt),
                     )).toList(),
               ),
@@ -730,7 +710,7 @@ class _AdminDashboard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final analytics = data.analytics;
-    final currencySymbol = _currencySymbol('PHP');
+    final currencySymbol = CurrencyUtils.symbol();
     final authNotifier = ref.read(authStateProvider.notifier);
 
     return Column(
@@ -1164,7 +1144,7 @@ class _StaffDashboard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final analytics = data.analytics;
-    final currencySymbol = _currencySymbol('PHP');
+    final currencySymbol = CurrencyUtils.symbol();
     final authNotifier = ref.read(authStateProvider.notifier);
 
     return Column(

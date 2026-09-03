@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/data/models/category_sales_result.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
@@ -18,11 +19,6 @@ class CategorySalesBarChart extends StatelessWidget {
   });
 
   String get _currency => storeInfo?.currency ?? 'PHP';
-
-  String get _currencySymbol {
-    if (_currency == 'PHP') return '₱';
-    return _currency;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +43,7 @@ class CategorySalesBarChart extends StatelessWidget {
 
     return HorizontalBarChart(
       items: items,
-      valuePrefix: _currencySymbol,
+      valuePrefix: CurrencyUtils.symbol(currency: _currency),
       height: height,
     );
   }

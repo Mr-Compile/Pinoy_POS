@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/category_sales_result.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
@@ -88,7 +89,7 @@ class CategorySalesList extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          '$_currency ${sorted[i].totalSales.toStringAsFixed(2)}',
+                          CurrencyUtils.format(sorted[i].totalSales, currency: _currency),
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                 fontWeight: FontWeight.bold,
                               ),

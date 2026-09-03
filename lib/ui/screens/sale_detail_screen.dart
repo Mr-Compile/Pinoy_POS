@@ -333,7 +333,7 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
                 _buildProofCard(receipt),
               ],
               const SizedBox(height: 24),
-              _buildActions(receipt, canVerify),
+              _buildActions(receipt, canVerify, canViewEvidence),
             ],
           ),
         ),
@@ -605,37 +605,54 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
     );
   }
 
-  Widget _buildActions(ReceiptViewData receipt, bool canVerify) {
+  Widget _buildActions(
+      ReceiptViewData receipt, bool canVerify, bool canViewEvidence) {
+    final actions = <Widget>[
+      FilledButton.icon(
+        onPressed: _viewReceipt,
+        icon: const Icon(Icons.receipt_long_outlined),
+        label: const Text('View Receipt'),
+      ),
+      LoadingButton(
+        isLoading: _isExporting,
+        onPressed: _isExporting ? null : () => _downloadPdf(receipt),
+        label: 'Download PDF',
+      ),
+      if (canViewEvidence &&
+          receipt.paymentProofPath != null &&
+          receipt.paymentProofPath!.isNotEmpty) ...[
+        OutlinedButton.icon(
+          onPressed: _viewPaymentProof,
+          icon: const Icon(Icons.image_outlined),
+          label: const Text('View Image'),
+        ),
+        LoadingButton(
+          isLoading: _isExportingProof,
+          onPressed: _isExportingProof ? null : _downloadGcashProofImage,
+          label: 'Download Image',
+        ),
+      ],
+    ];
+
+    return _buildActionPairs(actions);
+  }
+
+  Widget _buildActionPairs(List<Widget> actions) {
+    final rows = <Widget>[];
+    for (var i = 0; i < actions.length; i += 2) {
+      final children = <Widget>[Expanded(child: actions[i])];
+      if (i + 1 < actions.length) {
+        children.add(const SizedBox(width: 12));
+        children.add(Expanded(child: actions[i + 1]));
+      }
+      rows.add(Row(children: children));
+      if (i + 2 < actions.length) {
+        rows.add(const SizedBox(height: 12));
+      }
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        FilledButton.icon(
-          onPressed: _viewReceipt,
-          icon: const Icon(Icons.receipt_long_outlined),
-          label: const Text('View Receipt'),
-        ),
-        const SizedBox(height: 12),
-        LoadingButton(
-          isLoading: _isExporting,
-          onPressed: _isExporting ? null : () => _downloadPdf(receipt),
-          label: 'Download PDF',
-        ),
-        const SizedBox(height: 12),
-        if (receipt.paymentProofPath != null &&
-            receipt.paymentProofPath!.isNotEmpty) ...[
-          OutlinedButton.icon(
-            onPressed: _viewPaymentProof,
-            icon: const Icon(Icons.image_outlined),
-            label: const Text('View Image'),
-          ),
-          const SizedBox(height: 12),
-          LoadingButton(
-            isLoading: _isExportingProof,
-            onPressed: _isExportingProof ? null : _downloadGcashProofImage,
-            label: 'Download Image',
-          ),
-        ],
-      ],
+      children: rows,
     );
   }
 

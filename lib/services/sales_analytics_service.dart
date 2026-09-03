@@ -6,13 +6,17 @@ import 'package:pinoy_pos/data/models/payment_breakdown.dart';
 import 'package:pinoy_pos/data/models/peak_sales_period.dart';
 import 'package:pinoy_pos/data/models/reporting_period.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
+import 'package:pinoy_pos/data/models/sale_item.dart';
 import 'package:pinoy_pos/data/models/sales_analytics.dart';
 import 'package:pinoy_pos/data/models/sales_by_hour_point.dart';
 import 'package:pinoy_pos/data/models/staff_sales_summary.dart';
 import 'package:pinoy_pos/data/models/top_product_result.dart';
 import 'package:pinoy_pos/data/models/user.dart';
+import 'package:pinoy_pos/data/repositories/category_repository.dart';
+import 'package:pinoy_pos/data/repositories/product_repository.dart';
 import 'package:pinoy_pos/data/repositories/sale_item_repository.dart';
 import 'package:pinoy_pos/data/repositories/sale_repository.dart';
+import 'package:pinoy_pos/data/repositories/user_repository.dart';
 
 /// Single source of truth for sales analytics, reports, and exports.
 ///
@@ -24,6 +28,9 @@ import 'package:pinoy_pos/data/repositories/sale_repository.dart';
 class SalesAnalyticsService {
   final SaleRepository _saleRepository = SaleRepository();
   final SaleItemRepository _saleItemRepository = SaleItemRepository();
+  final ProductRepository _productRepository = ProductRepository();
+  final CategoryRepository _categoryRepository = CategoryRepository();
+  final UserRepository _userRepository = UserRepository();
   final SessionManager _sessionManager = SessionManager();
 
   int? get _scopedUserId {
@@ -42,6 +49,9 @@ class SalesAnalyticsService {
     ReportingPeriod period, {
     DateTime? customStart,
     DateTime? customEnd,
+    String? paymentMethod,
+    String? paymentStatus,
+    int? selectedStaffId,
   }) async {
     if (!_canViewReports) return _emptyAnalytics(period, customStart, customEnd);
 
@@ -50,7 +60,12 @@ class SalesAnalyticsService {
       customStart: customStart,
       customEnd: customEnd,
     );
-    return _analyticsForBounds(bounds);
+    return _analyticsForBounds(
+      bounds,
+      paymentMethod: paymentMethod,
+      paymentStatus: paymentStatus,
+      selectedStaffId: selectedStaffId,
+    );
   }
 
   /// Complete analytics for explicit [bounds].
@@ -71,6 +86,8 @@ class SalesAnalyticsService {
     ReportingPeriod period, {
     DateTime? customStart,
     DateTime? customEnd,
+    String? paymentMethod,
+    String? paymentStatus,
   }) async {
     if (!_canViewReports) {
       return _emptyAnalytics(period, customStart, customEnd);
@@ -88,7 +105,12 @@ class SalesAnalyticsService {
       return _emptyAnalytics(period, customStart, customEnd);
     }
 
-    return _analyticsForBounds(bounds, targetUserId: effectiveUserId);
+    return _analyticsForBounds(
+      bounds,
+      targetUserId: effectiveUserId,
+      paymentMethod: paymentMethod,
+      paymentStatus: paymentStatus,
+    );
   }
 
   /// Sales list for a period, newest first.
@@ -172,8 +194,23 @@ class SalesAnalyticsService {
   Future<SalesAnalytics> _analyticsForBounds(
     ReportingPeriodBounds bounds, {
     int? targetUserId,
+    String? paymentMethod,
+    String? paymentStatus,
+    int? selectedStaffId,
   }) async {
-    final userId = targetUserId ?? _scopedUserId;
+    final useFiltered = (paymentMethod != null && paymentMethod.isNotEmpty) ||
+        (paymentStatus != null && paymentStatus != 'confirmed') ||
+        (selectedStaffId != null);
+    if (useFiltered) {
+      return _filteredAnalyticsForBounds(
+        bounds,
+        paymentMethod: paymentMethod,
+        paymentStatus: paymentStatus,
+        userId: selectedStaffId ?? targetUserId ?? _scopedUserId,
+      );
+    }
+
+    final userId = selectedStaffId ?? targetUserId ?? _scopedUserId;
 
     final currentSummary = await _saleRepository.getSalesSummary(
       bounds.start,
@@ -296,6 +333,9 @@ class SalesAnalyticsService {
       staffSummaries: staffSummaries,
       peakSalesPeriod: peakSalesPeriod,
       sales: sales,
+      paymentMethod: paymentMethod,
+      paymentStatus: paymentStatus,
+      staffUserId: selectedStaffId ?? targetUserId,
     );
   }
 
@@ -310,6 +350,288 @@ class SalesAnalyticsService {
       customEnd: customEnd,
     );
     return SalesAnalytics.empty(bounds);
+  }
+
+  Future<SalesAnalytics> _filteredAnalyticsForBounds(
+    ReportingPeriodBounds bounds, {
+    int? userId,
+    String? paymentMethod,
+    String? paymentStatus,
+  }) async {
+    final currentSales = await _saleRepository.getFilteredSales(
+      start: bounds.start,
+      end: bounds.end,
+      paymentMethod: paymentMethod,
+      paymentStatus: paymentStatus,
+      userId: userId,
+      limit: null,
+    );
+
+    final previousSales = await _saleRepository.getFilteredSales(
+      start: bounds.previousStart,
+      end: bounds.previousEnd,
+      paymentMethod: paymentMethod,
+      paymentStatus: paymentStatus,
+      userId: userId,
+      limit: null,
+    );
+
+    final sales = currentSales.take(100).toList();
+
+    final currentSaleIds = currentSales
+        .where((s) => s.id != null)
+        .map((s) => s.id!)
+        .toList();
+    final currentItems = currentSaleIds.isEmpty
+        ? <SaleItem>[]
+        : await _saleItemRepository.getBySaleIds(currentSaleIds);
+
+    final previousSaleIds = previousSales
+        .where((s) => s.id != null)
+        .map((s) => s.id!)
+        .toList();
+    final previousItems = previousSaleIds.isEmpty
+        ? <SaleItem>[]
+        : await _saleItemRepository.getBySaleIds(previousSaleIds);
+
+    final transactionCount = currentSales.length;
+    final totalSales = currentSales.fold<double>(
+      0.0,
+      (sum, sale) => sum + sale.totalAmount,
+    );
+    final averageTransaction =
+        transactionCount == 0 ? 0.0 : totalSales / transactionCount;
+    final itemsSold = currentItems.fold<int>(
+      0,
+      (sum, item) => sum + item.quantity,
+    );
+
+    final previousCount = previousSales.length;
+    final previousTotal = previousSales.fold<double>(
+      0.0,
+      (sum, sale) => sum + sale.totalAmount,
+    );
+    final previousAverage =
+        previousCount == 0 ? 0.0 : previousTotal / previousCount;
+    final previousItemsSold = previousItems.fold<int>(
+      0,
+      (sum, item) => sum + item.quantity,
+    );
+
+    final comparison = SalesPeriodComparison(
+      previousTotalSales: previousTotal,
+      previousTransactionCount: previousCount,
+      previousAverageTransaction: previousAverage,
+      previousItemsSold: previousItemsSold,
+    );
+
+    final trend = _trendFromSales(currentSales, bounds);
+
+    final previousBounds = ReportingPeriodBounds(
+      start: bounds.previousStart,
+      end: bounds.previousEnd,
+      previousStart: bounds.previousStart,
+      previousEnd: bounds.previousEnd,
+      groupBy: bounds.groupBy,
+    );
+    final previousTrend = _trendFromSales(previousSales, previousBounds);
+
+    final paymentBreakdown = _paymentBreakdownFromSales(currentSales);
+    final topProducts = _topProductsFromItems(currentItems);
+    final categorySales =
+        await _categorySalesFromSales(currentSales, currentItems);
+    final staffSummaries =
+        await _staffSummariesFromSales(currentSales, userId);
+    final peakSalesPeriod = _peakSalesPeriodFromSales(currentSales, trend);
+
+    return SalesAnalytics(
+      bounds: bounds,
+      totalSales: totalSales,
+      transactionCount: transactionCount,
+      averageTransaction: averageTransaction,
+      itemsSold: itemsSold,
+      comparison: comparison,
+      trend: trend,
+      previousTrend: previousTrend,
+      paymentBreakdown: paymentBreakdown,
+      topProducts: topProducts,
+      categorySales: categorySales,
+      staffSummaries: staffSummaries,
+      peakSalesPeriod: peakSalesPeriod,
+      sales: sales,
+      paymentMethod: paymentMethod,
+      paymentStatus: paymentStatus,
+      staffUserId: userId,
+    );
+  }
+
+  List<DailySalesPoint> _trendFromSales(
+    List<Sale> sales,
+    ReportingPeriodBounds bounds,
+  ) {
+    final grouped = <DateTime, DailySalesPoint>{};
+    for (final sale in sales) {
+      final key = _trendKey(sale.createdAt, bounds.groupBy);
+      final existing = grouped[key];
+      grouped[key] = DailySalesPoint(
+        date: key,
+        total: (existing?.total ?? 0.0) + sale.totalAmount,
+        count: (existing?.count ?? 0) + 1,
+      );
+    }
+    return _fillTrendGaps(grouped.values.toList(), bounds);
+  }
+
+  List<PaymentBreakdown> _paymentBreakdownFromSales(List<Sale> sales) {
+    final grouped = <String, PaymentBreakdown>{};
+    for (final sale in sales) {
+      final method = sale.paymentMethod.isNotEmpty ? sale.paymentMethod : 'Unknown';
+      final existing = grouped[method];
+      grouped[method] = PaymentBreakdown(
+        method: method,
+        total: (existing?.total ?? 0.0) + sale.totalAmount,
+        count: (existing?.count ?? 0) + 1,
+      );
+    }
+    return grouped.values.toList()
+      ..sort((a, b) => b.total.compareTo(a.total));
+  }
+
+  List<TopProductResult> _topProductsFromItems(List<SaleItem> items) {
+    final grouped = <int, TopProductResult>{};
+    for (final item in items) {
+      final name = item.productName?.isNotEmpty == true
+          ? item.productName!
+          : 'Product #${item.productId}';
+      final existing = grouped[item.productId];
+      grouped[item.productId] = TopProductResult(
+        productId: item.productId,
+        productName: name,
+        totalQuantity: (existing?.totalQuantity ?? 0) + item.quantity,
+        revenue: (existing?.revenue ?? 0.0) + item.totalPrice,
+      );
+    }
+    final list = grouped.values.toList()
+      ..sort((a, b) => b.revenue.compareTo(a.revenue));
+    return list.take(10).toList();
+  }
+
+  Future<List<CategorySalesResult>> _categorySalesFromSales(
+    List<Sale> sales,
+    List<SaleItem> items,
+  ) async {
+    final products = await _productRepository.getAll();
+    final productMap = {for (final p in products) p.id: p};
+    final categories = await _categoryRepository.getAll();
+    final categoryNames = {for (final c in categories) c.id: c.name};
+
+    final saleTotalMap = {for (final s in sales) s.id: s.totalAmount};
+    final categorySales = <int?, CategorySalesResult>{};
+    final categorySaleIds = <int?, Set<int>>{};
+
+    for (final item in items) {
+      final product = productMap[item.productId];
+      final categoryId = product?.categoryId;
+      final categoryName = categoryNames[categoryId] ?? 'Uncategorized';
+      final saleTotal = saleTotalMap[item.saleId] ?? 0.0;
+
+      final existing = categorySales[categoryId];
+      final ids = categorySaleIds.putIfAbsent(categoryId, () => <int>{});
+      if (item.saleId != null) ids.add(item.saleId!);
+
+      categorySales[categoryId] = CategorySalesResult(
+        categoryId: categoryId,
+        categoryName: categoryName,
+        totalSales: (existing?.totalSales ?? 0.0) + saleTotal,
+        transactionCount: ids.length,
+        itemsSold: (existing?.itemsSold ?? 0) + item.quantity,
+      );
+    }
+
+    return categorySales.values.toList()
+      ..sort((a, b) => b.totalSales.compareTo(a.totalSales));
+  }
+
+  Future<List<StaffSalesSummary>> _staffSummariesFromSales(
+    List<Sale> sales,
+    int? filteredUserId,
+  ) async {
+    if (filteredUserId == null && !_canViewStaffPerformance) {
+      return const [];
+    }
+
+    final users = await _userRepository.getAll();
+
+    final byUser = <int, (double, int)>{};
+    for (final sale in sales) {
+      final existing = byUser[sale.userId];
+      if (existing == null) {
+        byUser[sale.userId] = (sale.totalAmount, 1);
+      } else {
+        byUser[sale.userId] = (
+          existing.$1 + sale.totalAmount,
+          existing.$2 + 1,
+        );
+      }
+    }
+
+    final summaries = <StaffSalesSummary>[];
+    for (final user in users) {
+      if (filteredUserId != null && user.id != filteredUserId) continue;
+      if (filteredUserId == null && user.role != UserRole.staff) continue;
+
+      final data = byUser[user.id];
+      if (data == null) continue;
+
+      summaries.add(StaffSalesSummary(
+        userId: user.id!,
+        fullName: user.fullName,
+        role: user.role,
+        totalSales: data.$1,
+        transactionCount: data.$2,
+      ));
+    }
+
+    return summaries..sort((a, b) => b.totalSales.compareTo(a.totalSales));
+  }
+
+  PeakSalesPeriod _peakSalesPeriodFromSales(
+    List<Sale> sales,
+    List<DailySalesPoint> trend,
+  ) {
+    final hourly = <int, SalesByHourPoint>{};
+    for (final sale in sales) {
+      final hour = sale.createdAt.hour;
+      final existing = hourly[hour];
+      hourly[hour] = SalesByHourPoint(
+        hour: hour,
+        total: (existing?.total ?? 0.0) + sale.totalAmount,
+        count: (existing?.count ?? 0) + 1,
+      );
+    }
+
+    SalesByHourPoint? peakHourPoint;
+    for (final point in hourly.values) {
+      if (peakHourPoint == null || point.total > peakHourPoint.total) {
+        peakHourPoint = point;
+      }
+    }
+
+    DailySalesPoint? peakDay;
+    for (final point in trend) {
+      if (peakDay == null || point.total > peakDay.total) {
+        peakDay = point;
+      }
+    }
+
+    return PeakSalesPeriod(
+      peakHour: peakHourPoint?.hour,
+      peakHourSales: peakHourPoint?.total ?? 0.0,
+      peakHourTransactions: peakHourPoint?.count ?? 0,
+      peakDay: peakDay?.date,
+      peakDaySales: peakDay?.total ?? 0.0,
+      peakDayTransactions: peakDay?.count ?? 0,
+    );
   }
 
   List<DailySalesPoint> _fillTrendGaps(

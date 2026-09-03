@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
 import 'package:pinoy_pos/data/models/top_product_result.dart';
@@ -77,7 +78,7 @@ class ProductPerformanceList extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      '$_currency ${products[i].revenue.toStringAsFixed(2)}',
+                      CurrencyUtils.format(products[i].revenue, currency: _currency),
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),

@@ -661,32 +661,8 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    final Widget? createAction = canManage
-        ? (isTablet
-            ? Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: AppButton.filled(
-                  size: AppButtonSize.small,
-                  icon: Icons.person_add,
-                  label: 'Add User',
-                  onPressed: () => _showAddUserDialog(),
-                ),
-              )
-            : null)
-        : null;
-
     return Scaffold(
-      appBar: AppHeader(
-        title: 'Users',
-        actions: [
-          ?createAction,
-          AppIconButton(
-            icon: Icons.refresh,
-            tooltip: 'Refresh',
-            onPressed: _refresh,
-          ),
-        ],
-      ),
+      appBar: const AppHeader(title: 'Users'),
       floatingActionButton: canManage && !isTablet
           ? FloatingActionButton.extended(
               icon: const Icon(Icons.person_add),
@@ -700,29 +676,50 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
           if (userState.users.isNotEmpty || _searchQuery.isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'Search by name or username...',
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() => _searchQuery = '');
-                          },
-                        )
-                      : null,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: 'Search by name or username...',
+                        prefixIcon: const Icon(Icons.search),
+                        suffixIcon: _searchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() => _searchQuery = '');
+                                },
+                              )
+                            : null,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                      ),
+                      onChanged: (value) => setState(() => _searchQuery = value),
+                    ),
                   ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
+                  const SizedBox(width: 12),
+                  AppIconButton(
+                    icon: Icons.refresh,
+                    tooltip: 'Refresh',
+                    onPressed: _refresh,
                   ),
-                ),
-                onChanged: (value) => setState(() => _searchQuery = value),
+                  if (canManage && isTablet) ...[
+                    const SizedBox(width: 12),
+                    AppButton.filled(
+                      size: AppButtonSize.small,
+                      icon: Icons.person_add,
+                      label: 'Add User',
+                      onPressed: _showAddUserDialog,
+                    ),
+                  ],
+                ],
               ),
             ),
           // ── Role filter chips ──

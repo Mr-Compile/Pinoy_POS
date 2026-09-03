@@ -13,6 +13,7 @@ import 'package:pinoy_pos/ui/screens/gcash_payment_screen.dart';
 import 'package:pinoy_pos/ui/screens/payment_success_screen.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/breakpoints.dart';
+import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
@@ -432,7 +433,7 @@ class _POSScreenState extends ConsumerState<POSScreen> {
                 ),
                 const SizedBox(height: Spacing.xs),
                 Text(
-                  '₱${product.price.toStringAsFixed(2)}',
+                  CurrencyUtils.format(product.price),
                   style: AppTypography.titleMediumBold(context)
                       .copyWith(color: cs.primary),
                 ),
@@ -656,7 +657,7 @@ class _FloatingCartButton extends ConsumerWidget {
       right: Spacing.lg,
       child: FloatingActionButton.extended(
         icon: const Icon(Icons.shopping_cart),
-        label: Text('${cart.itemCount} items · ₱${cart.total.toStringAsFixed(2)}'),
+        label: Text('${cart.itemCount} items · ${CurrencyUtils.format(cart.total)}'),
         onPressed: onOpenCart,
       ),
     );
@@ -732,7 +733,7 @@ class _CheckoutPanel extends ConsumerWidget {
                     children: [
                       Text('Subtotal', style: AppTypography.bodyLarge(context)),
                       Text(
-                        '₱${cart.subtotal.toStringAsFixed(2)}',
+                        CurrencyUtils.format(cart.subtotal),
                         style: AppTypography.bodyLarge(context)
                             .copyWith(fontWeight: FontWeight.w600),
                       ),
@@ -744,7 +745,7 @@ class _CheckoutPanel extends ConsumerWidget {
                     children: [
                       Text('Total', style: AppTypography.titleLargeBold(context)),
                       Text(
-                        '₱${cart.total.toStringAsFixed(2)}',
+                        CurrencyUtils.format(cart.total),
                         style: AppTypography.headlineSmallBold(context).copyWith(
                               color: cs.primary,
                             ),
@@ -811,7 +812,7 @@ class _CartItemRow extends ConsumerWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  '₱${product.price.toStringAsFixed(2)} × ${item.quantity}',
+                  '${CurrencyUtils.format(product.price)} × ${item.quantity}',
                   style: AppTypography.bodySmall(context)
                       .copyWith(color: cs.onSurfaceVariant),
                 ),
@@ -849,7 +850,7 @@ class _CartItemRow extends ConsumerWidget {
           SizedBox(
             width: 72,
             child: Text(
-              '₱${item.lineTotal.toStringAsFixed(2)}',
+              CurrencyUtils.format(item.lineTotal),
               style: AppTypography.titleSmallBold(context),
               textAlign: TextAlign.right,
             ),
@@ -1054,7 +1055,7 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
                     Text('Total Due',
                         style: TextStyle(color: cs.onPrimaryContainer)),
                     Text(
-                      '₱${widget.total.toStringAsFixed(2)}',
+                      CurrencyUtils.format(widget.total),
                       style: AppTypography.titleLargeBold(context)
                           .copyWith(color: cs.onPrimaryContainer),
                     ),
@@ -1087,11 +1088,11 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
               if (currentMethod == 'Cash') ...[
                 TextFormField(
                   controller: _cashController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Cash Received',
-                    prefixText: '₱',
-                    prefixIcon: Icon(Icons.payments),
-                    border: OutlineInputBorder(),
+                    prefixText: CurrencyUtils.symbol(),
+                    prefixIcon: const Icon(Icons.payments),
+                    border: const OutlineInputBorder(),
                   ),
                   keyboardType: TextInputType.number,
                   autofocus: true,
@@ -1122,7 +1123,7 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
                         Text('Change',
                             style: TextStyle(color: cs.onSurfaceVariant)),
                         Text(
-                          '₱${change.toStringAsFixed(2)}',
+                          CurrencyUtils.format(change),
                           style: AppTypography.titleLargeBold(context)
                               .copyWith(color: cs.primary),
                         ),
@@ -1186,7 +1187,7 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
 
   Widget _buildQuickCashButton(double amount) {
     return ActionChip(
-      label: Text('₱${amount.toStringAsFixed(0)}'),
+      label: Text(CurrencyUtils.formatWhole(amount)),
       onPressed: () {
         _cashController.text = amount.toStringAsFixed(2);
         setState(() {});

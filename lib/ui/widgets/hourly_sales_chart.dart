@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/data/models/sales_by_hour_point.dart';
 
 /// A horizontal, scrollable bar chart for sales by hour of day.
@@ -8,14 +9,14 @@ import 'package:pinoy_pos/data/models/sales_by_hour_point.dart';
 /// when the store is only busy at specific times.
 class HourlySalesChart extends StatelessWidget {
   final List<SalesByHourPoint> points;
-  final String valuePrefix;
+  final String? valuePrefix;
   final double height;
   final double barWidth;
 
   const HourlySalesChart({
     super.key,
     required this.points,
-    this.valuePrefix = '₱',
+    this.valuePrefix,
     this.height = 160,
     this.barWidth = 32,
   });
@@ -23,6 +24,7 @@ class HourlySalesChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final prefix = valuePrefix ?? CurrencyUtils.symbol();
     final filledPoints = _fillHours(points);
     final maxTotal = filledPoints
         .map((p) => p.total)
@@ -40,7 +42,7 @@ class HourlySalesChart extends StatelessWidget {
                 point: filledPoints[i],
                 maxTotal: maxTotal,
                 barWidth: barWidth,
-                valuePrefix: valuePrefix,
+                valuePrefix: prefix,
                 isCurrentHour: filledPoints[i].hour == DateTime.now().hour,
                 barColor: i == filledPoints.length - 1 &&
                         filledPoints[i].hour == DateTime.now().hour

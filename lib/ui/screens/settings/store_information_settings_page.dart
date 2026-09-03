@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
@@ -158,7 +159,7 @@ class _StoreInformationSettingsPageState
 
   String _currencyLabel(String currency) {
     return switch (currency) {
-      'PHP' => 'Philippine Peso (₱)',
+      'PHP' => 'Philippine Peso (${CurrencyUtils.symbol(currency: 'PHP')})',
       'USD' => 'US Dollar (\$)',
       'EUR' => 'Euro (€)',
       _ => currency,

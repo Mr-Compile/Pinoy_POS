@@ -64,6 +64,9 @@ class SalesAnalytics {
   final List<StaffSalesSummary> staffSummaries;
   final PeakSalesPeriod peakSalesPeriod;
   final List<Sale> sales;
+  final String? paymentMethod;
+  final String? paymentStatus;
+  final int? staffUserId;
 
   const SalesAnalytics({
     required this.bounds,
@@ -80,6 +83,9 @@ class SalesAnalytics {
     required this.staffSummaries,
     this.peakSalesPeriod = const PeakSalesPeriod(),
     required this.sales,
+    this.paymentMethod,
+    this.paymentStatus,
+    this.staffUserId,
   });
 
   /// Empty state used for permission-denied or zero-sales periods.

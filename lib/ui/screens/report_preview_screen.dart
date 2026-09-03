@@ -103,15 +103,9 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppHeader(
+      appBar: const AppHeader(
         title: 'Report Preview',
         showBackButton: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadFile,
-          ),
-        ],
       ),
       body: _isLoading
           ? const LoadingState(message: 'Loading report...')
@@ -244,6 +238,12 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
         padding: const EdgeInsets.all(Spacing.md),
         child: Row(
           children: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: 'Reload',
+              onPressed: _loadFile,
+            ),
+            const SizedBox(width: Spacing.sm),
             Expanded(
               child: AppButton.filled(
                 label: 'Export',

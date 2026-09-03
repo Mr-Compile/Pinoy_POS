@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/data/models/receipt_view_data.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
+import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/payment_proof_provider.dart';
 import 'package:pinoy_pos/providers/receipt_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
-import 'package:pinoy_pos/services/payment_proof_service.dart';
 import 'package:pinoy_pos/ui/screens/payment_proof_viewer_screen.dart';
 import 'package:pinoy_pos/ui/screens/sale_detail_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
@@ -36,7 +36,6 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
   bool _isLoading = false;
   bool _notFound = false;
   Sale? _loadedSale;
-  final Map<String, Future<PaymentProofInfo?>> _proofFutures = {};
 
   Sale get _sale => widget.sale ?? _loadedSale!;
   int get _saleId => _sale.id!;
@@ -485,61 +484,62 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
   }
 
   Widget _buildActions(ReceiptViewData receipt) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (receipt.paymentProofPath != null &&
-            receipt.paymentProofPath!.isNotEmpty) ...[
-          FutureBuilder<PaymentProofInfo?>(
-            future: _proofFutures.putIfAbsent(
-              receipt.paymentProofPath!,
-              () => ref
-                  .read(paymentProofServiceProvider)
-                  .resolveProofFromPath(receipt.paymentProofPath),
-            ),
-            builder: (context, snapshot) {
-              final info = snapshot.data;
-              final hasProof = info != null;
+    final canViewEvidence =
+        ref.read(authStateProvider.notifier).hasPermission('view_payment_evidence');
 
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: hasProof ? () => _viewPaymentProof(receipt) : null,
-                    icon: const Icon(Icons.image_outlined),
-                    label: const Text('View Image'),
-                  ),
-                  const SizedBox(height: 12),
-                  LoadingButton(
-                    isLoading: _isExportingProof,
-                    onPressed: _isExportingProof
-                        ? null
-                        : () => _downloadGcashProofImage(receipt),
-                    label: 'Download Image',
-                  ),
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 12),
-        ],
-        LoadingButton(
-          isLoading: _isExporting,
-          onPressed: _isExporting ? null : () => _downloadPdf(receipt),
-          label: 'Download as PDF',
+    final actions = <Widget>[
+      if (canViewEvidence &&
+          receipt.paymentProofPath != null &&
+          receipt.paymentProofPath!.isNotEmpty) ...[
+        OutlinedButton.icon(
+          onPressed: () => _viewPaymentProof(receipt),
+          icon: const Icon(Icons.image_outlined),
+          label: const Text('View Image'),
         ),
-        const SizedBox(height: 12),
-        OutlinedButton(
-          onPressed: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => SaleDetailScreen(sale: _sale),
-              ),
-            );
-          },
-          child: const Text('View Sale Details'),
+        LoadingButton(
+          isLoading: _isExportingProof,
+          onPressed: _isExportingProof
+              ? null
+              : () => _downloadGcashProofImage(receipt),
+          label: 'Download Image',
         ),
       ],
+      LoadingButton(
+        isLoading: _isExporting,
+        onPressed: _isExporting ? null : () => _downloadPdf(receipt),
+        label: 'Download as PDF',
+      ),
+      OutlinedButton(
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => SaleDetailScreen(sale: _sale),
+            ),
+          );
+        },
+        child: const Text('View Sale Details'),
+      ),
+    ];
+
+    return _buildActionPairs(actions);
+  }
+
+  Widget _buildActionPairs(List<Widget> actions) {
+    final rows = <Widget>[];
+    for (var i = 0; i < actions.length; i += 2) {
+      final children = <Widget>[Expanded(child: actions[i])];
+      if (i + 1 < actions.length) {
+        children.add(const SizedBox(width: 12));
+        children.add(Expanded(child: actions[i + 1]));
+      }
+      rows.add(Row(children: children));
+      if (i + 2 < actions.length) {
+        rows.add(const SizedBox(height: 12));
+      }
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: rows,
     );
   }
 }

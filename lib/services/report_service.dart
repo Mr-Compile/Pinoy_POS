@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/daily_sales_point.dart';
 import 'package:pinoy_pos/data/models/export_history.dart';
+import 'package:pinoy_pos/data/models/payment_breakdown.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
 import 'package:pinoy_pos/data/models/top_product_result.dart';
@@ -17,19 +18,6 @@ import 'package:pinoy_pos/data/repositories/sale_repository.dart';
 import 'package:pinoy_pos/services/sales_service.dart';
 import 'package:pinoy_pos/services/settings_service.dart';
 import 'package:pinoy_pos/data/repositories/user_repository.dart';
-
-/// Payment method totals used in reports and analytics.
-class PaymentBreakdown {
-  final String method;
-  final double total;
-  final int count;
-
-  PaymentBreakdown({
-    required this.method,
-    required this.total,
-    required this.count,
-  });
-}
 
 /// Business intelligence service for reports and exports.
 ///

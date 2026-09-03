@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/payment_validation_exception.dart';
 import 'package:pinoy_pos/data/models/payment_settings.dart';
 import 'package:pinoy_pos/providers/cart_provider.dart';
@@ -271,13 +272,6 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
       appBar: AppHeader(
         title: _isReviewing ? 'Review Payment' : 'GCash Payment',
         showBackButton: !_isReviewing,
-        actions: [
-          if (!_isReviewing)
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -355,7 +349,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
               style: TextStyle(color: cs.onPrimaryContainer),
             ),
             Text(
-              '₱${widget.total.toStringAsFixed(2)}',
+              CurrencyUtils.format(widget.total),
               style: AppTypography.titleLargeBold(context)
                   .copyWith(color: cs.onPrimaryContainer),
             ),

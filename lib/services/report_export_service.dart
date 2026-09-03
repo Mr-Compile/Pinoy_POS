@@ -108,7 +108,9 @@ class ReportExportService {
     final allSales = await SalesService().getFilteredSales(
       start: analytics.bounds.start,
       end: analytics.bounds.end,
-      paymentStatus: 'confirmed',
+      paymentMethod: analytics.paymentMethod,
+      paymentStatus: analytics.paymentStatus,
+      userId: analytics.staffUserId,
       limit: null,
     );
 
@@ -187,7 +189,9 @@ class ReportExportService {
     final allSales = await SalesService().getFilteredSales(
       start: analytics.bounds.start,
       end: analytics.bounds.end,
-      paymentStatus: 'confirmed',
+      paymentMethod: analytics.paymentMethod,
+      paymentStatus: analytics.paymentStatus,
+      userId: analytics.staffUserId,
       limit: null,
     );
 

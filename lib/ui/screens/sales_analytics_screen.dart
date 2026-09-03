@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/breakpoints.dart';
+import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/reporting_period.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/sales_analytics_provider.dart';
+import 'package:pinoy_pos/providers/staff_provider.dart';
 import 'package:pinoy_pos/services/report_export_service.dart';
 import 'package:pinoy_pos/ui/screens/sale_detail_screen.dart';
 import 'package:pinoy_pos/ui/screens/settings/store_information_settings_page.dart';
@@ -39,29 +42,24 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(salesAnalyticsProvider);
+    final staffState = ref.watch(staffControllerProvider);
     final canExport =
         ref.read(authStateProvider.notifier).hasPermission('export_reports');
+    final canViewStaff =
+        ref.read(authStateProvider.notifier).hasPermission('view_staff_performance');
 
     return Scaffold(
-      appBar: AppHeader(
-        title: 'Reports',
-        actions: [
-          if (canExport)
-            IconButton(
-              icon: const Icon(Icons.download),
-              tooltip: 'Export report',
-              onPressed: state.analytics == null ? null : _showExportMenu,
-            ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Refresh',
-            onPressed: () => ref.read(salesAnalyticsProvider.notifier).load(),
-          ),
-        ],
-      ),
+      appBar: const AppHeader(title: 'Reports'),
       body: state.isLoading && state.analytics == null
           ? const LoadingState(message: 'Loading sales analytics...')
-          : _buildBody(context, state, canExport),
+          : _buildBody(
+              context,
+              state,
+              canExport,
+              staffState.staff,
+              staffState.isLoading,
+              canViewStaff,
+            ),
     );
   }
 
@@ -69,6 +67,9 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
     BuildContext context,
     SalesAnalyticsState state,
     bool canExport,
+    List<User> staff,
+    bool staffLoading,
+    bool canViewStaff,
   ) {
     if (state.error != null) {
       return ErrorState(
@@ -105,6 +106,35 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
                   .setCustomRange(range.start, range.end),
             ),
             const SizedBox(height: Spacing.sm),
+            ResponsiveBuilder(
+              builder: (context, layout) {
+                if (layout.isCompact) {
+                  return _buildCompactActionsBar(
+                    context,
+                    state,
+                    canExport,
+                    canViewStaff,
+                  );
+                }
+                if (staff.isEmpty && !staffLoading) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) {
+                      ref.read(staffControllerProvider.notifier).loadStaff();
+                    }
+                  });
+                }
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
+                  child: _buildFilterBar(
+                    context,
+                    state,
+                    staff,
+                    canViewStaff,
+                    isCompact: false,
+                  ),
+                );
+              },
+            ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
               child: _buildPeriodHeader(context, state),
@@ -126,7 +156,7 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
                 child: SalesLineChart(
                   points: analytics.trend,
                   groupBy: analytics.bounds.groupBy,
-                  valuePrefix: _currencySymbol(state.storeInfo?.currency),
+                  valuePrefix: CurrencyUtils.symbol(currency: state.storeInfo?.currency),
                 ),
               ),
             ),
@@ -140,7 +170,7 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
                   current: analytics.trend,
                   previous: analytics.previousTrend,
                   groupBy: analytics.bounds.groupBy,
-                  valuePrefix: _currencySymbol(state.storeInfo?.currency),
+                  valuePrefix: CurrencyUtils.symbol(currency: state.storeInfo?.currency),
                 ),
               ),
             ),
@@ -220,6 +250,260 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
     );
   }
 
+  void _showFilterBottomSheet(
+    SalesAnalyticsState state,
+    List<User> staff,
+    bool canViewStaff,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(Spacing.md),
+            child: Consumer(
+              builder: (context, ref, _) {
+                final analyticsState = ref.watch(salesAnalyticsProvider);
+                final staffState = ref.watch(staffControllerProvider);
+                if (staffState.staff.isEmpty && !staffState.isLoading) {
+                  Future.microtask(() {
+                    ref.read(staffControllerProvider.notifier).loadStaff();
+                  });
+                }
+
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: Spacing.md),
+                    Text(
+                      'Filters',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: Spacing.md),
+                    _buildFilterBar(
+                      context,
+                      analyticsState,
+                      staffState.staff,
+                      canViewStaff,
+                      isCompact: true,
+                      currentMethod: analyticsState.paymentMethod,
+                      currentStatus: analyticsState.paymentStatus,
+                      currentStaff: analyticsState.selectedStaffId,
+                      onMethodChanged: (v) => ref
+                          .read(salesAnalyticsProvider.notifier)
+                          .setPaymentMethod(v),
+                      onStatusChanged: (v) => ref
+                          .read(salesAnalyticsProvider.notifier)
+                          .setPaymentStatus(v),
+                      onStaffChanged: (v) => ref
+                          .read(salesAnalyticsProvider.notifier)
+                          .setStaff(v),
+                    ),
+                    const SizedBox(height: Spacing.md),
+                    Row(
+                      children: [
+                        TextButton(
+                          onPressed: () {
+                            ref
+                                .read(salesAnalyticsProvider.notifier)
+                                .clearFilters();
+                            Navigator.pop(context);
+                          },
+                          child: const Text('Clear'),
+                        ),
+                        const Spacer(),
+                        FilledButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Close'),
+                        ),
+                      ],
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFilterBar(
+    BuildContext context,
+    SalesAnalyticsState state,
+    List<User> staff,
+    bool canViewStaff, {
+    required bool isCompact,
+    String? currentMethod,
+    String? currentStatus,
+    int? currentStaff,
+    ValueChanged<String?>? onMethodChanged,
+    ValueChanged<String?>? onStatusChanged,
+    ValueChanged<int?>? onStaffChanged,
+  }) {
+    final children = <Widget>[
+      if (canViewStaff) _buildStaffDropdown(currentStaff, staff, onStaffChanged),
+      _buildPaymentMethodDropdown(currentMethod, onMethodChanged),
+      _buildPaymentStatusDropdown(currentStatus, onStatusChanged),
+    ];
+
+    if (isCompact) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: children
+            .map((c) => Padding(
+                  padding: const EdgeInsets.only(bottom: Spacing.md),
+                  child: c,
+                ))
+            .toList(),
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: children
+          .map((c) => Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(right: Spacing.md),
+                  child: c,
+                ),
+              ))
+          .toList(),
+    );
+  }
+
+  Widget _buildCompactActionsBar(
+    BuildContext context,
+    SalesAnalyticsState state,
+    bool canExport,
+    bool canViewStaff,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
+      child: Row(
+        children: [
+          TextButton.icon(
+            onPressed: () => _showFilterBottomSheet(state, [], canViewStaff),
+            icon: const Icon(Icons.filter_alt_outlined),
+            label: const Text('Filters'),
+          ),
+          const Spacer(),
+          if (canExport)
+            FilledButton.icon(
+              onPressed: state.analytics == null ? null : _showExportMenu,
+              icon: const Icon(Icons.download),
+              label: const Text('Export'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStaffDropdown(
+    int? value,
+    List<User> staff,
+    ValueChanged<int?>? onChanged,
+  ) {
+    final items = [
+      const DropdownMenuItem<int>(value: null, child: Text('All staff')),
+      ...staff
+          .where((u) => u.id != null)
+          .map((u) => DropdownMenuItem<int>(value: u.id, child: Text(u.fullName))),
+    ];
+    return _buildDropdown<int>(
+      value: value,
+      label: 'Staff',
+      hint: 'All staff',
+      items: items,
+      onChanged: onChanged,
+    );
+  }
+
+  Widget _buildPaymentMethodDropdown(
+    String? value,
+    ValueChanged<String?>? onChanged,
+  ) {
+    const methods = ['Cash', 'GCash', 'Card', 'Other'];
+    final items = [
+      const DropdownMenuItem<String>(value: null, child: Text('All methods')),
+      ...methods.map((m) => DropdownMenuItem<String>(value: m, child: Text(m))),
+    ];
+    return _buildDropdown<String>(
+      value: value,
+      label: 'Payment method',
+      hint: 'All methods',
+      items: items,
+      onChanged: onChanged,
+    );
+  }
+
+  Widget _buildPaymentStatusDropdown(
+    String? value,
+    ValueChanged<String?>? onChanged,
+  ) {
+    const statuses = ['pending', 'confirmed', 'failed', 'cancelled', 'refunded'];
+    final labels = {
+      'pending': 'Pending',
+      'confirmed': 'Confirmed',
+      'failed': 'Failed',
+      'cancelled': 'Cancelled',
+      'refunded': 'Refunded',
+    };
+    final items = [
+      const DropdownMenuItem<String>(value: null, child: Text('All active')),
+      ...statuses.map(
+        (s) => DropdownMenuItem<String>(value: s, child: Text(labels[s]!)),
+      ),
+    ];
+    return _buildDropdown<String>(
+      value: value,
+      label: 'Payment status',
+      hint: 'All active',
+      items: items,
+      onChanged: onChanged,
+    );
+  }
+
+  Widget _buildDropdown<T>({
+    required T? value,
+    required String label,
+    required String hint,
+    required List<DropdownMenuItem<T>> items,
+    required ValueChanged<T?>? onChanged,
+  }) {
+    return InputDecorator(
+      decoration: InputDecoration(
+        labelText: label,
+        isDense: true,
+        border: const OutlineInputBorder(),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<T>(
+          value: value,
+          hint: Text(hint),
+          isDense: true,
+          isExpanded: true,
+          icon: const Icon(Icons.arrow_drop_down),
+          items: items,
+          onChanged: onChanged,
+        ),
+      ),
+    );
+  }
+
   Widget _buildPeriodHeader(BuildContext context, SalesAnalyticsState state) {
     final cs = Theme.of(context).colorScheme;
     return Row(
@@ -262,11 +546,6 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
       ReportGroupBy.week => 'By week',
       ReportGroupBy.month => 'By month',
     };
-  }
-
-  String _currencySymbol(String? currency) {
-    if (currency == 'PHP') return '₱';
-    return currency ?? 'PHP';
   }
 
   String _formatDate(DateTime date) {

@@ -15,6 +15,9 @@ class SalesAnalyticsState {
   final bool isLoading;
   final String? error;
   final Settings? storeInfo;
+  final String? paymentMethod;
+  final String? paymentStatus;
+  final int? selectedStaffId;
 
   const SalesAnalyticsState({
     this.period = ReportingPeriod.thisMonth,
@@ -24,6 +27,9 @@ class SalesAnalyticsState {
     this.isLoading = true,
     this.error,
     this.storeInfo,
+    this.paymentMethod,
+    this.paymentStatus = 'confirmed',
+    this.selectedStaffId,
   });
 
   SalesAnalyticsState copyWith({
@@ -34,9 +40,13 @@ class SalesAnalyticsState {
     bool? isLoading,
     String? error,
     Settings? storeInfo,
+    String? paymentMethod,
+    String? paymentStatus,
+    int? selectedStaffId,
     bool clearCustomRange = false,
     bool clearError = false,
     bool clearAnalytics = false,
+    bool clearFilters = false,
   }) {
     return SalesAnalyticsState(
       period: period ?? this.period,
@@ -46,6 +56,12 @@ class SalesAnalyticsState {
       isLoading: isLoading ?? this.isLoading,
       error: clearError ? null : (error ?? this.error),
       storeInfo: storeInfo ?? this.storeInfo,
+      paymentMethod: clearFilters ? null : (paymentMethod ?? this.paymentMethod),
+      paymentStatus: clearFilters
+          ? 'confirmed'
+          : (paymentStatus ?? this.paymentStatus),
+      selectedStaffId:
+          clearFilters ? null : (selectedStaffId ?? this.selectedStaffId),
     );
   }
 
@@ -53,6 +69,11 @@ class SalesAnalyticsState {
       customStart != null &&
       customEnd != null &&
       period == ReportingPeriod.custom;
+
+  bool get hasFilters =>
+      (paymentMethod != null && paymentMethod!.isNotEmpty) ||
+      (paymentStatus != null && paymentStatus != 'confirmed') ||
+      selectedStaffId != null;
 
   String get periodLabel {
     final analytics = this.analytics;
@@ -79,6 +100,7 @@ class SalesAnalyticsNotifier extends StateNotifier<SalesAnalyticsState> {
   }
 
   Future<void> load() async {
+    if (!mounted) return;
     state = state.copyWith(
       isLoading: true,
       clearError: true,
@@ -86,11 +108,16 @@ class SalesAnalyticsNotifier extends StateNotifier<SalesAnalyticsState> {
     );
     try {
       final storeInfo = await _settingsService.getStoreInfo();
+      if (!mounted) return;
       final analytics = await _service.getAnalytics(
         state.period,
         customStart: state.customStart,
         customEnd: state.customEnd,
+        paymentMethod: state.paymentMethod,
+        paymentStatus: state.paymentStatus,
+        selectedStaffId: state.selectedStaffId,
       );
+      if (!mounted) return;
       state = state.copyWith(
         isLoading: false,
         analytics: analytics,
@@ -98,6 +125,7 @@ class SalesAnalyticsNotifier extends StateNotifier<SalesAnalyticsState> {
       );
     } catch (e, st) {
       _log('load failed', e, st);
+      if (!mounted) return;
       state = state.copyWith(
         isLoading: false,
         error: 'Unable to load sales analytics. Please try again.',
@@ -122,9 +150,30 @@ class SalesAnalyticsNotifier extends StateNotifier<SalesAnalyticsState> {
     load();
   }
 
+  void setPaymentMethod(String? method) {
+    state = state.copyWith(paymentMethod: method);
+    load();
+  }
+
+  void setPaymentStatus(String? status) {
+    state = state.copyWith(paymentStatus: status);
+    load();
+  }
+
+  void setStaff(int? staffId) {
+    state = state.copyWith(selectedStaffId: staffId);
+    load();
+  }
+
+  void clearFilters() {
+    state = state.copyWith(clearFilters: true);
+    load();
+  }
+
   void refreshStoreInfo() async {
     try {
       final storeInfo = await _settingsService.getStoreInfo();
+      if (!mounted) return;
       state = state.copyWith(storeInfo: storeInfo);
     } catch (_) {
       // best-effort

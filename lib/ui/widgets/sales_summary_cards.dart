@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/data/models/sales_analytics.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
 import 'package:pinoy_pos/ui/widgets/kpi_card.dart';
@@ -16,11 +17,6 @@ class SalesSummaryCards extends StatelessWidget {
   });
 
   String get _currency => storeInfo?.currency ?? 'PHP';
-
-  String get _currencySymbol {
-    if (_currency == 'PHP') return '₱';
-    return _currency;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -106,7 +102,7 @@ class SalesSummaryCards extends StatelessWidget {
   }
 
   String _formatMoney(double value) {
-    return '$_currencySymbol${value.toStringAsFixed(2)}';
+    return CurrencyUtils.format(value, currency: _currency);
   }
 
   String _changeText(double? percent, String suffix) {
