@@ -45,21 +45,22 @@ class BackupLocation {
 
   /// Whether the [reference] format matches the [type].
   ///
-  /// A [fileSystem] location must not be a URI (it should be a path).
-  /// An [androidSaf] location must be a `content://` URI.
+  /// A [fileSystem] location must be a plain path (no URI scheme).  Paths
+  /// may contain spaces, so only leading/trailing whitespace is rejected.
+  /// An [androidSaf] location must be a `content://` URI and should not
+  /// contain unencoded spaces.
   /// A [webDownload] location is valid by convention.
   ///
-  /// References with leading/trailing/embedded whitespace or that contain
-  /// a scheme for the wrong type are rejected.
+  /// References with leading/trailing whitespace or a scheme for the wrong
+  /// type are rejected.
   bool get isReferenceValidForType {
     if (isNone) return true;
     final trimmed = reference.trim();
     if (trimmed != reference) return false;
     return switch (type) {
-      BackupStorageType.fileSystem =>
-        !reference.contains('://') && !reference.contains(' '),
+      BackupStorageType.fileSystem => !reference.contains('://'),
       BackupStorageType.androidSaf =>
-        reference.startsWith('content://') && !reference.contains(' '),
+          reference.startsWith('content://') && !reference.contains(' '),
       BackupStorageType.webDownload => true,
     };
   }

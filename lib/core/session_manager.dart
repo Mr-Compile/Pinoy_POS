@@ -65,9 +65,8 @@ class SessionManager {
     }
   }
 
-  /// Owner (Business Superuser) — manages store operations and business
-  /// decisions. Does NOT have user management, backup/restore, or system
-  /// maintenance access. The Owner uses the AI Business Advisor for
+  /// Owner (Business Owner) — manages store operations, business decisions,
+  /// and business continuity. The Owner uses the AI Business Advisor for
   /// business-wide analytics (sales, products, inventory, trends).
   static const List<String> _ownerPermissions = [
     'view_dashboard',
@@ -104,11 +103,13 @@ class SessionManager {
     'view_profile',
     'view_more',
     'view_report_submissions',
+    'backup_restore',
   ];
 
-  /// System Admin (Technical Administrator) — maintains the application,
-  /// accounts, backups, and system configuration. Does NOT have access to
-  /// POS, products, categories, stock, sales, reports, or announcements.
+  /// System Admin (IT / System Administration) — maintains the application,
+  /// user accounts, backups, and system configuration. Does NOT have access to
+  /// POS, products, categories, stock, sales, business reports, business
+  /// analytics, or announcements.
   ///
   /// AI access: Admin can CONFIGURE the Groq AI integration
   /// (`manage_ai_config`) and USE the AI System Assistant (`use_ai_advisor`)
@@ -117,8 +118,6 @@ class SessionManager {
   /// [AICapabilityPolicy].
   static const List<String> _systemAdminPermissions = [
     'view_dashboard',
-    'view_reports',
-    'view_staff_performance',
     'manage_users',
     'edit_users',
     'delete_users',

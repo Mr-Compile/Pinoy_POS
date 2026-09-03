@@ -61,6 +61,15 @@ class BackupImportRecord {
   });
 }
 
+/// Internal exception used to surface specific, user-facing backup errors.
+class _BackupServiceException implements Exception {
+  final String message;
+  _BackupServiceException(this.message);
+
+  @override
+  String toString() => message;
+}
+
 /// Backup & Restore service.
 ///
 /// Architecture: UI → Provider → BackupService → BackupStorageService →
@@ -281,11 +290,19 @@ class BackupService {
     }
 
     // 1. Prepare the backup bytes in a temporary file.
-    final tempPath = await _prepareBackupFile();
-    if (tempPath == null) {
-      return const BackupExportRecord(
+    final String tempPath;
+    try {
+      tempPath = await _prepareBackupFile();
+    } on _BackupServiceException catch (e) {
+      return BackupExportRecord(
         result: BackupExportResult.failed,
-        error: 'Could not prepare the backup file.',
+        error: e.message,
+      );
+    } catch (e) {
+      _log('Unexpected error while preparing backup: $e');
+      return BackupExportRecord(
+        result: BackupExportResult.failed,
+        error: 'Could not prepare the backup file: $e',
       );
     }
 
@@ -315,6 +332,7 @@ class BackupService {
     final targetLocation = override ?? savedLocation;
 
     // 3. Write to the chosen storage.
+    _log('Writing backup to target: $targetLocation');
     final write = await _storage.saveBackup(
       bytes: bytes,
       defaultFileName: defaultName,
@@ -669,7 +687,10 @@ class BackupService {
       await input.close();
 
       for (final file in archive) {
-        final outPath = p.join(tempDir, file.name);
+        // Archive entry names may use '/' or '\' depending on the creator.
+        // Normalize to the platform separator and remove any traversal.
+        final safeName = p.normalize(file.name.replaceAll('\\', '/'));
+        final outPath = p.join(tempDir, safeName);
         if (file.isFile) {
           final outFile = File(outPath);
           await outFile.parent.create(recursive: true);
@@ -892,6 +913,8 @@ class BackupService {
     // directory first. Legacy .db backups are restored directly.
     String? sourceDbPath;
     String? evidenceSourceDir;
+    String? qrSourceDir;
+    String? imagesSourceDir;
     String? extractedDir;
 
     if (isZip) {
@@ -908,19 +931,43 @@ class BackupService {
       if (await evidenceDir.exists()) {
         evidenceSourceDir = evidenceDir.path;
       }
+      final qrDir = Directory(p.join(extractedDir, 'gcash_qr'));
+      if (await qrDir.exists()) {
+        qrSourceDir = qrDir.path;
+      }
+      final imagesDir = Directory(p.join(extractedDir, 'images'));
+      if (await imagesDir.exists()) {
+        imagesSourceDir = imagesDir.path;
+      }
     } else {
       sourceDbPath = backupPath;
     }
 
     final db = await _dbHelper.database;
     final dbPath = db.path;
+    final dbDir = p.dirname(dbPath);
+    final dbName = p.basename(dbPath);
+    _log('Restoring database from $sourceDbPath to $dbPath');
     await _dbHelper.close();
+
+    // If the live database was running in WAL mode, the -wal and -shm files
+    // in the application directory still belong to the old database.  Leaving
+    // them behind and copying a new .db on top causes SQLite to apply the old
+    // WAL to the new file, which can silently roll back the restored data.
+    // Delete the old WAL/SHM/journal files before replacing the database.
+    final walFile = File(p.join(dbDir, '$dbName-wal'));
+    final shmFile = File(p.join(dbDir, '$dbName-shm'));
+    final journalFile = File(p.join(dbDir, '$dbName-journal'));
+    await _safeDelete(walFile);
+    await _safeDelete(shmFile);
+    await _safeDelete(journalFile);
 
     try {
       await File(sourceDbPath).copy(dbPath);
 
-      // Restore payment evidence if the backup contains it. Replace the
-      // current evidence directory so the database and files stay consistent.
+      // Restore payment evidence, product images, and the GCash QR image if
+      // the backup contains them. Replace the current directories so the
+      // database and files stay consistent.
       if (evidenceSourceDir != null) {
         final appDir = await getApplicationDocumentsDirectory();
         final evidenceTarget = Directory(p.join(appDir.path, 'payment_evidence'));
@@ -928,6 +975,24 @@ class BackupService {
           await evidenceTarget.delete(recursive: true);
         }
         await _copyDirectory(Directory(evidenceSourceDir), evidenceTarget);
+      }
+
+      if (qrSourceDir != null) {
+        final appDir = await getApplicationDocumentsDirectory();
+        final qrTarget = Directory(p.join(appDir.path, 'gcash_qr'));
+        if (await qrTarget.exists()) {
+          await qrTarget.delete(recursive: true);
+        }
+        await _copyDirectory(Directory(qrSourceDir), qrTarget);
+      }
+
+      if (imagesSourceDir != null) {
+        final appDir = await getApplicationDocumentsDirectory();
+        final imagesTarget = Directory(p.join(appDir.path, 'images'));
+        if (await imagesTarget.exists()) {
+          await imagesTarget.delete(recursive: true);
+        }
+        await _copyDirectory(Directory(imagesSourceDir), imagesTarget);
       }
 
       // Re-open the database and verify the restored file is structurally
@@ -989,9 +1054,10 @@ class BackupService {
 
   // ── Backup creation internals ────────────────────────────────────────
 
-  Future<String?> _prepareBackupFile() async {
+  Future<String> _prepareBackupFile() async {
     final db = await _dbHelper.database;
     final dbPath = db.path;
+    _log('Resolved live database path for backup: $dbPath');
 
     // Checkpoint the WAL (if active) so all committed transactions are
     // flushed into the main database file before we copy it.  Without
@@ -1012,28 +1078,42 @@ class BackupService {
     String? zipPath;
     try {
       tempDbPath = await _tempPath('pinoy_pos_backup_${_timestamp()}.db');
+      _log('Copying database to temp backup: $tempDbPath');
       await File(dbPath).copy(tempDbPath);
       await _writeBackupMetadata(tempDbPath);
 
       zipPath = await _tempPath('pinoy_pos_backup_${_timestamp()}.zip');
+      _log('Packaging backup zip: $zipPath');
       await _packageBackupZip(tempDbPath, zipPath);
 
       final tempFile = File(zipPath);
       final stat = await tempFile.stat();
       if (stat.size == 0) {
         await _safeDelete(tempFile);
-        return null;
+        throw _BackupServiceException('The prepared backup package was empty.');
       }
 
       return zipPath;
+    } on _BackupServiceException {
+      rethrow;
     } on FileSystemException catch (e) {
-      _log('Failed to prepare backup package: ${e.message}');
-      return null;
+      _log('Failed to prepare backup package: ${e.message} (path: ${e.path})');
+      throw _BackupServiceException(
+        'Could not prepare the backup file. ${e.message}${e.path != null ? ' (${e.path})' : ''}',
+      );
     } catch (e) {
       _log('Failed to prepare backup package: $e');
-      return null;
+      throw _BackupServiceException('Could not prepare the backup file: $e');
     } finally {
-      if (tempDbPath != null) await _safeDelete(File(tempDbPath));
+      if (tempDbPath != null) {
+        await _safeDelete(File(tempDbPath));
+        // The copied database may have left WAL/SHM/journal files behind in
+        // the temp directory.  Clean those up so we do not leak auxiliary
+        // SQLite files.
+        for (final suffix in ['-wal', '-shm', '-journal']) {
+          await _safeDelete(File('$tempDbPath$suffix'));
+        }
+      }
       // Reopen the database so the app can keep using it.
       await _dbHelper.database;
     }
@@ -1042,7 +1122,24 @@ class BackupService {
   Future<void> _writeBackupMetadata(String backupPath) async {
     Database? backupDb;
     try {
-      backupDb = await openDatabase(backupPath);
+      // Open the copied database with the correct version.  Without an
+      // explicit version, sqflite treats the request as version 1 and may
+      // throw a downgrade error when the copied database is already at the
+      // current schema version.
+      backupDb = await openDatabase(
+        backupPath,
+        version: constants.AppConstants.databaseVersion,
+        onConfigure: (db) async {
+          await db.execute('PRAGMA foreign_keys = ON');
+        },
+        onCreate: (db, version) {},
+        onUpgrade: (db, oldVersion, newVersion) {},
+      );
+
+      // Switch to a classic rollback journal so the metadata is written into
+      // the main .db file and we do not leave a -wal file next to it.
+      await backupDb.execute('PRAGMA journal_mode = DELETE');
+
       await backupDb.execute('''
         CREATE TABLE IF NOT EXISTS backup_metadata (
           id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -1070,11 +1167,13 @@ class BackupService {
     }
   }
 
-  /// Packages the database and the payment_evidence directory into a zip file.
+  /// Packages the database and image directories into a zip file.
   ///
-  /// The returned zip contains `pinoy_pos.db` at the root and a
-  /// `payment_evidence/` directory. This preserves GCash payment proof images
-  /// alongside the database so restore does not leave broken image references.
+  /// The returned zip contains `pinoy_pos.db` at the root and
+  /// `payment_evidence/`, `gcash_qr/`, and `images/` directories. This
+  /// preserves GCash payment proof images, the merchant QR code, and product
+  /// or profile images alongside the database so restore does not leave broken
+  /// image references.
   Future<void> _packageBackupZip(String dbPath, String zipPath) async {
     final stagingDir = await _tempDir('pinoy_pos_backup_staging_${_timestamp()}');
     final staging = Directory(stagingDir);
@@ -1085,12 +1184,14 @@ class BackupService {
       final stagedDb = File(p.join(staging.path, 'pinoy_pos.db'));
       await File(dbPath).copy(stagedDb.path);
 
-      // Copy payment_evidence into the staging directory.
+      // Copy image directories into the staging directory.
       final appDir = await getApplicationDocumentsDirectory();
-      final evidenceDir = Directory(p.join(appDir.path, 'payment_evidence'));
-      if (await evidenceDir.exists()) {
-        final stagedEvidence = Directory(p.join(staging.path, 'payment_evidence'));
-        await _copyDirectory(evidenceDir, stagedEvidence);
+      for (final dirName in ['payment_evidence', 'gcash_qr', 'images']) {
+        final sourceDir = Directory(p.join(appDir.path, dirName));
+        if (await sourceDir.exists()) {
+          final targetDir = Directory(p.join(staging.path, dirName));
+          await _copyDirectory(sourceDir, targetDir);
+        }
       }
 
       final encoder = ZipFileEncoder();

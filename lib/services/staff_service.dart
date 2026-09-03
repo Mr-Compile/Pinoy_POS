@@ -507,10 +507,15 @@ class StaffService {
     return _saleRepository.getByUserId(staffUserId, limit: limit);
   }
 
-  /// Returns activity logs related to a staff member (creation, updates,
-  /// status changes, etc.).
+  /// Returns the staff member's own activity logs and any account-level
+  /// events (creation, updates, status changes) related to that staff record.
   Future<List<ActivityLog>> getStaffActivityLogs(int staffUserId) async {
     _assertPermission();
-    return _activityLogRepository.getByEntity('user', staffUserId);
+    final ownLogs = await _activityLogRepository.getByUserId(staffUserId);
+    final accountLogs =
+        await _activityLogRepository.getByEntity('user', staffUserId);
+    final combined = [...ownLogs, ...accountLogs];
+    combined.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return combined;
   }
 }

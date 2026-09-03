@@ -42,8 +42,9 @@ class SettingsScreen extends ConsumerWidget {
     final authNotifier = ref.read(authStateProvider.notifier);
 
     // Role checks
+    // Owner has edit_settings but not manage_users; Admin has manage_users.
     final canEditBusiness = authNotifier.hasPermission('edit_settings') &&
-        !authNotifier.hasPermission('backup_restore');
+        !authNotifier.hasPermission('manage_users');
     final canBackup = authNotifier.hasPermission('backup_restore');
     final canManageAi = authNotifier.hasPermission('manage_ai_config');
     final canManageAiQuota = authNotifier.hasPermission('manage_users') && authNotifier.hasPermission('edit_settings');

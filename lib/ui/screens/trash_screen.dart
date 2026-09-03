@@ -21,9 +21,22 @@ class TrashScreen extends ConsumerStatefulWidget {
   ConsumerState<TrashScreen> createState() => _TrashScreenState();
 }
 
+class _TrashTab {
+  final String label;
+  final IconData icon;
+  final WidgetBuilder builder;
+
+  const _TrashTab({
+    required this.label,
+    required this.icon,
+    required this.builder,
+  });
+}
+
 class _TrashScreenState extends ConsumerState<TrashScreen>
     with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+  TabController? _tabController;
+  List<_TrashTab> _visibleTabs = [];
 
   List<Product> _deletedProducts = [];
   List<Category> _deletedCategories = [];
@@ -33,13 +46,41 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _initTabs();
     _loadTrash();
+  }
+
+  void _initTabs() {
+    final authNotifier = ref.read(authStateProvider.notifier);
+    _visibleTabs = [
+      if (authNotifier.hasPermission('view_products'))
+        _TrashTab(
+          label: 'Products',
+          icon: Icons.inventory_2_outlined,
+          builder: (_) => _buildProductsTab(),
+        ),
+      if (authNotifier.hasPermission('view_categories'))
+        _TrashTab(
+          label: 'Categories',
+          icon: Icons.category_outlined,
+          builder: (_) => _buildCategoriesTab(),
+        ),
+      if (authNotifier.hasPermission('manage_users'))
+        _TrashTab(
+          label: 'Users',
+          icon: Icons.people_outline,
+          builder: (_) => _buildUsersTab(),
+        ),
+    ];
+    _tabController?.dispose();
+    _tabController = _visibleTabs.isEmpty
+        ? null
+        : TabController(length: _visibleTabs.length, vsync: this);
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _tabController?.dispose();
     super.dispose();
   }
 
@@ -256,13 +297,6 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
 
   @override
   Widget build(BuildContext context) {
-    final authNotifier = ref.read(authStateProvider.notifier);
-    final canRestore = authNotifier.hasPermission('restore_trash');
-    final canDeleteUsers = authNotifier.hasPermission('delete_users');
-    final canDeleteProducts = authNotifier.hasPermission('delete_products');
-    final canDeleteCategories = authNotifier.hasPermission('delete_categories');
-    final deletedUsers = ref.watch(userControllerProvider).deletedUsers;
-
     if (_isLoading) {
       return Scaffold(
         appBar: AppHeader(title: 'Trash Bin', showBackButton: true),
@@ -281,31 +315,36 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
       );
     }
 
+    if (_visibleTabs.isEmpty) {
+      return Scaffold(
+        appBar: AppHeader(title: 'Trash Bin', showBackButton: true),
+        body: const EmptyState(
+          icon: Icons.delete_outline,
+          title: 'No Trash Items',
+          message: 'You do not have access to any trash categories.',
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppHeader(
         title: 'Trash Bin',
         showBackButton: true,
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
-            Tab(icon: Icon(Icons.inventory_2_outlined), text: 'Products'),
-            Tab(icon: Icon(Icons.category_outlined), text: 'Categories'),
-            Tab(icon: Icon(Icons.people_outline), text: 'Users'),
-          ],
+          tabs: _visibleTabs
+              .map((tab) => Tab(icon: Icon(tab.icon), text: tab.label))
+              .toList(),
         ),
       ),
       body: TabBarView(
         controller: _tabController,
-        children: [
-          _buildProductsTab(canRestore, canDeleteProducts),
-          _buildCategoriesTab(canRestore, canDeleteCategories),
-          _buildUsersTab(canRestore, canDeleteUsers, deletedUsers),
-        ],
+        children: _visibleTabs.map((tab) => tab.builder(context)).toList(),
       ),
     );
   }
 
-  Widget _buildProductsTab(bool canRestore, bool canDelete) {
+  Widget _buildProductsTab() {
     if (_deletedProducts.isEmpty) {
       return const EmptyState(
         icon: Icons.inventory_2,
@@ -313,6 +352,12 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
         message: 'Deleted products will appear here for recovery',
       );
     }
+
+    final authNotifier = ref.read(authStateProvider.notifier);
+    final canRestore =
+        authNotifier.hasPermission('restore_trash') &&
+        authNotifier.hasPermission('edit_products');
+    final canDelete = authNotifier.hasPermission('delete_products');
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
@@ -350,7 +395,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
     );
   }
 
-  Widget _buildCategoriesTab(bool canRestore, bool canDelete) {
+  Widget _buildCategoriesTab() {
     if (_deletedCategories.isEmpty) {
       return const EmptyState(
         icon: Icons.category,
@@ -358,6 +403,12 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
         message: 'Deleted categories will appear here for recovery',
       );
     }
+
+    final authNotifier = ref.read(authStateProvider.notifier);
+    final canRestore =
+        authNotifier.hasPermission('restore_trash') &&
+        authNotifier.hasPermission('edit_categories');
+    final canDelete = authNotifier.hasPermission('delete_categories');
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
@@ -394,8 +445,14 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
     );
   }
 
-  Widget _buildUsersTab(
-      bool canRestore, bool canDeleteUsers, List<User> deletedUsers) {
+  Widget _buildUsersTab() {
+    final deletedUsers = ref.watch(userControllerProvider).deletedUsers;
+    final authNotifier = ref.read(authStateProvider.notifier);
+    final canRestore =
+        authNotifier.hasPermission('restore_trash') &&
+        authNotifier.hasPermission('edit_users');
+    final canDeleteUsers = authNotifier.hasPermission('delete_users');
+
     if (deletedUsers.isEmpty) {
       return const EmptyState(
         icon: Icons.people,

@@ -16,6 +16,8 @@
   final String gcashPaymentProofRequirement;
   final String gcashVerificationMode;
   final int gcashReferenceMinLength;
+  final String? gcashQrImagePath;
+  final String? gcashQrImageType;
   final int aiDailyQuota;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -36,6 +38,8 @@
     this.gcashPaymentProofRequirement = 'optional',
     this.gcashVerificationMode = 'immediate',
     this.gcashReferenceMinLength = 6,
+    this.gcashQrImagePath,
+    this.gcashQrImageType,
     this.aiDailyQuota = 20,
     required this.createdAt,
     required this.updatedAt,
@@ -58,6 +62,8 @@
       'gcash_payment_proof_requirement': gcashPaymentProofRequirement,
       'gcash_verification_mode': gcashVerificationMode,
       'gcash_reference_min_length': gcashReferenceMinLength,
+      'gcash_qr_image_path': gcashQrImagePath,
+      'gcash_qr_image_type': gcashQrImageType,
       'ai_daily_quota': aiDailyQuota,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
@@ -121,6 +127,8 @@
       gcashVerificationMode:
           stringOrNull('gcash_verification_mode') ?? 'immediate',
       gcashReferenceMinLength: intOrNull('gcash_reference_min_length') ?? 6,
+      gcashQrImagePath: stringOrNull('gcash_qr_image_path'),
+      gcashQrImageType: stringOrNull('gcash_qr_image_type'),
       aiDailyQuota: intOrNull('ai_daily_quota') ?? 20,
       createdAt: parseDateTime('created_at'),
       updatedAt: parseDateTime('updated_at'),
@@ -143,6 +151,8 @@
     String? gcashPaymentProofRequirement,
     String? gcashVerificationMode,
     int? gcashReferenceMinLength,
+    String? gcashQrImagePath,
+    String? gcashQrImageType,
     int? aiDailyQuota,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -167,6 +177,8 @@
           gcashPaymentProofRequirement ?? this.gcashPaymentProofRequirement,
       gcashVerificationMode: gcashVerificationMode ?? this.gcashVerificationMode,
       gcashReferenceMinLength: gcashReferenceMinLength ?? this.gcashReferenceMinLength,
+      gcashQrImagePath: gcashQrImagePath ?? this.gcashQrImagePath,
+      gcashQrImageType: gcashQrImageType ?? this.gcashQrImageType,
       aiDailyQuota: aiDailyQuota ?? this.aiDailyQuota,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,

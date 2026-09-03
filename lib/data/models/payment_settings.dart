@@ -9,6 +9,8 @@ class PaymentSettings {
   final String gcashPaymentProofRequirement;
   final String gcashVerificationMode;
   final int gcashReferenceMinLength;
+  final String? gcashQrImagePath;
+  final String? gcashQrImageType;
 
   const PaymentSettings({
     required this.gcashEnabled,
@@ -17,6 +19,8 @@ class PaymentSettings {
     required this.gcashPaymentProofRequirement,
     required this.gcashVerificationMode,
     required this.gcashReferenceMinLength,
+    this.gcashQrImagePath,
+    this.gcashQrImageType,
   });
 
   factory PaymentSettings.fromSettings(Settings settings) {
@@ -27,6 +31,8 @@ class PaymentSettings {
       gcashPaymentProofRequirement: settings.gcashPaymentProofRequirement,
       gcashVerificationMode: settings.gcashVerificationMode,
       gcashReferenceMinLength: settings.gcashReferenceMinLength,
+      gcashQrImagePath: settings.gcashQrImagePath,
+      gcashQrImageType: settings.gcashQrImageType,
     );
   }
 

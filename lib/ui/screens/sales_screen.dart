@@ -199,10 +199,9 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
               ),
             ),
           ],
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
                 DropdownButtonFormField<String?>(
                   key: const ValueKey('filter_payment_method'),
                   initialValue: selectedMethod,
@@ -245,7 +244,6 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
             ),
           ),
         ),
-      ),
     );
 
     if (result != null && mounted) {

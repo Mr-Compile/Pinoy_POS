@@ -14,24 +14,19 @@ class ActivityLogService {
   final ActivityLogRepository _activityLogRepository = ActivityLogRepository();
   final SessionManager _sessionManager = SessionManager();
 
-  /// Returns recent activities scoped to the current user's role.
+  /// Returns the current user's own recent activities.
   ///
-  /// - Owner / Admin: all activities (database-level, no UI filtering).
-  /// - Staff: only the current user's own activities (WHERE user_id = ?).
+  /// Activity logs are scoped to the actor (user_id) for every role so that
+  /// one user's personal activity view never leaks another user's actions.
   Future<List<ActivityLog>> getRecentActivities() async {
     if (!_sessionManager.hasPermission('view_activity_logs')) {
       return [];
     }
     final currentUser = _sessionManager.currentUser;
-    if (currentUser == null) {
+    if (currentUser == null || currentUser.id == null) {
       return [];
     }
-    // Staff may only view their own activity logs. The filter is applied
-    // at the DAO/query level, not in the UI.
-    if (currentUser.role == UserRole.staff) {
-      return _activityLogRepository.getByUserId(currentUser.id!);
-    }
-    return _activityLogRepository.getRecentActivities();
+    return _activityLogRepository.getByUserId(currentUser.id!);
   }
 
   Future<List<ActivityLog>> getUserActivities(int userId) async {
@@ -57,9 +52,14 @@ class ActivityLogService {
     DatabaseExecutor? txn,
   }) async {
     final currentUser = _sessionManager.currentUser;
+    if (currentUser == null || currentUser.id == null) {
+      // Refuse to create anonymous log entries; a missing actor breaks
+      // per-user scoping and audit integrity.
+      return;
+    }
     final activityLog = ActivityLog(
-      userId: currentUser?.id ?? 0,
-      role: currentUser?.role.name,
+      userId: currentUser.id!,
+      role: currentUser.role.name,
       action: action,
       entity: entity,
       entityId: entityId,

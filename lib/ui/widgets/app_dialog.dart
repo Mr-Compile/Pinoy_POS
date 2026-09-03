@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/spacing.dart';
@@ -161,14 +163,23 @@ class AppDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isTablet = screenWidth >= 600;
-    final maxDialogWidth = isTablet ? 480.0 : 320.0;
+    final size = MediaQuery.of(context).size;
+    final viewPadding = MediaQuery.of(context).viewPadding;
+    final isTablet = size.width >= 600;
+    // Clamp the dialog to the available safe width so it never overflows
+    // on small or landscape phones. Default dialog insets are also reduced.
+    final safeWidth = size.width - viewPadding.horizontal;
+    final maxDialogWidth =
+        isTablet ? min(560.0, safeWidth - 48) : min(440.0, safeWidth - 32);
 
     return Semantics(
       label: type.semanticLabel,
       container: true,
       child: Dialog(
+        insetPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 24,
+        ),
         child: ConstrainedBox(
           constraints: BoxConstraints(
             minWidth: 280,
@@ -252,6 +263,7 @@ class AppDialog extends StatelessWidget {
   Widget _buildMessage(BuildContext context) {
     return Text(
       message!,
+      softWrap: true,
       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
@@ -268,6 +280,7 @@ class AppDialog extends StatelessWidget {
       ),
       child: Text(
         details!,
+        softWrap: true,
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),

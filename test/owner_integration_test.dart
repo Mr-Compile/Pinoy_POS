@@ -542,7 +542,7 @@ void main() {
 
       const forbidden = [
         'manage_users', 'edit_users', 'delete_users',
-        'reset_password', 'toggle_user_active', 'backup_restore',
+        'reset_password', 'toggle_user_active',
       ];
 
       for (final perm in forbidden) {

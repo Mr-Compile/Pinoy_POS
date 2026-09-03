@@ -1035,10 +1035,9 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
           onPressed: (context) => completePayment(context),
         ),
       ],
-      child: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(
+      child: Form(
+        key: _formKey,
+        child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1176,8 +1175,7 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
             ],
           ),
         ),
-      ),
-    );
+      );
   }
 
   double _roundUp(double value, double to) {

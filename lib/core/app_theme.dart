@@ -92,11 +92,11 @@ class AppSemanticColors {
     neutralContainer: const Color(0xFF374151),
     onNeutralContainer: const Color(0xFFF3F4F6),
 
-    // On-colors. Several light roles share pure white or black, so the map
-    // uses a single representative for each value. The resolved tone is a
-    // high-contrast neutral that works on every resolved semantic surface.
-    onNeutral: const Color(0xFF1F2937),
-    onWarning: const Color(0xFF000000),
+    // On-colors. Pure white foregrounds (e.g., onPrimary, onSuccess,
+    // onError, onNeutral) become dark in dark mode because their surfaces
+    // lighten. Pure black foregrounds (onWarning, onInfo) stay black.
+    const Color(0xFFFFFFFF): const Color(0xFF000000),
+    const Color(0xFF000000): const Color(0xFF000000),
 
     // Disabled
     disabled: const Color(0xFF6B7280),

@@ -203,8 +203,10 @@ class DashboardService {
         .toList()
       ..sort((a, b) => a.stock.compareTo(b.stock));
 
-    // Recent activity (Owner sees all).
-    final activities = await _activityLogRepository.getRecentActivities();
+    // Recent activity (Owner sees own actions only; dashboard is a personal view).
+    final activities = await _activityLogRepository.getByUserId(
+      _sessionManager.currentUser!.id!,
+    );
     final recentActivities = activities.take(5).toList();
 
     // Active announcements, pinned first.
@@ -243,13 +245,23 @@ class DashboardService {
     final admins = await _userRepository.getByRole(UserRole.admin);
     final staff = await _userRepository.getByRole(UserRole.staff);
 
-    // Recent activity count (last 7 days) + 5 most recent.
+    // Recent activity count (last 7 days) + 5 most recent — scoped to the
+    // current admin user so each admin sees only their own system activity.
+    final currentUser = _sessionManager.currentUser;
     final now = DateTime.now();
     final weekAgo = now.subtract(const Duration(days: 7));
-    final weekActivities =
-        await _activityLogRepository.getByDateRange(weekAgo, now);
-    final recentActivities =
-        (await _activityLogRepository.getRecentActivities()).take(5).toList();
+    final weekActivities = currentUser?.id == null
+        ? <ActivityLog>[]
+        : await _activityLogRepository.getByUserIdAndDateRange(
+            currentUser!.id!,
+            weekAgo,
+            now,
+          );
+    final recentActivities = currentUser?.id == null
+        ? <ActivityLog>[]
+        : (await _activityLogRepository.getByUserId(currentUser!.id!))
+            .take(5)
+            .toList();
 
     // Backup status from backup_history (real DB rows, not filesystem scan).
     final backups = await _backupHistoryRepository.getAll();

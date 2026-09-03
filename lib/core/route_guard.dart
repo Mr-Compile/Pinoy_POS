@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/screens/access_denied_screen.dart';
-import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 
 /// Centralized route guard that checks permissions before allowing navigation.
 ///
@@ -91,9 +90,15 @@ class RouteGuard {
       // Logging is best-effort; don't block the denial
     }
 
-    // Show access denied dialog
+    // Navigate to the dedicated access denied screen
     if (context.mounted) {
-      AppDialogService.accessDenied(context);
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const AccessDeniedScreen(),
+          settings: const RouteSettings(name: 'access_denied'),
+        ),
+      );
     }
   }
 }

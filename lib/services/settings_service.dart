@@ -3,9 +3,14 @@ import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/payment_settings.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
 import 'package:pinoy_pos/data/repositories/settings_repository.dart';
+import 'package:flutter/foundation.dart';
 import 'package:pinoy_pos/services/groq_service.dart';
+import 'package:pinoy_pos/services/image_service.dart';
 import 'package:pinoy_pos/services/secure_storage_service.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:io';
 
 class SettingsService {
   final SettingsRepository _settingsRepository = SettingsRepository();
@@ -93,6 +98,60 @@ class SettingsService {
     _currentSettings = updated;
     _storeInfo = null;
     return true;
+  }
+
+  /// Picks and stores a GCash merchant QR image, then writes the relative
+  /// path and MIME type to the settings table. Requires `edit_settings`.
+  Future<ImagePickResult> updateGcashQrImage() async {
+    if (!_sessionManager.hasPermission('edit_settings')) {
+      throw AuthorizationException('edit_settings');
+    }
+
+    final result = await ImageService().pickAndStoreImage(
+      directory: 'gcash_qr',
+      fileName: 'gcash_qr',
+      maxWidth: 1024,
+      maxHeight: 1024,
+    );
+
+    if (!result.isSuccess) return result;
+
+    final current = await getSettings();
+    await _deleteGcashQrFile(current.gcashQrImagePath);
+    await updateSettings(
+      current.copyWith(
+        gcashQrImagePath: result.filePath,
+        gcashQrImageType: result.mediaType,
+      ),
+    );
+    return result;
+  }
+
+  /// Removes the stored GCash merchant QR image and clears its columns.
+  Future<void> clearGcashQrImage() async {
+    if (!_sessionManager.hasPermission('edit_settings')) {
+      throw AuthorizationException('edit_settings');
+    }
+
+    final current = await getSettings();
+    await _deleteGcashQrFile(current.gcashQrImagePath);
+    await updateSettings(
+      current.copyWith(
+        gcashQrImagePath: null,
+        gcashQrImageType: null,
+      ),
+    );
+  }
+
+  Future<void> _deleteGcashQrFile(String? relativePath) async {
+    if (relativePath == null || relativePath.isEmpty || kIsWeb) return;
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final file = File(p.join(appDir.path, relativePath));
+      if (await file.exists()) await file.delete();
+    } catch (_) {
+      // Best-effort cleanup; don't block settings updates.
+    }
   }
 
   /// Returns the store information (name, address, contact, currency) to use

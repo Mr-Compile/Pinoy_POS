@@ -449,7 +449,9 @@ class AINavigationRegistry {
     return null;
   }
 
-  static Widget _saleDetailsFallbackBuilder(BuildContext context) => const SalesScreen();
+  static Widget _saleDetailsFallbackBuilder(BuildContext context) =>
+      const DashboardScreen();
 
-  static Widget _receiptFallbackBuilder(BuildContext context) => const SalesScreen();
+  static Widget _receiptFallbackBuilder(BuildContext context) =>
+      const DashboardScreen();
 }

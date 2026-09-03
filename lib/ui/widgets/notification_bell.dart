@@ -6,6 +6,7 @@ import 'package:pinoy_pos/data/models/notification.dart' as models;
 import 'package:pinoy_pos/providers/notification_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/screens/notifications_screen.dart';
+import 'package:pinoy_pos/ui/screens/report_submissions_screen.dart';
 import 'package:pinoy_pos/ui/screens/stock_screen.dart';
 import 'package:pinoy_pos/ui/screens/announcements_screen.dart';
 import 'package:pinoy_pos/ui/screens/backup_restore_screen.dart';
@@ -150,6 +151,9 @@ class _NotificationBellState extends ConsumerState<NotificationBell> {
         break;
       case 'backup':
         target = const BackupRestoreScreen();
+        break;
+      case 'report_submitted':
+        target = const ReportSubmissionsScreen(submissionsOnly: true);
         break;
     }
     if (target != null) {
@@ -395,6 +399,8 @@ class _NotificationTile extends StatelessWidget {
         return Icons.campaign_outlined;
       case 'backup':
         return Icons.backup_outlined;
+      case 'report_submitted':
+        return Icons.insert_drive_file_outlined;
       default:
         return Icons.info_outline;
     }
@@ -408,6 +414,8 @@ class _NotificationTile extends StatelessWidget {
         return cs.primary;
       case 'backup':
         return AppSemanticColors.resolve(AppSemanticColors.info, brightness);
+      case 'report_submitted':
+        return AppSemanticColors.resolve(AppSemanticColors.success, brightness);
       default:
         return cs.onSurfaceVariant;
     }

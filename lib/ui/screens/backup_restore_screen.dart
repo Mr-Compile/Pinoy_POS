@@ -325,7 +325,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
   String _generateDefaultFileName() {
     final now = DateTime.now();
     final stamp = DateFormat('yyyy-MM-dd_HH-mm-ss').format(now);
-    return 'pinoy_pos_backup_$stamp.db';
+    return 'pinoy_pos_backup_$stamp.zip';
   }
 
   // ── Import Backup ────────────────────────────────────────────────────

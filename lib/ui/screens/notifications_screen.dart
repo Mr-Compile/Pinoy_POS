@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/data/models/notification.dart' as models;
+import 'package:pinoy_pos/providers/notification_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
@@ -46,6 +47,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     try {
       final notificationService = ref.read(notificationServiceProvider);
       await notificationService.markAsRead(notification.id!);
+      refreshNotificationCount(ref);
       _loadNotifications();
     } catch (e) {
       if (mounted) {
@@ -59,6 +61,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     try {
       final notificationService = ref.read(notificationServiceProvider);
       await notificationService.markAllAsRead();
+      refreshNotificationCount(ref);
       if (mounted) {
         await AppDialogService.success(context, title: 'Done', message: 'All notifications marked as read.');
       }

@@ -91,7 +91,7 @@ class BackupStorageService {
     final result = await FilePicker.platform.pickFiles(
       dialogTitle: 'Import Backup',
       type: FileType.custom,
-      allowedExtensions: ['db'],
+      allowedExtensions: ['zip', 'db'],
       withData: true,
     );
 
@@ -322,7 +322,7 @@ class BackupStorageService {
         fileName: defaultFileName,
         dialogTitle: 'Export Backup',
         type: FileType.custom,
-        allowedExtensions: ['db'],
+        allowedExtensions: ['zip'],
       );
       if (targetPath == null || targetPath.isEmpty) {
         return const BackupWriteResult(success: false, error: null);

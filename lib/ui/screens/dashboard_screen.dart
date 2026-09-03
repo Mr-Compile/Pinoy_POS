@@ -766,7 +766,7 @@ class _AdminDashboard extends ConsumerWidget {
         _buildAdminQuickActions(context, ref, authNotifier),
         const SizedBox(height: Spacing.xxl),
 
-        // ── Sales analytics (when permitted) ──
+        // ── Sales analytics (only when the role is permitted) ──
         if (analytics != null) ...[
           AppSection(
             title: 'Sales Performance',
@@ -795,17 +795,6 @@ class _AdminDashboard extends ConsumerWidget {
             context,
             analytics.sales.take(5).toList(),
             title: 'Recent Transactions',
-          ),
-          const SizedBox(height: Spacing.xxl),
-        ] else ...[
-          AppSection(
-            title: 'Sales Analytics',
-            padding: const EdgeInsets.only(bottom: Spacing.md),
-            child: AppCard(
-              child: _ChartEmptyState(
-                message: 'Sales analytics are not available for this role.',
-              ),
-            ),
           ),
           const SizedBox(height: Spacing.xxl),
         ],

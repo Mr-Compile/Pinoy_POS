@@ -398,6 +398,11 @@ class DatabaseHelper {
     if (oldVersion < 18) {
       await _migrateExportHistoryV18(db);
     }
+
+    // Migration from v18 → v19: add GCash QR merchant image storage.
+    if (oldVersion < 19) {
+      await _migrateSettingsV19(db);
+    }
   }
 
   /// Backfills payment_proof_type for existing sales by detecting the actual
@@ -483,6 +488,22 @@ class DatabaseHelper {
       );
     } catch (_) {
       // Ignore; the column may not have been added.
+    }
+  }
+
+  /// Migration from v18 → v19: add GCash QR merchant image storage to settings.
+  Future<void> _migrateSettingsV19(Database db) async {
+    const newColumns = [
+      'gcash_qr_image_path',
+      'gcash_qr_image_type',
+    ];
+
+    for (final column in newColumns) {
+      try {
+        await db.execute('ALTER TABLE settings ADD COLUMN $column TEXT');
+      } catch (_) {
+        // Column may already exist; continue with the rest.
+      }
     }
   }
 
@@ -650,6 +671,8 @@ class DatabaseHelper {
         gcash_payment_proof_requirement TEXT NOT NULL DEFAULT 'optional',
         gcash_verification_mode TEXT NOT NULL DEFAULT 'immediate',
         gcash_reference_min_length INTEGER NOT NULL DEFAULT 6,
+        gcash_qr_image_path TEXT,
+        gcash_qr_image_type TEXT,
         ai_daily_quota INTEGER NOT NULL DEFAULT 20,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL

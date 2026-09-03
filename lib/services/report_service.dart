@@ -15,6 +15,7 @@ import 'package:pinoy_pos/data/repositories/export_history_repository.dart';
 import 'package:pinoy_pos/data/repositories/product_repository.dart';
 import 'package:pinoy_pos/data/repositories/sale_item_repository.dart';
 import 'package:pinoy_pos/data/repositories/sale_repository.dart';
+import 'package:pinoy_pos/services/notification_service.dart';
 import 'package:pinoy_pos/services/sales_service.dart';
 import 'package:pinoy_pos/services/settings_service.dart';
 import 'package:pinoy_pos/data/repositories/user_repository.dart';
@@ -32,6 +33,7 @@ class ReportService {
       ExportHistoryRepository();
   final SalesService _salesService = SalesService();
   final SettingsService _settingsService = SettingsService();
+  final NotificationService _notificationService = NotificationService();
   final SessionManager _sessionManager = SessionManager();
 
   // ── Business metrics (Owner / Staff) ──
@@ -269,7 +271,8 @@ class ReportService {
     }
   }
 
-  /// Marks a previously generated report as submitted to the Owner.
+  /// Marks a previously generated report as submitted to the Owner and
+  /// notifies all Owner accounts.
   Future<bool> submitReport(int id) async {
     if (!_sessionManager.hasPermission('export_reports')) return false;
 
@@ -282,7 +285,32 @@ class ReportService {
         submittedAt: DateTime.now(),
       ),
     );
+
+    await _notifyOwnersOfSubmission(report);
     return true;
+  }
+
+  Future<void> _notifyOwnersOfSubmission(ExportHistory report) async {
+    try {
+      final owners = await _userRepository.getByRole(UserRole.owner);
+      final ownerIds =
+          owners.where((u) => u.id != null).map((u) => u.id!).toList();
+      if (ownerIds.isEmpty) return;
+
+      final reportNumber = report.reportNumber ?? 'RPT-${report.id}';
+      final submitter = _sessionManager.currentUser;
+      final submitterName = submitter?.fullName ?? 'A staff member';
+
+      await _notificationService.createNotificationForUsers(
+        title: 'Report Submitted',
+        message:
+            '$submitterName submitted sales report $reportNumber for review.',
+        type: 'report_submitted',
+        userIds: ownerIds,
+      );
+    } catch (_) {
+      // Notification is best-effort and must not block the submission.
+    }
   }
 
   /// Marks a submitted report as viewed by the Owner.

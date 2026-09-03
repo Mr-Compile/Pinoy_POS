@@ -411,4 +411,86 @@ Scope: Full audit of theme architecture, semantic colors, dark/light mode, notif
 - `flutter analyze` — No issues found.
 - `flutter test` — 161 tests passed (159 original + 2 new notification bell regression tests).
 
+## Role, Permission, GCash QR, Notification, and Dialog Repair Pass
+
+Date: current session
+Scope: `lib/core/session_manager.dart`, `lib/core/route_guard.dart`, `lib/core/ai_navigation_registry.dart`, `lib/core/database.dart`, `lib/core/app_theme.dart`, `lib/ui/screens/*`, `lib/services/*`, `lib/data/*`, and related tests.
+
+### Audit findings
+
+1. **Admin saw business analytics it should not see.** `_systemAdminPermissions` included `view_reports` and `view_staff_performance`, so the Admin dashboard rendered Sales Performance cards and the Admin role could open reports and staff performance. Admin is an IT/system administration role and should not access business sales data.
+2. **Owner lacked business-continuity permission.** `_ownerPermissions` did not include `backup_restore`, so the business owner could not create or restore backups through the settings UI.
+3. **Trash screen showed tabs for entities the user could not manage.** Admin users without product/category permissions still saw Products and Categories trash tabs because the tab list was hardcoded.
+4. **Activity logs leaked across users.** `ActivityLogService.getRecentActivities()` returned every log in the table for Owner and Admin, and the Owner dashboard "Recent Activity" card showed global activity. Activity views should be scoped to the current actor.
+5. **GCash had no merchant QR code.** Payment settings only stored rules. Staff could not display a merchant QR for customers, and the settings screen had no upload control.
+6. **Staff report submissions did not notify the Owner.** `ReportService.submitReport()` updated the `export_history` status but did not create a notification. Owners had to discover submissions manually.
+7. **Notification badge stayed stale.** `NotificationsScreen` did not call `refreshNotificationCount()` after marking notifications as read, so the bell badge did not update.
+8. **`RouteGuard` did not use `AccessDeniedScreen`.** The guard logged an attempt and opened a dialog, while the dedicated `AccessDeniedScreen` existed as dead code.
+9. **AI navigation fallbacks routed to a sales screen.** `_saleDetailsFallbackBuilder` and `_receiptFallbackBuilder` returned `SalesScreen` when a `saleId` was missing, which could push a Staff/Admin-only screen to the wrong role.
+10. **Dialog layout overflowed on small screens.** `AppDialog` used a fixed 320 px `maxWidth` and did not clamp to the safe area, so landscape phones and small devices could overflow horizontally. Message `Text` widgets had no overflow defense.
+11. **Dark mode contrast was broken for `onPrimary`, `onSuccess`, and `onError`.** `AppSemanticColors._darkForLight` had no mapping for pure white, so those foregrounds stayed white against lightened dark-mode surfaces.
+
+### Changes made
+
+#### Role and permission architecture
+
+| File | Change | Reason |
+|------|--------|--------|
+| `lib/core/session_manager.dart` | Removed `view_reports` and `view_staff_performance` from `_systemAdminPermissions`; added `backup_restore` to `_ownerPermissions` | Admin stays out of business analytics; Owner can back up business data |
+| `lib/ui/screens/dashboard_screen.dart` | Admin dashboard now only renders the Sales Performance, Sales Trend, Comparison, Payment/Top Products, Category Sales, Staff Performance, Peak Sales, and Recent Transactions cards when `analytics` is not null | Remove dead UI when analytics is unavailable for the role |
+| `lib/ui/screens/settings_screen.dart` | `canEditBusiness` now uses `edit_settings && !manage_users` instead of `!backup_restore` | Owner and Admin both have `edit_settings`; only the Owner (no `manage_users`) should edit store information |
+| `lib/ui/screens/trash_screen.dart` | Tab list is now built dynamically from `view_products`, `view_categories`, and `manage_users`; restore/delete actions are gated with the matching entity edit/delete permission | Trash only shows content the user is authorized to see and manage |
+| `lib/core/route_guard.dart` | `_logAndDeny` now pushes `AccessDeniedScreen` instead of opening a dialog; removed unused `AppDialogService` import | Wire up the dedicated access-denied screen |
+| `lib/core/ai_navigation_registry.dart` | `_saleDetailsFallbackBuilder` and `_receiptFallbackBuilder` return `DashboardScreen` instead of `SalesScreen` | Avoid routing users to a sales screen without a valid sale ID and permission |
+
+#### Activity log scoping
+
+| File | Change | Reason |
+|------|--------|--------|
+| `lib/data/dao/activity_log_dao.dart` | Added `getByUserIdAndDateRange(int userId, DateTime start, DateTime end)` | Query activity for a specific actor and date range |
+| `lib/data/repositories/activity_log_repository.dart` | Added `getByUserIdAndDateRange(...)` forwarding to the DAO | Repository access to the new scoped query |
+| `lib/services/activity_log_service.dart` | `getRecentActivities()` now always returns `getByUserId(currentUser.id!)` regardless of role; `logActivity()` rejects logging when `currentUser` or `id` is null | Personal activity views never leak another user's actions; anonymous logs no longer pollute the audit trail |
+| `lib/services/dashboard_service.dart` | Owner and Admin recent activity and 7-day counts now query `getByUserId(...)` / `getByUserIdAndDateRange(...)` for the current user | Dashboard activity feeds are scoped to the current user, not global |
+| `lib/services/staff_service.dart` | `getStaffActivityLogs()` combines the staff member's own `getByUserId()` logs with account-level `getByEntity('user', ...)` events | Show both daily activity and account lifecycle events |
+
+#### GCash QR image
+
+| File | Change | Reason |
+|------|--------|--------|
+| `lib/core/database.dart` | Bumped `databaseVersion` to 19; added `gcash_qr_image_path` and `gcash_qr_image_type` columns to `settings`; `_migrateSettingsV19()` adds the columns to existing databases | Persist the merchant QR image |
+| `lib/data/models/settings.dart` | Added `gcashQrImagePath` and `gcashQrImageType` fields, plus `toMap`, `fromMap`, and `copyWith` support | Model keeps the new columns in sync with the DB |
+| `lib/data/models/payment_settings.dart` | Added `gcashQrImagePath` and `gcashQrImageType` to `PaymentSettings.fromSettings()` | POS flow can read the QR without touching full settings |
+| `lib/services/settings_service.dart` | Added `updateGcashQrImage()` and `clearGcashQrImage()` using `ImageService` and file cleanup | Owner/Admin can upload, replace, or remove the QR image |
+| `lib/ui/screens/payment_settings_page.dart` | Added a "Merchant QR Code" section with image preview, Upload/Change, and Remove buttons | UI for managing the QR image |
+| `lib/ui/screens/gcash_payment_screen.dart` | `_buildMerchantQrCard()` displays the configured QR image with scan instructions during the GCash payment flow | Customers can scan the merchant QR before entering the reference number |
+| `lib/services/backup_service.dart` | `_packageBackupZip()` now copies `payment_evidence/`, `gcash_qr/`, and `images/`; restore extracts `gcash_qr/` and `images/` as well | Backup includes the QR image and product/profile images |
+
+#### Notifications
+
+| File | Change | Reason |
+|------|--------|--------|
+| `lib/services/report_service.dart` | `submitReport()` calls `_notifyOwnersOfSubmission()` to create a `report_submitted` notification for every Owner | Staff submissions now appear in the Owner's notification inbox |
+| `lib/ui/widgets/notification_bell.dart` | Added `report_submitted` to `_iconForType`, `_colorForType`, and the tap navigation switch, routing to `ReportSubmissionsScreen(submissionsOnly: true)` | Owners can tap the notification to view the submission |
+| `lib/ui/screens/notifications_screen.dart` | `_markAsRead()` and `_markAllAsRead()` call `refreshNotificationCount(ref)` after the DB update | Bell badge reflects the latest unread count immediately |
+
+#### Dialogs and dark mode
+
+| File | Change | Reason |
+|------|--------|--------|
+| `lib/ui/widgets/app_dialog.dart` | `maxDialogWidth` now clamps to `safeWidth - 32/48`; `insetPadding` explicitly set to 16 horizontal; message/details `Text` get `softWrap: true` | Prevent horizontal overflow on small/landscape devices and long messages |
+| `lib/core/app_theme.dart` | `AppSemanticColors._darkForLight` maps `Color(0xFFFFFFFF)` to `Color(0xFF000000)` and `Color(0xFF000000)` to itself | White foregrounds switch to black in dark mode for readable contrast on lightened surfaces |
+| `lib/ui/screens/pos_screen.dart` | Removed nested `SingleChildScrollView` inside the payment dialog; `Form` is the direct `AppDialog` child | Eliminate double scroll view and potential unbounded height warnings |
+| `lib/ui/screens/sales_screen.dart` | Removed nested `SingleChildScrollView` from the filter dialog | Same dialog scroll logic as `AppDialog` |
+
+### Test updates
+
+- `test/session_manager_test.dart` — Updated Admin permission assertions to expect `view_reports` and `view_staff_performance` as false.
+- `test/owner_integration_test.dart` — Removed `backup_restore` from the Owner forbidden-permission list.
+- `test/staff_service_test.dart` — `getStaffActivityLogs()` still passes because the combined query returns account-level `STAFF_CREATED` logs.
+
+### Verification
+
+- `flutter analyze` — No issues found.
+- `flutter test` — 235 tests passed.
+
 

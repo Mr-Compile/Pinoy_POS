@@ -14,6 +14,7 @@ import 'package:pinoy_pos/ui/screens/payment_success_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
+import 'package:pinoy_pos/ui/widgets/app_image.dart';
 import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 
 /// GCash payment flow: customer, reference, payment proof, review, confirm.
@@ -290,6 +291,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
         children: [
           _buildTotalCard(cs),
           const SizedBox(height: 24),
+          _buildMerchantQrCard(settings, cs),
           if (settings.customerNameVisible) ...[
             TextFormField(
               controller: _customerController,
@@ -356,6 +358,56 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildMerchantQrCard(PaymentSettings settings, ColorScheme cs) {
+    final qrPath = settings.gcashQrImagePath;
+    if (qrPath == null || qrPath.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AppCard(
+          color: cs.primaryContainer,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Icon(Icons.qr_code_scanner, color: cs.onPrimaryContainer),
+                const SizedBox(height: 8),
+                Text(
+                  'Scan this GCash QR code to pay',
+                  style: TextStyle(
+                    color: cs.onPrimaryContainer,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 240),
+                  child: AspectRatio(
+                    aspectRatio: 1,
+                    child: AppImage(
+                      imagePath: qrPath,
+                      placeholderIcon: Icons.qr_code,
+                      fit: BoxFit.contain,
+                      semanticLabel: 'GCash merchant QR code',
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'After paying, enter the reference number below.',
+                  style: TextStyle(color: cs.onPrimaryContainer),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+      ],
     );
   }
 

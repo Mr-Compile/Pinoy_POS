@@ -266,3 +266,21 @@ flutter test
 ```
 
 Result: `flutter analyze` reports no issues; `flutter test` passes 232/232 tests.
+ 
+ #   R o l e ,   P e r m i s s i o n ,   G C a s h   Q R ,   N o t i f i c a t i o n ,   a n d   D i a l o g   R e p a i r   N o t e s  
+ 
+## Design Decisions
+
+- **Owner owns the business continuity settings.** `_ownerPermissions` now includes `backup_restore`. The previous restriction kept backup/restore off the Owner''s Settings screen; the business owner should control it.
+- **Admin stays out of business analytics.** `_systemAdminPermissions` no longer includes `view_reports` or `view_staff_performance`. Admin manages users, AI config, backups, and system settings.
+- **Activity logs are per-actor, never global.** `ActivityLogService.getRecentActivities()` returns only the current user''s logs. Owner and Admin see their own actions in the dashboard and on the Activity Logs screen.
+- **Trash tabs are permission-driven.** `TrashScreen` builds its tab list from `view_products`, `view_categories`, and `manage_users`, and it gates restore/delete with the matching entity permission.
+- **GCash uses a merchant QR stored in settings.** `settings.gcash_qr_image_path` and `settings.gcash_qr_image_type` persist the QR image. `SettingsService` uploads/clears it, `PaymentSettingsPage` previews it, and `GcashPaymentScreen` displays it during checkout.
+- **Staff report submissions notify Owners.** `ReportService.submitReport()` creates a `report_submitted` notification for every Owner account.
+- **Backup packages include image directories.** `BackupService` now zips `payment_evidence/`, `gcash_qr/`, and `images/` and restores them.
+- **`RouteGuard` uses `AccessDeniedScreen`.** Unauthorized navigation now pushes the dedicated screen instead of a generic dialog.
+
+## Verification
+
+- `flutter analyze` -- No issues found.
+- `flutter test` -- 235 tests passed.

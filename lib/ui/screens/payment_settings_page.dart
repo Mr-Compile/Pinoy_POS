@@ -5,6 +5,7 @@ import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
+import 'package:pinoy_pos/ui/widgets/app_image.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
@@ -83,6 +84,64 @@ class _PaymentSettingsPageState extends ConsumerState<PaymentSettingsPage> {
     }
   }
 
+  Future<void> _uploadGcashQr() async {
+    setState(() => _isLoading = true);
+    try {
+      final settingsService = ref.read(settingsServiceProvider);
+      final result = await settingsService.updateGcashQrImage();
+      if (!mounted) return;
+
+      if (result.isSuccess) {
+        await AppDialogService.success(
+          context,
+          title: 'QR Image Saved',
+          message: 'The GCash QR image has been uploaded.',
+        );
+        await _loadSettings();
+      } else {
+        setState(() => _isLoading = false);
+        AppDialogService.error(
+          context,
+          title: 'Upload Failed',
+          message: result.error ?? 'Could not upload the GCash QR image.',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        AppDialogService.error(
+          context,
+          title: 'Upload Failed',
+          message: 'Could not upload the GCash QR image.',
+        );
+      }
+    }
+  }
+
+  Future<void> _clearGcashQr() async {
+    final confirmed = await AppDialogService.deleteConfirm(
+      context,
+      itemName: 'GCash QR image',
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isLoading = true);
+    try {
+      final settingsService = ref.read(settingsServiceProvider);
+      await settingsService.clearGcashQrImage();
+      await _loadSettings();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        AppDialogService.error(
+          context,
+          title: 'Error',
+          message: 'Failed to remove the GCash QR image.',
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final settings = _settings;
@@ -105,6 +164,8 @@ class _PaymentSettingsPageState extends ConsumerState<PaymentSettingsPage> {
                   : _PaymentSettingsForm(
                       settings: settings,
                       onSave: _save,
+                      onUploadGcashQr: _uploadGcashQr,
+                      onClearGcashQr: _clearGcashQr,
                       isLoading: _isLoading,
                     ),
     );
@@ -114,11 +175,15 @@ class _PaymentSettingsPageState extends ConsumerState<PaymentSettingsPage> {
 class _PaymentSettingsForm extends StatefulWidget {
   final Settings settings;
   final ValueChanged<Settings> onSave;
+  final VoidCallback onUploadGcashQr;
+  final VoidCallback onClearGcashQr;
   final bool isLoading;
 
   const _PaymentSettingsForm({
     required this.settings,
     required this.onSave,
+    required this.onUploadGcashQr,
+    required this.onClearGcashQr,
     required this.isLoading,
   });
 
@@ -169,6 +234,89 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
       'owner_admin' => 'An Owner or Admin can confirm pending GCash sales.',
       _ => 'GCash sales are confirmed automatically.',
     };
+  }
+
+  Widget _buildGcashQrSection(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final hasImage =
+        widget.settings.gcashQrImagePath != null &&
+        widget.settings.gcashQrImagePath!.isNotEmpty;
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Merchant QR Code',
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+          const SizedBox(height: 8),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 240),
+            child: AspectRatio(
+              aspectRatio: 1,
+              child: hasImage
+                  ? AppImage(
+                      imagePath: widget.settings.gcashQrImagePath,
+                      placeholderIcon: Icons.qr_code,
+                      fit: BoxFit.contain,
+                      semanticLabel: 'GCash merchant QR code',
+                    )
+                  : _buildQrPlaceholder(cs),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: LoadingButton(
+                  isLoading: widget.isLoading,
+                  onPressed: widget.isLoading
+                      ? null
+                      : () => widget.onUploadGcashQr(),
+                  label: hasImage ? 'Change QR Image' : 'Upload QR Image',
+                ),
+              ),
+              if (hasImage) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                  child: LoadingButton(
+                    isLoading: widget.isLoading,
+                    onPressed: widget.isLoading
+                        ? null
+                        : () => widget.onClearGcashQr(),
+                    label: 'Remove',
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQrPlaceholder(ColorScheme cs) {
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.qr_code, size: 48, color: cs.outline),
+            const SizedBox(height: 8),
+            Text(
+              'No GCash QR image uploaded',
+              style: TextStyle(color: cs.onSurfaceVariant),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _submit() {
@@ -326,6 +474,8 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
                     ),
                   ),
                 ),
+                const Divider(),
+                _buildGcashQrSection(context),
               ],
             ),
           ),

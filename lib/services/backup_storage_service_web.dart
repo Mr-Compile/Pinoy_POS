@@ -13,7 +13,7 @@ import 'package:pinoy_pos/data/models/backup_location.dart';
 /// supported. Backups are downloaded through the browser and restores are
 /// loaded from a user-picked file.
 class BackupStorageService {
-  static const _downloadMimeType = 'application/x-sqlite3';
+  static const _downloadMimeType = 'application/octet-stream';
 
   /// Web does not support choosing a persistent backup folder.
   Future<BackupLocation?> pickLocation({BackupLocation? initial}) async {
@@ -33,7 +33,7 @@ class BackupStorageService {
     final result = await FilePicker.platform.pickFiles(
       dialogTitle: 'Import Backup',
       type: FileType.custom,
-      allowedExtensions: ['db'],
+      allowedExtensions: ['zip', 'db'],
       withData: true,
     );
 
@@ -75,23 +75,32 @@ class BackupStorageService {
     BackupLocation? defaultLocation,
   }) async {
     try {
-      final data = bytes.buffer.toJS;
+      // Copy into a fresh view so a Uint8List that is a slice of a larger
+      // buffer does not include trailing bytes in the download.
+      final cleanBytes = bytes.sublist(0);
+      final data = cleanBytes.toJS;
       final blobParts = [data].toJS as JSArray<web.BlobPart>;
       final blob = web.Blob(blobParts, web.BlobPropertyBag(type: _downloadMimeType));
       final url = web.URL.createObjectURL(blob);
       final anchor = web.HTMLAnchorElement()
         ..href = url
-        ..download = _ensureDbExtension(defaultFileName);
+        ..download = _ensureBackupExtension(defaultFileName);
 
       web.document.body?.append(anchor);
       anchor.click();
       anchor.remove();
+
+      // Give the browser a moment to start the download before revoking the
+      // object URL; revoking immediately can cancel the download on some
+      // browsers.
+      await Future.delayed(const Duration(seconds: 2));
       web.URL.revokeObjectURL(url);
 
+      final downloadedName = _ensureBackupExtension(defaultFileName);
       return BackupWriteResult(
         success: true,
-        storageReference: defaultFileName,
-        displayName: defaultFileName,
+        storageReference: downloadedName,
+        displayName: downloadedName,
         fileSize: bytes.length,
         writtenTo: const BackupLocation(
           type: BackupStorageType.webDownload,
@@ -136,8 +145,9 @@ class BackupStorageService {
   /// No-op on web.
   Future<void> releaseUri(String reference) async {}
 
-  String _ensureDbExtension(String name) {
-    if (!name.toLowerCase().endsWith('.db')) return '$name.db';
-    return name;
+  String _ensureBackupExtension(String name) {
+    final lower = name.toLowerCase();
+    if (lower.endsWith('.zip') || lower.endsWith('.db')) return name;
+    return '$name.zip';
   }
 }
