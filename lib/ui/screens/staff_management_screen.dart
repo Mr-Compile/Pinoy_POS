@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/authorization_exception.dart';
 import 'package:pinoy_pos/core/constants.dart';
+import 'package:pinoy_pos/core/modal_result.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/staff_provider.dart';
@@ -9,6 +11,7 @@ import 'package:pinoy_pos/services/staff_service.dart';
 import 'package:pinoy_pos/services/user_service.dart';
 import 'package:pinoy_pos/ui/screens/staff_detail_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog_form.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
@@ -304,159 +307,203 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
 
   Future<void> _showStaffDialog(User? staff) async {
     final isEdit = staff != null;
-    final formKey = GlobalKey<FormState>();
-    final usernameController =
-        TextEditingController(text: isEdit ? staff.username : '');
-    final fullNameController =
-        TextEditingController(text: isEdit ? staff.fullName : '');
-    final pinController = TextEditingController();
-    bool isSaving = false;
 
-    await showDialog(
+    final result = await showDialog<ModalResult<void>>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AppDialog(
-          type: AppDialogType.info,
-          title: isEdit ? 'Edit Staff' : 'Add Staff',
-          actions: [
-            AppDialogAction(
-              label: 'Cancel',
-              onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(),
-            ),
-            AppDialogAction(
-              label: isEdit ? 'Save' : 'Add',
-              isPrimary: true,
-              isLoading: isSaving,
-              onPressed: isSaving
-                  ? null
-                  : (context) async {
-                      if (!formKey.currentState!.validate()) return;
-                      setState(() => isSaving = true);
+      builder: (context) => AppDialogForm<ModalResult<void>>(
+        type: AppDialogType.info,
+        title: isEdit ? 'Edit Staff' : 'Add Staff',
+        childBuilder: (context, state) {
+          final usernameController =
+              state.textController('username', text: staff?.username ?? '');
+          final fullNameController =
+              state.textController('fullName', text: staff?.fullName ?? '');
+          final pinController = state.textController('pin');
 
-                      final controller =
-                          ref.read(staffControllerProvider.notifier);
-                      final pinValue = pinController.text.trim();
-                      final UserOperationResult result;
-
-                      if (isEdit) {
-                        result = await controller.updateStaff(
-                          staffId: staff.id!,
-                          username: usernameController.text.trim(),
-                          fullName: fullNameController.text.trim(),
-                          pin: pinValue.isEmpty ? null : pinValue,
-                        );
-                      } else {
-                        result = await controller.createStaff(
-                          username: usernameController.text.trim(),
-                          fullName: fullNameController.text.trim(),
-                          pin: pinValue.isEmpty ? null : pinValue,
-                        );
-                      }
-
-                      if (context.mounted) {
-                        setState(() => isSaving = false);
-                      }
-
-                      if (result.success) {
-                        if (context.mounted) {
-                          Navigator.of(context, rootNavigator: true).pop();
-                          final message = isEdit
-                              ? 'Staff updated successfully'
-                              : '${result.message} The temporary password is ${AppConstants.defaultTemporaryPassword}.';
-                          await AppDialogService.success(
-                            context,
-                            title: isEdit ? 'Updated' : 'Created',
-                            message: message,
-                          );
-                        }
-                      } else {
-                        if (context.mounted) {
-                          AppDialogService.error(
-                            context,
-                            title: isEdit ? 'Update Failed' : 'Create Failed',
-                            message: result.message,
-                          );
-                        }
-                      }
-                    },
-            ),
-          ],
-          child: SingleChildScrollView(
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (!isEdit)
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color:
-                            Theme.of(context).colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.info_outline,
-                            size: 20,
-                            color: Theme.of(context).colorScheme.primary,
+          return Form(
+            key: state.formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!isEdit)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color:
+                          Theme.of(context).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          size: 20,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'A temporary password will be assigned. The staff member must change it on first login.',
+                            style: AppTypography.bodySmall(context),
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'A temporary password will be assigned. The staff member must change it on first login.',
-                              style: AppTypography.bodySmall(context),
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  if (!isEdit) const SizedBox(height: Spacing.md),
-                  TextFormField(
-                    controller: usernameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Username',
-                      border: OutlineInputBorder(),
-                    ),
-                    autofocus: true,
-                    textInputAction: TextInputAction.next,
-                    validator: (value) => Validators.required(value, 'Username'),
                   ),
-                  const SizedBox(height: Spacing.md),
-                  TextFormField(
-                    controller: fullNameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Full Name',
-                      border: OutlineInputBorder(),
-                    ),
-                    textInputAction: TextInputAction.next,
-                    validator: (value) => Validators.required(value, 'Full Name'),
+                if (!isEdit) const SizedBox(height: Spacing.md),
+                TextFormField(
+                  controller: usernameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Username',
+                    border: OutlineInputBorder(),
                   ),
-                  const SizedBox(height: Spacing.md),
-                  TextFormField(
-                    controller: pinController,
-                    decoration: InputDecoration(
-                      labelText: 'PIN (optional)',
-                      border: const OutlineInputBorder(),
-                      hintText: isEdit && staff.hasPin
-                          ? 'Enter new PIN to replace (${staff.configuredPinLength} digits)'
-                          : '4-6 digits',
-                    ),
-                    keyboardType: TextInputType.number,
-                    textInputAction: TextInputAction.done,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) return null;
-                      return Validators.pin(value);
-                    },
+                  textInputAction: TextInputAction.next,
+                  onChanged: (_) => state.markChanged(),
+                  onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
+                  validator: (value) => Validators.required(value, 'Username'),
+                ),
+                const SizedBox(height: Spacing.md),
+                TextFormField(
+                  controller: fullNameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Full Name',
+                    border: OutlineInputBorder(),
                   ),
-                ],
-              ),
+                  textInputAction: TextInputAction.next,
+                  onChanged: (_) => state.markChanged(),
+                  onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
+                  validator: (value) => Validators.required(value, 'Full Name'),
+                ),
+                const SizedBox(height: Spacing.md),
+                TextFormField(
+                  controller: pinController,
+                  decoration: InputDecoration(
+                    labelText: 'PIN (optional)',
+                    border: const OutlineInputBorder(),
+                    hintText: isEdit && staff.hasPin
+                        ? 'Enter new PIN to replace (${staff.configuredPinLength} digits)'
+                        : '4-6 digits',
+                  ),
+                  keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.done,
+                  onChanged: (_) => state.markChanged(),
+                  onFieldSubmitted: (_) => _saveStaff(state, staff, context),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) return null;
+                    return Validators.pin(value);
+                  },
+                ),
+              ],
             ),
+          );
+        },
+        actionsBuilder: (context, state) => [
+          AppDialogAction(
+            label: 'Cancel',
+            onPressed: (context) => state.pop(const ModalResult<void>.cancelled()),
           ),
-        ),
+          AppDialogAction(
+            label: isEdit ? 'Save' : 'Add',
+            isPrimary: true,
+            isLoading: state.isSaving,
+            onPressed: state.isSaving
+                ? null
+                : (context) => _saveStaff(state, staff, context),
+          ),
+        ],
       ),
     );
+
+    if (!mounted) return;
+
+    if (result == null || result.isCancelled) {
+      return;
+    }
+
+    if (result.isSaved) {
+      final message = isEdit
+          ? 'Staff updated successfully'
+          : 'Staff created successfully The temporary password is ${AppConstants.defaultTemporaryPassword}.';
+      await AppDialogService.success(
+        context,
+        title: isEdit ? 'Updated' : 'Created',
+        message: message,
+      );
+      if (mounted) {
+        await _loadStaff();
+      }
+    } else if (result.isFailed) {
+      await AppDialogService.error(
+        context,
+        title: 'Error',
+        message: result.error ?? 'An unexpected error occurred.',
+      );
+    }
+  }
+
+  Future<void> _loadStaff() =>
+      ref.read(staffControllerProvider.notifier).loadStaff();
+
+  Future<void> _saveStaff(
+    AppDialogFormState<ModalResult<void>> state,
+    User? staff,
+    BuildContext dialogContext,
+  ) async {
+    if (!state.formKey.currentState!.validate()) {
+      return;
+    }
+
+    state.setSaving(true);
+
+    final username = state.textController('username').text.trim();
+    final fullName = state.textController('fullName').text.trim();
+    final pin = state.textController('pin').text.trim();
+
+    final staffService = ref.read(staffServiceProvider);
+    final UserOperationResult result;
+
+    try {
+      if (staff != null) {
+        result = await staffService.updateStaff(
+          staffId: staff.id!,
+          username: username,
+          fullName: fullName,
+          pin: pin.isEmpty ? null : pin,
+        );
+      } else {
+        result = await staffService.createStaff(
+          username: username,
+          fullName: fullName,
+          pin: pin.isEmpty ? null : pin,
+        );
+      }
+    } catch (e) {
+      if (dialogContext.mounted) {
+        state.setSaving(false);
+        final message = e is AuthorizationException
+            ? e.message
+            : 'An unexpected error occurred. Please try again.';
+        await AppDialogService.error(
+          dialogContext,
+          title: staff != null ? 'Update Failed' : 'Create Failed',
+          message: message,
+        );
+      }
+      return;
+    }
+
+    if (result.success) {
+      state.pop(const ModalResult<void>.saved());
+    } else {
+      if (dialogContext.mounted) {
+        state.setSaving(false);
+        await AppDialogService.error(
+          dialogContext,
+          title: staff != null ? 'Update Failed' : 'Create Failed',
+          message: result.message,
+        );
+      }
+    }
   }
 }
 

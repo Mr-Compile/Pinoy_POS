@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/modal_result.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/user_provider.dart';
 import 'package:pinoy_pos/services/password_strength_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog_form.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/validators.dart';
@@ -59,193 +61,193 @@ class SecuritySettingsPage extends ConsumerWidget {
     );
   }
 
-  void _showChangePasswordDialog(
+  Future<void> _showChangePasswordDialog(
     BuildContext context,
     WidgetRef ref,
     User user,
-  ) {
-    final formKey = GlobalKey<FormState>();
-    final oldPasswordController = TextEditingController();
-    final newPasswordController = TextEditingController();
-    final confirmPasswordController = TextEditingController();
-    bool isSaving = false;
-    bool obscureOld = true;
-    bool obscureNew = true;
-    bool obscureConfirm = true;
-    bool newPasswordTouched = false;
-    bool confirmPasswordTouched = false;
-
-    showDialog(
+  ) async {
+    final result = await showDialog<ModalResult<void>>(
       context: context,
       useRootNavigator: true,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) {
+      builder: (dialogContext) => AppDialogForm<ModalResult<void>>(
+        type: AppDialogType.info,
+        title: 'Change Password',
+        childBuilder: (context, state) {
+          final oldController = state.textController('oldPassword');
+          final newController = state.textController('newPassword');
+          final confirmController = state.textController('confirmPassword');
+          final obscureOld =
+              state.value<bool>('obscureOldPassword', true) ?? true;
+          final obscureNew =
+              state.value<bool>('obscureNewPassword', true) ?? true;
+          final obscureConfirm =
+              state.value<bool>('obscureConfirmPassword', true) ?? true;
           final strengthResult = PasswordStrengthService.evaluate(
-            password: newPasswordController.text,
+            password: newController.text,
             username: user.username,
           );
 
-          return AppDialog(
-            type: AppDialogType.info,
-            title: 'Change Password',
-            actions: [
-              AppDialogAction(
-                label: 'Cancel',
-                onPressed: (context) =>
-                    Navigator.of(context, rootNavigator: true).pop(),
-              ),
-              AppDialogAction(
-                label: 'Change',
-                isPrimary: true,
-                isLoading: isSaving,
-                onPressed: isSaving
-                    ? null
-                    : (context) async {
-                        setState(() {
-                          newPasswordTouched = true;
-                          confirmPasswordTouched = true;
-                        });
-                        if (!formKey.currentState!.validate()) return;
-                        setState(() => isSaving = true);
-                        final result = await ref
-                            .read(userControllerProvider.notifier)
-                            .changePassword(
-                              userId: user.id!,
-                              oldPassword: oldPasswordController.text,
-                              newPassword: newPasswordController.text,
-                            );
-                        if (context.mounted) {
-                          setState(() => isSaving = false);
-                          if (result.success) {
-                            oldPasswordController.clear();
-                            newPasswordController.clear();
-                            confirmPasswordController.clear();
-                            await AppDialogService.success(
-                              context,
-                              title: 'Password Changed',
-                              message: result.message,
-                            );
-                            if (!context.mounted) return;
-                            Navigator.of(context, rootNavigator: true).pop();
-                          } else {
-                            await AppDialogService.error(
-                              context,
-                              title: 'Change Failed',
-                              message: result.message,
-                            );
-                            if (!context.mounted) return;
-                            Navigator.of(context, rootNavigator: true).pop();
-                          }
-                        }
-                      },
-              ),
-            ],
-            child: SingleChildScrollView(
-              child: Form(
-                key: formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextFormField(
-                      controller: oldPasswordController,
-                      decoration: InputDecoration(
-                        labelText: 'Current Password',
-                        border: const OutlineInputBorder(),
-                        prefixIcon: const Icon(Icons.lock_outline),
-                        suffixIcon: IconButton(
-                          icon: Icon(obscureOld
-                              ? Icons.visibility_off
-                              : Icons.visibility),
-                          onPressed: () =>
-                              setState(() => obscureOld = !obscureOld),
-                          tooltip: obscureOld
-                              ? 'Show password'
-                              : 'Hide password',
-                        ),
+          return Form(
+            key: state.formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: oldController,
+                  decoration: InputDecoration(
+                    labelText: 'Current Password',
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscureOld
+                          ? Icons.visibility_off
+                          : Icons.visibility),
+                      onPressed: () => state.setValue<bool>(
+                        'obscureOldPassword',
+                        !obscureOld,
                       ),
-                      obscureText: obscureOld,
-                      autofocus: true,
-                      validator: (value) =>
-                          Validators.required(value, 'Current password'),
+                      tooltip: obscureOld ? 'Show password' : 'Hide password',
                     ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: newPasswordController,
-                      decoration: InputDecoration(
-                        labelText: 'New Password',
-                        border: const OutlineInputBorder(),
-                        prefixIcon: const Icon(Icons.lock_outline),
-                        suffixIcon: IconButton(
-                          icon: Icon(obscureNew
-                              ? Icons.visibility_off
-                              : Icons.visibility),
-                          onPressed: () =>
-                              setState(() => obscureNew = !obscureNew),
-                          tooltip: obscureNew
-                              ? 'Show password'
-                              : 'Hide password',
-                        ),
-                      ),
-                      obscureText: obscureNew,
-                      onChanged: (value) {
-                        setState(() => newPasswordTouched = true);
-                      },
-                      validator: (value) {
-                        if (!newPasswordTouched) return null;
-                        if (value == null || value.isEmpty) {
-                          return 'Enter a new password.';
-                        }
-                        return PasswordStrengthService.validate(
-                          password: value,
-                          username: user.username,
-                          currentPassword: oldPasswordController.text,
-                        );
-                      },
-                    ),
-                    if (newPasswordController.text.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      PasswordStrengthMeter(result: strengthResult),
-                    ],
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: confirmPasswordController,
-                      decoration: InputDecoration(
-                        labelText: 'Confirm New Password',
-                        border: const OutlineInputBorder(),
-                        prefixIcon: const Icon(Icons.lock_outline),
-                        suffixIcon: IconButton(
-                          icon: Icon(obscureConfirm
-                              ? Icons.visibility_off
-                              : Icons.visibility),
-                          onPressed: () => setState(
-                              () => obscureConfirm = !obscureConfirm),
-                          tooltip: obscureConfirm
-                              ? 'Show password'
-                              : 'Hide password',
-                        ),
-                      ),
-                      obscureText: obscureConfirm,
-                      onChanged: (value) {
-                        setState(() => confirmPasswordTouched = true);
-                      },
-                      validator: (value) {
-                        if (!confirmPasswordTouched) return null;
-                        if (value == null || value.isEmpty) {
-                          return 'Please confirm your password.';
-                        }
-                        if (value != newPasswordController.text) {
-                          return 'Your passwords don\'t match.';
-                        }
-                        return null;
-                      },
-                    ),
-                  ],
+                  ),
+                  obscureText: obscureOld,
+                  validator: (value) =>
+                      Validators.required(value, 'Current password'),
                 ),
-              ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: newController,
+                  decoration: InputDecoration(
+                    labelText: 'New Password',
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscureNew
+                          ? Icons.visibility_off
+                          : Icons.visibility),
+                      onPressed: () => state.setValue<bool>(
+                        'obscureNewPassword',
+                        !obscureNew,
+                      ),
+                      tooltip: obscureNew ? 'Show password' : 'Hide password',
+                    ),
+                  ),
+                  obscureText: obscureNew,
+                  onChanged: (value) {
+                    state.markChanged();
+                    state.setValue<bool>('newPasswordTouched', true);
+                  },
+                  validator: (value) {
+                    if (!(state.value<bool>('newPasswordTouched', false) ??
+                        false)) {
+                      return null;
+                    }
+                    if (value == null || value.isEmpty) {
+                      return 'Enter a new password.';
+                    }
+                    return PasswordStrengthService.validate(
+                      password: value,
+                      username: user.username,
+                      currentPassword: oldController.text,
+                    );
+                  },
+                ),
+                if (newController.text.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  PasswordStrengthMeter(result: strengthResult),
+                ],
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: confirmController,
+                  decoration: InputDecoration(
+                    labelText: 'Confirm New Password',
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscureConfirm
+                          ? Icons.visibility_off
+                          : Icons.visibility),
+                      onPressed: () => state.setValue<bool>(
+                        'obscureConfirmPassword',
+                        !obscureConfirm,
+                      ),
+                      tooltip:
+                          obscureConfirm ? 'Show password' : 'Hide password',
+                    ),
+                  ),
+                  obscureText: obscureConfirm,
+                  onChanged: (value) {
+                    state.setValue<bool>('confirmPasswordTouched', true);
+                  },
+                  validator: (value) {
+                    if (!(state.value<bool>('confirmPasswordTouched', false) ??
+                        false)) {
+                      return null;
+                    }
+                    if (value == null || value.isEmpty) {
+                      return 'Please confirm your password.';
+                    }
+                    if (value != newController.text) {
+                      return 'Your passwords don\'t match.';
+                    }
+                    return null;
+                  },
+                ),
+              ],
             ),
           );
         },
+        actionsBuilder: (context, state) => [
+          AppDialogAction(
+            label: 'Cancel',
+            onPressed: (dialogContext) =>
+                state.pop(const ModalResult<void>.cancelled()),
+          ),
+          AppDialogAction(
+            label: 'Change',
+            isPrimary: true,
+            isLoading: state.isSaving,
+            onPressed: (dialogContext) async {
+              state.setValue<bool>('newPasswordTouched', true);
+              state.setValue<bool>('confirmPasswordTouched', true);
+
+              if (!state.formKey.currentState!.validate()) return;
+
+              state.setSaving(true);
+
+              final result = await ref
+                  .read(userControllerProvider.notifier)
+                  .changePassword(
+                    userId: user.id!,
+                    oldPassword: state.textController('oldPassword').text,
+                    newPassword: state.textController('newPassword').text,
+                  );
+
+              if (result.success) {
+                state.pop(const ModalResult<void>.saved());
+              } else {
+                if (dialogContext.mounted) {
+                  state.setSaving(false);
+                  await AppDialogService.error(
+                    dialogContext,
+                    title: 'Change Failed',
+                    message: result.message,
+                  );
+                }
+              }
+            },
+          ),
+        ],
       ),
     );
+
+    if (!context.mounted) return;
+
+    if (result?.isSaved ?? false) {
+      await AppDialogService.success(
+        context,
+        title: 'Password Changed',
+        message: 'Your password has been changed successfully.',
+      );
+    }
   }
 }

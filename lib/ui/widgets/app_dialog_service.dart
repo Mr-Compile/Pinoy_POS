@@ -1038,7 +1038,6 @@ class _VoidSaleDialogState extends State<_VoidSaleDialog> {
           labelText: 'Reason',
           border: OutlineInputBorder(),
         ),
-        autofocus: true,
         maxLines: 2,
         onChanged: (_) => setState(() {}),
       ),

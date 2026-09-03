@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/modal_result.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/services/image_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog_form.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
@@ -209,89 +211,22 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   // ── EDIT PROFILE (full name) ─────────────────────────────────────────
 
-  void _showEditProfileDialog(User user) {
-    final formKey = GlobalKey<FormState>();
-    final fullNameController = TextEditingController(text: user.fullName);
-    final usernameController = TextEditingController(text: user.username);
-    bool isSaving = false;
-
-    showDialog(
+  Future<void> _showEditProfileDialog(User user) async {
+    final result = await showDialog<ModalResult<void>>(
       context: context,
       useRootNavigator: true,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AppDialog(
-          type: AppDialogType.info,
-          title: 'Edit Profile',
-          actions: [
-            AppDialogAction(
-              label: 'Cancel',
-              onPressed: (context) =>
-                  Navigator.of(context, rootNavigator: true).pop(),
-            ),
-            AppDialogAction(
-              label: 'Save',
-              isPrimary: true,
-              isLoading: isSaving,
-              onPressed: isSaving
-                  ? null
-                  : (context) async {
-                      if (!formKey.currentState!.validate()) return;
+      builder: (dialogContext) => AppDialogForm<ModalResult<void>>(
+        type: AppDialogType.info,
+        title: 'Edit Profile',
+        childBuilder: (context, state) {
+          final fullNameController =
+              state.textController('fullName', text: user.fullName);
+          final usernameController =
+              state.textController('username', text: user.username);
 
-                      final newUsername = usernameController.text.trim();
-                      final isChangingUsername =
-                          newUsername != user.username;
-
-                      if (isChangingUsername && !user.hasChangedUsername) {
-                        final confirmed = await AppDialogService.confirmation(
-                          context,
-                          title: 'Change Username?',
-                          message:
-                              'You can only change your username once. After saving, it will be permanently set to "$newUsername".',
-                          confirmLabel: 'Yes, Change It',
-                          cancelLabel: 'Cancel',
-                        );
-                        if (confirmed != true) return;
-                      }
-
-                      if (!context.mounted) return;
-                      setState(() => isSaving = true);
-                      final success = await ref
-                          .read(authStateProvider.notifier)
-                          .updateProfile(
-                            userId: user.id!,
-                            fullName: fullNameController.text.trim(),
-                            username: newUsername,
-                          );
-                      if (context.mounted) {
-                        setState(() => isSaving = false);
-                        if (success) {
-                          await AppDialogService.success(
-                            context,
-                            title: 'Profile Updated',
-                            message: isChangingUsername
-                                ? 'Your profile and username have been updated.'
-                                : 'Profile updated successfully.',
-                          );
-                          if (!context.mounted) return;
-                          Navigator.of(context, rootNavigator: true).pop();
-                        } else {
-                          await AppDialogService.error(
-                            context,
-                            title: 'Update Failed',
-                            message: isChangingUsername
-                                ? 'Failed to change username. It may already be in use or you may have already changed it.'
-                                : 'Failed to update profile.',
-                          );
-                          if (!context.mounted) return;
-                          Navigator.of(context, rootNavigator: true).pop();
-                        }
-                      }
-                    },
-            ),
-          ],
-          child: SingleChildScrollView(
+          return SingleChildScrollView(
             child: Form(
-              key: formKey,
+              key: state.formKey,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -301,9 +236,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       labelText: 'Full Name',
                       border: OutlineInputBorder(),
                     ),
-                    autofocus: true,
                     validator: (value) =>
                         Validators.required(value, 'Full Name'),
+                    onChanged: (_) => state.markChanged(),
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
@@ -321,13 +256,104 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       (v) => Validators.minLength(v, 3, 'Username'),
                       (v) => Validators.maxLength(v, 50, 'Username'),
                     ], value),
+                    onChanged: (_) => state.markChanged(),
                   ),
                 ],
               ),
             ),
+          );
+        },
+        actionsBuilder: (context, state) => [
+          AppDialogAction(
+            label: 'Cancel',
+            isLoading: state.isSaving,
+            onPressed: state.isSaving
+                ? null
+                : (context) async {
+                    if (state.hasChanges) {
+                      final discard =
+                          await AppDialogService.unsavedChanges(context);
+                      if (discard == true && context.mounted) {
+                        state.pop(const ModalResult<void>.cancelled());
+                      }
+                    } else if (context.mounted) {
+                      state.pop(const ModalResult<void>.cancelled());
+                    }
+                  },
           ),
-        ),
+          AppDialogAction(
+            label: 'Save',
+            isPrimary: true,
+            isLoading: state.isSaving,
+            onPressed: state.isSaving
+                ? null
+                : (context) async {
+                    if (!state.formKey.currentState!.validate()) return;
+
+                    final newUsername =
+                        state.textController('username').text.trim();
+                    final isChangingUsername = newUsername != user.username;
+
+                    if (isChangingUsername && !user.hasChangedUsername) {
+                      final confirmed = await AppDialogService.confirmation(
+                        context,
+                        title: 'Change Username?',
+                        message:
+                            'You can only change your username once. After saving, it will be permanently set to "$newUsername".',
+                        confirmLabel: 'Yes, Change It',
+                        cancelLabel: 'Cancel',
+                      );
+                      if (confirmed != true) return;
+                    }
+
+                    if (!context.mounted) return;
+                    state.setSaving(true);
+                    final success = await ref
+                        .read(authStateProvider.notifier)
+                        .updateProfile(
+                          userId: user.id!,
+                          fullName:
+                              state.textController('fullName').text.trim(),
+                          username: newUsername,
+                        );
+
+                    if (success) {
+                      state.pop(const ModalResult<void>.saved());
+                    } else {
+                      state.setSaving(false);
+                      if (context.mounted) {
+                        await AppDialogService.error(
+                          context,
+                          title: 'Update Failed',
+                          message: isChangingUsername
+                              ? 'Failed to change username. It may already be in use or you may have already changed it.'
+                              : 'Failed to update profile.',
+                        );
+                      }
+                    }
+                  },
+          ),
+        ],
       ),
     );
+
+    if (!mounted) return;
+
+    if (result case final r? when r.isSaved) {
+      final updatedUser = ref.read(authStateProvider).user;
+      await AppDialogService.success(
+        context,
+        title: 'Profile Updated',
+        message: updatedUser != null && updatedUser.username != user.username
+            ? 'Your profile and username have been updated.'
+            : 'Profile updated successfully.',
+      );
+    } else if (result case final r? when r.isFailed) {
+      await AppDialogService.error(
+        context,
+        title: 'Update Failed',
+        message: r.error ?? 'Failed to update profile.',
+      );
+    }
   }
 }

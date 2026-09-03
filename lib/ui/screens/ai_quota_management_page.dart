@@ -7,6 +7,7 @@ import 'package:pinoy_pos/services/ai_quota_service.dart';
 import 'package:pinoy_pos/services/super_admin_verification_service.dart';
 import 'package:pinoy_pos/services/user_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog_form.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 
@@ -88,70 +89,78 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
   }
 
   Future<void> _changeDefaultQuota() async {
-    final controller = TextEditingController(text: _defaultQuota.toString());
-    var applyToExisting = false;
-
     final result =
         await showDialog<ModalResult<({int value, bool applyToExisting})>>(
       context: context,
       useRootNavigator: true,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AppDialog(
-          type: AppDialogType.info,
-          title: 'Change Default AI Quota',
-          actions: [
-            AppDialogAction(
-              label: 'Cancel',
-              onPressed: (context) => Navigator.of(context, rootNavigator: true)
-                  .pop(
-                const ModalResult<({int value, bool applyToExisting})>
-                    .cancelled(),
-              ),
-            ),
-            AppDialogAction(
-              label: 'Save',
-              isPrimary: true,
-              onPressed: (context) {
-                final value = int.tryParse(controller.text.trim());
-                if (value == null) return;
-                Navigator.of(context, rootNavigator: true).pop(
-                  ModalResult<({int value, bool applyToExisting})>.saved(
-                    (value: value, applyToExisting: applyToExisting),
+      builder: (context) =>
+          AppDialogForm<ModalResult<({int value, bool applyToExisting})>>(
+        type: AppDialogType.info,
+        title: 'Change Default AI Quota',
+        childBuilder: (context, state) {
+          final controller =
+              state.textController('quota', text: _defaultQuota.toString());
+          final applyToExisting =
+              state.value<bool>('applyToExisting', false);
+
+          return Form(
+            key: state.formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextFormField(
+                  controller: controller,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'New default daily quota',
+                    helperText: 'Applies to new users unless overridden',
                   ),
-                );
-              },
-            ),
-          ],
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextField(
-                controller: controller,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'New default daily quota',
-                  helperText: 'Applies to new users unless overridden',
                 ),
-                autofocus: true,
-              ),
-              const SizedBox(height: Spacing.sm),
-              CheckboxListTile(
-                title: const Text('Apply to all existing users'),
-                value: applyToExisting,
-                onChanged: (value) {
-                  setDialogState(() => applyToExisting = value ?? false);
-                },
-                controlAffinity: ListTileControlAffinity.leading,
-                contentPadding: EdgeInsets.zero,
-              ),
-            ],
+                const SizedBox(height: Spacing.sm),
+                CheckboxListTile(
+                  title: const Text('Apply to all existing users'),
+                  value: applyToExisting,
+                  onChanged: (value) {
+                    state.setValue<bool>('applyToExisting', value ?? false);
+                  },
+                  controlAffinity: ListTileControlAffinity.leading,
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ],
+            ),
+          );
+        },
+        actionsBuilder: (context, state) => [
+          AppDialogAction(
+            label: 'Cancel',
+            onPressed: (context) => state.pop(
+              const ModalResult<({int value, bool applyToExisting})>
+                  .cancelled(),
+            ),
           ),
-        ),
+          AppDialogAction(
+            label: 'Save',
+            isPrimary: true,
+            onPressed: (context) {
+              final value =
+                  int.tryParse(state.textController('quota').text.trim());
+              if (value == null) return;
+
+              state.pop(
+                ModalResult<({int value, bool applyToExisting})>.saved(
+                  (
+                    value: value,
+                    applyToExisting:
+                        state.value<bool>('applyToExisting') ?? false,
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
-
-    controller.dispose();
 
     if (!mounted) return;
 
@@ -178,45 +187,51 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
 
   Future<void> _editUserQuota(User user) async {
     final quota = _quotas[user.id!];
-    final controller = TextEditingController(
-      text: (quota?.dailyQuota ?? _defaultQuota).toString(),
-    );
 
     final result = await showDialog<ModalResult<int>>(
       context: context,
       useRootNavigator: true,
-      builder: (context) => AppDialog(
+      builder: (context) => AppDialogForm<ModalResult<int>>(
         type: AppDialogType.info,
         title: 'Edit Quota for ${user.fullName}',
-        actions: [
+        childBuilder: (context, state) {
+          final controller = state.textController(
+            'quota',
+            text: (quota?.dailyQuota ?? _defaultQuota).toString(),
+          );
+
+          return Form(
+            key: state.formKey,
+            child: TextFormField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Daily quota',
+              ),
+            ),
+          );
+        },
+        actionsBuilder: (context, state) => [
           AppDialogAction(
             label: 'Cancel',
-            onPressed: (context) => Navigator.of(context, rootNavigator: true)
-                .pop(const ModalResult<int>.cancelled()),
+            onPressed: (context) => state.pop(
+              const ModalResult<int>.cancelled(),
+            ),
           ),
           AppDialogAction(
             label: 'Save',
             isPrimary: true,
             onPressed: (context) {
-              final value = int.tryParse(controller.text.trim());
+              final value =
+                  int.tryParse(state.textController('quota').text.trim());
               if (value == null) return;
-              Navigator.of(context, rootNavigator: true)
-                  .pop(ModalResult<int>.saved(value));
+
+              state.pop(ModalResult<int>.saved(value));
             },
           ),
         ],
-        child: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: 'Daily quota',
-          ),
-          autofocus: true,
-        ),
       ),
     );
-
-    controller.dispose();
 
     if (!mounted) return;
     if (user.id == null) return;
@@ -528,7 +543,6 @@ class _SuperAdminVerificationDialogState
       child: TextField(
         controller: _controller,
         obscureText: _obscure,
-        autofocus: true,
         textInputAction: TextInputAction.done,
         onSubmitted: (_) => _verify(context),
         onChanged: (_) => _clearError(),

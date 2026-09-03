@@ -8,6 +8,7 @@ import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog_form.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_list_item.dart';
@@ -412,108 +413,93 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
   }
 
   Future<void> _showCategoryDialog({Category? category}) async {
-    final formKey = GlobalKey<FormState>();
-    final nameController = TextEditingController(text: category?.name ?? '');
-    bool hasChanges = false;
-    bool isSaving = false;
-
-    await showDialog<ModalResult<void>>(
+    final result = await showDialog<ModalResult<void>>(
       context: context,
       useRootNavigator: true,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setState) {
-          void setSaving(bool value) => setState(() => isSaving = value);
+      builder: (dialogContext) => AppDialogForm<ModalResult<void>>(
+        type: AppDialogType.info,
+        title: category == null ? 'Add Category' : 'Edit Category',
+        childBuilder: (context, state) {
+          final nameController = state.textController(
+            'name',
+            text: category?.name ?? '',
+          );
 
-          return AppDialog(
-            type: AppDialogType.info,
-            title: category == null
-                ? 'Add Category'
-                : 'Edit Category',
-            actions: [
-              AppDialogAction(
-                label: 'Cancel',
-                isLoading: isSaving,
-                onPressed: isSaving
-                    ? null
-                    : (context) async {
-                        if (hasChanges) {
-                          final discard =
-                              await AppDialogService.unsavedChanges(context);
-                          if (discard == true && context.mounted) {
-                            Navigator.of(context, rootNavigator: true)
-                                .pop(const ModalResult<void>.cancelled());
-                          }
-                        } else if (context.mounted) {
-                          Navigator.of(context, rootNavigator: true)
-                              .pop(const ModalResult<void>.cancelled());
-                        }
-                      },
+          return Form(
+            key: state.formKey,
+            child: TextFormField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'Category Name',
+                border: OutlineInputBorder(),
               ),
-              AppDialogAction(
-                label: 'Save',
-                isPrimary: true,
-                isLoading: isSaving,
-                onPressed: isSaving
-                    ? null
-                    : (context) => _saveCategory(
-                          formKey,
-                          nameController,
-                          category,
-                          setSaving,
-                          context,
-                        ),
-              ),
-            ],
-            child: Form(
-              key: formKey,
-              child: TextFormField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Category Name',
-                  border: OutlineInputBorder(),
-                ),
-                autofocus: true,
-                textInputAction: TextInputAction.done,
-                validator: (value) =>
-                    Validators.required(value, 'Category name'),
-                onChanged: (value) {
-                  if (!hasChanges) {
-                    setState(() {
-                      hasChanges = true;
-                    });
-                  }
-                },
-                onFieldSubmitted: isSaving
-                    ? null
-                    : (_) => _saveCategory(
-                          formKey,
-                          nameController,
-                          category,
-                          setSaving,
-                          dialogContext,
-                        ),
-              ),
+              textInputAction: TextInputAction.done,
+              validator: (value) =>
+                  Validators.required(value, 'Category name'),
+              onChanged: (_) => state.markChanged(),
+              onFieldSubmitted: (_) =>
+                  _saveCategory(state, category, context),
             ),
           );
         },
+        actionsBuilder: (context, state) => [
+          AppDialogAction(
+            label: 'Cancel',
+            isLoading: state.isSaving,
+            onPressed: state.isSaving
+                ? null
+                : (context) async {
+                    if (state.hasChanges) {
+                      final discard =
+                          await AppDialogService.unsavedChanges(context);
+                      if (discard == true && context.mounted) {
+                        state.pop(
+                          const ModalResult<void>.cancelled(),
+                        );
+                      }
+                    } else if (context.mounted) {
+                      state.pop(
+                        const ModalResult<void>.cancelled(),
+                      );
+                    }
+                  },
+          ),
+          AppDialogAction(
+            label: 'Save',
+            isPrimary: true,
+            isLoading: state.isSaving,
+            onPressed: state.isSaving
+                ? null
+                : (context) => _saveCategory(state, category, context),
+          ),
+        ],
       ),
     );
 
-    nameController.dispose();
+    if (!mounted) return;
+
+    if (result?.isSaved ?? false) {
+      await AppDialogService.success(
+        context,
+        title: category == null ? 'Created' : 'Updated',
+        message: category == null
+            ? 'Category created successfully.'
+            : 'Category updated successfully.',
+      );
+      if (mounted) _loadCategories();
+    }
   }
 
   Future<void> _saveCategory(
-    GlobalKey<FormState> formKey,
-    TextEditingController nameController,
+    AppDialogFormState<ModalResult<void>> state,
     Category? category,
-    void Function(bool) setSaving,
     BuildContext dialogContext,
   ) async {
-    if (!formKey.currentState!.validate()) {
+    if (!state.formKey.currentState!.validate()) {
       return;
     }
 
-    final name = nameController.text.trim();
+    final name = state.textController('name').text.trim();
 
     final isDuplicate = _categories.any((c) =>
       c.name.toLowerCase() == name.toLowerCase() &&
@@ -531,7 +517,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
       return;
     }
 
-    setSaving(true);
+    state.setSaving(true);
 
     try {
       final categoryService = ref.read(categoryServiceProvider);
@@ -549,32 +535,16 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
       }
 
       if (dialogContext.mounted) {
-        await AppDialogService.success(
-          dialogContext,
-          title: category == null ? 'Created' : 'Updated',
-          message: category == null
-              ? 'Category created successfully.'
-              : 'Category updated successfully.',
-        );
+        state.pop(const ModalResult<void>.saved());
       }
-
-      if (dialogContext.mounted) {
-        Navigator.of(dialogContext, rootNavigator: true)
-            .pop(const ModalResult<void>.saved());
-      }
-
-      _loadCategories();
     } catch (e) {
       if (dialogContext.mounted) {
-        AppDialogService.error(
+        state.setSaving(false);
+        await AppDialogService.error(
           dialogContext,
           title: 'Save Failed',
           message: 'Failed to save category.',
         );
-      }
-    } finally {
-      if (dialogContext.mounted) {
-        setSaving(false);
       }
     }
   }

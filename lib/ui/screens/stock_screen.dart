@@ -1077,7 +1077,6 @@ class _StockOperationDialogState extends State<_StockOperationDialog> {
                   border: const OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.number,
-                autofocus: true,
                 validator: (value) {
                   final qty = int.tryParse(value?.trim() ?? '');
                   if (qty == null) {

@@ -221,3 +221,48 @@ Result: `flutter analyze` reports no issues; `flutter test` passes 232/232 tests
 - `lib/ui/screens/reports_screen.dart` and `lib/providers/reports_provider.dart` remain as dead code. They duplicate the PDF/Excel/CSV logic that now lives in `ReportExportService`. Removing them needs explicit confirmation because the `owner_screens_test` `ReportsScreen builds for owner` test still references the old screen.
 - Report thumbnails are not yet generated. `thumbnail_path` is persisted but left `null`.
 - The owner export for the owner's own sales only is not a separate filter. Owner exports in `SalesAnalyticsScreen` already cover the selected period and use `SalesAnalyticsService`, which scopes Staff to their own sales and gives Owner the full store view.
+
+## Safe Dialog Lifecycle Pattern
+
+### Root Cause
+
+Dialogs with inline `StatefulBuilder`, `TextEditingController`, and `setState` caused "Tried to build dirty widgets in the wrong build scope" errors during dismissal. Controllers were used after disposal, and side effects (success toasts, provider reloads) ran while the dialog was still being popped, which conflicted with the active build scope.
+
+### Pattern
+
+Use `AppDialogForm<T>` for every form dialog:
+
+- Put it inside `showDialog<T>`.
+- Create `TextEditingController`s with `state.textController(key, text: ...)`. `AppDialogFormState` owns and disposes them when the route is removed.
+- Use `state.value<T>(key)` and `state.setValue<T>(key, value)` for non-text state such as toggles, role dropdowns, and selected images.
+- Use `state.formKey` for `Form` validation.
+- Call `state.markChanged()` on user input so `state.hasChanges` can guard cancellation.
+- Save logic sets `state.setSaving(true)`, validates, calls the service, and then `state.pop(const ModalResult<T>.saved(...))` on success. Errors keep the dialog open and call `state.setSaving(false)`.
+- Cancel logic pops `const ModalResult<T>.cancelled()`.
+- Side effects, toasts, and provider reloads happen **after** `await showDialog` returns in the parent screen, not inside the dialog.
+- The parent checks the `ModalResult` and acts: `r?.isSaved`, `r?.isCancelled`, `r?.isFailed`.
+
+### Files Added/Changed
+
+- `lib/ui/widgets/app_dialog_form.dart` — new reusable widget that owns controller lifecycle and dialog state.
+- Refactored dialog forms:
+  - `lib/ui/screens/products_screen.dart`
+  - `lib/ui/screens/categories_screen.dart`
+  - `lib/ui/screens/ai_quota_management_page.dart`
+  - `lib/ui/screens/staff_detail_screen.dart`
+  - `lib/ui/screens/staff_management_screen.dart`
+  - `lib/ui/screens/users_screen.dart`
+  - `lib/ui/screens/profile_screen.dart`
+  - `lib/ui/screens/announcements_screen.dart`
+  - `lib/ui/screens/settings/security_settings_page.dart`
+  - `lib/ui/screens/settings/pin_settings_page.dart`
+  - `lib/ui/screens/settings/store_information_settings_page.dart`
+
+### Verification
+
+```powershell
+flutter analyze
+flutter test
+```
+
+Result: `flutter analyze` reports no issues; `flutter test` passes 232/232 tests.

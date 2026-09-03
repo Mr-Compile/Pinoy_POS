@@ -1095,7 +1095,6 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
                     border: const OutlineInputBorder(),
                   ),
                   keyboardType: TextInputType.number,
-                  autofocus: true,
                   validator: (value) {
                     final cash = double.tryParse(value?.trim() ?? '');
                     if (cash == null) {

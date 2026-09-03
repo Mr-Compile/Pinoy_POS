@@ -11,6 +11,7 @@ import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/services/image_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog_form.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
@@ -312,66 +313,22 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
   }
 
   Future<void> _showProductDialog({Product? product}) async {
-    final formKey = GlobalKey<FormState>();
-    final nameController = TextEditingController(text: product?.name ?? '');
-    final priceController = TextEditingController(text: product?.price.toString() ?? '');
-    final stockController = TextEditingController(text: product?.stock.toString() ?? '');
-    int? selectedCategoryId = product?.categoryId;
-    bool hasChanges = false;
-    bool isSaving = false;
-    String? selectedImagePath = product?.imageUrl;
-
-    await showDialog<ModalResult<void>>(
+    final result = await showDialog<ModalResult<void>>(
       context: context,
       useRootNavigator: true,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setState) => AppDialog(
-          type: AppDialogType.info,
-          title: product == null ? 'Add Product' : 'Edit Product',
-          actions: [
-            AppDialogAction(
-              label: 'Cancel',
-              isLoading: isSaving,
-              onPressed: isSaving
-                  ? null
-                  : (context) async {
-                      if (hasChanges) {
-                        final discard =
-                            await AppDialogService.unsavedChanges(context);
-                        if (discard == true && context.mounted) {
-                          Navigator.of(context, rootNavigator: true).pop(
-                            const ModalResult<void>.cancelled(),
-                          );
-                        }
-                      } else if (context.mounted) {
-                        Navigator.of(context, rootNavigator: true).pop(
-                          const ModalResult<void>.cancelled(),
-                        );
-                      }
-                    },
-            ),
-            AppDialogAction(
-              label: 'Save',
-              isPrimary: true,
-              isLoading: isSaving,
-              onPressed: isSaving
-                  ? null
-                  : (context) => _saveProduct(
-                        formKey,
-                        nameController,
-                        priceController,
-                        stockController,
-                        selectedCategoryId,
-                        selectedImagePath,
-                        product,
-                        (value) => setState(() => isSaving = value),
-                        context,
-                      ),
-            ),
-          ],
-          child: SingleChildScrollView(
+      builder: (_) => AppDialogForm<ModalResult<void>>(
+        type: AppDialogType.info,
+        title: product == null ? 'Add Product' : 'Edit Product',
+        childBuilder: (context, state) {
+          final nameController = state.textController('name', text: product?.name ?? '');
+          final priceController = state.textController('price', text: product?.price.toString() ?? '');
+          final stockController = state.textController('stock', text: product?.stock.toString() ?? '');
+          final selectedImagePath = state.value<String?>('imagePath', product?.imageUrl);
+          final selectedCategoryId = state.value<int?>('categoryId', product?.categoryId);
+
+          return SingleChildScrollView(
             child: Form(
-              key: formKey,
+              key: state.formKey,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -382,10 +339,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                       final result = await imageService.pickAndStoreImage();
                       if (!context.mounted) return;
                       if (result.isSuccess) {
-                        setState(() {
-                          selectedImagePath = result.filePath;
-                          hasChanges = true;
-                        });
+                        state.setValue<String?>('imagePath', result.filePath);
                       } else if (result.error != 'No image selected') {
                         await AppDialogService.error(
                           context,
@@ -403,7 +357,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                         ),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: selectedImagePath != null && selectedImagePath!.isNotEmpty
+                      child: selectedImagePath != null && selectedImagePath.isNotEmpty
                           ? Stack(
                               children: [
                                 ClipRRect(
@@ -451,14 +405,9 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                             ),
                     ),
                   ),
-                  if (selectedImagePath != null && selectedImagePath!.isNotEmpty)
+                  if (selectedImagePath != null && selectedImagePath.isNotEmpty)
                     TextButton.icon(
-                      onPressed: () {
-                        setState(() {
-                          selectedImagePath = null;
-                          hasChanges = true;
-                        });
-                      },
+                      onPressed: () => state.setValue<String?>('imagePath', null),
                       icon: const Icon(Icons.remove_circle_outline, size: 18),
                       label: const Text('Remove Image'),
                     ),
@@ -469,16 +418,9 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                       labelText: 'Product Name',
                       border: OutlineInputBorder(),
                     ),
-                    autofocus: true,
                     textInputAction: TextInputAction.next,
                     validator: (value) => Validators.required(value, 'Product name'),
-                    onChanged: (value) {
-                      if (!hasChanges) {
-                        setState(() {
-                          hasChanges = true;
-                        });
-                      }
-                    },
+                    onChanged: (_) => state.markChanged(),
                     onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
                   ),
                   const SizedBox(height: 12),
@@ -494,13 +436,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                       (v) => Validators.required(v, 'Price'),
                       (v) => Validators.positiveNumber(v, 'Price'),
                     ], value),
-                    onChanged: (value) {
-                      if (!hasChanges) {
-                        setState(() {
-                          hasChanges = true;
-                        });
-                      }
-                    },
+                    onChanged: (_) => state.markChanged(),
                     onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
                   ),
                   const SizedBox(height: 12),
@@ -516,34 +452,23 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                       (v) => Validators.required(v, 'Stock'),
                       (v) => Validators.nonNegativeNumber(v, 'Stock'),
                     ], value),
-                    onChanged: (value) {
-                      if (!hasChanges) {
-                        setState(() {
-                          hasChanges = true;
-                        });
-                      }
-                    },
+                    onChanged: (_) => state.markChanged(),
                     onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
                   ),
                   const SizedBox(height: 12),
-                  DropdownButtonFormField<int>(
+                  DropdownButtonFormField<int?>(
                     decoration: const InputDecoration(
                       labelText: 'Category',
                       border: OutlineInputBorder(),
                     ),
                     items: _categories.map((category) {
-                      return DropdownMenuItem<int>(
+                      return DropdownMenuItem<int?>(
                         value: category.id,
                         child: Text(category.name),
                       );
                     }).toList(),
                     initialValue: selectedCategoryId,
-                    onChanged: (value) {
-                      setState(() {
-                        selectedCategoryId = value;
-                        hasChanges = true;
-                      });
-                    },
+                    onChanged: (value) => state.setValue<int?>('categoryId', value),
                     validator: (value) {
                       if (value == null) {
                         return 'Category is required';
@@ -554,32 +479,65 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                 ],
               ),
             ),
+          );
+        },
+        actionsBuilder: (context, state) => [
+          AppDialogAction(
+            label: 'Cancel',
+            isLoading: state.isSaving,
+            onPressed: (context) async {
+              if (state.hasChanges) {
+                final discard = await AppDialogService.unsavedChanges(context);
+                if (discard == true && context.mounted) {
+                  state.pop(const ModalResult<void>.cancelled());
+                }
+              } else if (context.mounted) {
+                state.pop(const ModalResult<void>.cancelled());
+              }
+            },
           ),
-        ),
+          AppDialogAction(
+            label: 'Save',
+            isPrimary: true,
+            isLoading: state.isSaving,
+            onPressed: (context) {
+              if (state.isSaving) return;
+              _saveProduct(state, product, context);
+            },
+          ),
+        ],
       ),
     );
 
-    nameController.dispose();
-    priceController.dispose();
-    stockController.dispose();
+    if (!mounted) return;
+
+    if (result?.isSaved ?? false) {
+      await _loadData();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              product == null
+                  ? 'Product created successfully.'
+                  : 'Product updated successfully.',
+            ),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _saveProduct(
-    GlobalKey<FormState> formKey,
-    TextEditingController nameController,
-    TextEditingController priceController,
-    TextEditingController stockController,
-    int? selectedCategoryId,
-    String? selectedImagePath,
+    AppDialogFormState<ModalResult<void>> state,
     Product? product,
-    ValueChanged<bool> setSaving,
     BuildContext dialogContext,
   ) async {
-    if (!formKey.currentState!.validate()) {
+    if (!state.formKey.currentState!.validate()) {
       return;
     }
 
-    final name = nameController.text.trim();
+    final name = state.textController('name').text.trim();
+    final selectedCategoryId = state.value<int?>('categoryId');
 
     // Check for duplicate product name within same category
     final isDuplicate = _products.any((p) =>
@@ -599,15 +557,15 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
       return;
     }
 
-    setSaving(true);
+    state.setSaving(true);
 
     try {
       final productData = Product(
         name: name,
-        price: double.parse(priceController.text),
-        stock: int.parse(stockController.text),
+        price: double.parse(state.textController('price').text),
+        stock: int.parse(state.textController('stock').text),
         categoryId: selectedCategoryId,
-        imageUrl: selectedImagePath,
+        imageUrl: state.value<String?>('imagePath'),
         createdAt: DateTime.now(),
       );
 
@@ -627,35 +585,15 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
         );
       }
 
-      if (dialogContext.mounted) {
-        await AppDialogService.success(
-          dialogContext,
-          title: product == null ? 'Created' : 'Updated',
-          message: product == null
-              ? 'Product created successfully.'
-              : 'Product updated successfully.',
-        );
-      }
-
-      if (dialogContext.mounted) {
-        Navigator.of(dialogContext, rootNavigator: true)
-            .pop(const ModalResult<void>.saved());
-      }
-
-      if (mounted) {
-        _loadData();
-      }
+      state.pop(const ModalResult<void>.saved());
     } catch (e) {
       if (dialogContext.mounted) {
+        state.setSaving(false);
         AppDialogService.error(
           dialogContext,
           title: 'Save Failed',
           message: 'Failed to save product.',
         );
-      }
-    } finally {
-      if (dialogContext.mounted) {
-        setSaving(false);
       }
     }
   }

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/currency_utils.dart';
+import 'package:pinoy_pos/core/modal_result.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog_form.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
@@ -63,7 +65,9 @@ class _StoreInformationSettingsPageState
     if (_isLoading) {
       return Scaffold(
         appBar: const AppHeader(
-            title: 'Store Information', showBackButton: true),
+          title: 'Store Information',
+          showBackButton: true,
+        ),
         body: const LoadingState(),
       );
     }
@@ -71,7 +75,9 @@ class _StoreInformationSettingsPageState
     if (_loadError != null) {
       return Scaffold(
         appBar: const AppHeader(
-            title: 'Store Information', showBackButton: true),
+          title: 'Store Information',
+          showBackButton: true,
+        ),
         body: ErrorState(
           title: 'Failed to Load',
           message: _loadError!,
@@ -84,7 +90,9 @@ class _StoreInformationSettingsPageState
     if (settings == null) {
       return Scaffold(
         appBar: const AppHeader(
-            title: 'Store Information', showBackButton: true),
+          title: 'Store Information',
+          showBackButton: true,
+        ),
         body: const Center(child: Text('No settings found.')),
       );
     }
@@ -100,9 +108,11 @@ class _StoreInformationSettingsPageState
                 ListTile(
                   leading: const Icon(Icons.store_outlined),
                   title: const Text('Store Name'),
-                  subtitle: Text(settings.storeName.isNotEmpty
-                      ? settings.storeName
-                      : 'Not set'),
+                  subtitle: Text(
+                    settings.storeName.isNotEmpty
+                        ? settings.storeName
+                        : 'Not set',
+                  ),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => _editStoreName(settings),
                 ),
@@ -110,20 +120,27 @@ class _StoreInformationSettingsPageState
                 ListTile(
                   leading: const Icon(Icons.location_on_outlined),
                   title: const Text('Store Address'),
-                  subtitle: Text(settings.storeAddress.isNotEmpty
-                      ? settings.storeAddress
-                      : 'Not set'),
+                  subtitle: Text(
+                    settings.storeAddress.isNotEmpty
+                        ? settings.storeAddress
+                        : 'Not set',
+                  ),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () =>
-                      _editStoreField(settings, 'Store Address', 'store_address'),
+                  onTap: () => _editStoreField(
+                    settings,
+                    'Store Address',
+                    'store_address',
+                  ),
                 ),
                 const Divider(),
                 ListTile(
                   leading: const Icon(Icons.phone_outlined),
                   title: const Text('Store Contact'),
-                  subtitle: Text(settings.storePhone.isNotEmpty
-                      ? settings.storePhone
-                      : 'Not set'),
+                  subtitle: Text(
+                    settings.storePhone.isNotEmpty
+                        ? settings.storePhone
+                        : 'Not set',
+                  ),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () =>
                       _editStoreField(settings, 'Store Contact', 'store_phone'),
@@ -133,13 +150,17 @@ class _StoreInformationSettingsPageState
                   leading: const Icon(Icons.receipt_long_outlined),
                   title: const Text('Receipt Footer'),
                   subtitle: Text(
-                      (settings.receiptFooter != null &&
-                              settings.receiptFooter!.isNotEmpty)
-                          ? settings.receiptFooter!
-                          : 'Not set'),
+                    (settings.receiptFooter != null &&
+                            settings.receiptFooter!.isNotEmpty)
+                        ? settings.receiptFooter!
+                        : 'Not set',
+                  ),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => _editStoreField(
-                      settings, 'Receipt Footer', 'receipt_footer'),
+                    settings,
+                    'Receipt Footer',
+                    'receipt_footer',
+                  ),
                 ),
                 const Divider(),
                 ListTile(
@@ -166,52 +187,78 @@ class _StoreInformationSettingsPageState
     };
   }
 
-  Future<void> _editStoreName(Settings settings) async {
-    final settingsService = ref.read(settingsServiceProvider);
-    final controller = TextEditingController(text: settings.storeName);
-    final result = await showDialog<String>(
+  Future<ModalResult<String>?> _showTextEditDialog({
+    required String title,
+    required String label,
+    required String initialValue,
+    int maxLines = 1,
+  }) {
+    return showDialog<ModalResult<String>>(
       context: context,
       useRootNavigator: true,
-      builder: (context) => AppDialog(
+      builder: (context) => AppDialogForm<ModalResult<String>>(
         type: AppDialogType.info,
-        title: 'Store Name',
-        actions: [
+        title: title,
+        childBuilder: (context, state) {
+          final controller = state.textController('value', text: initialValue);
+
+          return TextField(
+            controller: controller,
+            decoration: InputDecoration(
+              labelText: label,
+              border: const OutlineInputBorder(),
+            ),
+            maxLines: maxLines,
+          );
+        },
+        actionsBuilder: (context, state) => [
           AppDialogAction(
             label: 'Cancel',
             onPressed: (context) =>
-                Navigator.of(context, rootNavigator: true).pop(),
+                state.pop(const ModalResult<String>.cancelled()),
           ),
           AppDialogAction(
             label: 'Save',
             isPrimary: true,
-            onPressed: (context) => Navigator.of(context, rootNavigator: true)
-                .pop(controller.text.trim()),
+            onPressed: (context) => state.pop(
+              ModalResult<String>.saved(
+                state.textController('value').text.trim(),
+              ),
+            ),
           ),
         ],
-        child: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            labelText: 'Store Name',
-            border: OutlineInputBorder(),
-          ),
-          autofocus: true,
-        ),
       ),
     );
+  }
 
-    if (result != null && result.isNotEmpty && mounted) {
+  Future<void> _editStoreName(Settings settings) async {
+    final settingsService = ref.read(settingsServiceProvider);
+    final result = await _showTextEditDialog(
+      title: 'Store Name',
+      label: 'Store Name',
+      initialValue: settings.storeName,
+    );
+
+    if (result?.isSaved == true && result!.value!.isNotEmpty && mounted) {
       try {
-        await settingsService
-            .updateSettings(settings.copyWith(storeName: result));
+        await settingsService.updateSettings(
+          settings.copyWith(storeName: result.value!),
+        );
         await _loadSettings();
         if (mounted) {
-          await AppDialogService.success(context,
-              title: 'Updated', message: 'Store name updated.');
+          await AppDialogService.success(
+            context,
+            title: 'Updated',
+            message: 'Store name updated.',
+          );
         }
       } catch (e) {
         if (mounted) {
-          AppDialogService.error(context,
-              title: 'Error', message: 'Failed to update store name.');
+          AppDialogService.error(
+            context,
+            title: 'Error',
+            message: 'Failed to update store name.',
+          );
         }
       }
     }
@@ -239,65 +286,46 @@ class _StoreInformationSettingsPageState
         currentValue = '';
     }
 
-    final controller = TextEditingController(text: currentValue);
-    final result = await showDialog<String>(
-      context: context,
-      useRootNavigator: true,
-      builder: (context) => AppDialog(
-        type: AppDialogType.info,
-        title: label,
-        actions: [
-          AppDialogAction(
-            label: 'Cancel',
-            onPressed: (context) =>
-                Navigator.of(context, rootNavigator: true).pop(),
-          ),
-          AppDialogAction(
-            label: 'Save',
-            isPrimary: true,
-            onPressed: (context) => Navigator.of(context, rootNavigator: true)
-                .pop(controller.text.trim()),
-          ),
-        ],
-        child: TextField(
-          controller: controller,
-          decoration: InputDecoration(
-            labelText: label,
-            border: const OutlineInputBorder(),
-          ),
-          autofocus: true,
-          maxLines: fieldKey == 'receipt_footer' ? 2 : 1,
-        ),
-      ),
+    final result = await _showTextEditDialog(
+      title: label,
+      label: label,
+      initialValue: currentValue,
+      maxLines: fieldKey == 'receipt_footer' ? 2 : 1,
     );
 
-    if (result != null && mounted) {
+    if (result?.isSaved == true && mounted) {
       final updated = settings.copyWith(
-        storeAddress: fieldKey == 'store_address' ? result : null,
-        storePhone: fieldKey == 'store_phone' ? result : null,
-        receiptFooter: fieldKey == 'receipt_footer' ? result : null,
+        storeAddress: fieldKey == 'store_address' ? result!.value! : null,
+        storePhone: fieldKey == 'store_phone' ? result!.value! : null,
+        receiptFooter: fieldKey == 'receipt_footer' ? result!.value! : null,
       );
       try {
         await settingsService.updateSettings(updated);
         await _loadSettings();
         if (mounted) {
-          await AppDialogService.success(context,
-              title: 'Updated', message: '$label updated.');
+          await AppDialogService.success(
+            context,
+            title: 'Updated',
+            message: '$label updated.',
+          );
         }
       } catch (e) {
         if (mounted) {
-          AppDialogService.error(context,
-              title: 'Error', message: 'Failed to update $label.');
+          AppDialogService.error(
+            context,
+            title: 'Error',
+            message: 'Failed to update $label.',
+          );
         }
       }
     }
   }
 
-  void _showCurrencyDialog(Settings settings) {
+  Future<String?> _showCurrencyDialog(Settings settings) async {
     final currencies = ['PHP', 'USD', 'EUR'];
     final current = settings.currency;
 
-    showDialog(
+    final result = await showDialog<String>(
       context: context,
       useRootNavigator: true,
       builder: (dialogContext) => AppDialog(
@@ -313,39 +341,50 @@ class _StoreInformationSettingsPageState
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: currencies
-              .map((currency) => ListTile(
-                    title: Text(_currencyLabel(currency)),
-                    leading: Icon(
-                      currency == current
-                          ? Icons.radio_button_checked
-                          : Icons.radio_button_unchecked,
-                    ),
-                    onTap: () async {
-                      Navigator.of(dialogContext, rootNavigator: true).pop();
-                      final settingsService =
-                          ref.read(settingsServiceProvider);
-                      try {
-                        await settingsService.updateSettings(
-                          settings.copyWith(currency: currency),
-                        );
-                        await _loadSettings();
-                        if (mounted) {
-                          await AppDialogService.success(context,
-                              title: 'Updated',
-                              message: 'Currency updated.');
-                        }
-                      } catch (e) {
-                        if (mounted) {
-                          AppDialogService.error(context,
-                              title: 'Error',
-                              message: 'Failed to update currency.');
-                        }
-                      }
-                    },
-                  ))
+              .map(
+                (currency) => ListTile(
+                  title: Text(_currencyLabel(currency)),
+                  leading: Icon(
+                    currency == current
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked,
+                  ),
+                  onTap: () => Navigator.of(
+                    dialogContext,
+                    rootNavigator: true,
+                  ).pop(currency),
+                ),
+              )
               .toList(),
         ),
       ),
     );
+
+    if (result != null && mounted) {
+      final settingsService = ref.read(settingsServiceProvider);
+      try {
+        await settingsService.updateSettings(
+          settings.copyWith(currency: result),
+        );
+        await _loadSettings();
+        if (mounted) {
+          await AppDialogService.success(
+            context,
+            title: 'Updated',
+            message: 'Currency updated.',
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          AppDialogService.error(
+            context,
+            title: 'Error',
+            message: 'Failed to update currency.',
+          );
+        }
+      }
+    }
+
+    return result;
   }
 }

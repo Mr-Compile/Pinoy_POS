@@ -7,9 +7,11 @@ import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog_form.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/validators.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/modal_result.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/providers/notification_provider.dart';
 
@@ -229,97 +231,29 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
     );
   }
 
-  void _showAnnouncementDialog({Announcement? announcement}) {
-    final formKey = GlobalKey<FormState>();
-    final titleController =
-        TextEditingController(text: announcement?.title ?? '');
-    final contentController =
-        TextEditingController(text: announcement?.content ?? '');
-    bool isPinned = announcement?.isPinned ?? false;
-    bool isSaving = false;
-
-    showDialog(
+  Future<void> _showAnnouncementDialog({Announcement? announcement}) async {
+    final result = await showDialog<ModalResult<void>>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AppDialog(
-          type: AppDialogType.info,
-          title: announcement == null
-              ? 'Add Announcement'
-              : 'Edit Announcement',
-          actions: [
-            AppDialogAction(
-              label: 'Cancel',
-              onPressed: (context) =>
-                  Navigator.of(context, rootNavigator: true).pop(),
-            ),
-            AppDialogAction(
-              label: 'Save',
-              isPrimary: true,
-              isLoading: isSaving,
-              onPressed: isSaving
-                  ? null
-                  : (context) async {
-                      if (!formKey.currentState!.validate()) return;
-                      setState(() => isSaving = true);
-                      try {
-                        final announcementService =
-                            ref.read(announcementServiceProvider);
-                        bool success;
-                        if (announcement == null) {
-                          success = await announcementService.createAnnouncement(
-                            title: titleController.text.trim(),
-                            content: contentController.text.trim(),
-                            isPinned: isPinned,
-                          );
-                        } else {
-                          final data = announcement.copyWith(
-                            title: titleController.text.trim(),
-                            content: contentController.text.trim(),
-                            isPinned: isPinned,
-                          );
-                          success = await announcementService
-                              .updateAnnouncement(data);
-                        }
-                        if (context.mounted) {
-                          if (success) {
-                            await AppDialogService.success(
-                              context,
-                              title: 'Saved',
-                              message: 'Announcement saved successfully.',
-                            );
-                            if (!context.mounted) return;
-                            Navigator.of(context, rootNavigator: true).pop();
-                            refreshNotificationCount(ref);
-                            _loadAnnouncements();
-                          } else {
-                            await AppDialogService.error(
-                              context,
-                              title: 'Save Failed',
-                              message: 'Failed to save announcement.',
-                            );
-                            if (!context.mounted) return;
-                            Navigator.of(context, rootNavigator: true).pop();
-                          }
-                        }
-                      } catch (e) {
-                        if (context.mounted) {
-                          AppDialogService.error(
-                            context,
-                            title: 'Save Failed',
-                            message: 'Failed to save announcement.',
-                          );
-                        }
-                      } finally {
-                        if (context.mounted) {
-                          setState(() => isSaving = false);
-                        }
-                      }
-                    },
-            ),
-          ],
-          child: SingleChildScrollView(
+      useRootNavigator: true,
+      builder: (dialogContext) => AppDialogForm<ModalResult<void>>(
+        type: AppDialogType.info,
+        title: announcement == null ? 'Add Announcement' : 'Edit Announcement',
+        childBuilder: (context, state) {
+          final titleController = state.textController(
+            'title',
+            text: announcement?.title ?? '',
+          );
+          final contentController = state.textController(
+            'content',
+            text: announcement?.content ?? '',
+          );
+          final isPinned =
+              state.value<bool>('isPinned', announcement?.isPinned ?? false) ??
+                  false;
+
+          return SingleChildScrollView(
             child: Form(
-              key: formKey,
+              key: state.formKey,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -329,9 +263,8 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
                       labelText: 'Title',
                       border: OutlineInputBorder(),
                     ),
-                    autofocus: true,
-                    validator: (value) =>
-                        Validators.required(value, 'Title'),
+                    validator: (value) => Validators.required(value, 'Title'),
+                    onChanged: (_) => state.markChanged(),
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
@@ -341,22 +274,116 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
                       border: OutlineInputBorder(),
                     ),
                     maxLines: 4,
-                    validator: (value) =>
-                        Validators.required(value, 'Content'),
+                    validator: (value) => Validators.required(value, 'Content'),
+                    onChanged: (_) => state.markChanged(),
                   ),
                   const SizedBox(height: 12),
                   SwitchListTile(
                     title: const Text('Pin to top'),
                     value: isPinned,
                     onChanged: (value) =>
-                        setState(() => isPinned = value),
+                        state.setValue<bool>('isPinned', value),
                   ),
                 ],
               ),
             ),
+          );
+        },
+        actionsBuilder: (context, state) => [
+          AppDialogAction(
+            label: 'Cancel',
+            onPressed: (context) async {
+              if (state.hasChanges) {
+                final discard = await AppDialogService.unsavedChanges(context);
+                if (discard == true && context.mounted) {
+                  state.pop(const ModalResult<void>.cancelled());
+                }
+              } else if (context.mounted) {
+                state.pop(const ModalResult<void>.cancelled());
+              }
+            },
           ),
-        ),
+          AppDialogAction(
+            label: 'Save',
+            isPrimary: true,
+            isLoading: state.isSaving,
+            onPressed: (context) {
+              if (state.isSaving) return;
+              _saveAnnouncement(state, announcement, context);
+            },
+          ),
+        ],
       ),
     );
+
+    if (!mounted) return;
+
+    if (result?.isSaved ?? false) {
+      await AppDialogService.success(
+        context,
+        title: 'Saved',
+        message: 'Announcement saved successfully.',
+      );
+      if (!mounted) return;
+      refreshNotificationCount(ref);
+      _loadAnnouncements();
+    }
+  }
+
+  Future<void> _saveAnnouncement(
+    AppDialogFormState<ModalResult<void>> state,
+    Announcement? announcement,
+    BuildContext dialogContext,
+  ) async {
+    if (!state.formKey.currentState!.validate()) {
+      return;
+    }
+
+    final title = state.textController('title').text.trim();
+    final content = state.textController('content').text.trim();
+    final isPinned = state.value<bool>('isPinned') ?? false;
+
+    state.setSaving(true);
+
+    try {
+      final announcementService = ref.read(announcementServiceProvider);
+      bool success;
+      if (announcement == null) {
+        success = await announcementService.createAnnouncement(
+          title: title,
+          content: content,
+          isPinned: isPinned,
+        );
+      } else {
+        final data = announcement.copyWith(
+          title: title,
+          content: content,
+          isPinned: isPinned,
+        );
+        success = await announcementService.updateAnnouncement(data);
+      }
+
+      if (success) {
+        state.pop(const ModalResult<void>.saved());
+      } else {
+        if (dialogContext.mounted) {
+          state.setSaving(false);
+          await AppDialogService.error(
+            dialogContext,
+            title: 'Save Failed',
+            message: 'Failed to save announcement.',
+          );
+        }
+      }
+    } catch (e) {
+      if (dialogContext.mounted) {
+        state.setSaving(false);
+        await AppDialogService.error(
+          dialogContext,
+          title: 'Save Failed',
+          message: 'Failed to save announcement.',
+        );
+      }
+    }
   }
 }

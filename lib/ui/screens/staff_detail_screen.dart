@@ -1,8 +1,9 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/currency_utils.dart';
+import 'package:pinoy_pos/core/modal_result.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/activity_log.dart';
 import 'package:pinoy_pos/data/models/reporting_period.dart';
@@ -12,6 +13,7 @@ import 'package:pinoy_pos/providers/staff_provider.dart';
 import 'package:pinoy_pos/ui/screens/sale_detail_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog_form.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
@@ -48,10 +50,7 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
     final state = ref.watch(staffDetailProvider(widget.staffId));
 
     return Scaffold(
-      appBar: const AppHeader(
-        title: 'Staff Details',
-        showBackButton: true,
-      ),
+      appBar: const AppHeader(title: 'Staff Details', showBackButton: true),
       body: _buildBody(context, state),
     );
   }
@@ -79,7 +78,8 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
     }
 
     return RefreshIndicator(
-      onRefresh: () => ref.read(staffDetailProvider(widget.staffId).notifier).load(),
+      onRefresh: () =>
+          ref.read(staffDetailProvider(widget.staffId).notifier).load(),
       child: SingleChildScrollView(
         padding: const EdgeInsets.only(bottom: Spacing.xl),
         child: Column(
@@ -133,7 +133,9 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
                   child: SalesTrendChart(
                     trend: state.analytics!.trend,
                     groupBy: state.analytics!.bounds.groupBy,
-                    valuePrefix: CurrencyUtils.symbol(currency: state.storeInfo?.currency),
+                    valuePrefix: CurrencyUtils.symbol(
+                      currency: state.storeInfo?.currency,
+                    ),
                   ),
                 ),
               ),
@@ -177,9 +179,7 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
               padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
               child: AppSection(
                 title: 'Activity Log',
-                child: _ActivityLogList(
-                  logs: state.activityLogs,
-                ),
+                child: _ActivityLogList(logs: state.activityLogs),
               ),
             ),
             const SizedBox(height: Spacing.xl),
@@ -262,9 +262,9 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
                 const SizedBox(height: Spacing.xs),
                 Text(
                   '@${staff.username}',
-                  style: AppTypography.bodyMedium(context).copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
+                  style: AppTypography.bodyMedium(
+                    context,
+                  ).copyWith(color: cs.onSurfaceVariant),
                 ),
                 const SizedBox(height: Spacing.sm),
                 Wrap(
@@ -285,9 +285,9 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
                 const SizedBox(height: Spacing.sm),
                 Text(
                   'Created on ${DateFormat.yMd().format(staff.createdAt)}',
-                  style: AppTypography.bodySmall(context).copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
+                  style: AppTypography.bodySmall(
+                    context,
+                  ).copyWith(color: cs.onSurfaceVariant),
                 ),
               ],
             ),
@@ -308,16 +308,13 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: AppTypography.titleMediumBold(context),
-        ),
+        Text(label, style: AppTypography.titleMediumBold(context)),
         if (rangeText.isNotEmpty)
           Text(
             rangeText,
-            style: AppTypography.bodySmall(context).copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
+            style: AppTypography.bodySmall(
+              context,
+            ).copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
           ),
       ],
     );
@@ -325,7 +322,6 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
 
   String _trendSubtitle(ReportingPeriodBounds bounds) {
     return switch (bounds.groupBy) {
-
       ReportGroupBy.day => 'Daily',
       ReportGroupBy.hour => 'Hourly',
       ReportGroupBy.week => 'Weekly',
@@ -337,9 +333,7 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
     if (sale.id == null) return;
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => SaleDetailScreen(saleId: sale.id!),
-      ),
+      MaterialPageRoute(builder: (_) => SaleDetailScreen(saleId: sale.id!)),
     );
   }
 
@@ -358,27 +352,36 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
         .resetPassword(staff.id!);
     if (mounted) {
       if (result.success) {
-        await AppDialogService.success(context,
-            title: 'Done', message: result.message);
+        await AppDialogService.success(
+          context,
+          title: 'Done',
+          message: result.message,
+        );
       } else {
-        AppDialogService.error(context,
-            title: 'Error', message: result.message);
+        AppDialogService.error(
+          context,
+          title: 'Error',
+          message: result.message,
+        );
       }
     }
   }
 
   Future<void> _activateStaff(User staff) async {
-    final result =
-        await ref.read(staffControllerProvider.notifier).activateStaff(staff.id!);
+    final result = await ref
+        .read(staffControllerProvider.notifier)
+        .activateStaff(staff.id!);
     if (!mounted) return;
     if (result.success) {
       await ref.read(staffDetailProvider(widget.staffId).notifier).load();
       if (!mounted) return;
-      await AppDialogService.success(context,
-          title: 'Done', message: result.message);
+      await AppDialogService.success(
+        context,
+        title: 'Done',
+        message: result.message,
+      );
     } else {
-      AppDialogService.error(context,
-          title: 'Error', message: result.message);
+      AppDialogService.error(context, title: 'Error', message: result.message);
     }
   }
 
@@ -399,11 +402,13 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
     if (result.success) {
       await ref.read(staffDetailProvider(widget.staffId).notifier).load();
       if (!mounted) return;
-      await AppDialogService.success(context,
-          title: 'Done', message: result.message);
+      await AppDialogService.success(
+        context,
+        title: 'Done',
+        message: result.message,
+      );
     } else {
-      AppDialogService.error(context,
-          title: 'Error', message: result.message);
+      AppDialogService.error(context, title: 'Error', message: result.message);
     }
   }
 
@@ -415,87 +420,43 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
     );
     if (confirmed != true || !mounted) return;
 
-    final result =
-        await ref.read(staffControllerProvider.notifier).softDeleteStaff(staff.id!);
+    final result = await ref
+        .read(staffControllerProvider.notifier)
+        .softDeleteStaff(staff.id!);
     if (mounted) {
       if (result.success) {
         Navigator.of(context).maybePop();
       } else {
-        AppDialogService.error(context,
-            title: 'Error', message: result.message);
+        AppDialogService.error(
+          context,
+          title: 'Error',
+          message: result.message,
+        );
       }
     }
   }
 
   Future<void> _showEditStaffDialog(User staff) async {
-    final formKey = GlobalKey<FormState>();
-    final usernameController = TextEditingController(text: staff.username);
-    final fullNameController = TextEditingController(text: staff.fullName);
-    final pinController = TextEditingController();
-    bool isSaving = false;
-
-    await showDialog(
+    final result = await showDialog<ModalResult<void>>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AppDialog(
-          type: AppDialogType.info,
-          title: 'Edit Staff',
-          actions: [
-            AppDialogAction(
-              label: 'Cancel',
-              onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(),
-            ),
-            AppDialogAction(
-              label: 'Save',
-              isPrimary: true,
-              isLoading: isSaving,
-              onPressed: isSaving
-                  ? null
-                  : (context) async {
-                      if (!formKey.currentState!.validate()) return;
-                      setState(() => isSaving = true);
+      useRootNavigator: true,
+      builder: (dialogContext) => AppDialogForm<ModalResult<void>>(
+        type: AppDialogType.info,
+        title: 'Edit Staff',
+        childBuilder: (context, state) {
+          final usernameController = state.textController(
+            'username',
+            text: staff.username,
+          );
+          final fullNameController = state.textController(
+            'fullName',
+            text: staff.fullName,
+          );
+          final pinController = state.textController('pin');
 
-                      final pinValue = pinController.text.trim();
-                      final result = await ref
-                          .read(staffControllerProvider.notifier)
-                          .updateStaff(
-                            staffId: staff.id!,
-                            username: usernameController.text.trim(),
-                            fullName: fullNameController.text.trim(),
-                            pin: pinValue.isEmpty ? null : pinValue,
-                          );
-
-                      if (context.mounted) {
-                        setState(() => isSaving = false);
-                      }
-
-                      if (result.success) {
-                        if (context.mounted) {
-                          Navigator.of(context, rootNavigator: true).pop();
-                          await AppDialogService.success(
-                            context,
-                            title: 'Updated',
-                            message: result.message,
-                          );
-                          await ref
-                              .read(staffDetailProvider(widget.staffId).notifier)
-                              .load();
-                        }
-                      } else {
-                        if (context.mounted) {
-                          AppDialogService.error(
-                            context,
-                            title: 'Update Failed',
-                            message: result.message,
-                          );
-                        }
-                      }
-                    },
-            ),
-          ],
-          child: SingleChildScrollView(
+          return SingleChildScrollView(
             child: Form(
-              key: formKey,
+              key: state.formKey,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -505,8 +466,11 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
                       labelText: 'Username',
                       border: OutlineInputBorder(),
                     ),
-                    autofocus: true,
-                    validator: (value) => Validators.required(value, 'Username'),
+                    textInputAction: TextInputAction.next,
+                    onChanged: (_) => state.markChanged(),
+                    onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
+                    validator: (value) =>
+                        Validators.required(value, 'Username'),
                   ),
                   const SizedBox(height: Spacing.md),
                   TextFormField(
@@ -515,7 +479,11 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
                       labelText: 'Full Name',
                       border: OutlineInputBorder(),
                     ),
-                    validator: (value) => Validators.required(value, 'Full Name'),
+                    textInputAction: TextInputAction.next,
+                    onChanged: (_) => state.markChanged(),
+                    onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
+                    validator: (value) =>
+                        Validators.required(value, 'Full Name'),
                   ),
                   const SizedBox(height: Spacing.md),
                   TextFormField(
@@ -528,6 +496,9 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
                           : '4-6 digits',
                     ),
                     keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.done,
+                    onChanged: (_) => state.markChanged(),
+                    onFieldSubmitted: (_) => _saveStaff(state, staff, context),
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) return null;
                       return Validators.pin(value);
@@ -536,10 +507,89 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
                 ],
               ),
             ),
+          );
+        },
+        actionsBuilder: (context, state) => [
+          AppDialogAction(
+            label: 'Cancel',
+            onPressed: state.isSaving
+                ? null
+                : (dialogContext) async {
+                    if (state.hasChanges) {
+                      final discard = await AppDialogService.unsavedChanges(
+                        dialogContext,
+                      );
+                      if (discard == true && dialogContext.mounted) {
+                        state.pop(const ModalResult<void>.cancelled());
+                      }
+                    } else if (dialogContext.mounted) {
+                      state.pop(const ModalResult<void>.cancelled());
+                    }
+                  },
           ),
-        ),
+          AppDialogAction(
+            label: 'Save',
+            isPrimary: true,
+            isLoading: state.isSaving,
+            onPressed: state.isSaving
+                ? null
+                : (dialogContext) async {
+                    await _saveStaff(state, staff, dialogContext);
+                  },
+          ),
+        ],
       ),
     );
+
+    if (!mounted) return;
+
+    if (result?.isSaved == true) {
+      await AppDialogService.success(
+        context,
+        title: 'Updated',
+        message: 'Staff updated successfully',
+      );
+      await ref.read(staffDetailProvider(widget.staffId).notifier).load();
+    } else if (result?.isFailed == true) {
+      AppDialogService.error(
+        context,
+        title: 'Update Failed',
+        message: result?.error ?? 'An error occurred while updating staff.',
+      );
+    }
+  }
+
+  Future<void> _saveStaff(
+    AppDialogFormState<ModalResult<void>> state,
+    User staff,
+    BuildContext dialogContext,
+  ) async {
+    if (!state.formKey.currentState!.validate()) return;
+
+    state.setSaving(true);
+
+    final pinValue = state.textController('pin').text.trim();
+    final result = await ref
+        .read(staffControllerProvider.notifier)
+        .updateStaff(
+          staffId: staff.id!,
+          username: state.textController('username').text.trim(),
+          fullName: state.textController('fullName').text.trim(),
+          pin: pinValue.isEmpty ? null : pinValue,
+        );
+
+    if (result.success) {
+      state.pop(const ModalResult<void>.saved());
+    } else {
+      state.setSaving(false);
+      if (dialogContext.mounted) {
+        AppDialogService.error(
+          dialogContext,
+          title: 'Update Failed',
+          message: result.message,
+        );
+      }
+    }
   }
 }
 
@@ -586,11 +636,7 @@ class _ActivityLogRow extends StatelessWidget {
           CircleAvatar(
             radius: 18,
             backgroundColor: cs.primaryContainer,
-            child: Icon(
-              Icons.history,
-              size: 18,
-              color: cs.onPrimaryContainer,
-            ),
+            child: Icon(Icons.history, size: 18, color: cs.onPrimaryContainer),
           ),
           const SizedBox(width: Spacing.md),
           Expanded(
@@ -604,17 +650,17 @@ class _ActivityLogRow extends StatelessWidget {
                 if (log.details != null && log.details!.isNotEmpty)
                   Text(
                     log.details!,
-                    style: AppTypography.bodySmall(context).copyWith(
-                      color: cs.onSurfaceVariant,
-                    ),
+                    style: AppTypography.bodySmall(
+                      context,
+                    ).copyWith(color: cs.onSurfaceVariant),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                 Text(
                   _formatDate(log.createdAt),
-                  style: AppTypography.labelSmall(context).copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
+                  style: AppTypography.labelSmall(
+                    context,
+                  ).copyWith(color: cs.onSurfaceVariant),
                 ),
               ],
             ),
@@ -660,4 +706,3 @@ class _ResponsiveTwoColumn extends StatelessWidget {
     );
   }
 }
-

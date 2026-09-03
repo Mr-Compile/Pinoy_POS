@@ -30,10 +30,13 @@ class _AppShellState extends ConsumerState<AppShell> {
   int _selectedIndex = 0;
   bool _hasRedirected = false;
   ProviderSubscription<AuthState>? _authSubscription;
+  late final PageController _pageController;
 
   @override
   void initState() {
     super.initState();
+    _pageController = PageController(initialPage: _selectedIndex);
+
     // ref.listen is only valid inside build(). For a ConsumerStatefulWidget
     // that must react to auth changes from initState, Riverpod 2.x exposes
     // ref.listenManual, which returns a ProviderSubscription we own and
@@ -46,6 +49,7 @@ class _AppShellState extends ConsumerState<AppShell> {
           setState(() {
             _selectedIndex = 0;
           });
+          _pageController.jumpToPage(0);
           _updateCurrentDestination();
         }
       },
@@ -59,6 +63,7 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   @override
   void dispose() {
+    _pageController.dispose();
     _authSubscription?.close();
     _authSubscription = null;
     super.dispose();
@@ -112,7 +117,9 @@ class _AppShellState extends ConsumerState<AppShell> {
       selectedIndex = 0;
       if (_selectedIndex != 0) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) setState(() => _selectedIndex = 0);
+          if (!mounted) return;
+          _pageController.jumpToPage(0);
+          setState(() => _selectedIndex = 0);
         });
       }
     }
@@ -143,7 +150,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                 _buildNavigationRail(tabs, constraints.maxWidth, selectedIndex),
                 const VerticalDivider(thickness: 1, width: 1),
                 Expanded(
-                  child: _getScreen(tabs[selectedIndex].screen),
+                  child: _getScreen(tabs, selectedIndex),
                 ),
               ],
             ),
@@ -160,7 +167,7 @@ class _AppShellState extends ConsumerState<AppShell> {
       drawer: _buildDrawer(tabs, selectedIndex),
       body: Stack(
         children: [
-          _getScreen(tabs[selectedIndex].screen),
+          _getScreen(tabs, selectedIndex),
           if (canUseAIAdvisor && !aiChatState.isPanelOpen)
             AIChatHead(userId: authState.user!.id!),
           if (canUseAIAdvisor && aiChatState.isPanelOpen)
@@ -173,8 +180,12 @@ class _AppShellState extends ConsumerState<AppShell> {
     );
   }
 
-  Widget _getScreen(Widget screen) {
-    return screen;
+  Widget _getScreen(List<AppTab> tabs, int selectedIndex) {
+    return PageView(
+      controller: _pageController,
+      physics: const NeverScrollableScrollPhysics(),
+      children: tabs.map((tab) => _KeepAliveTab(child: tab.screen)).toList(),
+    );
   }
 
   NavigationRail _buildNavigationRail(
@@ -186,6 +197,7 @@ class _AppShellState extends ConsumerState<AppShell> {
         setState(() {
           _selectedIndex = index;
         });
+        _pageController.jumpToPage(index);
         _updateCurrentDestination();
       },
       extended: layout.isAtLeastExpanded,
@@ -233,6 +245,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                 setState(() {
                   _selectedIndex = index;
                 });
+                _pageController.jumpToPage(index);
                 Navigator.of(context).pop();
                 _updateCurrentDestination();
               },
@@ -251,6 +264,7 @@ class _AppShellState extends ConsumerState<AppShell> {
         setState(() {
           _selectedIndex = index;
         });
+        _pageController.jumpToPage(index);
         _updateCurrentDestination();
       },
       destinations: tabs
@@ -411,6 +425,27 @@ class _AppShellState extends ConsumerState<AppShell> {
       'view_more' => 'more',
       _ => null,
     };
+  }
+}
+
+class _KeepAliveTab extends StatefulWidget {
+  final Widget child;
+
+  const _KeepAliveTab({required this.child});
+
+  @override
+  State<_KeepAliveTab> createState() => _KeepAliveTabState();
+}
+
+class _KeepAliveTabState extends State<_KeepAliveTab>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
   }
 }
 
