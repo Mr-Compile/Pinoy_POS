@@ -5,6 +5,7 @@ import 'package:pinoy_pos/core/auth_navigation.dart';
 import 'package:pinoy_pos/core/constants.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
+import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_logo.dart';
 import 'package:pinoy_pos/ui/widgets/theme_toggle.dart';
@@ -165,7 +166,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   const SizedBox(height: 16),
                                   _buildPasswordField(colorScheme, authState.isLoading),
                                   const SizedBox(height: 32),
-                                  _buildSignInButton(authState.isLoading, colorScheme, brightness),
+                                  AppButton.gradient(
+                    label: 'Sign In',
+                    onPressed: _login,
+                    isLoading: authState.isLoading,
+                    fullWidth: true,
+                  ),
                                 ],
                               ),
                             ),
@@ -323,73 +329,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
-  Widget _buildSignInButton(bool isLoading, ColorScheme colorScheme, Brightness brightness) {
-    final gradientColors = [
-      AppSemanticColors.resolve(AppSemanticColors.primaryLight, brightness),
-      AppSemanticColors.resolve(AppSemanticColors.primaryDark, brightness),
-    ];
-
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.primary.withValues(alpha: 0.35),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        type: MaterialType.transparency,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          onTap: isLoading ? null : _login,
-          borderRadius: BorderRadius.circular(16),
-          child: Ink(
-            width: double.infinity,
-            height: 56,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              gradient: LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                colors: gradientColors,
-              ),
-            ),
-            child: Center(
-              child: isLoading
-                  ? Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          'Signing in...',
-                          style: AppTypography.titleMediumBold(context)
-                              .copyWith(color: Colors.white),
-                        ),
-                      ],
-                    )
-                  : Text(
-                      'Sign In',
-                      style: AppTypography.titleMediumBold(context)
-                          .copyWith(color: Colors.white),
-                    ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class _IconContainer extends StatelessWidget {

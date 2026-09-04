@@ -454,58 +454,64 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
           );
           final pinController = state.textController('pin');
 
-          return SingleChildScrollView(
-            child: Form(
-              key: state.formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: usernameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Username',
-                      border: OutlineInputBorder(),
-                    ),
-                    textInputAction: TextInputAction.next,
-                    onChanged: (_) => state.markChanged(),
-                    onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
-                    validator: (value) =>
-                        Validators.required(value, 'Username'),
+          return Form(
+            key: state.formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Center(
+                  child: AppAvatar(
+                    imagePath: staff.profileImagePath,
+                    initials: staff.fullName.isNotEmpty
+                        ? staff.fullName[0].toUpperCase()
+                        : '?',
+                    radius: 40,
                   ),
-                  const SizedBox(height: Spacing.md),
-                  TextFormField(
-                    controller: fullNameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Full Name',
-                      border: OutlineInputBorder(),
-                    ),
-                    textInputAction: TextInputAction.next,
-                    onChanged: (_) => state.markChanged(),
-                    onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
-                    validator: (value) =>
-                        Validators.required(value, 'Full Name'),
+                ),
+                const SizedBox(height: Spacing.md),
+                TextFormField(
+                  controller: usernameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Username',
+                    border: OutlineInputBorder(),
                   ),
-                  const SizedBox(height: Spacing.md),
-                  TextFormField(
-                    controller: pinController,
-                    decoration: InputDecoration(
-                      labelText: 'PIN (optional)',
-                      border: const OutlineInputBorder(),
-                      hintText: staff.hasPin
-                          ? 'Enter new PIN to replace (${staff.configuredPinLength} digits)'
-                          : '4-6 digits',
-                    ),
-                    keyboardType: TextInputType.number,
-                    textInputAction: TextInputAction.done,
-                    onChanged: (_) => state.markChanged(),
-                    onFieldSubmitted: (_) => _saveStaff(state, staff, context),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) return null;
-                      return Validators.pin(value);
-                    },
+                  textInputAction: TextInputAction.next,
+                  onChanged: (_) => state.markChanged(),
+                  onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
+                  validator: (value) => Validators.required(value, 'Username'),
+                ),
+                const SizedBox(height: Spacing.md),
+                TextFormField(
+                  controller: fullNameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Full Name',
+                    border: OutlineInputBorder(),
                   ),
-                ],
-              ),
+                  textInputAction: TextInputAction.next,
+                  onChanged: (_) => state.markChanged(),
+                  onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
+                  validator: (value) => Validators.required(value, 'Full Name'),
+                ),
+                const SizedBox(height: Spacing.md),
+                TextFormField(
+                  controller: pinController,
+                  decoration: InputDecoration(
+                    labelText: 'PIN (optional)',
+                    border: const OutlineInputBorder(),
+                    hintText: staff.hasPin
+                        ? 'Enter new PIN to replace (${staff.configuredPinLength} digits)'
+                        : '4-6 digits',
+                  ),
+                  keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.done,
+                  onChanged: (_) => state.markChanged(),
+                  onFieldSubmitted: (_) => _saveStaff(state, staff, context),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) return null;
+                    return Validators.pin(value);
+                  },
+                ),
+              ],
             ),
           );
         },

@@ -28,6 +28,7 @@ class AppDialogService {
       // nested Navigator (e.g. inside an inner Scaffold) could pop the
       // wrong route, leaving the dialog stuck open.
       useRootNavigator: true,
+      useSafeArea: true,
       barrierDismissible: dismissible,
       builder: (context) => AppDialog(
         type: type,
@@ -380,6 +381,7 @@ class AppDialogService {
     return showDialog<String>(
       context: context,
       useRootNavigator: true,
+      useSafeArea: true,
       builder: (context) => const _VoidSaleDialog(),
     );
   }

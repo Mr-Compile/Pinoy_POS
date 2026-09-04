@@ -424,3 +424,26 @@ Results:
 - `owner_screens_test.dart` -- 14/14 passed.
 
 A full `flutter test` also passes 239/239 with `--concurrency=1` on Windows to avoid the `sqflite_common_ffi` file-lock race.
+
+## Android Backup `createDocument` Invalid URI Fix
+
+### Root Cause
+
+`MainActivity.createDocument()` passed the raw tree URI returned by `ACTION_OPEN_DOCUMENT_TREE` straight to `DocumentsContract.createDocument()`. `DocumentsContract.createDocument()` expects a **document** URI, not a **tree** URI, so some Android builds and document providers threw `IllegalArgumentException: Invalid URI` at `ContentResolver.call(... DocumentsContract.java:1380)` and the backup failed before any file was written.
+
+### Changes Made
+
+- `android/app/src/main/kotlin/com/pinoypos/pinoy_pos/MainActivity.kt`
+  - `createDocument()` now checks `DocumentsContract.isTreeUri(treeUri)` and early-returns `INVALID_ARGS` when the saved location is not a tree.
+  - It converts the tree URI to a document URI with `DocumentsContract.buildDocumentUriUsingTree(treeUri, DocumentsContract.getTreeDocumentId(treeUri))` before calling `DocumentsContract.createDocument()`.
+
+### Verification
+
+```powershell
+flutter analyze
+flutter build apk --debug
+```
+
+Results:
+- `flutter analyze` -- No issues found.
+- `flutter build apk --debug` -- Built successfully.

@@ -44,6 +44,9 @@ dependencies {
     // Required for FlutterFragmentActivity and ActivityResultContracts
     implementation("androidx.activity:activity-ktx:1.9.3")
     implementation("androidx.fragment:fragment-ktx:1.8.9")
+    // DocumentFile is used by the Storage Access Framework bridge
+    // to create and manage documents in a user-selected tree.
+    implementation("androidx.documentfile:documentfile:1.0.1")
 }
 
 flutter {

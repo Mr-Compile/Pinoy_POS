@@ -142,7 +142,13 @@ class BackupReadResult {
   final String? error;
 
   /// Raw backup bytes. Non-null when [success] is true.
+  /// Prefer [filePath] on mobile where the file may be too large to load
+  /// into memory.
   final Uint8List? bytes;
+
+  /// Local filesystem path to a copy of the backup. Non-null on platforms
+  /// that return a file instead of bytes.
+  final String? filePath;
 
   /// The filename shown to the user.
   final String? displayName;
@@ -154,6 +160,7 @@ class BackupReadResult {
     required this.success,
     this.error,
     this.bytes,
+    this.filePath,
     this.displayName,
     this.fileSize,
   });

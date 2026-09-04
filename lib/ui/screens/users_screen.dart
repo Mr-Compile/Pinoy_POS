@@ -271,6 +271,16 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  Center(
+                    child: AppAvatar(
+                      imagePath: user.profileImagePath,
+                      initials: user.fullName.isNotEmpty
+                          ? user.fullName[0].toUpperCase()
+                          : '?',
+                      radius: 40,
+                    ),
+                  ),
+                  const SizedBox(height: Spacing.md),
                   TextFormField(
                     controller: usernameController,
                     decoration: const InputDecoration(

@@ -68,13 +68,20 @@ class _ProfileMenuState extends ConsumerState<ProfileMenu> {
     final size = renderBox.size;
     final offset = renderBox.localToGlobal(Offset.zero);
 
+    final screenSize = MediaQuery.of(context).size;
+    const menuWidth = 260.0;
+    final desiredLeft = offset.dx + size.width - menuWidth;
+    final maxLeft = (screenSize.width - menuWidth).clamp(0.0, double.infinity);
+    final left = desiredLeft.clamp(0.0, maxLeft);
+    final right = (screenSize.width - left - menuWidth).clamp(0.0, double.infinity);
+
     showMenu<void>(
       context: context,
       useRootNavigator: true,
       position: RelativeRect.fromLTRB(
-        offset.dx + size.width - 260,
+        left,
         offset.dy + size.height + 8,
-        offset.dx + size.width,
+        right,
         0,
       ),
       constraints: const BoxConstraints(maxWidth: 280),

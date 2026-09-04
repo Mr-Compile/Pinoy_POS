@@ -1661,49 +1661,15 @@ class _QuickAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final brightness = Theme.of(context).brightness;
-    final foregroundColor = _foregroundColor(context, brightness);
-    return AppButton.filled(
+    return AppButton.quickAction(
       onPressed: onTap,
       color: color,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minWidth: 64, minHeight: 48),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 28, color: foregroundColor),
-            const SizedBox(height: Spacing.xs),
-            Text(
-              label,
-              style: AppTypography.labelMedium(context).copyWith(
-                color: foregroundColor,
-                fontWeight: FontWeight.w600,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
+      icon: icon,
+      label: label,
     );
   }
-
-  Color _foregroundColor(BuildContext context, Brightness brightness) {
-    final cs = Theme.of(context).colorScheme;
-    return switch (color) {
-      AppButtonColor.primary => cs.onPrimary,
-      AppButtonColor.success =>
-        AppSemanticColors.resolveOn(AppSemanticColors.onSuccess, brightness),
-      AppButtonColor.warning =>
-        AppSemanticColors.resolveOn(AppSemanticColors.onWarning, brightness),
-      AppButtonColor.info =>
-        AppSemanticColors.resolveOn(AppSemanticColors.onInfo, brightness),
-      AppButtonColor.error =>
-        AppSemanticColors.resolveOn(AppSemanticColors.onError, brightness),
-      AppButtonColor.neutral =>
-        AppSemanticColors.resolveOn(AppSemanticColors.onNeutral, brightness),
-    };
-  }
 }
+
 
 /// Two-column layout that stacks vertically on mobile and goes side-by-side
 /// on tablet/desktop (≥600px). Each column gets equal width.

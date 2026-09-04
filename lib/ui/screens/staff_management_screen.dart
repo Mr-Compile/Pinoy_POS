@@ -351,6 +351,18 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
                     ),
                   ),
                 if (!isEdit) const SizedBox(height: Spacing.md),
+                if (isEdit) ...[
+                  Center(
+                    child: AppAvatar(
+                      imagePath: staff.profileImagePath,
+                      initials: staff.fullName.isNotEmpty
+                          ? staff.fullName[0].toUpperCase()
+                          : '?',
+                      radius: 40,
+                    ),
+                  ),
+                  const SizedBox(height: Spacing.md),
+                ],
                 TextFormField(
                   controller: usernameController,
                   decoration: const InputDecoration(

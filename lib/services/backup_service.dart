@@ -289,7 +289,7 @@ class BackupService {
       throw AuthorizationException('backup_restore');
     }
 
-    // 1. Prepare the backup bytes in a temporary file.
+    // 1. Prepare the backup payload in a temporary file.
     final String tempPath;
     try {
       tempPath = await _prepareBackupFile();
@@ -306,23 +306,21 @@ class BackupService {
       );
     }
 
-    late final Uint8List bytes;
     try {
-      bytes = await File(tempPath).readAsBytes();
+      final tempFile = File(tempPath);
+      if (!await tempFile.exists() || await tempFile.length() == 0) {
+        await _safeDelete(tempFile);
+        return const BackupExportRecord(
+          result: BackupExportResult.failed,
+          error: 'The backup file was empty.',
+        );
+      }
     } catch (e) {
-      _log('Failed to read prepared backup file: $e');
+      _log('Failed to verify prepared backup file: $e');
       await _safeDelete(File(tempPath));
       return BackupExportRecord(
         result: BackupExportResult.failed,
-        error: 'Could not read the prepared backup: $e',
-      );
-    }
-
-    if (bytes.isEmpty) {
-      await _safeDelete(File(tempPath));
-      return const BackupExportRecord(
-        result: BackupExportResult.failed,
-        error: 'The backup file was empty.',
+        error: 'Could not verify the prepared backup: $e',
       );
     }
 
@@ -334,7 +332,7 @@ class BackupService {
     // 3. Write to the chosen storage.
     _log('Writing backup to target: $targetLocation');
     final write = await _storage.saveBackup(
-      bytes: bytes,
+      sourceFilePath: tempPath,
       defaultFileName: defaultName,
       location: targetLocation,
       defaultLocation: savedLocation,
@@ -421,10 +419,20 @@ class BackupService {
       );
     }
 
-    return await _restoreFromBytes(
-      read.bytes!,
+    final filePath = read.filePath;
+    if (filePath == null || filePath.isEmpty) {
+      return BackupImportRecord(
+        result: BackupImportResult.failed,
+        displayName: read.displayName,
+        fileSize: read.fileSize,
+        error: 'The selected backup file could not be read.',
+      );
+    }
+
+    return await _restoreFromFile(
+      filePath,
       read.displayName ?? 'backup.db',
-      read.fileSize ?? read.bytes!.length,
+      read.fileSize ?? 0,
     );
   }
 
@@ -443,123 +451,30 @@ class BackupService {
       );
     }
 
-    String? tempPath;
-    try {
-      if (storageType == BackupStorageType.androidSaf ||
-          _isContentUri(backup.filePath)) {
-        final read = await _storage.readBackup(backup.filePath);
-        if (!read.success) {
-          return BackupImportRecord(
-            result: BackupImportResult.failed,
-            displayName: backup.displayName,
-            fileSize: backup.fileSize,
-            error: read.error,
-          );
-        }
-        if (read.bytes == null || read.bytes!.isEmpty) {
-          return BackupImportRecord(
-            result: BackupImportResult.invalidFile,
-            displayName: read.displayName,
-            fileSize: read.fileSize,
-          );
-        }
-        tempPath = await _writeTempImportFile(
-          read.bytes!,
-          read.displayName ?? 'backup.db',
-        );
-      } else {
-        tempPath = _toLocalPath(backup.filePath);
-        if (tempPath == null) {
-          return BackupImportRecord(
-            result: BackupImportResult.failed,
-            displayName: backup.displayName,
-            fileSize: backup.fileSize,
-            error: 'The backup file could not be opened.',
-          );
-        }
-      }
-
-      if (tempPath == null || tempPath.isEmpty) {
-        return BackupImportRecord(
-          result: BackupImportResult.failed,
-          displayName: backup.displayName,
-          fileSize: backup.fileSize,
-          error: 'The backup file could not be opened.',
-        );
-      }
-
-      final validation = await _validateBackupFile(tempPath);
-      if (validation != BackupImportResult.success) {
-        if (tempPath != backup.filePath) {
-          await _safeDelete(File(tempPath));
-        }
-        return BackupImportRecord(
-          result: validation,
-          displayName: backup.displayName,
-          fileSize: backup.fileSize,
-        );
-      }
-
-      final fileSize = await File(tempPath).length();
-
-      // Safety backup.
-      final safetyPath = await _createSafetyBackup();
-
-      // Log started.
-      try {
-        await _activityLogService.logActivity(
-          action: 'BACKUP_RESTORE_STARTED',
-          entity: 'backup',
-          details:
-              'Restoring from: ${backup.displayName ?? backup.filePath} (${_formatFileSize(fileSize)})',
-        );
-      } catch (e) {
-        _log('Failed to log restore start: $e');
-      }
-
-      final (success, restoreError) = await _performRestore(tempPath);
-
-      if (tempPath != backup.filePath) {
-        await _safeDelete(File(tempPath));
-      }
-
-      if (!success) {
-        if (safetyPath != null) {
-          await _performRestore(safetyPath);
-        }
-        await _logRestoreFailure(backup.displayName ?? backup.filePath);
-        if (safetyPath != null) {
-          await _safeDelete(File(safetyPath));
-        }
-        return BackupImportRecord(
-          result: BackupImportResult.failed,
-          displayName: backup.displayName,
-          fileSize: backup.fileSize,
-          error: restoreError ?? 'The backup could not be restored.',
-        );
-      }
-
-      await _logRestoreSuccess(backup.displayName ?? backup.filePath);
-      if (safetyPath != null) {
-        await _safeDelete(File(safetyPath));
-      }
-      return BackupImportRecord(
-        result: BackupImportResult.success,
-        displayName: backup.displayName,
-        fileSize: backup.fileSize,
-      );
-    } catch (e) {
-      _log('Restore from history failed: $e');
-      if (tempPath != null && tempPath != backup.filePath) {
-        await _safeDelete(File(tempPath));
-      }
+    final read = await _storage.readBackup(backup.filePath);
+    if (!read.success) {
       return BackupImportRecord(
         result: BackupImportResult.failed,
         displayName: backup.displayName,
         fileSize: backup.fileSize,
-        error: 'Restore failed: $e',
+        error: read.error,
       );
     }
+
+    final tempPath = read.filePath;
+    if (tempPath == null || tempPath.isEmpty) {
+      return BackupImportRecord(
+        result: BackupImportResult.invalidFile,
+        displayName: read.displayName,
+        fileSize: read.fileSize,
+      );
+    }
+
+    return _restoreFromFile(
+      tempPath,
+      read.displayName ?? backup.displayName ?? 'backup.db',
+      read.fileSize ?? await File(tempPath).length(),
+    );
   }
 
   // ── Backup History ───────────────────────────────────────────────────
@@ -827,15 +742,13 @@ class BackupService {
 
   // ── Restore internals ────────────────────────────────────────────────
 
-  Future<BackupImportRecord> _restoreFromBytes(
-    Uint8List bytes,
+  Future<BackupImportRecord> _restoreFromFile(
+    String tempPath,
     String displayName,
     int fileSize,
   ) async {
-    String? tempPath;
     try {
-      tempPath = await _writeTempImportFile(bytes, displayName);
-      if (tempPath == null || tempPath.isEmpty) {
+      if (tempPath.isEmpty) {
         return const BackupImportRecord(
           result: BackupImportResult.failed,
           error: 'Could not create a temporary backup file.',
@@ -894,9 +807,7 @@ class BackupService {
       );
     } catch (e) {
       _log('Backup restore failed: $e');
-      if (tempPath != null) {
-        await _safeDelete(File(tempPath));
-      }
+      await _safeDelete(File(tempPath));
       return BackupImportRecord(
         result: BackupImportResult.failed,
         error: 'Backup restore failed: $e',
@@ -1270,18 +1181,6 @@ class BackupService {
     final dir = Directory(p.join(tempDir.path, dirName));
     await dir.create(recursive: true);
     return dir.path;
-  }
-
-  Future<String?> _writeTempImportFile(Uint8List bytes, String displayName) async {
-    final tempPath = await _tempPath('pinoy_pos_import_${_timestamp()}_${p.basename(displayName)}');
-    try {
-      final file = File(tempPath);
-      await file.writeAsBytes(bytes, flush: true);
-      return tempPath;
-    } catch (e) {
-      _log('Failed to write temp import file: $e');
-      return null;
-    }
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────

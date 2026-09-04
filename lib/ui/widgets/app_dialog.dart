@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/ui/widgets/app_button.dart';
 
@@ -165,66 +166,74 @@ class AppDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final viewPadding = MediaQuery.of(context).viewPadding;
-    final isTablet = size.width >= 600;
-    // Clamp the dialog to the available safe width so it never overflows
-    // on small or landscape phones. Default dialog insets are also reduced.
-    final safeWidth = size.width - viewPadding.horizontal;
-    final maxDialogWidth =
-        isTablet ? min(560.0, safeWidth - 48) : min(440.0, safeWidth - 32);
+    final isAlert = child == null;
 
-    return Semantics(
-      label: type.semanticLabel,
-      container: true,
-      child: Dialog(
-        insetPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 24,
-        ),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            minWidth: 280,
-            maxWidth: maxDialogWidth,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(Spacing.xxl),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (showIcon) ...[
-                    _buildIcon(context),
-                    const SizedBox(height: Spacing.lg),
-                  ],
-                  _buildTitle(context),
-                  if (message != null) ...[
-                    const SizedBox(height: Spacing.sm),
-                    _buildMessage(context),
-                  ],
-                  if (details != null) ...[
-                    const SizedBox(height: Spacing.sm),
-                    _buildDetails(context),
-                  ],
-                  if (child != null) ...[
-                    const SizedBox(height: Spacing.md),
-                    child!,
-                  ],
-                  if (actions.isNotEmpty) ...[
-                    const SizedBox(height: Spacing.xxl),
-                    _buildActions(context, isTablet),
-                  ],
-                ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final layout = layoutClassFor(constraints.maxWidth);
+        final (horizontalInset, maxDialogWidth) = switch (layout) {
+          LayoutClass.compact => (32.0, min(360.0, constraints.maxWidth - 64.0)),
+          LayoutClass.medium => (24.0, min(480.0, constraints.maxWidth - 48.0)),
+          LayoutClass.expanded => (24.0, min(560.0, constraints.maxWidth - 48.0)),
+        };
+        // Never let the max fall below the min width to keep BoxConstraints
+        // valid, even on very small/foldable windows.
+        final effectiveMax = max(280.0, maxDialogWidth);
+
+        return Semantics(
+          label: type.semanticLabel,
+          container: true,
+          child: Dialog(
+            alignment: Alignment.center,
+            insetPadding: EdgeInsets.symmetric(
+              horizontal: horizontalInset,
+              vertical: 24,
+            ),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minWidth: 280,
+                maxWidth: effectiveMax,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(Spacing.xxl),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (showIcon) ...[
+                        _buildIcon(context, isAlert),
+                        const SizedBox(height: Spacing.lg),
+                      ],
+                      _buildTitle(context, isAlert),
+                      if (message != null) ...[
+                        const SizedBox(height: Spacing.sm),
+                        _buildMessage(context, isAlert),
+                      ],
+                      if (details != null) ...[
+                        const SizedBox(height: Spacing.sm),
+                        _buildDetails(context),
+                      ],
+                      if (child != null) ...[
+                        const SizedBox(height: Spacing.md),
+                        child!,
+                      ],
+                      if (actions.isNotEmpty) ...[
+                        const SizedBox(height: Spacing.xxl),
+                        _buildActions(context, layout.isAtLeastMedium),
+                      ],
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildIcon(BuildContext context) {
+  Widget _buildIcon(BuildContext context, bool centered) {
     final brightness = Theme.of(context).brightness;
     if (type == AppDialogType.loading) {
       return Center(
@@ -240,7 +249,7 @@ class AppDialog extends StatelessWidget {
     }
 
     return Align(
-      alignment: Alignment.centerLeft,
+      alignment: centered ? Alignment.center : Alignment.centerLeft,
       child: Container(
         width: 56,
         height: 56,
@@ -257,17 +266,19 @@ class AppDialog extends StatelessWidget {
     );
   }
 
-  Widget _buildTitle(BuildContext context) {
+  Widget _buildTitle(BuildContext context, bool centered) {
     return Text(
       title,
+      textAlign: centered ? TextAlign.center : TextAlign.start,
       style: AppTypography.headlineSmallSemibold(context),
     );
   }
 
-  Widget _buildMessage(BuildContext context) {
+  Widget _buildMessage(BuildContext context, bool centered) {
     return Text(
       message!,
       softWrap: true,
+      textAlign: centered ? TextAlign.center : TextAlign.start,
       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),

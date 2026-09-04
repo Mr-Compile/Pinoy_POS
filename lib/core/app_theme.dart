@@ -232,6 +232,7 @@ class AppColors {
           ),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           minimumSize: const Size(48, 48),
+          backgroundBuilder: AppColors.elevatedButtonBackgroundBuilder,
         ),
       ),
 
@@ -244,6 +245,7 @@ class AppColors {
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           // Slightly taller padding for better touch targets.
           minimumSize: const Size(48, 48),
+          backgroundBuilder: AppColors.filledButtonBackgroundBuilder,
         ),
       ),
 
@@ -341,6 +343,7 @@ class AppColors {
 
       // ── Dialog theme ─────────────────────────────────────────────
       dialogTheme: DialogThemeData(
+        alignment: Alignment.center,
         backgroundColor: isDark
             ? colorScheme.surfaceContainerHigh
             : colorScheme.surface,
@@ -412,21 +415,153 @@ class AppColors {
         .toColor();
   }
 
-  // ── Premium button gradient ────────────────────────────────────────
+  // ── Login / primary gradient ────────────────────────────────────────
 
-  /// Returns a subtle vertical gradient for a primary button using the
-  /// exact primary palette from the theme. Light mode uses the lighter blue
-  /// on top; dark mode uses the darker blue on the bottom for depth.
-  static LinearGradient? premiumButtonGradient(
-    ColorScheme colorScheme,
-    Brightness brightness,
-  ) {
-    final primary = AppSemanticColors.resolve(AppSemanticColors.primary, brightness);
-    final primaryLight = AppSemanticColors.resolve(AppSemanticColors.primaryLight, brightness);
+  /// Returns the horizontal blue gradient used by the login screen and
+  /// primary gradient buttons. It is the single source of truth for that
+  /// gradient and adapts to both light and dark mode.
+  static LinearGradient loginGradient(Brightness brightness) {
     return LinearGradient(
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
-      colors: [primaryLight, primary],
+      begin: Alignment.centerLeft,
+      end: Alignment.centerRight,
+      colors: [
+        AppSemanticColors.resolve(AppSemanticColors.primaryLight, brightness),
+        AppSemanticColors.resolve(AppSemanticColors.primaryDark, brightness),
+      ],
+    );
+  }
+
+  /// Background builder used by [FilledButtonThemeData] and
+  /// [ElevatedButtonThemeData] to give primary buttons the same horizontal
+  /// gradient as the login screen. Non-primary colors are rendered as flat
+  /// fills, and disabled buttons receive the standard dimming overlay.
+  static Widget _primaryButtonBackgroundBuilder(
+    BuildContext context,
+    Set<WidgetState> states,
+    Widget? child, {
+    required bool treatNullStyleAsPrimary,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
+    final style = context.widget is FilledButton
+        ? (context.widget as FilledButton).style
+        : context.widget is ElevatedButton
+            ? (context.widget as ElevatedButton).style
+            : null;
+    final bg = style?.backgroundColor;
+
+    final disabled = states.contains(WidgetState.disabled);
+    const borderRadius = BorderRadius.all(Radius.circular(12));
+
+    final bool isPrimary;
+    if (bg != null) {
+      final enabledStates = <WidgetState>{...states}
+        ..remove(WidgetState.disabled);
+      final enabledBg = bg.resolve(enabledStates);
+      isPrimary = enabledBg == cs.primary;
+    } else {
+      isPrimary = treatNullStyleAsPrimary;
+    }
+
+    if (isPrimary) {
+      return _GradientOverlayBackground(
+        gradient: loginGradient(brightness),
+        borderRadius: borderRadius,
+        disabled: disabled,
+        child: child,
+      );
+    }
+
+    final resolvedBg = bg!.resolve(states);
+    final enabledStates = <WidgetState>{...states}
+      ..remove(WidgetState.disabled);
+    final enabledBg = bg.resolve(enabledStates);
+    final bgColor = resolvedBg ??
+        enabledBg?.withValues(alpha: 0.12) ??
+        cs.onSurface.withValues(alpha: 0.12);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: borderRadius,
+      ),
+      child: child,
+    );
+  }
+
+  /// [ButtonLayerBuilder] for [FilledButton] — null style is treated as
+  /// primary because a plain [FilledButton] is a primary CTA by default.
+  static Widget filledButtonBackgroundBuilder(
+    BuildContext context,
+    Set<WidgetState> states,
+    Widget? child,
+  ) {
+    return _primaryButtonBackgroundBuilder(
+      context,
+      states,
+      child,
+      treatNullStyleAsPrimary: true,
+    );
+  }
+
+  /// [ButtonLayerBuilder] for [ElevatedButton] — null style keeps the
+  /// default surface appearance; only explicit primary backgrounds become
+  /// the gradient.
+  static Widget elevatedButtonBackgroundBuilder(
+    BuildContext context,
+    Set<WidgetState> states,
+    Widget? child,
+  ) {
+    return _primaryButtonBackgroundBuilder(
+      context,
+      states,
+      child,
+      treatNullStyleAsPrimary: false,
+    );
+  }
+}
+
+/// Layer used by [AppColors.filledButtonBackgroundBuilder] and
+/// [AppColors.elevatedButtonBackgroundBuilder] to paint a rounded gradient
+/// and an optional disabled overlay behind a button's child.
+class _GradientOverlayBackground extends StatelessWidget {
+  final LinearGradient gradient;
+  final BorderRadius borderRadius;
+  final bool disabled;
+  final Widget? child;
+
+  const _GradientOverlayBackground({
+    required this.gradient,
+    required this.borderRadius,
+    required this.disabled,
+    this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Stack(
+      fit: StackFit.passthrough,
+      children: [
+        Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: gradient,
+              borderRadius: borderRadius,
+            ),
+          ),
+        ),
+        if (disabled)
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                color: cs.onSurface.withValues(alpha: 0.12),
+                borderRadius: borderRadius,
+              ),
+            ),
+          ),
+        ?child,
+      ],
     );
   }
 }

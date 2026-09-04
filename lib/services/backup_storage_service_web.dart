@@ -68,12 +68,23 @@ class BackupStorageService {
   ///
   /// [location] and [defaultLocation] are ignored on web; the browser always
   /// asks the user where to save the downloaded file.
+  ///
+  /// On web the local [sourceFilePath] cannot be read by the browser, so the
+  /// caller should provide the [bytes] payload when a web export is needed.
   Future<BackupWriteResult> saveBackup({
-    required Uint8List bytes,
+    required String sourceFilePath,
     required String defaultFileName,
+    Uint8List? bytes,
     BackupLocation? location,
     BackupLocation? defaultLocation,
   }) async {
+    if (bytes == null || bytes.isEmpty) {
+      return const BackupWriteResult(
+        success: false,
+        error: 'Web export requires the backup bytes to be provided.',
+      );
+    }
+
     try {
       // Copy into a fresh view so a Uint8List that is a slice of a larger
       // buffer does not include trailing bytes in the download.

@@ -1,12 +1,8 @@
 package com.pinoypos.pinoy_pos
 
-import android.app.Activity
 import android.content.Intent
-import android.database.Cursor
 import android.net.Uri
 import android.os.Bundle
-import android.provider.DocumentsContract
-import android.provider.OpenableColumns
 import android.util.Log
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
@@ -15,22 +11,33 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.Result
-import java.io.ByteArrayOutputStream
 import java.io.File
 
 private const val CHANNEL = "com.pinoypos.pinoy_pos/backup_storage"
-private const val TAG = "BackupStorage"
+private const val TAG = "MainActivity"
 
+/**
+ * Main entry point for the Flutter UI.
+ *
+ * SAF (Storage Access Framework) storage logic is delegated to [StorageBridge]
+ * so this activity only owns the activity-launchers required for picker
+ * intents and the method-channel dispatch table.
+ */
 class MainActivity : FlutterFragmentActivity() {
+
+    private lateinit var storageBridge: StorageBridge
 
     private lateinit var openDocumentTreeLauncher: ActivityResultLauncher<Uri?>
     private var pendingOpenTreeResult: Result? = null
 
     private lateinit var openDocumentLauncher: ActivityResultLauncher<Array<String>>
     private var pendingOpenDocumentResult: Result? = null
+    private var pendingOpenDocumentTargetDir: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        storageBridge = StorageBridge(this)
 
         openDocumentTreeLauncher = registerForActivityResult(
             ActivityResultContracts.OpenDocumentTree()
@@ -58,8 +65,6 @@ class MainActivity : FlutterFragmentActivity() {
                 return@registerForActivityResult
             }
 
-            // Verify the write permission was actually persisted. Some
-            // document providers return a URI but do not grant write access.
             val hasWrite = contentResolver.persistedUriPermissions.any {
                 it.uri == uri && it.isWritePermission
             }
@@ -75,7 +80,7 @@ class MainActivity : FlutterFragmentActivity() {
             result.success(
                 mapOf(
                     "uri" to uri.toString(),
-                    "displayName" to (getDisplayName(uri) ?: "Selected folder"),
+                    "displayName" to (storageBridge.getDisplayName(uri) ?: "Selected folder"),
                 )
             )
         }
@@ -84,7 +89,9 @@ class MainActivity : FlutterFragmentActivity() {
             ActivityResultContracts.OpenDocument()
         ) { uri ->
             val result = pendingOpenDocumentResult
+            val targetDir = pendingOpenDocumentTargetDir
             pendingOpenDocumentResult = null
+            pendingOpenDocumentTargetDir = null
             if (result == null) return@registerForActivityResult
 
             if (uri == null) {
@@ -92,8 +99,6 @@ class MainActivity : FlutterFragmentActivity() {
                 return@registerForActivityResult
             }
 
-            // Persist read access so restore-from-history still works
-            // after the app is restarted.
             val takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION
             try {
                 contentResolver.takePersistableUriPermission(uri, takeFlags)
@@ -101,31 +106,12 @@ class MainActivity : FlutterFragmentActivity() {
                 Log.w(TAG, "Could not take persistable permission for $uri", e)
             }
 
-            Thread {
-                try {
-                    contentResolver.openInputStream(uri)?.use { input ->
-                        val bytes = input.readBytes()
-                        val displayName = getDisplayName(uri) ?: "backup.db"
-                        runOnUiThread {
-                            result.success(
-                                mapOf(
-                                    "uri" to uri.toString(),
-                                    "displayName" to displayName,
-                                    "size" to bytes.size,
-                                    "bytes" to bytes,
-                                )
-                            )
-                        }
-                    } ?: runOnUiThread {
-                        result.error("READ_ERROR", "Could not open the selected file", null)
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to read picked document", e)
-                    runOnUiThread {
-                        result.error("READ_ERROR", e.message, null)
-                    }
-                }
-            }.start()
+            if (targetDir == null) {
+                result.error("INVALID_ARGS", "Missing targetDir for import", null)
+                return@registerForActivityResult
+            }
+
+            storageBridge.copyUriToTempFile(uri, File(targetDir), result)
         }
     }
 
@@ -138,11 +124,11 @@ class MainActivity : FlutterFragmentActivity() {
         ).setMethodCallHandler { call, result ->
             when (call.method) {
                 "openDocumentTree" -> openDocumentTree(call, result)
-                "createDocument" -> createDocument(call, result)
-                "readDocument" -> readDocument(call, result)
+                "writeBackup" -> writeBackup(call, result)
+                "readBackup" -> readBackup(call, result)
+                "openDocument" -> openDocument(call, result)
                 "isUriValid" -> isUriValid(call, result)
                 "getDisplayName" -> getDisplayName(call, result)
-                "openDocument" -> openDocument(call, result)
                 "deleteDocument" -> deleteDocument(call, result)
                 "releaseUri" -> releaseUri(call, result)
                 else -> result.notImplemented()
@@ -165,149 +151,55 @@ class MainActivity : FlutterFragmentActivity() {
         val mimeTypes = call.argument<List<String>>("mimeTypes")
             ?.toTypedArray()
             ?: arrayOf("*/*")
+        val targetDir = call.argument<String>("targetDir")
+        if (targetDir == null) {
+            result.error("INVALID_ARGS", "Missing targetDir for import", null)
+            return
+        }
         pendingOpenDocumentResult = result
+        pendingOpenDocumentTargetDir = targetDir
         try {
             openDocumentLauncher.launch(mimeTypes)
         } catch (e: Exception) {
             pendingOpenDocumentResult = null
+            pendingOpenDocumentTargetDir = null
             result.error("LAUNCH_ERROR", e.message, null)
         }
     }
 
-    private fun createDocument(call: MethodCall, result: Result) {
+    private fun writeBackup(call: MethodCall, result: Result) {
         val treeUriString = call.argument<String>("treeUri")
+        val sourceFilePath = call.argument<String>("sourceFilePath")
         val displayName = call.argument<String>("displayName")
         val mimeType = call.argument<String>("mimeType") ?: "application/octet-stream"
-        val bytes = call.argument<ByteArray>("bytes")
 
-        if (treeUriString == null || displayName == null || bytes == null) {
-            result.error("INVALID_ARGS", "Missing treeUri, displayName, or bytes", null)
+        if (treeUriString == null || sourceFilePath == null || displayName == null) {
+            result.error(
+                "INVALID_ARGS",
+                "Missing treeUri, sourceFilePath, or displayName",
+                null,
+            )
             return
         }
 
         val treeUri = Uri.parse(treeUriString)
+        val sourceFile = File(sourceFilePath)
 
-        Thread {
-            try {
-                val docUri = DocumentsContract.createDocument(
-                    contentResolver,
-                    treeUri,
-                    mimeType,
-                    displayName,
-                )
-
-                if (docUri == null) {
-                    runOnUiThread {
-                        result.error("CREATE_FAILED", "Could not create document in selected folder", null)
-                    }
-                    return@Thread
-                }
-
-                // Use the simplest write mode ("w") first; "rwt" is not
-                // supported by every document provider and can cause
-                // "not allowed to write" / IllegalArgumentException failures.
-                val output = contentResolver.openOutputStream(docUri, "w")
-                    ?: contentResolver.openOutputStream(docUri, "wt")
-                    ?: contentResolver.openOutputStream(docUri)
-
-                if (output == null) {
-                    runOnUiThread {
-                        result.error("WRITE_FAILED", "Could not open output stream for writing", null)
-                    }
-                    return@Thread
-                }
-
-                output.use {
-                    it.write(bytes)
-                    it.flush()
-                }
-
-                // Verify the provider actually persisted the bytes.
-                val actualSize = (contentResolver.openFileDescriptor(docUri, "r")?.use { pfd ->
-                    pfd.statSize
-                } ?: contentResolver.query(docUri, null, null, null, null)?.use { cursor ->
-                    if (cursor.moveToFirst()) {
-                        val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
-                            .takeIf { it >= 0 }
-                            ?: -1
-                        if (sizeIndex >= 0) cursor.getLong(sizeIndex) else -1L
-                    } else {
-                        -1L
-                    }
-                }) ?: -1L
-
-                if (actualSize >= 0 && actualSize != bytes.size.toLong()) {
-                    runOnUiThread {
-                        result.error(
-                            "WRITE_FAILED",
-                            "The backup file size does not match the expected size.",
-                            null,
-                        )
-                    }
-                    return@Thread
-                }
-
-                val finalName = getDisplayName(docUri) ?: displayName
-                runOnUiThread {
-                    result.success(
-                        mapOf(
-                            "uri" to docUri.toString(),
-                            "displayName" to finalName,
-                            "size" to if (actualSize >= 0) actualSize else bytes.size.toLong(),
-                        )
-                    )
-                }
-            } catch (e: SecurityException) {
-                Log.e(TAG, "Permission denied writing backup document", e)
-                runOnUiThread {
-                    result.error(
-                        "WRITE_FAILED",
-                        "Not allowed to write to the selected folder. " +
-                            "Choose a different location or grant write access.",
-                        null,
-                    )
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to create backup document", e)
-                runOnUiThread {
-                    result.error("WRITE_FAILED", e.message, null)
-                }
-            }
-        }.start()
+        storageBridge.writeDocument(treeUri, sourceFile, displayName, mimeType, result)
     }
 
-    private fun readDocument(call: MethodCall, result: Result) {
+    private fun readBackup(call: MethodCall, result: Result) {
         val uriString = call.argument<String>("uri") ?: run {
             result.error("INVALID_ARGS", "Missing uri", null)
             return
         }
-        val uri = Uri.parse(uriString)
+        val targetDir = call.argument<String>("targetDir") ?: run {
+            result.error("INVALID_ARGS", "Missing targetDir for import", null)
+            return
+        }
 
-        Thread {
-            try {
-                contentResolver.openInputStream(uri)?.use { input ->
-                    val bytes = input.readBytes()
-                    val displayName = getDisplayName(uri) ?: "backup.db"
-                    runOnUiThread {
-                        result.success(
-                            mapOf(
-                                "uri" to uri.toString(),
-                                "displayName" to displayName,
-                                "size" to bytes.size,
-                                "bytes" to bytes,
-                            )
-                        )
-                    }
-                } ?: runOnUiThread {
-                    result.error("READ_ERROR", "Could not open the backup file", null)
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to read backup document", e)
-                runOnUiThread {
-                    result.error("READ_ERROR", e.message, null)
-                }
-            }
-        }.start()
+        val uri = Uri.parse(uriString)
+        storageBridge.copyUriToTempFile(uri, File(targetDir), result)
     }
 
     private fun isUriValid(call: MethodCall, result: Result) {
@@ -318,39 +210,8 @@ class MainActivity : FlutterFragmentActivity() {
         val uri = Uri.parse(uriString)
 
         Thread {
-            try {
-                val hasPermission = if (DocumentsContract.isTreeUri(uri)) {
-                    contentResolver.persistedUriPermissions.any {
-                        it.uri == uri && it.isWritePermission
-                    }
-                } else {
-                    contentResolver.persistedUriPermissions.any {
-                        it.uri == uri && it.isReadPermission
-                    }
-                }
-
-                if (!hasPermission) {
-                    runOnUiThread { result.success(false) }
-                    return@Thread
-                }
-
-                // Tree URIs must be queried through their document URI; a
-                // direct query on the tree URI fails on some providers.
-                val documentUri = if (DocumentsContract.isTreeUri(uri)) {
-                    DocumentsContract.buildDocumentUriUsingTree(
-                        uri,
-                        DocumentsContract.getTreeDocumentId(uri),
-                    )
-                } else {
-                    uri
-                }
-
-                val canQuery = canReadUri(documentUri)
-                runOnUiThread { result.success(canQuery) }
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to validate URI", e)
-                runOnUiThread { result.success(false) }
-            }
+            val valid = storageBridge.isUriValid(uri)
+            runOnUiThread { result.success(valid) }
         }.start()
     }
 
@@ -362,13 +223,8 @@ class MainActivity : FlutterFragmentActivity() {
         val uri = Uri.parse(uriString)
 
         Thread {
-            try {
-                val deleted = DocumentsContract.deleteDocument(contentResolver, uri)
-                runOnUiThread { result.success(deleted) }
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to delete document", e)
-                runOnUiThread { result.success(false) }
-            }
+            val deleted = storageBridge.deleteDocument(uri)
+            runOnUiThread { result.success(deleted) }
         }.start()
     }
 
@@ -379,16 +235,8 @@ class MainActivity : FlutterFragmentActivity() {
         }
         val uri = Uri.parse(uriString)
 
-        try {
-            contentResolver.releasePersistableUriPermission(
-                uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-            )
-            result.success(null)
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to release URI", e)
-            result.success(null)
-        }
+        storageBridge.releaseUri(uri)
+        result.success(null)
     }
 
     private fun getDisplayName(call: MethodCall, result: Result) {
@@ -397,56 +245,10 @@ class MainActivity : FlutterFragmentActivity() {
             return
         }
         val uri = Uri.parse(uriString)
-        result.success(getDisplayName(uri) ?: uri.lastPathSegment ?: "Selected item")
-    }
 
-    private fun getDisplayName(uri: Uri): String? {
-        return try {
-            // Tree URIs cannot be queried directly; resolve them to their
-            // document URI first so we can read the display name column.
-            val displayUri = if (DocumentsContract.isTreeUri(uri)) {
-                DocumentsContract.buildDocumentUriUsingTree(
-                    uri,
-                    DocumentsContract.getTreeDocumentId(uri),
-                )
-            } else {
-                uri
-            }
-            contentResolver.query(displayUri, null, null, null, null)?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                        .takeIf { it >= 0 }
-                        ?: cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
-                            .takeIf { it >= 0 }
-                            ?: -1
-                    if (index >= 0) cursor.getString(index) else null
-                } else {
-                    null
-                }
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Could not query display name", e)
-            null
-        }
+        Thread {
+            val name = storageBridge.getDisplayName(uri) ?: uri.lastPathSegment ?: "Selected item"
+            runOnUiThread { result.success(name) }
+        }.start()
     }
-
-    private fun canReadUri(uri: Uri): Boolean {
-        return try {
-            contentResolver.query(uri, arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID), null, null, null)?.use { cursor ->
-                cursor.moveToFirst()
-            } ?: false
-        } catch (e: Exception) {
-            false
-        }
-    }
-}
-
-private fun java.io.InputStream.readBytes(): ByteArray {
-    val output = ByteArrayOutputStream()
-    val buffer = ByteArray(8192)
-    var read: Int
-    while (this.read(buffer).also { read = it } != -1) {
-        output.write(buffer, 0, read)
-    }
-    return output.toByteArray()
 }

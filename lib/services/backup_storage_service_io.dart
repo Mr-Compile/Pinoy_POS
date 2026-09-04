@@ -19,6 +19,10 @@ import 'package:pinoy_pos/services/file_export_service.dart';
 ///
 /// On Windows / desktop it uses [FilePicker] to select a folder and plain
 /// Dart [File] operations to write the backup.
+///
+/// Import and export are stream-based wherever possible: the caller provides
+/// a local [sourceFilePath] for the backup payload, and the platform side
+/// streams it to the destination instead of loading the whole file into RAM.
 class BackupStorageService {
   static const _channel = MethodChannel('com.pinoypos.pinoy_pos/backup_storage');
 
@@ -77,12 +81,12 @@ class BackupStorageService {
     );
   }
 
-  /// Picks a backup file for restore and returns its bytes.
+  /// Picks a backup file for restore and returns the path to a local copy.
   ///
   /// On Android this launches a Storage Access Framework picker so the
   /// user can choose any file (including `.db` files that the regular
   /// file picker cannot filter for). On desktop it uses [FilePicker].
-  /// The returned [BackupReadResult.bytes] are the raw backup bytes.
+  /// The returned [BackupReadResult.filePath] is the local copy.
   Future<BackupReadResult> pickBackupForRestore() async {
     if (Platform.isAndroid) {
       return _pickBackupForRestoreAndroid();
@@ -92,38 +96,47 @@ class BackupStorageService {
       dialogTitle: 'Import Backup',
       type: FileType.custom,
       allowedExtensions: ['zip', 'db'],
-      withData: true,
+      withData: false,
     );
 
     if (result == null || result.files.isEmpty) {
       return const BackupReadResult(
         success: false,
         error: null,
-        bytes: null,
-        displayName: null,
-        fileSize: null,
       );
     }
 
     final file = result.files.first;
-    final bytes = file.bytes;
-    if (bytes == null || bytes.isEmpty) {
+    final filePath = file.path;
+
+    if (filePath == null || filePath.isEmpty) {
       return const BackupReadResult(
         success: false,
         error: 'The selected backup file is empty.',
       );
     }
 
+    final copiedPath = await _copyToTempFile(filePath, file.name);
+    if (copiedPath == null) {
+      return const BackupReadResult(
+        success: false,
+        error: 'Could not copy the selected backup to a temporary file.',
+      );
+    }
+
+    final size = await _safeFileSize(copiedPath, fallback: file.size);
+
     return BackupReadResult(
       success: true,
       displayName: file.name,
-      fileSize: bytes.length,
-      bytes: bytes,
+      fileSize: size,
+      filePath: copiedPath,
     );
   }
 
   Future<BackupReadResult> _pickBackupForRestoreAndroid() async {
     try {
+      final tempDir = await getTemporaryDirectory();
       final result = await _channel.invokeMapMethod<String, dynamic>(
         'openDocument',
         {
@@ -131,6 +144,7 @@ class BackupStorageService {
           // recognise .db files, so a restrictive filter hides backups.
           // The file is validated by its SQLite header after selection.
           'mimeTypes': ['*/*'],
+          'targetDir': tempDir.path,
         },
       );
 
@@ -138,20 +152,11 @@ class BackupStorageService {
         return const BackupReadResult(
           success: false,
           error: null,
-          bytes: null,
-          displayName: null,
-          fileSize: null,
         );
       }
 
-      final rawBytes = result['bytes'];
-      final bytes = rawBytes is Uint8List
-          ? rawBytes
-          : rawBytes is List<int>
-              ? Uint8List.fromList(rawBytes)
-              : null;
-
-      if (bytes == null || bytes.isEmpty) {
+      final filePath = result['filePath'] as String?;
+      if (filePath == null || filePath.isEmpty) {
         return const BackupReadResult(
           success: false,
           error: 'The selected backup file is empty.',
@@ -161,8 +166,8 @@ class BackupStorageService {
       return BackupReadResult(
         success: true,
         displayName: result['displayName'] as String?,
-        fileSize: result['size'] as int? ?? bytes.length,
-        bytes: bytes,
+        fileSize: result['size'] as int?,
+        filePath: filePath,
       );
     } on PlatformException catch (e) {
       return BackupReadResult(
@@ -183,7 +188,7 @@ class BackupStorageService {
   /// The returned [BackupWriteResult] carries the [storageReference] needed
   /// to identify the file later (path or content URI).
   Future<BackupWriteResult> saveBackup({
-    required Uint8List bytes,
+    required String sourceFilePath,
     required String defaultFileName,
     BackupLocation? location,
     BackupLocation? defaultLocation,
@@ -205,7 +210,7 @@ class BackupStorageService {
           location = null;
         } else {
           return _saveBackupDesktop(
-            bytes: bytes,
+            sourceFilePath: sourceFilePath,
             defaultFileName: defaultFileName,
             location: location,
           );
@@ -213,24 +218,32 @@ class BackupStorageService {
       }
 
       return _saveBackupAndroid(
-        bytes: bytes,
+        sourceFilePath: sourceFilePath,
         defaultFileName: defaultFileName,
         location: location,
       );
     }
 
     return _saveBackupDesktop(
-      bytes: bytes,
+      sourceFilePath: sourceFilePath,
       defaultFileName: defaultFileName,
       location: location,
     );
   }
 
   Future<BackupWriteResult> _saveBackupAndroid({
-    required Uint8List bytes,
+    required String sourceFilePath,
     required String defaultFileName,
     BackupLocation? location,
   }) async {
+    final sourceFile = File(sourceFilePath);
+    if (!await sourceFile.exists() || await sourceFile.length() == 0) {
+      return const BackupWriteResult(
+        success: false,
+        error: 'The backup file is empty or missing.',
+      );
+    }
+
     if (location == null || location.isNone) {
       // No default location: ask the user to pick a folder and create the
       // file there.
@@ -253,16 +266,16 @@ class BackupStorageService {
 
     try {
       final result = await _channel.invokeMapMethod<String, dynamic>(
-        'createDocument',
+        'writeBackup',
         {
           'treeUri': location.reference,
+          'sourceFilePath': sourceFilePath,
           'displayName': _makeUniqueFileName(defaultFileName),
           // Use a generic MIME type: some document providers reject
           // application/x-sqlite3, while application/octet-stream is
-          // accepted by all providers and the .db extension is preserved
+          // accepted by all providers and the .db/.zip extension is preserved
           // in the display name.
           'mimeType': 'application/octet-stream',
-          'bytes': bytes,
         },
       );
 
@@ -275,7 +288,7 @@ class BackupStorageService {
 
       final uri = result['uri'] as String?;
       final displayName = result['displayName'] as String? ?? defaultFileName;
-      final fileSize = result['size'] as int? ?? bytes.length;
+      final fileSize = result['size'] as int?;
 
       if (uri == null || uri.isEmpty) {
         return const BackupWriteResult(
@@ -284,7 +297,7 @@ class BackupStorageService {
         );
       }
 
-      if (fileSize == 0) {
+      if (fileSize == null || fileSize == 0) {
         return const BackupWriteResult(
           success: false,
           error: 'The backup file was empty after writing.',
@@ -307,7 +320,7 @@ class BackupStorageService {
   }
 
   Future<BackupWriteResult> _saveBackupDesktop({
-    required Uint8List bytes,
+    required String sourceFilePath,
     required String defaultFileName,
     BackupLocation? location,
   }) async {
@@ -315,8 +328,20 @@ class BackupStorageService {
     String displayName = defaultFileName;
     BackupLocation? writtenTo = location;
 
+    final sourceFile = File(sourceFilePath);
+    if (!await sourceFile.exists() || await sourceFile.length() == 0) {
+      return const BackupWriteResult(
+        success: false,
+        error: 'The backup file is empty or missing.',
+      );
+    }
+
     if (location == null || location.isNone) {
       // No default location: open a save-as dialog.
+      // The file_picker saveFile API needs the bytes, so for the picker-only
+      // case we read the payload. This is the only place on desktop where the
+      // full file is loaded into memory.
+      final bytes = await sourceFile.readAsBytes();
       targetPath = await FileExportService.saveBytes(
         bytes: bytes,
         fileName: defaultFileName,
@@ -358,12 +383,12 @@ class BackupStorageService {
       );
 
       try {
-        final file = File(targetPath);
-        await file.parent.create(recursive: true);
-        await file.writeAsBytes(bytes, flush: true);
+        final targetFile = File(targetPath);
+        await targetFile.parent.create(recursive: true);
+        await sourceFile.copy(targetPath);
 
         // Verify the file was actually written and is non-empty.
-        if (!await file.exists() || await file.length() == 0) {
+        if (!await targetFile.exists() || await targetFile.length() == 0) {
           return const BackupWriteResult(
             success: false,
             error: 'The backup file could not be verified after writing.',
@@ -377,7 +402,7 @@ class BackupStorageService {
       }
     }
 
-    final fileSize = await _safeFileSize(targetPath, fallback: bytes.length);
+    final fileSize = await _safeFileSize(targetPath, fallback: 0);
 
     return BackupWriteResult(
       success: true,
@@ -388,26 +413,17 @@ class BackupStorageService {
     );
   }
 
-  Future<int> _safeFileSize(String path, {required int fallback}) async {
-    try {
-      final file = File(path);
-      if (await file.exists()) {
-        return await file.length();
-      }
-    } catch (_) {}
-    return fallback;
-  }
-
   /// Reads a backup from a saved [reference] (path or URI).
   ///
   /// Used by "Restore from history" where the user does not pick the file
-  /// again.
+  /// again. The returned [BackupReadResult.filePath] is a local temp file.
   Future<BackupReadResult> readBackup(String reference) async {
     if (Platform.isAndroid && _isContentUri(reference)) {
       try {
+        final tempDir = await getTemporaryDirectory();
         final result = await _channel.invokeMapMethod<String, dynamic>(
-          'readDocument',
-          {'uri': reference},
+          'readBackup',
+          {'uri': reference, 'targetDir': tempDir.path},
         );
         if (result == null) {
           return const BackupReadResult(
@@ -415,8 +431,8 @@ class BackupStorageService {
             error: 'The backup file is no longer accessible.',
           );
         }
-        final bytes = result['bytes'] as Uint8List?;
-        if (bytes == null || bytes.isEmpty) {
+        final filePath = result['filePath'] as String?;
+        if (filePath == null || filePath.isEmpty) {
           return const BackupReadResult(
             success: false,
             error: 'The backup file is empty.',
@@ -425,8 +441,8 @@ class BackupStorageService {
         return BackupReadResult(
           success: true,
           displayName: result['displayName'] as String?,
-          fileSize: result['size'] as int? ?? bytes.length,
-          bytes: bytes,
+          fileSize: result['size'] as int?,
+          filePath: filePath,
         );
       } on PlatformException catch (e) {
         return BackupReadResult(
@@ -445,27 +461,29 @@ class BackupStorageService {
       );
     }
 
-    try {
-      final file = File(path);
-      if (!await file.exists()) {
-        return const BackupReadResult(
-          success: false,
-          error: 'The backup file was not found at the saved location.',
-        );
-      }
-      final bytes = await file.readAsBytes();
-      return BackupReadResult(
-        success: true,
-        displayName: p.basename(path),
-        fileSize: bytes.length,
-        bytes: bytes,
-      );
-    } catch (e) {
-      return BackupReadResult(
+    final file = File(path);
+    if (!await file.exists()) {
+      return const BackupReadResult(
         success: false,
-        error: 'Failed to read backup: $e',
+        error: 'The backup file was not found at the saved location.',
       );
     }
+
+    final copiedPath = await _copyToTempFile(path, p.basename(path));
+    if (copiedPath == null) {
+      return const BackupReadResult(
+        success: false,
+        error: 'Could not copy the backup to a temporary file.',
+      );
+    }
+
+    final fileSize = await _safeFileSize(copiedPath, fallback: 0);
+    return BackupReadResult(
+      success: true,
+      displayName: p.basename(path),
+      fileSize: fileSize,
+      filePath: copiedPath,
+    );
   }
 
   /// Verifies the saved backup location is still accessible.
@@ -597,6 +615,29 @@ class BackupStorageService {
     }
   }
 
+  // ---------------------------------------------------------------------
+  // Internal helpers
+  // ---------------------------------------------------------------------
+
+  /// Copies [sourcePath] into a temp directory, returning the new path or null.
+  Future<String?> _copyToTempFile(String sourcePath, String displayName) async {
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final safeName = displayName.replaceAll('/', '_').replaceAll('\\', '_');
+      final targetPath = p.join(
+        tempDir.path,
+        'pinoy_pos_import_${DateTime.now().millisecondsSinceEpoch}_$safeName',
+      );
+      final source = File(sourcePath);
+      if (!await source.exists()) return null;
+      await source.copy(targetPath);
+      return targetPath;
+    } catch (e) {
+      debugPrint('[BackupStorageService] Could not copy to temp file: $e');
+      return null;
+    }
+  }
+
   String _displayNameFromPath(String path) {
     final resolved = _decodeFileUri(path);
     final parts = p.split(resolved);
@@ -670,6 +711,16 @@ class BackupStorageService {
       candidate = '${name}_$i$ext';
     }
     return '${name}_${DateTime.now().millisecondsSinceEpoch}$ext';
+  }
+
+  Future<int> _safeFileSize(String path, {required int fallback}) async {
+    try {
+      final file = File(path);
+      if (await file.exists()) {
+        return await file.length();
+      }
+    } catch (_) {}
+    return fallback;
   }
 
   Future<(bool, String?)> _isDirectoryWritable(String reference) async {
