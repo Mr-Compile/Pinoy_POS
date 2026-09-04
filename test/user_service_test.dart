@@ -450,18 +450,19 @@ void main() {
     expect(result.success, isTrue);
   });
 
-  test('RBAC: admin cannot create an owner (privilege escalation)', () async {
+  test('RBAC: admin can create an owner', () async {
     await authenticateAsAdmin();
     final userService = UserService();
 
     final result = await userService.createUser(
-      username: 'badowner',
-      fullName: 'Bad Owner',
+      username: 'adminowner',
+      fullName: 'Owner Created by Admin',
       role: UserRole.owner,
     );
 
-    expect(result.success, isFalse);
-    expect(result.message, contains('role'));
+    expect(result.success, isTrue);
+    expect(result.user, isNotNull);
+    expect(result.user!.role, UserRole.owner);
   });
 
   test('RBAC: admin cannot create another admin', () async {
@@ -476,6 +477,25 @@ void main() {
 
     expect(result.success, isFalse);
     expect(result.message, contains('role'));
+  });
+
+  test('RBAC: owner can create another owner', () async {
+    final dbHelper = DatabaseHelper();
+    final db = await dbHelper.database;
+    final maps = await db.query('users', where: 'username = ?', whereArgs: ['owner']);
+    final owner = User.fromMap(maps.first);
+    SessionManager().setCurrentUser(owner);
+
+    final userService = UserService();
+    final result = await userService.createUser(
+      username: 'owner2',
+      fullName: 'Second Owner',
+      role: UserRole.owner,
+    );
+
+    expect(result.success, isTrue);
+    expect(result.user, isNotNull);
+    expect(result.user!.role, UserRole.owner);
   });
 
   test('ACTIVITY LOG: user creation logs USER_CREATED action', () async {

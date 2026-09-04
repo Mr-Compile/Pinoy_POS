@@ -93,9 +93,9 @@ class BackupStorageService {
     }
 
     final result = await FilePicker.platform.pickFiles(
-      dialogTitle: 'Import Backup',
+      dialogTitle: 'Restore Pinoy POS Database',
       type: FileType.custom,
-      allowedExtensions: ['zip', 'db'],
+      allowedExtensions: ['db', 'zip'],
       withData: false,
     );
 
@@ -345,9 +345,9 @@ class BackupStorageService {
       targetPath = await FileExportService.saveBytes(
         bytes: bytes,
         fileName: defaultFileName,
-        dialogTitle: 'Export Backup',
+        dialogTitle: 'Export Pinoy POS Database',
         type: FileType.custom,
-        allowedExtensions: ['zip'],
+        allowedExtensions: ['db'],
       );
       if (targetPath == null || targetPath.isEmpty) {
         return const BackupWriteResult(success: false, error: null);

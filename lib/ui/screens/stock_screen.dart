@@ -989,13 +989,12 @@ class _StockOperationDialogState extends State<_StockOperationDialog> {
           },
         ),
       ],
-      child: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
               // Product info
               Container(
                 padding: const EdgeInsets.all(Spacing.md),

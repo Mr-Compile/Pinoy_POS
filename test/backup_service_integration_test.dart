@@ -97,7 +97,7 @@ void main() {
       expect(await File(result.storageReference!).length(), greaterThan(0));
     });
 
-    test('Admin can export a backup to a temp folder and the file is valid', () async {
+    test('Admin can export a real SQLite .db backup', () async {
       await authAsAdmin();
 
       final targetDir = Directory(p.join(appDir.path, 'backups'));
@@ -119,6 +119,27 @@ void main() {
       final file = File(result.storageReference!);
       expect(await file.exists(), isTrue, reason: 'Backup file does not exist on disk');
       expect(await file.length(), greaterThan(0), reason: 'Backup file on disk is empty');
+
+      // Verify the exported file is a real SQLite .db file.
+      expect(p.extension(file.path).toLowerCase(), '.db',
+          reason: 'Backup must use .db extension');
+      final raf = await file.open();
+      final header = await raf.read(16);
+      await raf.close();
+      final headerStr = String.fromCharCodes(header);
+      expect(headerStr, startsWith('SQLite format 3'),
+          reason: 'Backup must be a valid SQLite database file');
+
+      // It should contain the Pinoy POS backup metadata.
+      final testDb = await openDatabase(file.path, readOnly: true);
+      final metaRows = await testDb.query(
+        'backup_metadata',
+        where: 'id = 1',
+        limit: 1,
+      );
+      expect(metaRows, isNotEmpty,
+          reason: 'Backup metadata should be present');
+      await testDb.close();
     });
 
     test('Exported backup can be restored and contains the expected data', () async {

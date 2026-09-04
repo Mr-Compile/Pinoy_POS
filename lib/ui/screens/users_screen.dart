@@ -266,69 +266,67 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
           final pinController = state.textController('pin');
           final selectedRole = state.value<UserRole>('role', user.role);
 
-          return SingleChildScrollView(
-            child: Form(
-              key: state.formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Center(
-                    child: AppAvatar(
-                      imagePath: user.profileImagePath,
-                      initials: user.fullName.isNotEmpty
-                          ? user.fullName[0].toUpperCase()
-                          : '?',
-                      radius: 40,
-                    ),
+          return Form(
+            key: state.formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Center(
+                  child: AppAvatar(
+                    imagePath: user.profileImagePath,
+                    initials: user.fullName.isNotEmpty
+                        ? user.fullName[0].toUpperCase()
+                        : '?',
+                    radius: 40,
                   ),
-                  const SizedBox(height: Spacing.md),
-                  AppTextFormField(
-                    controller: usernameController,
-                    label: 'Username',
-                    validator: (value) =>
-                        Validators.required(value, 'Username'),
-                    onChanged: (_) => state.markChanged(),
-                  ),
-                  const SizedBox(height: 12),
-                  AppTextFormField(
-                    controller: fullNameController,
-                    label: 'Full Name',
-                    validator: (value) =>
-                        Validators.required(value, 'Full Name'),
-                    onChanged: (_) => state.markChanged(),
-                  ),
-                  const SizedBox(height: 12),
-                  AppTextFormField(
-                    controller: pinController,
-                    label: 'PIN (optional)',
-                    hint: user.hasPin
-                        ? 'Enter new PIN to replace (${user.configuredPinLength} digits)'
-                        : '4-6 digits',
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) return null;
-                      return Validators.pin(value);
-                    },
-                    onChanged: (_) => state.markChanged(),
-                  ),
-                  const SizedBox(height: 12),
-                  AppDropdownField<UserRole>(
-                    label: 'Role',
-                    items: roleItems
-                        .map((role) => DropdownMenuItem(
-                              value: role,
-                              child: Text(role.displayName),
-                            ))
+                ),
+                const SizedBox(height: Spacing.md),
+                AppTextFormField(
+                  controller: usernameController,
+                  label: 'Username',
+                  validator: (value) =>
+                      Validators.required(value, 'Username'),
+                  onChanged: (_) => state.markChanged(),
+                ),
+                const SizedBox(height: 12),
+                AppTextFormField(
+                  controller: fullNameController,
+                  label: 'Full Name',
+                  validator: (value) =>
+                      Validators.required(value, 'Full Name'),
+                  onChanged: (_) => state.markChanged(),
+                ),
+                const SizedBox(height: 12),
+                AppTextFormField(
+                  controller: pinController,
+                  label: 'PIN (optional)',
+                  hint: user.hasPin
+                      ? 'Enter new PIN to replace (${user.configuredPinLength} digits)'
+                      : '4-6 digits',
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) return null;
+                    return Validators.pin(value);
+                  },
+                  onChanged: (_) => state.markChanged(),
+                ),
+                const SizedBox(height: 12),
+                AppDropdownField<UserRole>(
+                  label: 'Role',
+                  items: roleItems
+                      .map((role) => DropdownMenuItem(
+                            value: role,
+                            child: Text(role.displayName),
+                          ))
                         .toList(),
-                    initialValue: selectedRole,
-                    onChanged: (value) {
-                      if (value != null) {
-                        state.setValue<UserRole>('role', value);
-                      }
-                    },
-                  ),
-                ],
-              ),
+                  initialValue: selectedRole,
+                  onChanged: (value) {
+                    if (value != null) {
+                      state.setValue<UserRole>('role', value);
+                    }
+                  },
+                ),
+              ],
             ),
           );
         },
@@ -438,13 +436,12 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
           final pinController = state.textController('pin');
           final selectedRole = state.value<UserRole>('role', UserRole.staff);
 
-          return SingleChildScrollView(
-            child: Form(
-              key: state.formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // ── Temp password info card ──
+          return Form(
+            key: state.formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // ── Temp password info card ──
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(

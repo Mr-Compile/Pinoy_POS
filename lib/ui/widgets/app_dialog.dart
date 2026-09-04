@@ -142,7 +142,7 @@ class AppDialogAction {
   });
 }
 
-class AppDialog extends StatelessWidget {
+class AppDialog extends StatefulWidget {
   final AppDialogType type;
   final String title;
   final String? message;
@@ -151,6 +151,8 @@ class AppDialog extends StatelessWidget {
   final bool dismissible;
   final bool showIcon;
   final Widget? child;
+  final bool showClose;
+  final void Function(BuildContext dialogContext)? onClosePressed;
 
   const AppDialog({
     super.key,
@@ -162,15 +164,61 @@ class AppDialog extends StatelessWidget {
     this.dismissible = true,
     this.showIcon = true,
     this.child,
+    this.showClose = false,
+    this.onClosePressed,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final isAlert = child == null;
+  State<AppDialog> createState() => _AppDialogState();
+}
 
+class _AppDialogState extends State<AppDialog> {
+  final _bodyKey = GlobalKey();
+  late final ScrollController _scrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+    FocusManager.instance.addListener(_onFocusChanged);
+  }
+
+  @override
+  void dispose() {
+    FocusManager.instance.removeListener(_onFocusChanged);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  /// Scrolls the form body so the currently focused field stays visible when
+  /// the keyboard appears or the user moves focus.
+  void _onFocusChanged() {
+    final focused = FocusManager.instance.primaryFocus;
+    final focusedContext = focused?.context;
+    if (focusedContext == null) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      final scrollable = Scrollable.maybeOf(focusedContext);
+      if (scrollable == null || scrollable.widget.key != _bodyKey) return;
+
+      Scrollable.ensureVisible(
+        focusedContext,
+        alignment: 0.5,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final layout = layoutClassFor(constraints.maxWidth);
+        final isTablet = layout.isAtLeastMedium;
+
         final (horizontalInset, maxDialogWidth) = switch (layout) {
           LayoutClass.compact => (
             16.0,
@@ -187,59 +235,49 @@ class AppDialog extends StatelessWidget {
         };
 
         final viewInsets = MediaQuery.viewInsetsOf(context);
+        final keyboardHeight = viewInsets.bottom;
+        final isKeyboardVisible = keyboardHeight > 0;
+        const verticalInset = 24.0;
+
+        // The form path gets a bounded max height so the body can scroll and
+        // the actions remain pinned. Alert dialogs shrink to their content.
+        final maxDialogHeight = (constraints.maxHeight -
+                keyboardHeight -
+                (verticalInset * 2) -
+                (Spacing.xxl * 2))
+            .clamp(0.0, double.infinity);
+
+        final isAlert = widget.child == null;
+        final alignment = isAlert
+            ? Alignment.center
+            : (isKeyboardVisible ? Alignment.topCenter : Alignment.center);
 
         return Semantics(
-          label: type.semanticLabel,
+          label: widget.type.semanticLabel,
           container: true,
           child: SafeArea(
             minimum: EdgeInsets.zero,
             child: AnimatedPadding(
               duration: const Duration(milliseconds: 220),
               curve: Curves.easeOut,
-              padding: EdgeInsets.only(bottom: viewInsets.bottom),
+              padding: EdgeInsets.only(bottom: keyboardHeight),
               child: Dialog(
-                alignment: Alignment.center,
+                alignment: alignment,
                 insetPadding: EdgeInsets.symmetric(
                   horizontal: horizontalInset,
-                  vertical: 24,
+                  vertical: verticalInset,
                 ),
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
                     minWidth: 0,
                     maxWidth: maxDialogWidth,
+                    maxHeight: isAlert
+                        ? double.infinity
+                        : (maxDialogHeight > 200 ? maxDialogHeight : 200),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(Spacing.xxl),
-                    child: SingleChildScrollView(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          if (showIcon) ...[
-                            _buildIcon(context, isAlert),
-                            const SizedBox(height: Spacing.lg),
-                          ],
-                          _buildTitle(context, isAlert),
-                          if (message != null) ...[
-                            const SizedBox(height: Spacing.sm),
-                            _buildMessage(context, isAlert),
-                          ],
-                          if (details != null) ...[
-                            const SizedBox(height: Spacing.sm),
-                            _buildDetails(context),
-                          ],
-                          if (child != null) ...[
-                            const SizedBox(height: Spacing.md),
-                            child!,
-                          ],
-                          if (actions.isNotEmpty) ...[
-                            const SizedBox(height: Spacing.xxl),
-                            _buildActions(context, layout.isAtLeastMedium),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
+                  child: isAlert
+                      ? _buildAlertBody(context, isTablet)
+                      : _buildFormBody(context, isTablet),
                 ),
               ),
             ),
@@ -249,9 +287,117 @@ class AppDialog extends StatelessWidget {
     );
   }
 
+  Widget _buildFormBody(BuildContext context, bool isTablet) {
+    return Padding(
+      padding: const EdgeInsets.all(Spacing.xxl),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildFormHeader(context),
+          const SizedBox(height: Spacing.md),
+          Flexible(
+            child: SingleChildScrollView(
+              key: _bodyKey,
+              controller: _scrollController,
+              child: widget.child!,
+            ),
+          ),
+          if (widget.actions.isNotEmpty) ...[
+            const SizedBox(height: Spacing.xxl),
+            _buildActions(context, isTablet),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFormHeader(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (widget.showIcon) ...[
+                    Center(child: _buildIcon(context, false)),
+                    const SizedBox(height: Spacing.lg),
+                  ],
+                  Text(
+                    widget.title,
+                    style: AppTypography.headlineSmallSemibold(context),
+                    textAlign: TextAlign.start,
+                  ),
+                ],
+              ),
+            ),
+            if (widget.showClose) _buildCloseButton(context),
+          ],
+        ),
+        if (widget.message != null) ...[
+          const SizedBox(height: Spacing.sm),
+          _buildMessage(context, false),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildCloseButton(BuildContext context) {
+    final onPressed = widget.onClosePressed ??
+        (dialogContext) =>
+            Navigator.of(dialogContext, rootNavigator: true).pop();
+
+    return Padding(
+      padding: const EdgeInsets.only(left: Spacing.sm),
+      child: IconButton(
+        icon: const Icon(Icons.close),
+        tooltip: 'Close',
+        visualDensity: VisualDensity.compact,
+        onPressed: () => onPressed(context),
+      ),
+    );
+  }
+
+  Widget _buildAlertBody(BuildContext context, bool isTablet) {
+    return Padding(
+      padding: const EdgeInsets.all(Spacing.xxl),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (widget.showIcon) ...[
+              _buildIcon(context, true),
+              const SizedBox(height: Spacing.lg),
+            ],
+            _buildTitle(context, true),
+            if (widget.message != null) ...[
+              const SizedBox(height: Spacing.sm),
+              _buildMessage(context, true),
+            ],
+            if (widget.details != null) ...[
+              const SizedBox(height: Spacing.sm),
+              _buildDetails(context),
+            ],
+            if (widget.actions.isNotEmpty) ...[
+              const SizedBox(height: Spacing.xxl),
+              _buildActions(context, isTablet),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildIcon(BuildContext context, bool centered) {
     final brightness = Theme.of(context).brightness;
-    if (type == AppDialogType.loading) {
+    if (widget.type == AppDialogType.loading) {
       return Center(
         child: SizedBox(
           width: 48,
@@ -270,13 +416,13 @@ class AppDialog extends StatelessWidget {
         width: 56,
         height: 56,
         decoration: BoxDecoration(
-          color: type.iconBgColor(brightness),
+          color: widget.type.iconBgColor(brightness),
           shape: BoxShape.circle,
         ),
         child: Icon(
-          type.icon,
+          widget.type.icon,
           size: 32,
-          color: type.iconColor(brightness),
+          color: widget.type.iconColor(brightness),
         ),
       ),
     );
@@ -284,17 +430,17 @@ class AppDialog extends StatelessWidget {
 
   Widget _buildTitle(BuildContext context, bool centered) {
     return Text(
-      title,
-      textAlign: TextAlign.center,
+      widget.title,
+      textAlign: centered ? TextAlign.center : TextAlign.start,
       style: AppTypography.headlineSmallSemibold(context),
     );
   }
 
   Widget _buildMessage(BuildContext context, bool centered) {
     return Text(
-      message!,
+      widget.message!,
       softWrap: true,
-      textAlign: TextAlign.center,
+      textAlign: centered ? TextAlign.center : TextAlign.start,
       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
@@ -310,7 +456,7 @@ class AppDialog extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
-        details!,
+        widget.details!,
         softWrap: true,
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -320,7 +466,7 @@ class AppDialog extends StatelessWidget {
   }
 
   Widget _buildActions(BuildContext context, bool isTablet) {
-    final stackVertically = actions.length > 2 || !isTablet;
+    final stackVertically = widget.actions.length > 2 || !isTablet;
 
     Widget buildAction(AppDialogAction action, {required bool fullWidth}) {
       final handler = action.onPressed == null || action.isLoading
@@ -357,7 +503,7 @@ class AppDialog extends StatelessWidget {
     if (stackVertically) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: actions.asMap().entries.map((entry) {
+        children: widget.actions.asMap().entries.map((entry) {
           final i = entry.key;
           final action = entry.value;
           final isFirst = i == 0;
@@ -372,11 +518,11 @@ class AppDialog extends StatelessWidget {
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
-      children: actions.asMap().entries.map((entry) {
+      children: widget.actions.asMap().entries.map((entry) {
         final i = entry.key;
         final action = entry.value;
         final isFirst = i == 0;
-        final isLast = i == actions.length - 1;
+        final isLast = i == widget.actions.length - 1;
 
         return Expanded(
           child: Padding(

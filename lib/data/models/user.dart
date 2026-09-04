@@ -13,10 +13,24 @@ enum UserRole {
 
 extension UserRoleManagement on UserRole {
   /// Whether a user with [managerRole] is allowed to create or manage
-  /// accounts with this role.  A role can only be managed by a strictly
-  /// higher-privileged role, preventing privilege escalation (e.g. an Admin
-  /// creating an Owner, or an Admin creating another Admin).
-  bool canBeManagedBy(UserRole managerRole) => index > managerRole.index;
+  /// accounts with this role.
+  ///
+  /// Explicit matrix (rows = target role, columns = manager role):
+  ///
+  /// | Target | Owner | Admin | Staff |
+  /// |--------|-------|-------|-------|
+  /// | Owner  |  YES  |  YES  |  NO   |
+  /// | Admin  |  YES  |  NO   |  NO   |
+  /// | Staff  |  YES  |  YES  |  NO   |
+  ///
+  /// Owner has full control. Admin can create and manage Owner and Staff,
+  /// but not another Admin. Staff cannot manage any role.
+  bool canBeManagedBy(UserRole managerRole) => switch (managerRole) {
+        UserRole.owner => true,
+        UserRole.admin =>
+            this == UserRole.owner || this == UserRole.staff,
+        UserRole.staff => false,
+      };
 
   /// The roles that a user with [managerRole] is allowed to create or assign.
   static List<UserRole> manageableBy(UserRole managerRole) =>

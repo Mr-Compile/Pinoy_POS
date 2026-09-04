@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:archive/archive_io.dart';
 import 'package:flutter/foundation.dart';
-import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:pinoy_pos/core/constants.dart' as constants;
@@ -541,8 +540,9 @@ class BackupService {
 
   /// Validates a backup file.
   ///
-  /// Supports the current zip backup format (which contains the database and
-  /// the `payment_evidence` directory) and legacy plain SQLite `.db` backups.
+  /// The canonical native format is a plain SQLite `.db` file.
+  /// Legacy zip backups (created by earlier versions of Pinoy POS) are still
+  /// supported: the zip is extracted and the contained `.db` is validated.
   /// Returns `incompatible` or `invalidFile` for files that do not contain a
   /// valid Pinoy POS database.
   Future<BackupImportResult> _validateBackupFile(String path) async {
@@ -809,47 +809,58 @@ class BackupService {
     String displayName,
     int fileSize,
   ) async {
+    if (tempPath.isEmpty) {
+      return const BackupImportRecord(
+        result: BackupImportResult.failed,
+        error: 'Could not create a temporary backup file.',
+      );
+    }
+
+    final validation = await _validateBackupFile(tempPath);
+    if (validation != BackupImportResult.success) {
+      await _safeDelete(File(tempPath));
+      return BackupImportRecord(
+        result: validation,
+        displayName: displayName,
+        fileSize: fileSize,
+      );
+    }
+
+    final safetyPath = await _createSafetyBackup();
+    if (safetyPath == null || safetyPath.isEmpty) {
+      _log('Safety backup could not be created; aborting restore.');
+      await _safeDelete(File(tempPath));
+      return BackupImportRecord(
+        result: BackupImportResult.failed,
+        error: 'A safety backup of the current database could not be created.',
+        displayName: displayName,
+        fileSize: fileSize,
+      );
+    }
+
     try {
-      if (tempPath.isEmpty) {
-        return const BackupImportRecord(
-          result: BackupImportResult.failed,
-          error: 'Could not create a temporary backup file.',
-        );
-      }
+      await _activityLogService.logActivity(
+        action: 'BACKUP_RESTORE_STARTED',
+        entity: 'backup',
+        details: 'Restoring from: $displayName (${_formatFileSize(fileSize)})',
+      );
+    } catch (e) {
+      _log('Failed to log restore start: $e');
+    }
 
-      final validation = await _validateBackupFile(tempPath);
-      if (validation != BackupImportResult.success) {
-        await _safeDelete(File(tempPath));
-        return BackupImportRecord(
-          result: validation,
-          displayName: displayName,
-          fileSize: fileSize,
-        );
-      }
-
-      final safetyPath = await _createSafetyBackup();
-
-      try {
-        await _activityLogService.logActivity(
-          action: 'BACKUP_RESTORE_STARTED',
-          entity: 'backup',
-          details: 'Restoring from: $displayName (${_formatFileSize(fileSize)})',
-        );
-      } catch (e) {
-        _log('Failed to log restore start: $e');
-      }
-
+    try {
       final (success, restoreError) = await _performRestore(tempPath);
       await _safeDelete(File(tempPath));
 
       if (!success) {
-        if (safetyPath != null) {
+        // Restore failed: roll back to the safety backup before reporting.
+        try {
           await _performRestore(safetyPath);
+        } catch (e) {
+          _log('Safety restore also failed: $e');
         }
+        await _safeDelete(File(safetyPath));
         await _logRestoreFailure(displayName);
-        if (safetyPath != null) {
-          await _safeDelete(File(safetyPath));
-        }
         return BackupImportRecord(
           result: BackupImportResult.failed,
           error: restoreError ?? 'The backup could not be restored.',
@@ -859,9 +870,7 @@ class BackupService {
       }
 
       await _logRestoreSuccess(displayName);
-      if (safetyPath != null) {
-        await _safeDelete(File(safetyPath));
-      }
+      await _safeDelete(File(safetyPath));
       return BackupImportRecord(
         result: BackupImportResult.success,
         displayName: displayName,
@@ -869,7 +878,16 @@ class BackupService {
       );
     } catch (e) {
       _log('Backup restore failed: $e');
+      // Roll back to the safety copy so the current database is not left
+      // in a broken state.
+      try {
+        await _performRestore(safetyPath);
+      } catch (e) {
+        _log('Safety restore also failed: $e');
+      }
+      await _safeDelete(File(safetyPath));
       await _safeDelete(File(tempPath));
+      await _logRestoreFailure(displayName);
       return BackupImportRecord(
         result: BackupImportResult.failed,
         error: 'Backup restore failed: $e',
@@ -882,8 +900,8 @@ class BackupService {
   Future<(bool, String?)> _performRestore(String backupPath) async {
     final isZip = await _isZipFile(backupPath);
 
-    // For zip backups, extract the database and attached files into a temp
-    // directory first. Legacy .db backups are restored directly.
+    // For legacy zip backups, extract the database and attached files into a
+    // temp directory first. Native .db backups are restored directly.
     String? sourceDbPath;
     String? evidenceSourceDir;
     String? qrSourceDir;
@@ -921,12 +939,15 @@ class BackupService {
       sourceDbPath = backupPath;
     }
 
-    final db = await _dbHelper.database;
-    final dbPath = db.path;
+    final dbPath = await _dbHelper.databasePath;
     final dbDir = p.dirname(dbPath);
     final dbName = p.basename(dbPath);
     _log('Restoring database from $sourceDbPath to $dbPath');
-    await _dbHelper.close();
+
+    // Close any open connection without trying to reopen the live database.
+    // During restore the file at [dbPath] may be in a transient/corrupt state,
+    // and [databasePath] gives us the path without opening it.
+    await _dbHelper.closeIfOpen();
 
     // If the live database was running in WAL mode, the -wal and -shm files
     // in the application directory still belong to the old database.  Leaving
@@ -939,13 +960,15 @@ class BackupService {
     await _safeDelete(walFile);
     await _safeDelete(shmFile);
     await _safeDelete(journalFile);
+    // Remove the current database file so the copy can create the new one.
+    await _safeDelete(File(dbPath));
 
     try {
       await File(sourceDbPath).copy(dbPath);
 
       // Restore payment evidence, product images, and the GCash QR image if
-      // the backup contains them. Replace the current directories so the
-      // database and files stay consistent.
+      // the legacy zip backup contains them. Replace the current directories
+      // so the database and files stay consistent.
       if (evidenceSourceDir != null) {
         final appDir = await getApplicationDocumentsDirectory();
         final evidenceTarget = Directory(p.join(appDir.path, 'payment_evidence'));
@@ -998,11 +1021,9 @@ class BackupService {
       return (true, null);
     } on FileSystemException catch (e) {
       _log('Failed to copy backup to database path: ${e.message}');
-      await _dbHelper.database;
       return (false, 'Could not copy backup to the database location: ${e.message}');
     } catch (e) {
       _log('Failed to copy backup to database path: $e');
-      await _dbHelper.database;
       return (false, 'Could not copy backup to the database location: $e');
     } finally {
       if (extractedDir != null) {
@@ -1025,6 +1046,7 @@ class BackupService {
     }
 
     await _dbHelper.close();
+    await _safeDelete(File(tempPath));
     try {
       await File(dbPath).copy(tempPath);
       return tempPath;
@@ -1062,41 +1084,37 @@ class BackupService {
     await _dbHelper.close();
 
     String? tempDbPath;
-    String? zipPath;
     try {
       tempDbPath = await _tempPath('pinoy_pos_backup_${_timestamp()}.db');
       _log('Copying database to temp backup: $tempDbPath');
+      await _safeDelete(File(tempDbPath));
       await File(dbPath).copy(tempDbPath);
       await _writeBackupMetadata(tempDbPath);
 
-      zipPath = await _tempPath('pinoy_pos_backup_${_timestamp()}.zip');
-      _log('Packaging backup zip: $zipPath');
-      await _packageBackupZip(tempDbPath, zipPath);
-
-      final tempFile = File(zipPath);
+      final tempFile = File(tempDbPath);
       final stat = await tempFile.stat();
       if (stat.size == 0) {
         await _safeDelete(tempFile);
-        throw _BackupServiceException('The prepared backup package was empty.');
+        throw _BackupServiceException('The prepared backup file was empty.');
       }
 
-      return zipPath;
+      return tempDbPath;
     } on _BackupServiceException {
       rethrow;
     } on FileSystemException catch (e) {
-      _log('Failed to prepare backup package: ${e.message} (path: ${e.path})');
+      _log('Failed to prepare backup file: ${e.message} (path: ${e.path})');
       throw _BackupServiceException(
         'Could not prepare the backup file. ${e.message}${e.path != null ? ' (${e.path})' : ''}',
       );
     } catch (e) {
-      _log('Failed to prepare backup package: $e');
+      _log('Failed to prepare backup file: $e');
       throw _BackupServiceException('Could not prepare the backup file: $e');
     } finally {
       if (tempDbPath != null) {
-        await _safeDelete(File(tempDbPath));
         // The copied database may have left WAL/SHM/journal files behind in
         // the temp directory.  Clean those up so we do not leak auxiliary
-        // SQLite files.
+        // SQLite files. The .db file itself must be kept because it is the
+        // backup payload.
         for (final suffix in ['-wal', '-shm', '-journal']) {
           await _safeDelete(File('$tempDbPath$suffix'));
         }
@@ -1154,40 +1172,6 @@ class BackupService {
     }
   }
 
-  /// Packages the database and image directories into a zip file.
-  ///
-  /// The returned zip contains `pinoy_pos.db` at the root and
-  /// `payment_evidence/`, `gcash_qr/`, and `images/` directories. This
-  /// preserves GCash payment proof images, the merchant QR code, and product
-  /// or profile images alongside the database so restore does not leave broken
-  /// image references.
-  Future<void> _packageBackupZip(String dbPath, String zipPath) async {
-    final stagingDir = await _tempDir('pinoy_pos_backup_staging_${_timestamp()}');
-    final staging = Directory(stagingDir);
-    await staging.create(recursive: true);
-
-    try {
-      // Copy DB to the staging root as pinoy_pos.db.
-      final stagedDb = File(p.join(staging.path, 'pinoy_pos.db'));
-      await File(dbPath).copy(stagedDb.path);
-
-      // Copy image and attachment directories into the staging directory.
-      final appDir = await getApplicationDocumentsDirectory();
-      for (final dirName in ['payment_evidence', 'gcash_qr', 'images', 'attachments']) {
-        final sourceDir = Directory(p.join(appDir.path, dirName));
-        if (await sourceDir.exists()) {
-          final targetDir = Directory(p.join(staging.path, dirName));
-          await _copyDirectory(sourceDir, targetDir);
-        }
-      }
-
-      final encoder = ZipFileEncoder();
-      await encoder.zipDirectoryAsync(staging, filename: zipPath, level: ZipFileEncoder.STORE);
-    } finally {
-      await _safeDeleteDir(staging);
-    }
-  }
-
   Future<void> _copyDirectory(Directory source, Directory target) async {
     if (!await source.exists()) return;
     await target.create(recursive: true);
@@ -1214,10 +1198,10 @@ class BackupService {
   }
 
   String _generateBackupFileName() {
-    final now = DateTime.now();
-    // Include milliseconds so rapid consecutive backups do not collide.
-    final stamp = DateFormat('yyyy-MM-dd_HH-mm-ss-SSS').format(now);
-    return 'pinoy_pos_backup_$stamp.zip';
+    // The canonical default filename for a Pinoy POS database backup.
+    // The storage layer may append a numeric suffix if the same folder
+    // already contains a file with this name.
+    return 'pinoy_pos.db';
   }
 
   String _timestamp() {

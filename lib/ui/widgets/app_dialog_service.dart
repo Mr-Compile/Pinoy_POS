@@ -544,7 +544,7 @@ class AppDialogService {
     return success(
       context,
       title: 'Backup Created Successfully',
-      message: 'Your Pinoy POS backup was saved successfully.',
+      message: 'Your Pinoy POS database backup was saved successfully.',
       details: 'File: $displayName\nLocation: $location${fileSize != null ? '\nSize: $fileSize' : ''}',
       primaryLabel: 'Done',
     );
@@ -718,8 +718,8 @@ class AppDialogService {
   static Future<void> backupRestoreSuccess(BuildContext context) {
     return success(
       context,
-      title: 'Backup Restored Successfully',
-      message: 'Your data has been restored successfully.\nThe application will refresh to load the restored data.',
+      title: 'Database Restored Successfully',
+      message: 'Database restored successfully.\nPinoy POS will now refresh and load the restored data.',
       primaryLabel: 'Continue',
     );
   }
@@ -735,7 +735,7 @@ class AppDialogService {
       title: 'Restore Failed',
       message: reason != null && reason.isNotEmpty
           ? 'Failed to restore the backup: $reason'
-          : 'Failed to restore the backup. The file may be corrupt or incompatible.',
+          : 'Failed to restore the .db backup. The file may be corrupt or incompatible.',
     );
   }
 
@@ -745,7 +745,7 @@ class AppDialogService {
     return error(
       context,
       title: 'Invalid Backup File',
-      message: 'The selected file is not a valid Pinoy POS backup or cannot be restored.',
+      message: 'The selected .db file is invalid or corrupted. Please choose a valid Pinoy POS SQLite database.',
       primaryLabel: 'Choose Another File',
     );
   }
@@ -756,7 +756,7 @@ class AppDialogService {
     return error(
       context,
       title: 'Incompatible Backup',
-      message: 'This backup file does not contain the required Pinoy POS data tables and cannot be restored.',
+      message: 'This .db file does not contain the required Pinoy POS data tables and cannot be restored.',
       primaryLabel: 'Choose Another File',
     );
   }

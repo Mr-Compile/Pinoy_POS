@@ -31,9 +31,9 @@ class BackupStorageService {
   /// Picks a backup file for restore and returns its bytes.
   Future<BackupReadResult> pickBackupForRestore() async {
     final result = await FilePicker.platform.pickFiles(
-      dialogTitle: 'Import Backup',
+      dialogTitle: 'Restore Pinoy POS Database',
       type: FileType.custom,
-      allowedExtensions: ['zip', 'db'],
+      allowedExtensions: ['db', 'zip'],
       withData: true,
     );
 
@@ -158,7 +158,7 @@ class BackupStorageService {
 
   String _ensureBackupExtension(String name) {
     final lower = name.toLowerCase();
-    if (lower.endsWith('.zip') || lower.endsWith('.db')) return name;
-    return '$name.zip';
+    if (lower.endsWith('.db')) return name;
+    return '$name.db';
   }
 }

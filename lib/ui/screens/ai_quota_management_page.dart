@@ -544,7 +544,7 @@ class _SuperAdminVerificationDialogState
         onSubmitted: (_) => _verify(context),
         onChanged: (_) => _clearError(),
         decoration: InputDecoration(
-          labelText: 'SuperAdmin password',
+          labelText: 'Password',
           errorText: _errorText,
           suffixIcon: IconButton(
             icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),

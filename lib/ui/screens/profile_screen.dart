@@ -225,36 +225,34 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           final usernameController =
               state.textController('username', text: user.username);
 
-          return SingleChildScrollView(
-            child: Form(
-              key: state.formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AppTextFormField(
-                    controller: fullNameController,
-                    label: 'Full Name',
-                    validator: (value) =>
-                        Validators.required(value, 'Full Name'),
-                    onChanged: (_) => state.markChanged(),
-                  ),
-                  const SizedBox(height: 16),
-                  AppTextFormField(
-                    controller: usernameController,
-                    readOnly: user.hasChangedUsername,
-                    label: 'Username',
-                    helperText: user.hasChangedUsername
-                        ? 'You have already changed your username.'
-                        : 'You can only change your username once.',
-                    validator: (value) => Validators.compose([
-                      (v) => Validators.required(v, 'Username'),
-                      (v) => Validators.minLength(v, 3, 'Username'),
-                      (v) => Validators.maxLength(v, 50, 'Username'),
-                    ], value),
-                    onChanged: (_) => state.markChanged(),
-                  ),
-                ],
-              ),
+          return Form(
+            key: state.formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AppTextFormField(
+                  controller: fullNameController,
+                  label: 'Full Name',
+                  validator: (value) =>
+                      Validators.required(value, 'Full Name'),
+                  onChanged: (_) => state.markChanged(),
+                ),
+                const SizedBox(height: 16),
+                AppTextFormField(
+                  controller: usernameController,
+                  readOnly: user.hasChangedUsername,
+                  label: 'Username',
+                  helperText: user.hasChangedUsername
+                      ? 'You have already changed your username.'
+                      : 'You can only change your username once.',
+                  validator: (value) => Validators.compose([
+                    (v) => Validators.required(v, 'Username'),
+                    (v) => Validators.minLength(v, 3, 'Username'),
+                    (v) => Validators.maxLength(v, 50, 'Username'),
+                  ], value),
+                  onChanged: (_) => state.markChanged(),
+                ),
+              ],
             ),
           );
         },

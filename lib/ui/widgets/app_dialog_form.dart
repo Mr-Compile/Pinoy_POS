@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:pinoy_pos/core/modal_result.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 
 /// Builder for the body of an [AppDialogForm].
 typedef AppDialogFormChildBuilder<T> = Widget Function(
@@ -51,6 +53,8 @@ class AppDialogForm<T> extends StatefulWidget {
     this.message,
     this.canPop = true,
     this.onPopInvokedWithResult,
+    this.showIcon = false,
+    this.showClose = true,
     required this.childBuilder,
     required this.actionsBuilder,
   });
@@ -67,6 +71,13 @@ class AppDialogForm<T> extends StatefulWidget {
 
   /// Optional handler for [PopScope.onPopInvokedWithResult].
   final AppDialogFormPopCallback<T>? onPopInvokedWithResult;
+
+  /// Whether the dialog type icon is shown at the top of the dialog.
+  /// Defaults to `false` for CRUD forms so the title is clean.
+  final bool showIcon;
+
+  /// Whether a close button is shown in the dialog header. Defaults to `true`.
+  final bool showClose;
 
   /// Builds the form body. Use [AppDialogFormState.textController] and
   /// [AppDialogFormState.value] / [AppDialogFormState.setValue] here.
@@ -158,6 +169,17 @@ class AppDialogFormState<T> extends State<AppDialogForm<T>> {
       title: widget.title,
       message: widget.message,
       dismissible: widget.canPop,
+      showIcon: widget.showIcon,
+      showClose: widget.showClose,
+      onClosePressed: (dialogContext) async {
+        if (hasChanges) {
+          final discard = await AppDialogService.unsavedChanges(dialogContext);
+          if (discard != true || !dialogContext.mounted) return;
+        }
+        if (dialogContext.mounted) {
+          Navigator.of(dialogContext, rootNavigator: true).pop();
+        }
+      },
       actions: widget.actionsBuilder(context, this),
       child: widget.childBuilder(context, this),
     );

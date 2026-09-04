@@ -252,35 +252,33 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
               state.value<bool>('isPinned', announcement?.isPinned ?? false) ??
                   false;
 
-          return SingleChildScrollView(
-            child: Form(
-              key: state.formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AppTextFormField(
-                    controller: titleController,
-                    label: 'Title',
-                    validator: (value) => Validators.required(value, 'Title'),
-                    onChanged: (_) => state.markChanged(),
-                  ),
-                  const SizedBox(height: 12),
-                  AppTextFormField(
-                    controller: contentController,
-                    label: 'Content',
-                    maxLines: 4,
-                    validator: (value) => Validators.required(value, 'Content'),
-                    onChanged: (_) => state.markChanged(),
-                  ),
-                  const SizedBox(height: 12),
-                  SwitchListTile(
-                    title: const Text('Pin to top'),
-                    value: isPinned,
-                    onChanged: (value) =>
-                        state.setValue<bool>('isPinned', value),
-                  ),
-                ],
-              ),
+          return Form(
+            key: state.formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AppTextFormField(
+                  controller: titleController,
+                  label: 'Title',
+                  validator: (value) => Validators.required(value, 'Title'),
+                  onChanged: (_) => state.markChanged(),
+                ),
+                const SizedBox(height: 12),
+                AppTextFormField(
+                  controller: contentController,
+                  label: 'Content',
+                  maxLines: 4,
+                  validator: (value) => Validators.required(value, 'Content'),
+                  onChanged: (_) => state.markChanged(),
+                ),
+                const SizedBox(height: 12),
+                SwitchListTile(
+                  title: const Text('Pin to top'),
+                  value: isPinned,
+                  onChanged: (value) =>
+                      state.setValue<bool>('isPinned', value),
+                ),
+              ],
             ),
           );
         },

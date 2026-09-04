@@ -901,6 +901,25 @@ class DatabaseHelper {
     _database = null;
   }
 
+  /// Closes the database only if it is currently open.
+  ///
+  /// Unlike [close], this never tries to open a database that is not already
+  /// cached. This is important during restore, when the file at the database
+  /// path may be in a transient/corrupt state and opening it could fail.
+  Future<void> closeIfOpen() async {
+    final db = _database;
+    if (db != null) {
+      await db.close();
+      _database = null;
+    }
+  }
+
+  /// Returns the filesystem path of the Pinoy POS database without opening it.
+  Future<String> get databasePath async {
+    final databasePath = await getDatabasesPath();
+    return join(databasePath, AppConstants.databaseName);
+  }
+
   /// Resets the singleton state for testing.  Closes any open database
   /// and clears the cached instance so the next access re-creates it.
   ///

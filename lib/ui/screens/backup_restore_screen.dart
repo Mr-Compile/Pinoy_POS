@@ -14,6 +14,8 @@ import 'package:pinoy_pos/providers/cart_provider.dart';
 import 'package:pinoy_pos/providers/payment_settings_provider.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/ai_advisor_provider.dart';
+import 'package:pinoy_pos/providers/staff_provider.dart';
+import 'package:pinoy_pos/providers/sales_analytics_provider.dart';
 import 'package:pinoy_pos/services/backup_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
@@ -323,9 +325,10 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
   }
 
   String _generateDefaultFileName() {
-    final now = DateTime.now();
-    final stamp = DateFormat('yyyy-MM-dd_HH-mm-ss').format(now);
-    return 'pinoy_pos_backup_$stamp.zip';
+    // Canonical default name for the Pinoy POS SQLite database backup.
+    // The storage layer may make the name unique if the folder already
+    // contains a file with this name.
+    return 'pinoy_pos.db';
   }
 
   // ── Import Backup ────────────────────────────────────────────────────
@@ -484,6 +487,9 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
     ref.invalidate(dashboardServiceProvider);
     ref.invalidate(receiptServiceProvider);
     ref.invalidate(imageServiceProvider);
+    ref.invalidate(staffServiceProvider);
+    ref.invalidate(staffControllerProvider);
+    ref.invalidate(salesAnalyticsProvider);
 
     // ── Stateful / cached providers ──
     // These hold cached UI state derived from the database. After a
@@ -829,7 +835,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
       _QuickActionCard(
         icon: Icons.upload_outlined,
         title: 'Export Backup',
-        subtitle: 'Create and save a copy of your data',
+        subtitle: 'Save a Pinoy POS database backup (.db)',
         iconColor: cs.primary,
         isLoading: _isExporting,
         onTap: _isExporting ? null : _exportBackup,
@@ -837,7 +843,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
       _QuickActionCard(
         icon: Icons.download_outlined,
         title: 'Import Backup',
-        subtitle: 'Restore from a previously exported file',
+        subtitle: 'Restore from a Pinoy POS .db backup',
         iconColor: cs.tertiary,
         isLoading: _isImporting,
         onTap: _isImporting ? null : _importBackup,
