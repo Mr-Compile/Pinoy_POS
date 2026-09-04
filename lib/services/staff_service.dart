@@ -13,6 +13,7 @@ import 'package:pinoy_pos/data/repositories/user_repository.dart';
 import 'package:pinoy_pos/services/activity_log_service.dart';
 import 'package:pinoy_pos/services/ai_quota_service.dart';
 import 'package:pinoy_pos/services/sales_analytics_service.dart';
+import 'package:pinoy_pos/services/trash_service.dart';
 import 'package:pinoy_pos/services/user_service.dart';
 
 /// Sort order for the staff management list.
@@ -38,6 +39,7 @@ class StaffService {
   final ActivityLogService _activityLogService = ActivityLogService();
   final SalesAnalyticsService _salesAnalyticsService = SalesAnalyticsService();
   final SessionManager _sessionManager = SessionManager();
+  final TrashService _trashService = TrashService();
 
   User? get currentUser => _sessionManager.currentUser;
 
@@ -400,16 +402,31 @@ class StaffService {
       return UserOperationResult(success: false, message: 'User is not a staff member');
     }
 
-    await _userRepository.softDelete(staffId);
-
-    await _activityLogService.logActivity(
-      action: 'STAFF_SOFT_DELETED',
-      entity: 'user',
+    final result = await _trashService.moveToTrash(
+      entityType: 'user',
       entityId: staffId,
-      details: 'Soft-deleted staff: ${user.username}',
+      entityName: user.fullName,
+      snapshotJson: TrashService.snapshotForUser(user),
     );
 
-    return UserOperationResult(success: true, message: 'Staff moved to trash');
+    if (result.success) {
+      await _activityLogService.logActivity(
+        action: 'STAFF_SOFT_DELETED',
+        entity: 'user',
+        entityId: staffId,
+        details: 'Soft-deleted staff: ${user.username}',
+      );
+
+      return UserOperationResult(
+        success: true,
+        message: 'Staff moved to trash',
+      );
+    }
+
+    return UserOperationResult(
+      success: false,
+      message: result.message,
+    );
   }
 
   /// Restores a soft-deleted staff account.
@@ -427,24 +444,24 @@ class StaffService {
       return UserOperationResult(success: false, message: 'Staff is not deleted');
     }
 
-    final existing = await _userRepository.getByUsername(user.username);
-    if (existing != null && existing.id != staffId) {
-      return UserOperationResult(
-        success: false,
-        message: 'Username "${user.username}" is already in use by another user',
+    final result = await _trashService.restoreByEntity('user', staffId);
+
+    if (result.success) {
+      await _activityLogService.logActivity(
+        action: 'STAFF_RESTORED',
+        entity: 'user',
+        entityId: staffId,
+        details: 'Restored staff: ${user.username}',
       );
+
+      return UserOperationResult(
+          success: true, message: 'Staff restored successfully');
     }
 
-    await _userRepository.restore(staffId);
-
-    await _activityLogService.logActivity(
-      action: 'STAFF_RESTORED',
-      entity: 'user',
-      entityId: staffId,
-      details: 'Restored staff: ${user.username}',
+    return UserOperationResult(
+      success: false,
+      message: result.message,
     );
-
-    return UserOperationResult(success: true, message: 'Staff restored successfully');
   }
 
   /// Permanently deletes a staff account.
@@ -465,16 +482,26 @@ class StaffService {
       );
     }
 
-    await _userRepository.permanentlyDelete(staffId);
+    final result = await _trashService.permanentDeleteByEntity('user', staffId);
 
-    await _activityLogService.logActivity(
-      action: 'STAFF_PERMANENTLY_DELETED',
-      entity: 'user',
-      entityId: staffId,
-      details: 'Permanently deleted staff: ${user.username}',
+    if (result.success) {
+      await _activityLogService.logActivity(
+        action: 'STAFF_PERMANENTLY_DELETED',
+        entity: 'user',
+        entityId: staffId,
+        details: 'Permanently deleted staff: ${user.username}',
+      );
+
+      return UserOperationResult(
+        success: true,
+        message: 'Staff permanently deleted',
+      );
+    }
+
+    return UserOperationResult(
+      success: false,
+      message: result.message,
     );
-
-    return UserOperationResult(success: true, message: 'Staff permanently deleted');
   }
 
   // ───────────────────────────────────────────────

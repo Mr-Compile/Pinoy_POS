@@ -2,6 +2,7 @@ import 'package:pinoy_pos/core/authorization_exception.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/payment_settings.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
+import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/data/repositories/settings_repository.dart';
 import 'package:flutter/foundation.dart';
 import 'package:pinoy_pos/services/groq_service.dart';
@@ -89,6 +90,20 @@ class SettingsService {
     if (!_sessionManager.hasPermission('edit_settings')) {
       throw AuthorizationException('edit_settings');
     }
+
+    // GCash payment settings are business-Owner only. Admins (who also have
+    // edit_settings) may still use this method for AI/system settings, but
+    // they must not be able to change the Owner's payment configuration.
+    if (_sessionManager.currentUser?.role == UserRole.admin) {
+      final current = await _settingsRepository.getSettings();
+      if (current != null && _gcashSettingsDiffer(current, settings)) {
+        throw AuthorizationException(
+          'edit_settings',
+          'Only the Owner can change GCash payment settings.',
+        );
+      }
+    }
+
     // The API key is never written to the settings table.
     final updated = settings.copyWith(
       groqApiKey: null,
@@ -100,11 +115,27 @@ class SettingsService {
     return true;
   }
 
+  /// Returns true if any GCash payment field differs between [a] and [b].
+  bool _gcashSettingsDiffer(Settings a, Settings b) {
+    return a.gcashEnabled != b.gcashEnabled ||
+        a.gcashReferenceRequired != b.gcashReferenceRequired ||
+        a.gcashCustomerNameRequirement != b.gcashCustomerNameRequirement ||
+        a.gcashPaymentProofRequirement != b.gcashPaymentProofRequirement ||
+        a.gcashVerificationMode != b.gcashVerificationMode ||
+        a.gcashReferenceMinLength != b.gcashReferenceMinLength ||
+        a.gcashQrImagePath != b.gcashQrImagePath ||
+        a.gcashQrImageType != b.gcashQrImageType;
+  }
+
   /// Picks and stores a GCash merchant QR image, then writes the relative
-  /// path and MIME type to the settings table. Requires `edit_settings`.
+  /// path and MIME type to the settings table. Requires business-Owner
+  /// privileges (see [SessionManager.canEditBusinessSettings]).
   Future<ImagePickResult> updateGcashQrImage() async {
-    if (!_sessionManager.hasPermission('edit_settings')) {
-      throw AuthorizationException('edit_settings');
+    if (!_sessionManager.canEditBusinessSettings()) {
+      throw AuthorizationException(
+        'edit_settings',
+        'Only the Owner can upload the GCash QR image.',
+      );
     }
 
     final result = await ImageService().pickAndStoreImage(
@@ -128,9 +159,13 @@ class SettingsService {
   }
 
   /// Removes the stored GCash merchant QR image and clears its columns.
+  /// Requires business-Owner privileges.
   Future<void> clearGcashQrImage() async {
-    if (!_sessionManager.hasPermission('edit_settings')) {
-      throw AuthorizationException('edit_settings');
+    if (!_sessionManager.canEditBusinessSettings()) {
+      throw AuthorizationException(
+        'edit_settings',
+        'Only the Owner can remove the GCash QR image.',
+      );
     }
 
     final current = await getSettings();

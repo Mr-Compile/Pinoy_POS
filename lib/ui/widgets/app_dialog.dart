@@ -148,6 +148,7 @@ class AppDialog extends StatelessWidget {
   final String? details;
   final List<AppDialogAction> actions;
   final bool dismissible;
+  final bool showIcon;
   final Widget? child;
 
   const AppDialog({
@@ -158,6 +159,7 @@ class AppDialog extends StatelessWidget {
     this.details,
     this.actions = const [],
     this.dismissible = true,
+    this.showIcon = true,
     this.child,
   });
 
@@ -192,8 +194,10 @@ class AppDialog extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _buildIcon(context),
-                  const SizedBox(height: Spacing.lg),
+                  if (showIcon) ...[
+                    _buildIcon(context),
+                    const SizedBox(height: Spacing.lg),
+                  ],
                   _buildTitle(context),
                   if (message != null) ...[
                     const SizedBox(height: Spacing.sm),

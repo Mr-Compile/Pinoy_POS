@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
+import 'package:pinoy_pos/providers/payment_settings_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
@@ -35,6 +37,16 @@ class _PaymentSettingsPageState extends ConsumerState<PaymentSettingsPage> {
   }
 
   Future<void> _loadSettings() async {
+    if (!SessionManager().canEditBusinessSettings()) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _error = 'You do not have permission to access Payment Settings.';
+        });
+      }
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _error = null;
@@ -92,6 +104,7 @@ class _PaymentSettingsPageState extends ConsumerState<PaymentSettingsPage> {
       if (!mounted) return;
 
       if (result.isSuccess) {
+        ref.invalidate(paymentSettingsProvider);
         await AppDialogService.success(
           context,
           title: 'QR Image Saved',
@@ -129,6 +142,7 @@ class _PaymentSettingsPageState extends ConsumerState<PaymentSettingsPage> {
     try {
       final settingsService = ref.read(settingsServiceProvider);
       await settingsService.clearGcashQrImage();
+      ref.invalidate(paymentSettingsProvider);
       await _loadSettings();
     } catch (e) {
       if (mounted) {
@@ -261,6 +275,7 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
                       imagePath: widget.settings.gcashQrImagePath,
                       placeholderIcon: Icons.qr_code,
                       fit: BoxFit.contain,
+                      cacheWidth: null,
                       semanticLabel: 'GCash merchant QR code',
                     )
                   : _buildQrPlaceholder(cs),

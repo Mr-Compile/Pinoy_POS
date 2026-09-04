@@ -6,7 +6,10 @@ import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/data/repositories/user_repository.dart';
 import 'package:pinoy_pos/services/activity_log_service.dart';
 import 'package:pinoy_pos/services/ai_quota_service.dart';
+import 'package:pinoy_pos/services/attachment_service.dart';
+import 'package:pinoy_pos/services/image_service.dart';
 import 'package:pinoy_pos/services/password_strength_service.dart';
+import 'package:pinoy_pos/services/trash_service.dart';
 
 /// Result of a user operation.  Carries a human-readable message and a
 /// success flag so the UI layer never needs to interpret raw exceptions.
@@ -50,6 +53,9 @@ class UserService {
   final UserRepository _userRepository = UserRepository();
   final ActivityLogService _activityLogService = ActivityLogService();
   final SessionManager _sessionManager = SessionManager();
+  final AttachmentService _attachmentService = AttachmentService();
+  final ImageService _imageService = ImageService();
+  final TrashService _trashService = TrashService();
 
   User? get currentUser => _sessionManager.currentUser;
 
@@ -94,7 +100,7 @@ class UserService {
 
   /// Returns all non-deleted users (User Management list).
   Future<List<User>> getAllUsers() async {
-    if (!_sessionManager.hasPermission('manage_users')) {
+    if (!_sessionManager.hasPermission('view_users')) {
       return [];
     }
     return _userRepository.getAllActive();
@@ -110,7 +116,7 @@ class UserService {
 
   /// Returns a single non-deleted user by id.
   Future<User?> getUserById(int id) async {
-    if (!_sessionManager.hasPermission('manage_users')) {
+    if (!_sessionManager.hasPermission('view_users')) {
       return null;
     }
     return _userRepository.getById(id);
@@ -295,17 +301,52 @@ class UserService {
       newPinLength = pin.length;
     }
 
+    final oldProfileImagePath = user.profileImagePath;
+    final newProfileImagePath = profileImagePath ?? oldProfileImagePath;
+    final profileImageChanged = newProfileImagePath != oldProfileImagePath;
+
     final updatedUser = user.copyWith(
       username: trimmedUsername ?? user.username,
       fullName: trimmedFullName ?? user.fullName,
       role: role ?? user.role,
       pin: newPin,
       pinLength: newPinLength,
-      profileImagePath: profileImagePath ?? user.profileImagePath,
+      profileImagePath: newProfileImagePath,
       updatedAt: DateTime.now(),
     );
 
     await _userRepository.update(updatedUser);
+
+    // Keep attachment records in sync with the stored profile image and
+    // delete the old physical file when it is being replaced.
+    if (profileImageChanged) {
+      await _attachmentService.replacePrimaryImage(
+        'user',
+        userId,
+        newProfileImagePath,
+        null,
+        attachmentType: 'profile_image',
+      );
+      if (oldProfileImagePath != null && oldProfileImagePath.isNotEmpty) {
+        await _imageService.deleteImage(oldProfileImagePath);
+      }
+    } else if (newProfileImagePath != null && newProfileImagePath.isNotEmpty) {
+      // Backfill attachment rows for users created before the attachment
+      // system was introduced.
+      final primary = await _attachmentService.getPrimaryImageAttachment(
+        'user',
+        userId,
+        attachmentType: 'profile_image',
+      );
+      if (primary == null) {
+        await _attachmentService.addAttachment(
+          entityType: 'user',
+          entityId: userId,
+          relativePath: newProfileImagePath,
+          attachmentType: 'profile_image',
+        );
+      }
+    }
 
     // If the current user edited their own account, update the session.
     if (_sessionManager.currentUser?.id == userId) {
@@ -592,18 +633,30 @@ class UserService {
       );
     }
 
-    await _userRepository.softDelete(userId);
-
-    await _activityLogService.logActivity(
-      action: 'USER_SOFT_DELETED',
-      entity: 'user',
+    final trashResult = await _trashService.moveToTrash(
+      entityType: 'user',
       entityId: userId,
-      details: 'Soft-deleted user: ${user.username}',
+      entityName: user.fullName,
+      snapshotJson: TrashService.snapshotForUser(user),
     );
 
+    if (trashResult.success) {
+      await _activityLogService.logActivity(
+        action: 'USER_SOFT_DELETED',
+        entity: 'user',
+        entityId: userId,
+        details: 'Soft-deleted user: ${user.username}',
+      );
+
+      return UserOperationResult(
+        success: true,
+        message: 'User moved to trash',
+      );
+    }
+
     return UserOperationResult(
-      success: true,
-      message: 'User moved to trash',
+      success: false,
+      message: trashResult.message,
     );
   }
 
@@ -639,25 +692,21 @@ class UserService {
       );
     }
 
-    // Check username conflict: is there an active user with the same username?
-    final existing = await _userRepository.getByUsername(user.username);
-    if (existing != null && existing.id != userId) {
-      return UserOperationResult(
-        success: false,
-        message: 'Username "${user.username}" is already in use by another user',
+    final result = await _trashService.restoreByEntity('user', userId);
+
+    if (result.success) {
+      await _activityLogService.logActivity(
+        action: 'USER_RESTORED',
+        entity: 'user',
+        entityId: userId,
+        details: 'Restored user: ${user.username}',
       );
+
+      return UserOperationResult(
+          success: true, message: 'User restored successfully');
     }
 
-    await _userRepository.restore(userId);
-
-    await _activityLogService.logActivity(
-      action: 'USER_RESTORED',
-      entity: 'user',
-      entityId: userId,
-      details: 'Restored user: ${user.username}',
-    );
-
-    return UserOperationResult(success: true, message: 'User restored successfully');
+    return UserOperationResult(success: false, message: result.message);
   }
 
   // ───────────────────────────────────────────────
@@ -692,18 +741,25 @@ class UserService {
       );
     }
 
-    await _userRepository.permanentlyDelete(userId);
+    final result = await _trashService.permanentDeleteByEntity('user', userId);
 
-    await _activityLogService.logActivity(
-      action: 'USER_PERMANENTLY_DELETED',
-      entity: 'user',
-      entityId: userId,
-      details: 'Permanently deleted user: ${user.username}',
-    );
+    if (result.success) {
+      await _activityLogService.logActivity(
+        action: 'USER_PERMANENTLY_DELETED',
+        entity: 'user',
+        entityId: userId,
+        details: 'Permanently deleted user: ${user.username}',
+      );
+
+      return UserOperationResult(
+        success: true,
+        message: 'User permanently deleted',
+      );
+    }
 
     return UserOperationResult(
-      success: true,
-      message: 'User permanently deleted',
+      success: false,
+      message: result.message,
     );
   }
 }

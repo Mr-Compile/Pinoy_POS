@@ -1,5 +1,6 @@
 import 'package:pinoy_pos/data/dao/base_dao.dart';
 import 'package:pinoy_pos/data/models/user.dart';
+import 'package:sqflite/sqflite.dart';
 
 class UserDao extends BaseDao<User> {
   @override
@@ -9,9 +10,12 @@ class UserDao extends BaseDao<User> {
   User fromMap(Map<String, dynamic> map) => User.fromMap(map);
 
   /// Returns a non-deleted user matching [username], or null.
-  Future<User?> getByUsername(String username) async {
-    final database = await db;
-    final maps = await database.query(
+  Future<User?> getByUsername(
+    String username, {
+    DatabaseExecutor? txn,
+  }) async {
+    final executor = txn ?? await db;
+    final maps = await executor.query(
       tableName,
       where: 'username = ? AND deleted_at IS NULL',
       whereArgs: [username],
@@ -22,9 +26,12 @@ class UserDao extends BaseDao<User> {
   }
 
   /// Returns any user matching [username] including soft-deleted ones.
-  Future<User?> getByUsernameWithDeleted(String username) async {
-    final database = await db;
-    final maps = await database.query(
+  Future<User?> getByUsernameWithDeleted(
+    String username, {
+    DatabaseExecutor? txn,
+  }) async {
+    final executor = txn ?? await db;
+    final maps = await executor.query(
       tableName,
       where: 'username = ?',
       whereArgs: [username],
@@ -35,9 +42,12 @@ class UserDao extends BaseDao<User> {
   }
 
   /// Returns a user by [id] including soft-deleted ones.
-  Future<User?> getByIdWithDeleted(int id) async {
-    final database = await db;
-    final maps = await database.query(
+  Future<User?> getByIdWithDeleted(
+    int id, {
+    DatabaseExecutor? txn,
+  }) async {
+    final executor = txn ?? await db;
+    final maps = await executor.query(
       tableName,
       where: 'id = ?',
       whereArgs: [id],
@@ -47,9 +57,12 @@ class UserDao extends BaseDao<User> {
     return fromMap(maps.first);
   }
 
-  Future<List<User>> getByRole(UserRole role) async {
-    final database = await db;
-    final maps = await database.query(
+  Future<List<User>> getByRole(
+    UserRole role, {
+    DatabaseExecutor? txn,
+  }) async {
+    final executor = txn ?? await db;
+    final maps = await executor.query(
       tableName,
       where: 'role = ? AND deleted_at IS NULL',
       whereArgs: [role.name],
@@ -57,18 +70,21 @@ class UserDao extends BaseDao<User> {
     return maps.map((map) => fromMap(map)).toList();
   }
 
-  Future<List<User>> getActiveUsers() async {
-    final database = await db;
-    final maps = await database.query(
+  Future<List<User>> getActiveUsers({DatabaseExecutor? txn}) async {
+    final executor = txn ?? await db;
+    final maps = await executor.query(
       tableName,
       where: 'is_active = 1 AND deleted_at IS NULL',
     );
     return maps.map((map) => fromMap(map)).toList();
   }
 
-  Future<void> updateLastLogin(int userId) async {
-    final database = await db;
-    await database.update(
+  Future<void> updateLastLogin(
+    int userId, {
+    DatabaseExecutor? txn,
+  }) async {
+    final executor = txn ?? await db;
+    await executor.update(
       tableName,
       {'last_login': DateTime.now().toIso8601String()},
       where: 'id = ?',
@@ -76,9 +92,13 @@ class UserDao extends BaseDao<User> {
     );
   }
 
-  Future<void> toggleActive(int userId, bool isActive) async {
-    final database = await db;
-    await database.update(
+  Future<void> toggleActive(
+    int userId,
+    bool isActive, {
+    DatabaseExecutor? txn,
+  }) async {
+    final executor = txn ?? await db;
+    await executor.update(
       tableName,
       {
         'is_active': isActive ? 1 : 0,
@@ -91,9 +111,12 @@ class UserDao extends BaseDao<User> {
 
   /// Permanently deletes a user row from the database.
   /// This is irreversible and should only be called from the Trash system.
-  Future<int> permanentlyDelete(int id) async {
-    final database = await db;
-    return await database.delete(
+  Future<int> permanentlyDelete(
+    int id, {
+    DatabaseExecutor? txn,
+  }) async {
+    final executor = txn ?? await db;
+    return executor.delete(
       tableName,
       where: 'id = ?',
       whereArgs: [id],

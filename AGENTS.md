@@ -266,8 +266,10 @@ flutter test
 ```
 
 Result: `flutter analyze` reports no issues; `flutter test` passes 232/232 tests.
- 
- #   R o l e ,   P e r m i s s i o n ,   G C a s h   Q R ,   N o t i f i c a t i o n ,   a n d   D i a l o g   R e p a i r   N o t e s  
+
+ 
+ #   R o l e ,   P e r m i s s i o n ,   G C a s h   Q R ,   N o t i f i c a t i o n ,   a n d   D i a l o g   R e p a i r   N o t e s 
+ 
  
 ## Design Decisions
 
@@ -284,3 +286,141 @@ Result: `flutter analyze` reports no issues; `flutter test` passes 232/232 tests
 
 - `flutter analyze` -- No issues found.
 - `flutter test` -- 235 tests passed.
+
+## GCash QR Owner/Staff Flow Repair
+
+### Root Cause
+
+The GCash QR upload and display flow existed but had three operational gaps:
+
+1. **Staff could see a stale QR.** `paymentSettingsProvider` was a normal `FutureProvider` that cached its value; when the Owner replaced the QR image, the Staff POS did not fetch the new image on the next tender.
+2. **QR image was downscaled for scanning.** `AppImage` always resized images to `cacheWidth: 512`, which could blur a dense GCash QR and make it harder to scan.
+3. **Admin could reach payment settings in the UI and, via `SettingsService.updateSettings`, change GCash configuration.** The existing `edit_settings` permission is shared by Owner and Admin, and the Owner already has `manage_users` in the current working tree, so `!manage_users` was not a safe differentiator.
+4. **No guidance when the QR was missing.** `GcashPaymentScreen` returned an empty `SizedBox` when `gcashQrImagePath` was null, so Staff saw no QR and no explanation.
+
+### Changes Made
+
+- `lib/core/session_manager.dart`
+  - Added `canEditBusinessSettings()` which checks **role == UserRole.owner** plus `edit_settings`.
+  - This fixes the Owner/Admin boundary even though the Owner permission set now includes `manage_users`.
+
+- `lib/services/settings_service.dart`
+  - `updateGcashQrImage()` and `clearGcashQrImage()` now require `canEditBusinessSettings()`.
+  - `updateSettings()` now also rejects an **Admin** user from changing any GCash-related field.
+  - Added a private `_gcashSettingsDiffer()` helper to detect changes to GCash fields.
+
+- `lib/ui/screens/settings_screen.dart`
+  - `Payment Settings` tile is now hidden from non-owners using `SessionManager().canEditBusinessSettings()`.
+
+- `lib/ui/screens/payment_settings_page.dart`
+  - `_loadSettings()` gates the page with `canEditBusinessSettings()`.
+  - After a successful QR upload or clear, `ref.invalidate(paymentSettingsProvider)` flushes the provider so the Staff POS fetches the fresh QR.
+
+- `lib/ui/screens/pos_screen.dart`
+  - `_PaymentDialog` now calls `ref.invalidate(paymentSettingsProvider)` in `initState()` so the tender dialog always starts with fresh payment/GCash settings.
+
+- `lib/ui/screens/gcash_payment_screen.dart`
+  - Refactored to `ref.watch(paymentSettingsProvider)` so the screen participates in the provider lifecycle and rebuilds with the latest settings.
+  - Added a dedicated missing-QR state (`_buildMissingQrCard`) that explains the situation to Staff and gives the Owner a "Configure GCash QR" button that navigates to `PaymentSettingsPage`.
+  - Updated `_buildMerchantQrCard` to render the merchant QR at full resolution (`cacheWidth: null`).
+
+- `lib/ui/widgets/app_image.dart`
+  - Added an optional `cacheWidth` parameter that defaults to `512` and can be set to `null` to decode the image at its original size.
+
+- `lib/ui/widgets/app_dialog.dart`
+  - Added `showIcon` (default `true`). The payment method dialog uses `showIcon: false` to avoid a generic info icon in a tender context.
+
+- `lib/data/repositories/trash_repository.dart` / `lib/data/repositories/stock_history_repository.dart` / `lib/data/dao/stock_history_dao.dart`
+  - Minor signature updates (`where`/`whereArgs` on `TrashRepository.getAll`, `limit` on `StockHistoryRepository.getByUserId`) so the uncommitted trash feature in the working tree continues to compile while the GCash work is verified.
+
+### Verification
+
+```powershell
+flutter analyze
+flutter test test/gcash_payment_service_test.dart
+flutter test test/payment_proof_service_test.dart test/file_type_utils_test.dart
+flutter test test/owner_integration_test.dart
+flutter test test/session_manager_test.dart
+flutter test test/owner_screens_test.dart
+```
+
+Results:
+- `flutter analyze` -- No issues found.
+- `gcash_payment_service_test.dart` -- 9/9 passed.
+- `payment_proof_service_test.dart` + `file_type_utils_test.dart` -- 43/43 passed.
+- `owner_integration_test.dart` -- 21/21 passed.
+- `session_manager_test.dart` -- 3/3 passed.
+- `owner_screens_test.dart` -- 14/14 passed.
+
+### QA Notes
+
+- Staff POS tender flow: when the Owner replaces the GCash QR in Payment Settings, the next `_PaymentDialog` + `GcashPaymentScreen` will load the new image.
+- QR image is no longer downscaled (`cacheWidth: null`) for the merchant QR in both `PaymentSettingsPage` and `GcashPaymentScreen`.
+- Payment Settings and GCash QR management are Owner-only. Admin still has `edit_settings` for AI/system settings but cannot reach or mutate GCash payment configuration.
+
+## Trash/Attachment/Permission Refactor
+
+### Root Cause
+
+The trash feature had several architectural gaps:
+
+1. `TrashService` and the `trash` table were largely unused. Soft deletion was duplicated in `ProductService`, `CategoryService`, and `UserService`, so the Trash UI read from source-table `getDeleted()` methods and the dashboard trash count was wrong.
+2. There was no central authority for restore or permanent delete, so attachment cleanup and permission checks were inconsistent.
+3. `SessionManager` did not give the Owner `manage_users`/`delete_users`/`view_users`/`empty_trash`, and the Admin lacked `view_users`, which conflicted with the intended role/permission matrix.
+4. `TrashScreen` read from separate product/category/user providers and used `manage_users` to gate the Users tab.
+5. Product/user images were not tracked as attachments, so permanent deletion could leave orphaned files and backup/restore did not include the new `attachments/` directory.
+
+### Changes Made
+
+- `lib/core/session_manager.dart`
+  - Added `manage_users`, `edit_users`, `delete_users`, `reset_password`, `toggle_user_active`, `view_users`, and `empty_trash` to Owner.
+  - Added `view_users` to Admin.
+
+- `lib/services/trash_service.dart`
+  - Rewrote `moveToTrash`, `restoreByEntity`, `restoreFromTrash`, `permanentDelete`, and `emptyTrash` to be the single authority for soft-delete/restore/permanent-delete.
+  - Uses database transactions, snapshots JSON for each trashed entity, attachment lifecycle management, and `TrashOperationResult` for consistent feedback.
+  - Added `snapshotForProduct`, `snapshotForCategory`, and `snapshotForUser` helpers.
+
+- `lib/services/product_service.dart`, `lib/services/category_service.dart`, `lib/services/user_service.dart`, `lib/services/staff_service.dart`
+  - Soft delete, restore, and permanent delete now route through `TrashService`.
+  - `ProductService` and `UserService` record primary profile/product images as attachments via `AttachmentService`.
+
+- `lib/services/attachment_service.dart`, `lib/services/file_storage_service.dart`, `lib/data/dao/attachment_dao.dart`, `lib/data/repositories/attachment_repository.dart`, `lib/data/models/attachment.dart`
+  - Generic attachment lifecycle: add, soft-delete, restore, permanently delete, and replace primary images.
+  - `FileStorageService` added `getFileSize` for trash metadata.
+
+- `lib/core/database.dart`
+  - Bumped schema to version 20.
+  - Added `attachments` table and indexes.
+  - Extended `trash` with `snapshot_json`, `attachment_count`, and `total_size_bytes`.
+
+- `lib/data/models/trash_item.dart`
+  - Added `attachmentCount` and `totalSizeBytes` fields and JSON accessors.
+
+- `lib/ui/screens/trash_screen.dart`
+  - Rewritten to read from `trashServiceProvider` and display `TrashItem` records.
+  - Tabs are gated by `view_products`, `view_categories`, and `view_users`.
+  - Restore uses `restore_trash` + the view permission for the tab; permanent delete uses the type-specific delete permission.
+  - Added search/filter across entity names and snapshots, and an `empty_trash` button.
+
+- `lib/services/backup_service.dart`
+  - Backup packages now include the `attachments/` directory and restore it.
+
+### Verification
+
+```powershell
+flutter analyze
+flutter test --concurrency=1 test/owner_integration_test.dart
+flutter test --concurrency=1 test/user_service_test.dart
+flutter test --concurrency=1 test/staff_service_test.dart
+flutter test --concurrency=1 test/owner_screens_test.dart
+```
+
+Results:
+- `flutter analyze` -- No issues found.
+- `owner_integration_test.dart` -- 24/24 passed.
+- `user_service_test.dart` -- 21/21 passed.
+- `staff_service_test.dart` -- 17/17 passed.
+- `owner_screens_test.dart` -- 14/14 passed.
+
+A full `flutter test` also passes 239/239 with `--concurrency=1` on Windows to avoid the `sqflite_common_ffi` file-lock race.

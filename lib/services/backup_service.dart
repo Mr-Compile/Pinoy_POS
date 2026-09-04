@@ -909,12 +909,13 @@ class BackupService {
   Future<(bool, String?)> _performRestore(String backupPath) async {
     final isZip = await _isZipFile(backupPath);
 
-    // For zip backups, extract the database and payment_evidence into a temp
+    // For zip backups, extract the database and attached files into a temp
     // directory first. Legacy .db backups are restored directly.
     String? sourceDbPath;
     String? evidenceSourceDir;
     String? qrSourceDir;
     String? imagesSourceDir;
+    String? attachmentsSourceDir;
     String? extractedDir;
 
     if (isZip) {
@@ -938,6 +939,10 @@ class BackupService {
       final imagesDir = Directory(p.join(extractedDir, 'images'));
       if (await imagesDir.exists()) {
         imagesSourceDir = imagesDir.path;
+      }
+      final attachmentsDir = Directory(p.join(extractedDir, 'attachments'));
+      if (await attachmentsDir.exists()) {
+        attachmentsSourceDir = attachmentsDir.path;
       }
     } else {
       sourceDbPath = backupPath;
@@ -993,6 +998,15 @@ class BackupService {
           await imagesTarget.delete(recursive: true);
         }
         await _copyDirectory(Directory(imagesSourceDir), imagesTarget);
+      }
+
+      if (attachmentsSourceDir != null) {
+        final appDir = await getApplicationDocumentsDirectory();
+        final attachmentsTarget = Directory(p.join(appDir.path, 'attachments'));
+        if (await attachmentsTarget.exists()) {
+          await attachmentsTarget.delete(recursive: true);
+        }
+        await _copyDirectory(Directory(attachmentsSourceDir), attachmentsTarget);
       }
 
       // Re-open the database and verify the restored file is structurally
@@ -1184,9 +1198,9 @@ class BackupService {
       final stagedDb = File(p.join(staging.path, 'pinoy_pos.db'));
       await File(dbPath).copy(stagedDb.path);
 
-      // Copy image directories into the staging directory.
+      // Copy image and attachment directories into the staging directory.
       final appDir = await getApplicationDocumentsDirectory();
-      for (final dirName in ['payment_evidence', 'gcash_qr', 'images']) {
+      for (final dirName in ['payment_evidence', 'gcash_qr', 'images', 'attachments']) {
         final sourceDir = Directory(p.join(appDir.path, dirName));
         if (await sourceDir.exists()) {
           final targetDir = Directory(p.join(staging.path, dirName));

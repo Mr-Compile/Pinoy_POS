@@ -3,11 +3,13 @@ import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/data/repositories/category_repository.dart';
 import 'package:pinoy_pos/services/activity_log_service.dart';
+import 'package:pinoy_pos/services/trash_service.dart';
 
 class CategoryService {
   final CategoryRepository _categoryRepository = CategoryRepository();
   final SessionManager _sessionManager = SessionManager();
   final ActivityLogService _activityLogService = ActivityLogService();
+  final TrashService _trashService = TrashService();
 
   Future<List<Category>> getActiveCategories() async {
     if (!_sessionManager.hasPermission('view_categories')) {
@@ -86,7 +88,8 @@ class CategoryService {
       return false;
     }
 
-    final existing = await _categoryRepository.getByName(category.name);
+    final existing =
+        await _categoryRepository.getByName(category.name);
     if (existing != null && existing.id != category.id) {
       return false;
     }
@@ -106,14 +109,28 @@ class CategoryService {
       throw AuthorizationException('delete_categories');
     }
 
-    await _categoryRepository.softDelete(id);
-    await _activityLogService.logActivity(
-      action: 'delete_category',
-      entity: 'category',
+    final category = await _categoryRepository.getById(id);
+    if (category == null) {
+      return false;
+    }
+
+    final result = await _trashService.moveToTrash(
+      entityType: 'category',
       entityId: id,
-      details: 'Soft-deleted category',
+      entityName: category.name,
+      snapshotJson: TrashService.snapshotForCategory(category),
     );
-    return true;
+
+    if (result.success) {
+      await _activityLogService.logActivity(
+        action: 'delete_category',
+        entity: 'category',
+        entityId: id,
+        details: 'Soft-deleted category: ${category.name}',
+      );
+    }
+
+    return result.success;
   }
 
   Future<bool> restoreCategory(int id) async {
@@ -121,14 +138,18 @@ class CategoryService {
       throw AuthorizationException('restore_trash');
     }
 
-    await _categoryRepository.restore(id);
-    await _activityLogService.logActivity(
-      action: 'restore_category',
-      entity: 'category',
-      entityId: id,
-      details: 'Restored category from trash',
-    );
-    return true;
+    final result = await _trashService.restoreByEntity('category', id);
+
+    if (result.success) {
+      await _activityLogService.logActivity(
+        action: 'restore_category',
+        entity: 'category',
+        entityId: id,
+        details: 'Restored category from trash',
+      );
+    }
+
+    return result.success;
   }
 
   /// Permanently deletes a category row from the database.
@@ -139,13 +160,18 @@ class CategoryService {
       throw AuthorizationException('delete_categories');
     }
 
-    await _categoryRepository.delete(id);
-    await _activityLogService.logActivity(
-      action: 'permanently_delete_category',
-      entity: 'category',
-      entityId: id,
-      details: 'Permanently deleted category',
-    );
-    return true;
+    final result =
+        await _trashService.permanentDeleteByEntity('category', id);
+
+    if (result.success) {
+      await _activityLogService.logActivity(
+        action: 'permanently_delete_category',
+        entity: 'category',
+        entityId: id,
+        details: 'Permanently deleted category',
+      );
+    }
+
+    return result.success;
   }
 }

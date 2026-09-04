@@ -11,6 +11,7 @@ class StockHistoryRepository {
   Future<StockHistory?> getById(int id) => _stockHistoryDao.getById(id);
   Future<List<StockHistory>> getAll() => _stockHistoryDao.getAll();
   Future<List<StockHistory>> getByProductId(int productId) => _stockHistoryDao.getByProductId(productId);
-  Future<List<StockHistory>> getByUserId(int userId) => _stockHistoryDao.getByUserId(userId);
+  Future<List<StockHistory>> getByUserId(int userId, {int limit = 200}) =>
+      _stockHistoryDao.getByUserId(userId, limit: limit);
   Future<List<StockHistory>> getByDateRange(DateTime start, DateTime end) => _stockHistoryDao.getByDateRange(start, end);
 }

@@ -906,6 +906,14 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
   String _paymentMethod = 'Cash';
 
   @override
+  void initState() {
+    super.initState();
+    // Always refresh payment settings when the tender dialog opens so the
+    // staff sees the latest GCash QR, enable state, and rules.
+    ref.invalidate(paymentSettingsProvider);
+  }
+
+  @override
   void dispose() {
     _cashController.dispose();
     _notesController.dispose();
@@ -1023,6 +1031,7 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
     return AppDialog(
       type: AppDialogType.info,
       title: 'Payment',
+      showIcon: false,
       actions: [
         AppDialogAction(
           label: 'Cancel',

@@ -1,5 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/ui/screens/activity_logs_screen.dart';
 import 'package:pinoy_pos/ui/screens/ai_config_screen.dart';
@@ -42,9 +43,9 @@ class SettingsScreen extends ConsumerWidget {
     final authNotifier = ref.read(authStateProvider.notifier);
 
     // Role checks
-    // Owner has edit_settings but not manage_users; Admin has manage_users.
-    final canEditBusiness = authNotifier.hasPermission('edit_settings') &&
-        !authNotifier.hasPermission('manage_users');
+    // Business settings (store info, payment config) are Owner-only.
+    final canEditBusiness =
+        SessionManager().canEditBusinessSettings();
     final canBackup = authNotifier.hasPermission('backup_restore');
     final canManageAi = authNotifier.hasPermission('manage_ai_config');
     final canManageAiQuota = authNotifier.hasPermission('manage_users') && authNotifier.hasPermission('edit_settings');
@@ -90,8 +91,8 @@ class SettingsScreen extends ConsumerWidget {
       ));
     }
 
-    // ── Payment Settings (Owner / Admin) ──
-    if (authNotifier.hasPermission('edit_settings')) {
+    // ── Payment Settings (Owner only) ──
+    if (canEditBusiness) {
       systemEntries.add(_SettingsEntry(
         icon: Icons.payments_outlined,
         title: 'Payment Settings',

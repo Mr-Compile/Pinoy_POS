@@ -23,6 +23,9 @@ import 'package:pinoy_pos/services/notification_service.dart';
 import 'package:pinoy_pos/data/repositories/announcement_repository.dart';
 import 'package:pinoy_pos/data/repositories/product_repository.dart';
 import 'package:pinoy_pos/data/repositories/category_repository.dart';
+import 'package:pinoy_pos/data/repositories/trash_repository.dart';
+import 'package:pinoy_pos/data/dao/trash_dao.dart';
+import 'package:pinoy_pos/services/trash_service.dart';
 
 /// Integration tests that verify the full Owner feature chain:
 ///
@@ -89,14 +92,13 @@ void main() {
       expect(await svc.getTotalProducts(), isA<int>());
     });
 
-    test('ReportService does not expose admin-only metrics to owner',
-        () async {
+    test('ReportService exposes user metrics to owner', () async {
       await authAsOwner();
       final svc = ReportService();
 
-      // Owner does NOT have manage_users or backup_restore.
-      expect(await svc.getTotalUsers(), 0);
-      expect(await svc.getActiveUsers(), 0);
+      // Owner now has manage_users and backup_restore.
+      expect(await svc.getTotalUsers(), greaterThanOrEqualTo(1));
+      expect(await svc.getActiveUsers(), greaterThanOrEqualTo(1));
       expect(await svc.getLastBackupPath(), isNull);
       expect(await svc.getLastBackupDate(), isNull);
     });
@@ -511,6 +513,141 @@ void main() {
       final deletedCats = await categoryRepo.getDeleted();
       expect(deletedCats.any((c) => c.id == fetchedCat.id), isTrue);
     });
+
+    test('Backfill creates trash records for pre-existing soft-deleted items', () async {
+      await authAsOwner();
+      final productSvc = ProductService();
+      final productRepo = ProductRepository();
+      final trashService = TrashService();
+
+      // Create and soft-delete a product directly, bypassing trash.
+      final product = Product(
+        name: 'Backfill Product',
+        price: 10.0,
+        stock: 5,
+        createdAt: DateTime.now(),
+      );
+      await productSvc.createProduct(product);
+      final fetched = (await productSvc.getActiveProducts())
+          .firstWhere((p) => p.name == 'Backfill Product');
+      await productRepo.softDelete(fetched.id!);
+
+      // No trash row yet.
+      var trash = await trashService.getAllTrash();
+      expect(trash.any((t) => t.entityId == fetched.id), isFalse);
+
+      // Backfill should create it.
+      final backfilled = await trashService.backfillSoftDeletedToTrash();
+      expect(backfilled, greaterThanOrEqualTo(1));
+
+      trash = await trashService.getAllTrash();
+      final item = trash.firstWhere((t) => t.entityId == fetched.id);
+      expect(item.entityType, 'product');
+      expect(item.entityName, 'Backfill Product');
+      expect(item.snapshotJson, isNotNull);
+    });
+
+    test('Expired trash is permanently deleted by processExpiredTrash', () async {
+      await authAsOwner();
+      final productSvc = ProductService();
+      final productRepo = ProductRepository();
+      final trashService = TrashService();
+      final trashRepo = TrashRepository();
+      final trashDao = TrashDao();
+
+      // Create and delete a product through the trash flow.
+      final product = Product(
+        name: 'Expired Product',
+        price: 10.0,
+        stock: 5,
+        createdAt: DateTime.now(),
+      );
+      await productSvc.createProduct(product);
+      final fetched = (await productSvc.getActiveProducts())
+          .firstWhere((p) => p.name == 'Expired Product');
+      await productSvc.deleteProduct(fetched.id!);
+
+      final trash = await trashRepo.getByEntity('product', fetched.id!);
+      expect(trash, isNotNull);
+
+      // Force the trash row to be expired.
+      final updated = trash!.copyWith(expiresAt: DateTime.now().subtract(const Duration(days: 1)));
+      await trashDao.update(updated);
+
+      // Process should permanently delete it.
+      final deleted = await trashService.processExpiredTrash();
+      expect(deleted, greaterThanOrEqualTo(1));
+
+      final after = await trashRepo.getByEntity('product', fetched.id!);
+      expect(after, isNull);
+
+      // The product row should be hard-deleted.
+      final gone = await productRepo.getById(fetched.id!);
+      expect(gone, isNull);
+    });
+
+    test('Bulk restore and bulk permanent delete work', () async {
+      await authAsOwner();
+      final productSvc = ProductService();
+      final categorySvc = CategoryService();
+      final trashService = TrashService();
+
+      // Create and delete a product.
+      final product = Product(
+        name: 'Bulk Product',
+        price: 10.0,
+        stock: 5,
+        createdAt: DateTime.now(),
+      );
+      await productSvc.createProduct(product);
+      final productFetched = (await productSvc.getActiveProducts())
+          .firstWhere((p) => p.name == 'Bulk Product');
+      await productSvc.deleteProduct(productFetched.id!);
+
+      // Create and delete a category.
+      final cat = Category(name: 'Bulk Cat', createdAt: DateTime.now());
+      await categorySvc.createCategory(cat);
+      final catFetched = (await categorySvc.getActiveCategories())
+          .firstWhere((c) => c.name == 'Bulk Cat');
+      await categorySvc.deleteCategory(catFetched.id!);
+
+      final trashBefore = await trashService.getAllTrash();
+      final ids = trashBefore
+          .where((t) => t.entityId == productFetched.id || t.entityId == catFetched.id)
+          .map((t) => t.id!)
+          .toList();
+      expect(ids.length, 2);
+
+      // Bulk restore.
+      final restoreResult = await trashService.bulkRestore(ids);
+      expect(restoreResult.success, isTrue);
+
+      final activeProducts = await productSvc.getActiveProducts();
+      expect(activeProducts.any((p) => p.id == productFetched.id), isTrue);
+      final activeCategories = await categorySvc.getActiveCategories();
+      expect(activeCategories.any((c) => c.id == catFetched.id), isTrue);
+
+      // Delete again and bulk permanently delete.
+      await productSvc.deleteProduct(productFetched.id!);
+      await categorySvc.deleteCategory(catFetched.id!);
+
+      final trashAgain = await trashService.getAllTrash();
+      final idsAgain = trashAgain
+          .where((t) => t.entityId == productFetched.id || t.entityId == catFetched.id)
+          .map((t) => t.id!)
+          .toList();
+      expect(idsAgain.length, 2);
+
+      final deleteResult = await trashService.bulkPermanentDelete(idsAgain);
+      expect(deleteResult.success, isTrue);
+
+      final trashAfter = await trashService.getAllTrash();
+      expect(
+        trashAfter.any((t) =>
+            t.entityId == productFetched.id || t.entityId == catFetched.id),
+        isFalse,
+      );
+    });
   });
 
   // ─── RBAC ─────────────────────────────────────────────────────────────
@@ -529,6 +666,9 @@ void main() {
         'view_trash', 'restore_trash', 'view_activity_logs',
         'view_ai_advisor', 'view_settings', 'edit_settings',
         'view_notifications', 'view_profile', 'view_more',
+        'manage_staff', 'view_staff_performance', 'view_report_submissions',
+        'backup_restore', 'manage_users', 'edit_users', 'delete_users',
+        'reset_password', 'toggle_user_active', 'view_users', 'empty_trash',
       ];
 
       for (final perm in expected) {
@@ -536,17 +676,17 @@ void main() {
       }
     });
 
-    test('Owner does NOT have admin-only permissions', () async {
+    test('Owner has user management permissions', () async {
       await authAsOwner();
       final sm = SessionManager();
 
-      const forbidden = [
+      const userPerms = [
         'manage_users', 'edit_users', 'delete_users',
-        'reset_password', 'toggle_user_active',
+        'reset_password', 'toggle_user_active', 'view_users',
       ];
 
-      for (final perm in forbidden) {
-        expect(sm.hasPermission(perm), isFalse, reason: 'Should not have: $perm');
+      for (final perm in userPerms) {
+        expect(sm.hasPermission(perm), isTrue, reason: 'Missing: $perm');
       }
     });
   });

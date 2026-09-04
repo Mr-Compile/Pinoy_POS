@@ -35,6 +35,11 @@ class AppImage extends StatefulWidget {
   /// Optional semantic label for accessibility.
   final String? semanticLabel;
 
+  /// Optional width used to resize the decoded image and reduce memory.
+  /// Pass `null` to decode the image at its full resolution (useful for
+  /// QR codes that must remain sharp when scaled).
+  final int? cacheWidth;
+
   const AppImage({
     super.key,
     required this.imagePath,
@@ -44,6 +49,7 @@ class AppImage extends StatefulWidget {
     this.borderRadius = 12,
     this.fit = BoxFit.cover,
     this.semanticLabel,
+    this.cacheWidth = 512,
   });
 
   @override
@@ -126,7 +132,7 @@ class _AppImageState extends State<AppImage> {
           _imageFile!,
           fit: widget.fit,
           semanticLabel: widget.semanticLabel,
-          cacheWidth: 512,
+          cacheWidth: widget.cacheWidth,
           errorBuilder: (context, error, stackTrace) {
             return _buildPlaceholder(
               child: Icon(

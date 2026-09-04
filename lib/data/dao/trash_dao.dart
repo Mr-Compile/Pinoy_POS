@@ -29,8 +29,12 @@ class TrashDao extends BaseDao<TrashItem> {
     return maps.map((map) => fromMap(map)).toList();
   }
 
-  Future<int> deleteByEntity(String entityType, int entityId) async {
-    final executor = await db;
+  Future<int> deleteByEntity(
+    String entityType,
+    int entityId, {
+    DatabaseExecutor? txn,
+  }) async {
+    final executor = txn ?? await db;
     return executor.delete(
       tableName,
       where: 'entity_type = ? AND entity_id = ?',
@@ -38,8 +42,11 @@ class TrashDao extends BaseDao<TrashItem> {
     );
   }
 
-  Future<List<TrashItem>> getByEntityType(String entityType) async {
-    final executor = await db;
+  Future<List<TrashItem>> getByEntityType(
+    String entityType, {
+    DatabaseExecutor? txn,
+  }) async {
+    final executor = txn ?? await db;
     final maps = await executor.query(
       tableName,
       where: 'entity_type = ?',
@@ -49,8 +56,12 @@ class TrashDao extends BaseDao<TrashItem> {
     return maps.map((map) => fromMap(map)).toList();
   }
 
-  Future<TrashItem?> getByEntity(String entityType, int entityId) async {
-    final executor = await db;
+  Future<TrashItem?> getByEntity(
+    String entityType,
+    int entityId, {
+    DatabaseExecutor? txn,
+  }) async {
+    final executor = txn ?? await db;
     final maps = await executor.query(
       tableName,
       where: 'entity_type = ? AND entity_id = ?',
@@ -59,5 +70,18 @@ class TrashDao extends BaseDao<TrashItem> {
     );
     if (maps.isEmpty) return null;
     return fromMap(maps.first);
+  }
+
+  /// Returns trash rows whose [expires_at] is in the past.
+  Future<List<TrashItem>> getExpired({DatabaseExecutor? txn}) async {
+    final executor = txn ?? await db;
+    final now = DateTime.now().toIso8601String();
+    final maps = await executor.query(
+      tableName,
+      where: 'expires_at IS NOT NULL AND expires_at <= ?',
+      whereArgs: [now],
+      orderBy: 'deleted_at DESC',
+    );
+    return maps.map((map) => fromMap(map)).toList();
   }
 }

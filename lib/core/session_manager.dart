@@ -65,6 +65,15 @@ class SessionManager {
     }
   }
 
+  /// Whether the current user is the business Owner and can manage
+  /// business-specific settings such as store information and payment
+  /// configuration. This is role-based (Owner), not permission-based, because
+  /// the Owner and System Admin both have `edit_settings`.
+  bool canEditBusinessSettings() {
+    return _currentUser?.role == UserRole.owner &&
+        hasPermission('edit_settings');
+  }
+
   /// Owner (Business Owner) — manages store operations, business decisions,
   /// and business continuity. The Owner uses the AI Business Advisor for
   /// business-wide analytics (sales, products, inventory, trends).
@@ -104,6 +113,13 @@ class SessionManager {
     'view_more',
     'view_report_submissions',
     'backup_restore',
+    'manage_users',
+    'edit_users',
+    'delete_users',
+    'reset_password',
+    'toggle_user_active',
+    'view_users',
+    'empty_trash',
   ];
 
   /// System Admin (IT / System Administration) — maintains the application,
@@ -135,6 +151,7 @@ class SessionManager {
     'view_notifications',
     'view_profile',
     'view_more',
+    'view_users',
   ];
 
   /// Staff (Operational User) — daily cashier and inventory operations.

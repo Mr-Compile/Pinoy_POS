@@ -19,13 +19,14 @@ class StockHistoryDao extends BaseDao<StockHistory> {
     return maps.map((map) => fromMap(map)).toList();
   }
 
-  Future<List<StockHistory>> getByUserId(int userId) async {
+  Future<List<StockHistory>> getByUserId(int userId, {int limit = 200}) async {
     final database = await db;
     final maps = await database.query(
       tableName,
       where: 'user_id = ?',
       whereArgs: [userId],
       orderBy: 'created_at DESC',
+      limit: limit,
     );
     return maps.map((map) => fromMap(map)).toList();
   }

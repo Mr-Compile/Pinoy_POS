@@ -5,16 +5,19 @@ import 'package:image_picker/image_picker.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/payment_validation_exception.dart';
+import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/payment_settings.dart';
 import 'package:pinoy_pos/providers/cart_provider.dart';
 import 'package:pinoy_pos/providers/payment_settings_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/services/image_service.dart';
+import 'package:pinoy_pos/ui/screens/payment_settings_page.dart';
 import 'package:pinoy_pos/ui/screens/payment_success_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
+import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 
 /// GCash payment flow: customer, reference, payment proof, review, confirm.
@@ -40,12 +43,9 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
   bool _isProcessing = false;
   bool _committed = false;
 
-  PaymentSettings? _paymentSettings;
-
   @override
   void initState() {
     super.initState();
-    _loadSettings();
   }
 
   @override
@@ -56,25 +56,6 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
     _customerController.dispose();
     _referenceController.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadSettings() async {
-    try {
-      final settings = await ref.read(paymentSettingsProvider.future);
-      if (mounted) {
-        setState(() {
-          _paymentSettings = settings;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        AppDialogService.error(
-          context,
-          title: 'Error',
-          message: 'Unable to load GCash settings.',
-        );
-      }
-    }
   }
 
   String? _validateReference(PaymentSettings settings, String? value) {
@@ -130,10 +111,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
     }
   }
 
-  void _goToReview() {
-    final settings = _paymentSettings;
-    if (settings == null) return;
-
+  void _goToReview(PaymentSettings settings) {
     if (!_formKey.currentState!.validate()) return;
 
     if (settings.paymentProofRequired &&
@@ -243,16 +221,27 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final settings = _paymentSettings;
     final cs = Theme.of(context).colorScheme;
+    final settingsAsync = ref.watch(paymentSettingsProvider);
 
-    if (settings == null) {
-      return const Scaffold(
+    return settingsAsync.when(
+      loading: () => const Scaffold(
         appBar: AppHeader(title: 'GCash Payment', showBackButton: true),
         body: Center(child: CircularProgressIndicator()),
-      );
-    }
+      ),
+      error: (err, _) => Scaffold(
+        appBar: const AppHeader(title: 'GCash Payment', showBackButton: true),
+        body: ErrorState(
+          title: 'Unable to Load GCash Settings',
+          message: err.toString(),
+          onRetry: () => ref.invalidate(paymentSettingsProvider),
+        ),
+      ),
+      data: (settings) => _buildPaymentScreen(settings, cs),
+    );
+  }
 
+  Widget _buildPaymentScreen(PaymentSettings settings, ColorScheme cs) {
     if (!settings.gcashEnabled) {
       return Scaffold(
         appBar: const AppHeader(title: 'GCash Payment', showBackButton: true),
@@ -277,7 +266,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: _isReviewing
-            ? _buildReview(cs)
+            ? _buildReview(settings, cs)
             : _buildDetails(settings, cs),
       ),
     );
@@ -291,7 +280,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
         children: [
           _buildTotalCard(cs),
           const SizedBox(height: 24),
-          _buildMerchantQrCard(settings, cs),
+          _buildMerchantQrSection(settings, cs),
           if (settings.customerNameVisible) ...[
             TextFormField(
               controller: _customerController,
@@ -329,7 +318,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              onPressed: _goToReview,
+              onPressed: () => _goToReview(settings),
               icon: const Icon(Icons.receipt_long_outlined),
               label: const Text('Review Payment'),
             ),
@@ -361,10 +350,15 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
     );
   }
 
-  Widget _buildMerchantQrCard(PaymentSettings settings, ColorScheme cs) {
+  Widget _buildMerchantQrSection(PaymentSettings settings, ColorScheme cs) {
     final qrPath = settings.gcashQrImagePath;
-    if (qrPath == null || qrPath.isEmpty) return const SizedBox.shrink();
+    if (qrPath != null && qrPath.isNotEmpty) {
+      return _buildMerchantQrCard(qrPath, cs);
+    }
+    return _buildMissingQrCard(cs);
+  }
 
+  Widget _buildMerchantQrCard(String qrPath, ColorScheme cs) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -392,6 +386,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
                       imagePath: qrPath,
                       placeholderIcon: Icons.qr_code,
                       fit: BoxFit.contain,
+                      cacheWidth: null,
                       semanticLabel: 'GCash merchant QR code',
                     ),
                   ),
@@ -402,6 +397,60 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
                   style: TextStyle(color: cs.onPrimaryContainer),
                   textAlign: TextAlign.center,
                 ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  Widget _buildMissingQrCard(ColorScheme cs) {
+    final canConfigure = SessionManager().canEditBusinessSettings();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AppCard(
+          color: cs.errorContainer,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Icon(Icons.qr_code, color: cs.onErrorContainer),
+                const SizedBox(height: 8),
+                Text(
+                  'GCash QR not configured',
+                  style: TextStyle(
+                    color: cs.onErrorContainer,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  canConfigure
+                      ? 'Upload the business GCash QR so customers can scan it.'
+                      : 'The Owner must upload the business GCash QR before customers can scan it.',
+                  style: TextStyle(color: cs.onErrorContainer),
+                  textAlign: TextAlign.center,
+                ),
+                if (canConfigure) ...[
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const PaymentSettingsPage(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.settings),
+                    label: const Text('Configure GCash QR'),
+                  ),
+                ],
               ],
             ),
           ),
@@ -504,7 +553,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
     );
   }
 
-  Widget _buildReview(ColorScheme cs) {
+  Widget _buildReview(PaymentSettings settings, ColorScheme cs) {
     final customer = _customerController.text.trim();
     final reference = _referenceController.text.trim();
     final hasProof = _paymentProofPath != null;
@@ -567,7 +616,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        if (_paymentSettings?.verificationRequired == true)
+        if (settings.verificationRequired)
           AppCard(
             color: cs.secondaryContainer,
             child: Padding(

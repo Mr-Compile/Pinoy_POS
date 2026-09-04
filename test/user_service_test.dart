@@ -432,7 +432,7 @@ void main() {
     );
   });
 
-  test('RBAC: owner (no manage_users) cannot create users', () async {
+  test('RBAC: owner can create staff users', () async {
     // Authenticate as the seeded owner.
     final dbHelper = DatabaseHelper();
     final db = await dbHelper.database;
@@ -442,14 +442,12 @@ void main() {
 
     final userService = UserService();
 
-    expect(
-      () => userService.createUser(
-        username: 'shouldfail',
-        fullName: 'Should Fail',
-        role: UserRole.staff,
-      ),
-      throwsA(isA<AuthorizationException>()),
+    final result = await userService.createUser(
+      username: 'ownercreated',
+      fullName: 'Owner Created',
+      role: UserRole.staff,
     );
+    expect(result.success, isTrue);
   });
 
   test('RBAC: admin cannot create an owner (privilege escalation)', () async {

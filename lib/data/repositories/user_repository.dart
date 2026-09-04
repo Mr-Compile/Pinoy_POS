@@ -1,24 +1,43 @@
 import 'package:pinoy_pos/data/dao/user_dao.dart';
 import 'package:pinoy_pos/data/models/user.dart';
+import 'package:sqflite/sqflite.dart';
 
 class UserRepository {
   final UserDao _userDao = UserDao();
 
-  Future<int> insert(User user) => _userDao.insert(user);
-  Future<int> update(User user) => _userDao.update(user);
-  Future<int> delete(int id) => _userDao.delete(id);
-  Future<int> softDelete(int id) => _userDao.softDelete(id);
-  Future<int> restore(int id) => _userDao.restore(id);
-  Future<int> permanentlyDelete(int id) => _userDao.permanentlyDelete(id);
-  Future<User?> getById(int id) => _userDao.getById(id);
-  Future<User?> getByIdWithDeleted(int id) => _userDao.getByIdWithDeleted(id);
-  Future<List<User>> getAll() => _userDao.getAll();
-  Future<List<User>> getAllActive() => _userDao.getAllActive();
-  Future<List<User>> getDeleted() => _userDao.getDeleted();
-  Future<User?> getByUsername(String username) => _userDao.getByUsername(username);
-  Future<User?> getByUsernameWithDeleted(String username) => _userDao.getByUsernameWithDeleted(username);
-  Future<List<User>> getByRole(UserRole role) => _userDao.getByRole(role);
-  Future<List<User>> getActiveUsers() => _userDao.getActiveUsers();
-  Future<void> updateLastLogin(int userId) => _userDao.updateLastLogin(userId);
-  Future<void> toggleActive(int userId, bool isActive) => _userDao.toggleActive(userId, isActive);
+  Future<int> insert(User user, {DatabaseExecutor? txn}) =>
+      _userDao.insert(user, txn: txn);
+  Future<int> update(User user, {DatabaseExecutor? txn}) =>
+      _userDao.update(user, txn: txn);
+  Future<int> delete(int id, {DatabaseExecutor? txn}) =>
+      _userDao.delete(id, txn: txn);
+  Future<int> softDelete(int id, {DatabaseExecutor? txn}) =>
+      _userDao.softDelete(id, txn: txn);
+  Future<int> restore(int id, {DatabaseExecutor? txn}) =>
+      _userDao.restore(id, txn: txn);
+  Future<int> permanentlyDelete(int id, {DatabaseExecutor? txn}) =>
+      _userDao.permanentlyDelete(id, txn: txn);
+  Future<User?> getById(int id, {DatabaseExecutor? txn}) =>
+      _userDao.getById(id, txn: txn);
+  Future<User?> getByIdWithDeleted(int id, {DatabaseExecutor? txn}) =>
+      _userDao.getByIdWithDeleted(id, txn: txn);
+  Future<List<User>> getAll({DatabaseExecutor? txn}) =>
+      _userDao.getAll(txn: txn);
+  Future<List<User>> getAllActive({DatabaseExecutor? txn}) =>
+      _userDao.getAllActive(txn: txn);
+  Future<List<User>> getDeleted({DatabaseExecutor? txn}) =>
+      _userDao.getDeleted(txn: txn);
+  Future<User?> getByUsername(String username, {DatabaseExecutor? txn}) =>
+      _userDao.getByUsername(username, txn: txn);
+  Future<User?> getByUsernameWithDeleted(String username,
+          {DatabaseExecutor? txn}) =>
+      _userDao.getByUsernameWithDeleted(username, txn: txn);
+  Future<List<User>> getByRole(UserRole role, {DatabaseExecutor? txn}) =>
+      _userDao.getByRole(role, txn: txn);
+  Future<List<User>> getActiveUsers({DatabaseExecutor? txn}) =>
+      _userDao.getActiveUsers(txn: txn);
+  Future<void> updateLastLogin(int userId, {DatabaseExecutor? txn}) =>
+      _userDao.updateLastLogin(userId, txn: txn);
+  Future<void> toggleActive(int userId, bool isActive, {DatabaseExecutor? txn}) =>
+      _userDao.toggleActive(userId, isActive, txn: txn);
 }

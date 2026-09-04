@@ -123,6 +123,9 @@ class DatabaseHelper {
           entity_type TEXT NOT NULL,
           entity_id INTEGER NOT NULL,
           entity_name TEXT,
+          snapshot_json TEXT,
+          attachment_count INTEGER NOT NULL DEFAULT 0,
+          total_size_bytes INTEGER NOT NULL DEFAULT 0,
           deleted_by INTEGER,
           deleted_at TEXT NOT NULL,
           expires_at TEXT,
@@ -403,6 +406,11 @@ class DatabaseHelper {
     if (oldVersion < 19) {
       await _migrateSettingsV19(db);
     }
+
+    // Migration from v19 → v20: generic attachments and trash snapshots.
+    if (oldVersion < 20) {
+      await _migrateV20(db);
+    }
   }
 
   /// Backfills payment_proof_type for existing sales by detecting the actual
@@ -505,6 +513,53 @@ class DatabaseHelper {
         // Column may already exist; continue with the rest.
       }
     }
+  }
+
+  Future<void> _createAttachmentsTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS attachments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        entity_type TEXT NOT NULL,
+        entity_id INTEGER NOT NULL,
+        file_path TEXT NOT NULL,
+        mime_type TEXT NOT NULL,
+        file_name TEXT NOT NULL,
+        attachment_type TEXT,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        deleted_at TEXT,
+        created_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_attachments_entity '
+      'ON attachments(entity_type, entity_id, deleted_at)',
+    );
+  }
+
+  /// Migration from v19 → v20: add generic attachments, extend trash with
+  /// snapshot JSON, and add attachment columns to existing tables.
+  Future<void> _migrateV20(Database db) async {
+    // Add snapshot_json to existing trash table.
+    try {
+      await db.execute('ALTER TABLE trash ADD COLUMN snapshot_json TEXT');
+    } catch (_) {
+      // Column may already exist.
+    }
+
+    // Add attachment count and size columns for UI and lifecycle tracking.
+    try {
+      await db.execute('ALTER TABLE trash ADD COLUMN attachment_count INTEGER NOT NULL DEFAULT 0');
+    } catch (_) {
+      // Column may already exist.
+    }
+    try {
+      await db.execute('ALTER TABLE trash ADD COLUMN total_size_bytes INTEGER NOT NULL DEFAULT 0');
+    } catch (_) {
+      // Column may already exist.
+    }
+
+    // Create attachments table for new installs and upgrades.
+    await _createAttachmentsTable(db);
   }
 
   Future<void> _createTables(Database db) async {
@@ -726,12 +781,18 @@ class DatabaseHelper {
         entity_type TEXT NOT NULL,
         entity_id INTEGER NOT NULL,
         entity_name TEXT,
+        snapshot_json TEXT,
+        attachment_count INTEGER NOT NULL DEFAULT 0,
+        total_size_bytes INTEGER NOT NULL DEFAULT 0,
         deleted_by INTEGER,
         deleted_at TEXT NOT NULL,
         expires_at TEXT,
         FOREIGN KEY (deleted_by) REFERENCES users(id)
       )
     ''');
+
+    // Attachments table
+    await _createAttachmentsTable(db);
 
     // Backup history table
     // file_path now stores a storage reference (filesystem path or URI).

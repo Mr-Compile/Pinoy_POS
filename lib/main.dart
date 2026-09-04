@@ -1,4 +1,5 @@
 ﻿import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -8,6 +9,7 @@ import 'package:pinoy_pos/core/database_seeder.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/providers/navigation_provider.dart';
 import 'package:pinoy_pos/providers/theme_provider.dart';
+import 'package:pinoy_pos/services/trash_service.dart';
 import 'package:pinoy_pos/ui/screens/splash_screen.dart';
 
 Future<void> main() async {
@@ -23,6 +25,19 @@ Future<void> main() async {
 
   final seeder = DatabaseSeeder();
   await seeder.seed();
+
+  // Make sure every pre-existing soft-deleted entity has a trash record,
+  // then permanently delete anything that has passed its 30-day retention.
+  try {
+    final trashService = TrashService();
+    await trashService.backfillSoftDeletedToTrash();
+    await trashService.processExpiredTrash();
+  } catch (e) {
+    // Startup cleanup should never prevent the app from launching.
+    if (kDebugMode) {
+      print('Trash cleanup failed during startup: $e');
+    }
+  }
 
   runApp(const ProviderScope(child: MyApp()));
 }
