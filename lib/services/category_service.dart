@@ -56,6 +56,13 @@ class CategoryService {
     return _categoryRepository.getById(id);
   }
 
+  Future<Category?> getCategoryByName(String name) async {
+    if (!_sessionManager.hasPermission('view_categories')) {
+      return null;
+    }
+    return _categoryRepository.getByName(name);
+  }
+
   Future<bool> createCategory(Category category) async {
     if (!_sessionManager.hasPermission('edit_categories')) {
       throw AuthorizationException('edit_categories');

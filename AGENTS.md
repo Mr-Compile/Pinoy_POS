@@ -447,3 +447,32 @@ flutter build apk --debug
 Results:
 - `flutter analyze` -- No issues found.
 - `flutter build apk --debug` -- Built successfully.
+
+## Global Input Field Design System
+
+### Pattern
+
+All data-entry fields use the shared components in `lib/ui/widgets/app_input_fields.dart`:
+
+- `AppTextFormField` — general labeled/hinted text or number input (supports label, hint, helperText, prefixIcon/prefix/prefixText, suffixIcon/suffix/suffixText, keyboardType, validators, obscureText, etc.).
+- `AppPasswordField` — any password/PIN-style secret input; owns the visibility-toggle suffix icon and supports `isLoading` to disable it.
+- `AppDropdownField<T>` — dropdowns that match the text-field design (same filled surface, radius, border, icon colors).
+- `AppSearchField` — compact search bars with a leading search icon and optional `onClear` button.
+
+### Visual source of truth
+
+`InputDecorationTheme` in `lib/core/app_theme.dart` owns the look: filled surface (`surfaceContainerLow` light / `surfaceContainerHighest` dark), 16px radius, subtle `outlineVariant` border, 1.5px `primary` focus ring, `error` error borders, state-aware label/icon colors, and `contentPadding` 16x16. `textSelectionTheme` sets the primary cursor/selection.
+
+### Rules
+
+- Never set `border:`/`enabledBorder:`/`focusedBorder:`/`errorBorder:`/`borderRadius` inside `InputDecoration` at call sites — the theme owns them.
+- Do not re-implement password visibility toggles; use `AppPasswordField`.
+- Specialized fields that keep a custom widget (AI chat composers, imperative `errorText` fields like the SuperAdmin password) must still omit explicit border overrides so the theme applies.
+- Icon colors come from `prefixIconColor`/`suffixIconColor` theme states; only pass a fully styled `prefix`/`suffix` widget when the default state colors are not appropriate (e.g., login's always-primary icons).
+
+### Verification
+
+```powershell
+flutter analyze
+flutter test test/app_input_fields_test.dart
+```

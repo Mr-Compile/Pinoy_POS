@@ -20,6 +20,7 @@ import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/period_selector.dart';
+import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 
 class SalesScreen extends ConsumerStatefulWidget {
   const SalesScreen({super.key});
@@ -202,41 +203,39 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-                DropdownButtonFormField<String?>(
+                AppDropdownField<String?>(
                   key: const ValueKey('filter_payment_method'),
+                  label: 'Payment Method',
                   initialValue: selectedMethod,
-                  decoration: const InputDecoration(
-                    labelText: 'Payment Method',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: [
-                    const DropdownMenuItem(value: null, child: Text('All')),
-                    ...methods.map((m) => DropdownMenuItem(
-                          value: m,
-                          child: Text(m),
-                        )),
-                  ],
+                  items: const [
+                    DropdownMenuItem<String?>(value: null, child: Text('All')),
+                  ] +
+                      methods
+                          .map((m) => DropdownMenuItem<String?>(
+                                value: m,
+                                child: Text(m),
+                              ))
+                          .toList(),
                   onChanged: (value) =>
                       setDialogState(() => selectedMethod = value),
                 ),
                 const SizedBox(height: 16),
-                DropdownButtonFormField<String?>(
+                AppDropdownField<String?>(
                   key: const ValueKey('filter_payment_status'),
+                  label: 'Status',
                   initialValue: selectedStatus,
-                  decoration: const InputDecoration(
-                    labelText: 'Status',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: [
-                    const DropdownMenuItem(
+                  items: const [
+                    DropdownMenuItem<String?>(
                         value: null, child: Text('All active')),
-                    ...statuses.map((s) => DropdownMenuItem(
-                          value: s,
-                          child: Text(
-                            s[0].toUpperCase() + s.substring(1),
-                          ),
-                        )),
-                  ],
+                  ] +
+                      statuses
+                          .map((s) => DropdownMenuItem<String?>(
+                                value: s,
+                                child: Text(
+                                  s[0].toUpperCase() + s.substring(1),
+                                ),
+                              ))
+                          .toList(),
                   onChanged: (value) =>
                       setDialogState(() => selectedStatus = value),
                 ),
@@ -373,23 +372,12 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
           Row(
             children: [
               Expanded(
-                child: TextField(
+                child: AppSearchField(
                   controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: 'Search receipt, customer, or reference...',
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, size: 18),
-                            onPressed: _clearSearch,
-                          )
-                        : null,
-                    border: const OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                  textInputAction: TextInputAction.search,
+                  hint: 'Search receipt, customer, or reference...',
                   onChanged: (value) => setState(() => _searchQuery = value),
                   onSubmitted: (_) => _loadSales(),
+                  onClear: _clearSearch,
                 ),
               ),
               const SizedBox(width: Spacing.sm),

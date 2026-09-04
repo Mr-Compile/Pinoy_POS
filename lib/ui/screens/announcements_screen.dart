@@ -9,6 +9,7 @@ import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_form.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
+import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/validators.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/modal_result.dart';
@@ -257,22 +258,16 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  TextFormField(
+                  AppTextFormField(
                     controller: titleController,
-                    decoration: const InputDecoration(
-                      labelText: 'Title',
-                      border: OutlineInputBorder(),
-                    ),
+                    label: 'Title',
                     validator: (value) => Validators.required(value, 'Title'),
                     onChanged: (_) => state.markChanged(),
                   ),
                   const SizedBox(height: 12),
-                  TextFormField(
+                  AppTextFormField(
                     controller: contentController,
-                    decoration: const InputDecoration(
-                      labelText: 'Content',
-                      border: OutlineInputBorder(),
-                    ),
+                    label: 'Content',
                     maxLines: 4,
                     validator: (value) => Validators.required(value, 'Content'),
                     onChanged: (_) => state.markChanged(),

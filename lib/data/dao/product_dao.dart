@@ -9,6 +9,18 @@ class ProductDao extends BaseDao<Product> {
   @override
   Product fromMap(Map<String, dynamic> map) => Product.fromMap(map);
 
+  Future<Product?> getByName(String name, {DatabaseExecutor? txn}) async {
+    final executor = txn ?? await db;
+    final maps = await executor.query(
+      tableName,
+      where: 'name = ? AND deleted_at IS NULL',
+      whereArgs: [name],
+      limit: 1,
+    );
+    if (maps.isEmpty) return null;
+    return fromMap(maps.first);
+  }
+
   Future<List<Product>> getByCategory(int categoryId) async {
     final database = await db;
     final maps = await database.query(

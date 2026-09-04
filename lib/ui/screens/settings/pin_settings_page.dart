@@ -8,6 +8,7 @@ import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_form.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
+import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/validators.dart';
 
 /// PIN settings sub-page — set or clear a login PIN.
@@ -89,55 +90,26 @@ class PinSettingsPage extends ConsumerWidget {
         childBuilder: (context, state) {
           final pinController = state.textController('pin');
           final confirmPinController = state.textController('confirmPin');
-          final obscurePin = state.value<bool>('obscurePin', true) ?? true;
-          final obscureConfirm =
-              state.value<bool>('obscureConfirm', true) ?? true;
 
           return Form(
             key: state.formKey,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextFormField(
+                AppPasswordField(
                   controller: pinController,
-                  decoration: InputDecoration(
-                    labelText: 'New PIN',
-                    border: const OutlineInputBorder(),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        obscurePin ? Icons.visibility_off : Icons.visibility,
-                      ),
-                      onPressed: () => state.setValue<bool>(
-                        'obscurePin',
-                        !obscurePin,
-                      ),
-                    ),
-                  ),
+                  label: 'New PIN',
                   keyboardType: TextInputType.number,
-                  obscureText: obscurePin,
+                  autofillHints: null,
                   onChanged: (_) => state.markChanged(),
                   validator: (value) => Validators.pin(value),
                 ),
                 const SizedBox(height: 16),
-                TextFormField(
+                AppPasswordField(
                   controller: confirmPinController,
-                  decoration: InputDecoration(
-                    labelText: 'Confirm PIN',
-                    border: const OutlineInputBorder(),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        obscureConfirm
-                            ? Icons.visibility_off
-                            : Icons.visibility,
-                      ),
-                      onPressed: () => state.setValue<bool>(
-                        'obscureConfirm',
-                        !obscureConfirm,
-                      ),
-                    ),
-                  ),
+                  label: 'Confirm PIN',
                   keyboardType: TextInputType.number,
-                  obscureText: obscureConfirm,
+                  autofillHints: null,
                   onChanged: (_) => state.markChanged(),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {

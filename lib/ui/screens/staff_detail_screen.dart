@@ -18,6 +18,7 @@ import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
+import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/app_section.dart';
 import 'package:pinoy_pos/ui/widgets/app_status_chip.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
@@ -469,39 +470,30 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
                   ),
                 ),
                 const SizedBox(height: Spacing.md),
-                TextFormField(
+                AppTextFormField(
                   controller: usernameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Username',
-                    border: OutlineInputBorder(),
-                  ),
+                  label: 'Username',
                   textInputAction: TextInputAction.next,
                   onChanged: (_) => state.markChanged(),
                   onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
                   validator: (value) => Validators.required(value, 'Username'),
                 ),
                 const SizedBox(height: Spacing.md),
-                TextFormField(
+                AppTextFormField(
                   controller: fullNameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Full Name',
-                    border: OutlineInputBorder(),
-                  ),
+                  label: 'Full Name',
                   textInputAction: TextInputAction.next,
                   onChanged: (_) => state.markChanged(),
                   onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
                   validator: (value) => Validators.required(value, 'Full Name'),
                 ),
                 const SizedBox(height: Spacing.md),
-                TextFormField(
+                AppTextFormField(
                   controller: pinController,
-                  decoration: InputDecoration(
-                    labelText: 'PIN (optional)',
-                    border: const OutlineInputBorder(),
-                    hintText: staff.hasPin
-                        ? 'Enter new PIN to replace (${staff.configuredPinLength} digits)'
-                        : '4-6 digits',
-                  ),
+                  label: 'PIN (optional)',
+                  hint: staff.hasPin
+                      ? 'Enter new PIN to replace (${staff.configuredPinLength} digits)'
+                      : '4-6 digits',
                   keyboardType: TextInputType.number,
                   textInputAction: TextInputAction.done,
                   onChanged: (_) => state.markChanged(),

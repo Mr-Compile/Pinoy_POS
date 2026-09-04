@@ -12,6 +12,7 @@ import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
+import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
@@ -429,24 +430,11 @@ class _StockScreenState extends ConsumerState<StockScreen> {
       child: Column(
         children: [
           // Search field
-          TextField(
+          AppSearchField(
             controller: _searchController,
-            decoration: InputDecoration(
-              hintText: 'Search products...',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: _searchQuery.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: _clearSearch,
-                      tooltip: 'Clear search',
-                    )
-                  : null,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              isDense: true,
-            ),
+            hint: 'Search products...',
             onChanged: _onSearchChanged,
+            onClear: _clearSearch,
           ),
           const SizedBox(height: Spacing.sm),
           // Stock status filter chips
@@ -1067,15 +1055,12 @@ class _StockOperationDialogState extends State<_StockOperationDialog> {
               ),
               const SizedBox(height: Spacing.lg),
               // Quantity / New stock input
-              TextFormField(
+              AppTextFormField(
                 controller: _quantityController,
-                decoration: InputDecoration(
-                  labelText: widget.isAdjust
-                      ? 'New Stock Quantity'
-                      : 'Quantity to Add',
-                  prefixIcon: const Icon(Icons.inventory),
-                  border: const OutlineInputBorder(),
-                ),
+                label: widget.isAdjust
+                    ? 'New Stock Quantity'
+                    : 'Quantity to Add',
+                prefixIcon: Icons.inventory,
                 keyboardType: TextInputType.number,
                 validator: (value) {
                   final qty = int.tryParse(value?.trim() ?? '');
@@ -1120,13 +1105,10 @@ class _StockOperationDialogState extends State<_StockOperationDialog> {
                 ),
               const SizedBox(height: Spacing.md),
               // Reason / Remarks
-              TextFormField(
+              AppTextFormField(
                 controller: _reasonController,
-                decoration: const InputDecoration(
-                  labelText: 'Remarks (optional)',
-                  prefixIcon: Icon(Icons.note),
-                  border: OutlineInputBorder(),
-                ),
+                label: 'Remarks (optional)',
+                prefixIcon: Icons.note,
                 maxLines: 2,
               ),
             ],

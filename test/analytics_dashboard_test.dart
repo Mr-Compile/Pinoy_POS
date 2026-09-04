@@ -5,12 +5,14 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:pinoy_pos/core/database.dart';
 import 'package:pinoy_pos/core/database_seeder.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
+import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/data/models/product.dart';
 import 'package:pinoy_pos/data/models/reporting_period.dart';
 import 'package:pinoy_pos/data/models/sale_item.dart';
 import 'package:pinoy_pos/data/repositories/product_repository.dart';
 import 'package:pinoy_pos/data/repositories/sale_repository.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
+import 'package:pinoy_pos/services/category_service.dart';
 import 'package:pinoy_pos/services/dashboard_service.dart';
 import 'package:pinoy_pos/services/product_service.dart';
 import 'package:pinoy_pos/services/sales_analytics_service.dart';
@@ -173,11 +175,20 @@ Future<void> _login(String username) async {
 }
 
 Future<Product> _createProduct(String name, double price, int stock) async {
+  final category = await CategoryService().createCategory(
+    Category(name: 'Test Category', createdAt: DateTime.now()),
+  );
+  expect(category, isTrue);
+
+  final categories = await CategoryService().getActiveCategories();
+  final categoryId = categories.first.id!;
+
   final product = Product(
     name: name,
     price: price,
     stock: stock,
     minStock: 5,
+    categoryId: categoryId,
     createdAt: DateTime.now(),
   );
   final success = await ProductService().createProduct(product);

@@ -1,20 +1,18 @@
 ﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pinoy_pos/core/modal_result.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
+import 'package:pinoy_pos/ui/dialogs/category_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_button.dart';
-import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
-import 'package:pinoy_pos/ui/widgets/app_dialog_form.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
+import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/app_list_item.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
-import 'package:pinoy_pos/ui/widgets/validators.dart';
 
 class CategoriesScreen extends ConsumerStatefulWidget {
   const CategoriesScreen({super.key});
@@ -326,24 +324,11 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
       padding: const EdgeInsets.fromLTRB(Spacing.lg, Spacing.md, Spacing.lg, Spacing.sm),
       child: Column(
         children: [
-          TextField(
+          AppSearchField(
             controller: _searchController,
-            decoration: InputDecoration(
-              hintText: 'Search categories...',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: _searchQuery.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: _clearSearch,
-                      tooltip: 'Clear search',
-                    )
-                  : null,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              isDense: true,
-            ),
+            hint: 'Search categories...',
             onChanged: _onSearchChanged,
+            onClear: _clearSearch,
           ),
           const SizedBox(height: Spacing.sm),
           SizedBox(
@@ -413,68 +398,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
   }
 
   Future<void> _showCategoryDialog({Category? category}) async {
-    final result = await showDialog<ModalResult<void>>(
-      context: context,
-      useRootNavigator: true,
-      builder: (dialogContext) => AppDialogForm<ModalResult<void>>(
-        type: AppDialogType.info,
-        title: category == null ? 'Add Category' : 'Edit Category',
-        childBuilder: (context, state) {
-          final nameController = state.textController(
-            'name',
-            text: category?.name ?? '',
-          );
-
-          return Form(
-            key: state.formKey,
-            child: TextFormField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'Category Name',
-                border: OutlineInputBorder(),
-              ),
-              textInputAction: TextInputAction.done,
-              validator: (value) =>
-                  Validators.required(value, 'Category name'),
-              onChanged: (_) => state.markChanged(),
-              onFieldSubmitted: (_) =>
-                  _saveCategory(state, category, context),
-            ),
-          );
-        },
-        actionsBuilder: (context, state) => [
-          AppDialogAction(
-            label: 'Cancel',
-            isLoading: state.isSaving,
-            onPressed: state.isSaving
-                ? null
-                : (context) async {
-                    if (state.hasChanges) {
-                      final discard =
-                          await AppDialogService.unsavedChanges(context);
-                      if (discard == true && context.mounted) {
-                        state.pop(
-                          const ModalResult<void>.cancelled(),
-                        );
-                      }
-                    } else if (context.mounted) {
-                      state.pop(
-                        const ModalResult<void>.cancelled(),
-                      );
-                    }
-                  },
-          ),
-          AppDialogAction(
-            label: 'Save',
-            isPrimary: true,
-            isLoading: state.isSaving,
-            onPressed: state.isSaving
-                ? null
-                : (context) => _saveCategory(state, category, context),
-          ),
-        ],
-      ),
-    );
+    final result = await showCategoryDialog(context, ref, category: category);
 
     if (!mounted) return;
 
@@ -487,65 +411,6 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
             : 'Category updated successfully.',
       );
       if (mounted) _loadCategories();
-    }
-  }
-
-  Future<void> _saveCategory(
-    AppDialogFormState<ModalResult<void>> state,
-    Category? category,
-    BuildContext dialogContext,
-  ) async {
-    if (!state.formKey.currentState!.validate()) {
-      return;
-    }
-
-    final name = state.textController('name').text.trim();
-
-    final isDuplicate = _categories.any((c) =>
-      c.name.toLowerCase() == name.toLowerCase() &&
-      (category == null || c.id != category.id)
-    );
-
-    if (isDuplicate) {
-      if (dialogContext.mounted) {
-        AppDialogService.error(
-          dialogContext,
-          title: 'Duplicate Name',
-          message: 'Category name already exists.',
-        );
-      }
-      return;
-    }
-
-    state.setSaving(true);
-
-    try {
-      final categoryService = ref.read(categoryServiceProvider);
-      final categoryData = Category(
-        name: name,
-        createdAt: DateTime.now(),
-      );
-
-      if (category == null) {
-        await categoryService.createCategory(categoryData);
-      } else {
-        await categoryService.updateCategory(
-          category.copyWith(name: categoryData.name),
-        );
-      }
-
-      if (dialogContext.mounted) {
-        state.pop(const ModalResult<void>.saved());
-      }
-    } catch (e) {
-      if (dialogContext.mounted) {
-        state.setSaving(false);
-        await AppDialogService.error(
-          dialogContext,
-          title: 'Save Failed',
-          message: 'Failed to save category.',
-        );
-      }
     }
   }
 }

@@ -519,18 +519,6 @@ class _AIChatPanelState extends ConsumerState<AIChatPanel> {
                   filled: true,
                   fillColor: cs.surface,
                   contentPadding: const EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.sm + 2),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: BorderSide.none,
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: BorderSide(color: cs.outlineVariant, width: 0.5),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: BorderSide(color: cs.primary, width: 1.5),
-                  ),
                 ),
               ),
             ),

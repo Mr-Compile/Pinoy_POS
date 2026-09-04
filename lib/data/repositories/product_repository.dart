@@ -11,6 +11,7 @@ class ProductRepository {
   Future<int> softDelete(int id, {DatabaseExecutor? txn}) => _productDao.softDelete(id, txn: txn);
   Future<int> restore(int id, {DatabaseExecutor? txn}) => _productDao.restore(id, txn: txn);
   Future<Product?> getById(int id, {DatabaseExecutor? txn}) => _productDao.getById(id, txn: txn);
+  Future<Product?> getByName(String name, {DatabaseExecutor? txn}) => _productDao.getByName(name, txn: txn);
   Future<List<Product>> getAll() => _productDao.getAll();
   Future<List<Product>> getAllActive() => _productDao.getAllActive();
   Future<List<Product>> getDeleted() => _productDao.getDeleted();

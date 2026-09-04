@@ -7,6 +7,7 @@ import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
+import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/app_logo.dart';
 import 'package:pinoy_pos/ui/widgets/theme_toggle.dart';
 
@@ -23,7 +24,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _passwordController = TextEditingController();
   final _usernameFocus = FocusNode();
   final _passwordFocus = FocusNode();
-  bool _obscurePassword = true;
 
   @override
   void initState() {
@@ -195,52 +195,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Widget _buildUsernameField(ColorScheme colorScheme) {
-    final borderRadius = BorderRadius.circular(20);
-    final hintStyle = AppTypography.bodyMedium(context)
-        .copyWith(color: colorScheme.onSurfaceVariant);
-
-    return TextFormField(
+    return AppTextFormField(
       controller: _usernameController,
       focusNode: _usernameFocus,
-      decoration: InputDecoration(
-        hintText: 'Username',
-        hintStyle: hintStyle,
-        filled: true,
-        prefixIcon: Icon(Icons.person_outline, color: colorScheme.primary),
-        border: OutlineInputBorder(
-          borderRadius: borderRadius,
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: borderRadius,
-          borderSide: BorderSide.none,
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: borderRadius,
-          borderSide: BorderSide(
-            color: colorScheme.primary.withValues(alpha: 0.5),
-            width: 1.5,
-          ),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: borderRadius,
-          borderSide: BorderSide(
-            color: colorScheme.error,
-            width: 1.5,
-          ),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: borderRadius,
-          borderSide: BorderSide(
-            color: colorScheme.error,
-            width: 1.5,
-          ),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 20,
-          vertical: 18,
-        ),
-      ),
+      hint: 'Username',
+      prefix: Icon(Icons.person_outline, color: colorScheme.primary),
       autofillHints: const [AutofillHints.username],
       textInputAction: TextInputAction.next,
       validator: (value) {
@@ -256,68 +215,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Widget _buildPasswordField(ColorScheme colorScheme, bool isLoading) {
-    final borderRadius = BorderRadius.circular(20);
-    final hintStyle = AppTypography.bodyMedium(context)
-        .copyWith(color: colorScheme.onSurfaceVariant);
-
-    return TextFormField(
+    return AppPasswordField(
       controller: _passwordController,
       focusNode: _passwordFocus,
-      obscureText: _obscurePassword,
-      decoration: InputDecoration(
-        hintText: 'Password',
-        hintStyle: hintStyle,
-        filled: true,
-        prefixIcon: Icon(Icons.lock_outline, color: colorScheme.primary),
-        suffixIcon: IconButton(
-          icon: Icon(
-            _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-            color: colorScheme.onSurfaceVariant,
-          ),
-          onPressed: isLoading
-              ? null
-              : () {
-                  setState(() {
-                    _obscurePassword = !_obscurePassword;
-                  });
-                },
-          tooltip: _obscurePassword ? 'Show password' : 'Hide password',
-        ),
-        border: OutlineInputBorder(
-          borderRadius: borderRadius,
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: borderRadius,
-          borderSide: BorderSide.none,
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: borderRadius,
-          borderSide: BorderSide(
-            color: colorScheme.primary.withValues(alpha: 0.5),
-            width: 1.5,
-          ),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: borderRadius,
-          borderSide: BorderSide(
-            color: colorScheme.error,
-            width: 1.5,
-          ),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: borderRadius,
-          borderSide: BorderSide(
-            color: colorScheme.error,
-            width: 1.5,
-          ),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 20,
-          vertical: 18,
-        ),
-      ),
+      label: null,
+      hint: 'Password',
+      prefix: Icon(Icons.lock_outline, color: colorScheme.primary),
       autofillHints: const [AutofillHints.password],
+      isLoading: isLoading,
       textInputAction: TextInputAction.done,
       validator: (value) {
         if (value == null || value.trim().isEmpty) {

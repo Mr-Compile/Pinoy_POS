@@ -2,23 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/currency_utils.dart';
-import 'package:pinoy_pos/core/modal_result.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/product.dart';
 import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
-import 'package:pinoy_pos/services/image_service.dart';
+import 'package:pinoy_pos/ui/dialogs/product_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_button.dart';
-import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
-import 'package:pinoy_pos/ui/widgets/app_dialog_form.dart';
-import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
+import 'package:pinoy_pos/ui/widgets/app_header.dart';
+import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
 import 'package:pinoy_pos/ui/widgets/app_list_item.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
-import 'package:pinoy_pos/ui/widgets/validators.dart';
 
 class ProductsScreen extends ConsumerStatefulWidget {
   const ProductsScreen({super.key});
@@ -150,27 +147,18 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
             child: Row(
               children: [
                 Expanded(
-                  child: TextField(
+                  child: AppSearchField(
                     controller: _searchController,
-                    decoration: const InputDecoration(
-                      labelText: 'Search products',
-                      prefixIcon: Icon(Icons.search),
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    textInputAction: TextInputAction.search,
+                    hint: 'Search products',
                     onChanged: _onSearchChanged,
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: DropdownButtonFormField<int?>(
+                  child: AppDropdownField<int?>(
                     initialValue: _selectedCategoryId,
-                    decoration: const InputDecoration(
-                      labelText: 'Category',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
+                    label: 'Category',
+                    isDense: true,
                     items: [
                       const DropdownMenuItem<int?>(
                         value: null,
@@ -313,286 +301,19 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
   }
 
   Future<void> _showProductDialog({Product? product}) async {
-    final result = await showDialog<ModalResult<void>>(
-      context: context,
-      useRootNavigator: true,
-      builder: (_) => AppDialogForm<ModalResult<void>>(
-        type: AppDialogType.info,
-        title: product == null ? 'Add Product' : 'Edit Product',
-        childBuilder: (context, state) {
-          final nameController = state.textController('name', text: product?.name ?? '');
-          final priceController = state.textController('price', text: product?.price.toString() ?? '');
-          final stockController = state.textController('stock', text: product?.stock.toString() ?? '');
-          final selectedImagePath = state.value<String?>('imagePath', product?.imageUrl);
-          final selectedCategoryId = state.value<int?>('categoryId', product?.categoryId);
-
-          return SingleChildScrollView(
-            child: Form(
-              key: state.formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // ── Image section ──
-                  GestureDetector(
-                    onTap: () async {
-                      final imageService = ImageService();
-                      final result = await imageService.pickAndStoreImage();
-                      if (!context.mounted) return;
-                      if (result.isSuccess) {
-                        state.setValue<String?>('imagePath', result.filePath);
-                      } else if (result.error != 'No image selected') {
-                        await AppDialogService.error(
-                          context,
-                          title: 'Image Error',
-                          message: result.error ?? 'Failed to select image.',
-                        );
-                      }
-                    },
-                    child: Container(
-                      width: 100,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: Theme.of(context).colorScheme.outlineVariant,
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: selectedImagePath != null && selectedImagePath.isNotEmpty
-                          ? Stack(
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: AppImage(
-                                    imagePath: selectedImagePath,
-                                    borderRadius: 12,
-                                    placeholderIcon: Icons.inventory_2,
-                                    placeholderIconSize: 32,
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
-                                Positioned(
-                                  bottom: 4,
-                                  right: 4,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(context).colorScheme.primary,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Icon(
-                                      Icons.camera_alt,
-                                      size: 16,
-                                      color: Theme.of(context).colorScheme.onPrimary,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            )
-                          : Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.add_a_photo,
-                                  size: 32,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Add Image',
-                                  style: Theme.of(context).textTheme.labelSmall,
-                                ),
-                              ],
-                            ),
-                    ),
-                  ),
-                  if (selectedImagePath != null && selectedImagePath.isNotEmpty)
-                    TextButton.icon(
-                      onPressed: () => state.setValue<String?>('imagePath', null),
-                      icon: const Icon(Icons.remove_circle_outline, size: 18),
-                      label: const Text('Remove Image'),
-                    ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Product Name',
-                      border: OutlineInputBorder(),
-                    ),
-                    textInputAction: TextInputAction.next,
-                    validator: (value) => Validators.required(value, 'Product name'),
-                    onChanged: (_) => state.markChanged(),
-                    onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: priceController,
-                    decoration: const InputDecoration(
-                      labelText: 'Price',
-                      border: OutlineInputBorder(),
-                    ),
-                    keyboardType: TextInputType.number,
-                    textInputAction: TextInputAction.next,
-                    validator: (value) => Validators.compose([
-                      (v) => Validators.required(v, 'Price'),
-                      (v) => Validators.positiveNumber(v, 'Price'),
-                    ], value),
-                    onChanged: (_) => state.markChanged(),
-                    onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: stockController,
-                    decoration: const InputDecoration(
-                      labelText: 'Stock',
-                      border: OutlineInputBorder(),
-                    ),
-                    keyboardType: TextInputType.number,
-                    textInputAction: TextInputAction.next,
-                    validator: (value) => Validators.compose([
-                      (v) => Validators.required(v, 'Stock'),
-                      (v) => Validators.nonNegativeNumber(v, 'Stock'),
-                    ], value),
-                    onChanged: (_) => state.markChanged(),
-                    onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<int?>(
-                    decoration: const InputDecoration(
-                      labelText: 'Category',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: _categories.map((category) {
-                      return DropdownMenuItem<int?>(
-                        value: category.id,
-                        child: Text(category.name),
-                      );
-                    }).toList(),
-                    initialValue: selectedCategoryId,
-                    onChanged: (value) => state.setValue<int?>('categoryId', value),
-                    validator: (value) {
-                      if (value == null) {
-                        return 'Category is required';
-                      }
-                      return null;
-                    },
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-        actionsBuilder: (context, state) => [
-          AppDialogAction(
-            label: 'Cancel',
-            isLoading: state.isSaving,
-            onPressed: (context) async {
-              if (state.hasChanges) {
-                final discard = await AppDialogService.unsavedChanges(context);
-                if (discard == true && context.mounted) {
-                  state.pop(const ModalResult<void>.cancelled());
-                }
-              } else if (context.mounted) {
-                state.pop(const ModalResult<void>.cancelled());
-              }
-            },
-          ),
-          AppDialogAction(
-            label: 'Save',
-            isPrimary: true,
-            isLoading: state.isSaving,
-            onPressed: (context) {
-              if (state.isSaving) return;
-              _saveProduct(state, product, context);
-            },
-          ),
-        ],
-      ),
-    );
+    final result = await showProductDialog(context, ref, product: product);
 
     if (!mounted) return;
 
     if (result?.isSaved ?? false) {
       await _loadData();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              product == null
-                  ? 'Product created successfully.'
-                  : 'Product updated successfully.',
-            ),
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _saveProduct(
-    AppDialogFormState<ModalResult<void>> state,
-    Product? product,
-    BuildContext dialogContext,
-  ) async {
-    if (!state.formKey.currentState!.validate()) {
-      return;
-    }
-
-    final name = state.textController('name').text.trim();
-    final selectedCategoryId = state.value<int?>('categoryId');
-
-    // Check for duplicate product name within same category
-    final isDuplicate = _products.any((p) =>
-      p.name.toLowerCase() == name.toLowerCase() &&
-      p.categoryId == selectedCategoryId &&
-      (product == null || p.id != product.id)
-    );
-
-    if (isDuplicate) {
-      if (dialogContext.mounted) {
-        AppDialogService.error(
-          dialogContext,
-          title: 'Duplicate Name',
-          message: 'Product name already exists in this category.',
-        );
-      }
-      return;
-    }
-
-    state.setSaving(true);
-
-    try {
-      final productData = Product(
-        name: name,
-        price: double.parse(state.textController('price').text),
-        stock: int.parse(state.textController('stock').text),
-        categoryId: selectedCategoryId,
-        imageUrl: state.value<String?>('imagePath'),
-        createdAt: DateTime.now(),
-      );
-
-      if (product == null) {
-        final productService = ref.read(productServiceProvider);
-        await productService.createProduct(productData);
-      } else {
-        final productService = ref.read(productServiceProvider);
-        await productService.updateProduct(
-          product.copyWith(
-            name: productData.name,
-            price: productData.price,
-            stock: productData.stock,
-            categoryId: productData.categoryId,
-            imageUrl: productData.imageUrl,
-          ),
-        );
-      }
-
-      state.pop(const ModalResult<void>.saved());
-    } catch (e) {
-      if (dialogContext.mounted) {
-        state.setSaving(false);
-        AppDialogService.error(
-          dialogContext,
-          title: 'Save Failed',
-          message: 'Failed to save product.',
+        await AppDialogService.success(
+          context,
+          title: product == null ? 'Created' : 'Updated',
+          message: product == null
+              ? 'Product created successfully.'
+              : 'Product updated successfully.',
         );
       }
     }

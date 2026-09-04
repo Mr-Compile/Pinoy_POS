@@ -79,6 +79,16 @@ void main() {
     return authService.currentUser!;
   }
 
+  /// Creates a default test category and returns its id.
+  Future<int> seedCategoryId(CategoryService categoryService) async {
+    final existing = await categoryService.getActiveCategories();
+    if (existing.isNotEmpty) return existing.first.id!;
+    await categoryService.createCategory(
+      Category(name: 'Test Category', createdAt: DateTime.now()),
+    );
+    return (await categoryService.getActiveCategories()).first.id!;
+  }
+
   // ─── Dashboard / Reports ──────────────────────────────────────────────
 
   group('Owner Dashboard / Reports chain', () {
@@ -220,6 +230,8 @@ void main() {
       await authAsOwner();
       final productSvc = ProductService();
       final stockSvc = StockService();
+      final categorySvc = CategoryService();
+      final categoryId = await seedCategoryId(categorySvc);
 
       // Create a product.
       final product = Product(
@@ -227,6 +239,7 @@ void main() {
         price: 10.0,
         stock: 50,
         minStock: 5,
+        categoryId: categoryId,
         createdAt: DateTime.now(),
       );
       await productSvc.createProduct(product);
@@ -253,12 +266,15 @@ void main() {
       await authAsOwner();
       final productSvc = ProductService();
       final stockSvc = StockService();
+      final categorySvc = CategoryService();
+      final categoryId = await seedCategoryId(categorySvc);
 
       final product = Product(
         name: 'Neg Test',
         price: 10.0,
         stock: 5,
         minStock: 1,
+        categoryId: categoryId,
         createdAt: DateTime.now(),
       );
       await productSvc.createProduct(product);
@@ -274,12 +290,15 @@ void main() {
       await authAsOwner();
       final productSvc = ProductService();
       final stockSvc = StockService();
+      final categorySvc = CategoryService();
+      final categoryId = await seedCategoryId(categorySvc);
 
       final product = Product(
         name: 'History Test',
         price: 10.0,
         stock: 10,
         minStock: 1,
+        categoryId: categoryId,
         createdAt: DateTime.now(),
       );
       await productSvc.createProduct(product);
@@ -300,6 +319,8 @@ void main() {
       await authAsOwner();
       final productSvc = ProductService();
       final salesSvc = SalesService();
+      final categorySvc = CategoryService();
+      final categoryId = await seedCategoryId(categorySvc);
 
       // Create a product to sell.
       final product = Product(
@@ -307,6 +328,7 @@ void main() {
         price: 20.0,
         stock: 100,
         minStock: 5,
+        categoryId: categoryId,
         createdAt: DateTime.now(),
       );
       await productSvc.createProduct(product);
@@ -486,12 +508,14 @@ void main() {
       final categorySvc = CategoryService();
       final productRepo = ProductRepository();
       final categoryRepo = CategoryRepository();
+      final categoryId = await seedCategoryId(categorySvc);
 
       // Create and delete a product.
       final product = Product(
         name: 'Trash Product',
         price: 10.0,
         stock: 5,
+        categoryId: categoryId,
         createdAt: DateTime.now(),
       );
       await productSvc.createProduct(product);
@@ -519,12 +543,15 @@ void main() {
       final productSvc = ProductService();
       final productRepo = ProductRepository();
       final trashService = TrashService();
+      final categorySvc = CategoryService();
+      final categoryId = await seedCategoryId(categorySvc);
 
       // Create and soft-delete a product directly, bypassing trash.
       final product = Product(
         name: 'Backfill Product',
         price: 10.0,
         stock: 5,
+        categoryId: categoryId,
         createdAt: DateTime.now(),
       );
       await productSvc.createProduct(product);
@@ -554,12 +581,15 @@ void main() {
       final trashService = TrashService();
       final trashRepo = TrashRepository();
       final trashDao = TrashDao();
+      final categorySvc = CategoryService();
+      final categoryId = await seedCategoryId(categorySvc);
 
       // Create and delete a product through the trash flow.
       final product = Product(
         name: 'Expired Product',
         price: 10.0,
         stock: 5,
+        categoryId: categoryId,
         createdAt: DateTime.now(),
       );
       await productSvc.createProduct(product);
@@ -591,12 +621,14 @@ void main() {
       final productSvc = ProductService();
       final categorySvc = CategoryService();
       final trashService = TrashService();
+      final categoryId = await seedCategoryId(categorySvc);
 
       // Create and delete a product.
       final product = Product(
         name: 'Bulk Product',
         price: 10.0,
         stock: 5,
+        categoryId: categoryId,
         createdAt: DateTime.now(),
       );
       await productSvc.createProduct(product);

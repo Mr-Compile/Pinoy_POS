@@ -25,6 +25,7 @@ import 'package:pinoy_pos/ui/widgets/app_status_chip.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
+import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 
 class POSScreen extends ConsumerStatefulWidget {
   const POSScreen({super.key});
@@ -301,24 +302,11 @@ class _POSScreenState extends ConsumerState<POSScreen> {
       child: Column(
         children: [
           // Search field
-          TextField(
+          AppSearchField(
             controller: _searchController,
-            decoration: InputDecoration(
-              hintText: 'Search products...',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: _searchQuery.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: _clearSearch,
-                      tooltip: 'Clear search',
-                    )
-                  : null,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              isDense: true,
-            ),
+            hint: 'Search products...',
             onChanged: _onSearchChanged,
+            onClear: _clearSearch,
           ),
           const SizedBox(height: Spacing.sm),
           // Category chips
@@ -1072,14 +1060,11 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
               ),
               const SizedBox(height: Spacing.lg),
               // Payment method
-              DropdownButtonFormField<String>(
+              AppDropdownField<String>(
                 key: const ValueKey('pos_payment_method'),
+                label: 'Payment Method',
+                prefixIcon: Icons.payment,
                 initialValue: currentMethod,
-                decoration: const InputDecoration(
-                  labelText: 'Payment Method',
-                  prefixIcon: Icon(Icons.payment),
-                  border: OutlineInputBorder(),
-                ),
                 items: methods
                     .map((m) => DropdownMenuItem(
                           value: m,
@@ -1094,14 +1079,11 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
               const SizedBox(height: Spacing.lg),
               // Cash received (Cash only)
               if (currentMethod == 'Cash') ...[
-                TextFormField(
+                AppTextFormField(
                   controller: _cashController,
-                  decoration: InputDecoration(
-                    labelText: 'Cash Received',
-                    prefixText: CurrencyUtils.symbol(),
-                    prefixIcon: const Icon(Icons.payments),
-                    border: const OutlineInputBorder(),
-                  ),
+                  label: 'Cash Received',
+                  prefixText: CurrencyUtils.symbol(),
+                  prefixIcon: Icons.payments,
                   keyboardType: TextInputType.number,
                   validator: (value) {
                     final cash = double.tryParse(value?.trim() ?? '');
@@ -1152,33 +1134,24 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
               ],
               // Reference and customer (Card/Other only)
               if (currentMethod == 'Card' || currentMethod == 'Other') ...[
-                TextFormField(
+                AppTextFormField(
                   controller: _referenceController,
-                  decoration: const InputDecoration(
-                    labelText: 'Reference Number (optional)',
-                    prefixIcon: Icon(Icons.confirmation_number),
-                    border: OutlineInputBorder(),
-                  ),
+                  label: 'Reference Number (optional)',
+                  prefixIcon: Icons.confirmation_number,
                 ),
                 const SizedBox(height: Spacing.md),
-                TextFormField(
+                AppTextFormField(
                   controller: _customerNameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Customer Name (optional)',
-                    prefixIcon: Icon(Icons.person),
-                    border: OutlineInputBorder(),
-                  ),
+                  label: 'Customer Name (optional)',
+                  prefixIcon: Icons.person,
                 ),
                 const SizedBox(height: Spacing.md),
               ],
               // Notes
-              TextFormField(
+              AppTextFormField(
                 controller: _notesController,
-                decoration: const InputDecoration(
-                  labelText: 'Notes (optional)',
-                  prefixIcon: Icon(Icons.note),
-                  border: OutlineInputBorder(),
-                ),
+                label: 'Notes (optional)',
+                prefixIcon: Icons.note,
                 maxLines: 2,
               ),
             ],

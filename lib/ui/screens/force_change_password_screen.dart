@@ -5,6 +5,7 @@ import 'package:pinoy_pos/core/auth_navigation.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/services/password_strength_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
+import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/password_strength_meter.dart';
 import 'package:pinoy_pos/ui/widgets/password_requirements_checklist.dart';
 
@@ -31,8 +32,6 @@ class _ForceChangePasswordScreenState
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
-  bool _obscureNewPassword = true;
-  bool _obscureConfirmPassword = true;
   bool _isSubmitting = false;
   bool _newPasswordTouched = false;
   bool _confirmPasswordTouched = false;
@@ -172,26 +171,10 @@ class _ForceChangePasswordScreenState
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 32),
-                      TextFormField(
+                      AppPasswordField(
                         controller: _newPasswordController,
-                        decoration: InputDecoration(
-                          labelText: 'New Password',
-                          border: const OutlineInputBorder(),
-                          prefixIcon: const Icon(Icons.lock_outline),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscureNewPassword
-                                  ? Icons.visibility_off
-                                  : Icons.visibility,
-                            ),
-                            onPressed: () => setState(() =>
-                                _obscureNewPassword = !_obscureNewPassword),
-                            tooltip: _obscureNewPassword
-                                ? 'Show password'
-                                : 'Hide password',
-                          ),
-                        ),
-                        obscureText: _obscureNewPassword,
+                        label: 'New Password',
+                        prefixIcon: Icons.lock_outline,
                         textInputAction: TextInputAction.next,
                         onChanged: (value) {
                           setState(() {
@@ -217,27 +200,10 @@ class _ForceChangePasswordScreenState
                       if (password.isNotEmpty)
                         PasswordStrengthMeter(result: strengthResult),
                       const SizedBox(height: 16),
-                      TextFormField(
+                      AppPasswordField(
                         controller: _confirmPasswordController,
-                        decoration: InputDecoration(
-                          labelText: 'Confirm New Password',
-                          border: const OutlineInputBorder(),
-                          prefixIcon: const Icon(Icons.lock_outline),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscureConfirmPassword
-                                  ? Icons.visibility_off
-                                  : Icons.visibility,
-                            ),
-                            onPressed: () => setState(() =>
-                                _obscureConfirmPassword =
-                                    !_obscureConfirmPassword),
-                            tooltip: _obscureConfirmPassword
-                                ? 'Show password'
-                                : 'Hide password',
-                          ),
-                        ),
-                        obscureText: _obscureConfirmPassword,
+                        label: 'Confirm New Password',
+                        prefixIcon: Icons.lock_outline,
                         textInputAction: TextInputAction.done,
                         onChanged: (value) {
                           setState(() {

@@ -11,6 +11,7 @@ import 'package:pinoy_pos/ui/widgets/app_image.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
+import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 
 /// GCash / payment configuration page.
 ///
@@ -473,19 +474,15 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
                   subtitle: Text('$_referenceMinLength characters'),
                   trailing: SizedBox(
                     width: 80,
-                    child: TextFormField(
+                    child: AppTextFormField(
                       initialValue: _referenceMinLength.toString(),
-                      textAlign: TextAlign.center,
                       keyboardType: TextInputType.number,
                       enabled: !widget.isLoading,
                       onChanged: (value) {
                         final parsed = int.tryParse(value) ?? 1;
                         setState(() => _referenceMinLength = parsed.clamp(1, 50));
                       },
-                      decoration: const InputDecoration(
-                        contentPadding: EdgeInsets.symmetric(horizontal: 8),
-                        border: OutlineInputBorder(),
-                      ),
+                      isDense: true,
                     ),
                   ),
                 ),

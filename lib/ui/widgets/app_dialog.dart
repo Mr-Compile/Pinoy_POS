@@ -172,57 +172,73 @@ class AppDialog extends StatelessWidget {
       builder: (context, constraints) {
         final layout = layoutClassFor(constraints.maxWidth);
         final (horizontalInset, maxDialogWidth) = switch (layout) {
-          LayoutClass.compact => (32.0, min(360.0, constraints.maxWidth - 64.0)),
-          LayoutClass.medium => (24.0, min(480.0, constraints.maxWidth - 48.0)),
-          LayoutClass.expanded => (24.0, min(560.0, constraints.maxWidth - 48.0)),
+          LayoutClass.compact => (
+            16.0,
+            min(360.0, max(120.0, constraints.maxWidth - 32.0))
+          ),
+          LayoutClass.medium => (
+            24.0,
+            min(480.0, max(120.0, constraints.maxWidth - 48.0))
+          ),
+          LayoutClass.expanded => (
+            24.0,
+            min(560.0, max(120.0, constraints.maxWidth - 48.0))
+          ),
         };
-        // Never let the max fall below the min width to keep BoxConstraints
-        // valid, even on very small/foldable windows.
-        final effectiveMax = max(280.0, maxDialogWidth);
+
+        final viewInsets = MediaQuery.viewInsetsOf(context);
 
         return Semantics(
           label: type.semanticLabel,
           container: true,
-          child: Dialog(
-            alignment: Alignment.center,
-            insetPadding: EdgeInsets.symmetric(
-              horizontal: horizontalInset,
-              vertical: 24,
-            ),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minWidth: 280,
-                maxWidth: effectiveMax,
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(Spacing.xxl),
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (showIcon) ...[
-                        _buildIcon(context, isAlert),
-                        const SizedBox(height: Spacing.lg),
-                      ],
-                      _buildTitle(context, isAlert),
-                      if (message != null) ...[
-                        const SizedBox(height: Spacing.sm),
-                        _buildMessage(context, isAlert),
-                      ],
-                      if (details != null) ...[
-                        const SizedBox(height: Spacing.sm),
-                        _buildDetails(context),
-                      ],
-                      if (child != null) ...[
-                        const SizedBox(height: Spacing.md),
-                        child!,
-                      ],
-                      if (actions.isNotEmpty) ...[
-                        const SizedBox(height: Spacing.xxl),
-                        _buildActions(context, layout.isAtLeastMedium),
-                      ],
-                    ],
+          child: SafeArea(
+            minimum: EdgeInsets.zero,
+            child: AnimatedPadding(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOut,
+              padding: EdgeInsets.only(bottom: viewInsets.bottom),
+              child: Dialog(
+                alignment: Alignment.center,
+                insetPadding: EdgeInsets.symmetric(
+                  horizontal: horizontalInset,
+                  vertical: 24,
+                ),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minWidth: 0,
+                    maxWidth: maxDialogWidth,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(Spacing.xxl),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (showIcon) ...[
+                            _buildIcon(context, isAlert),
+                            const SizedBox(height: Spacing.lg),
+                          ],
+                          _buildTitle(context, isAlert),
+                          if (message != null) ...[
+                            const SizedBox(height: Spacing.sm),
+                            _buildMessage(context, isAlert),
+                          ],
+                          if (details != null) ...[
+                            const SizedBox(height: Spacing.sm),
+                            _buildDetails(context),
+                          ],
+                          if (child != null) ...[
+                            const SizedBox(height: Spacing.md),
+                            child!,
+                          ],
+                          if (actions.isNotEmpty) ...[
+                            const SizedBox(height: Spacing.xxl),
+                            _buildActions(context, layout.isAtLeastMedium),
+                          ],
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -249,7 +265,7 @@ class AppDialog extends StatelessWidget {
     }
 
     return Align(
-      alignment: centered ? Alignment.center : Alignment.centerLeft,
+      alignment: centered ? Alignment.center : Alignment.center,
       child: Container(
         width: 56,
         height: 56,
@@ -269,7 +285,7 @@ class AppDialog extends StatelessWidget {
   Widget _buildTitle(BuildContext context, bool centered) {
     return Text(
       title,
-      textAlign: centered ? TextAlign.center : TextAlign.start,
+      textAlign: TextAlign.center,
       style: AppTypography.headlineSmallSemibold(context),
     );
   }
@@ -278,7 +294,7 @@ class AppDialog extends StatelessWidget {
     return Text(
       message!,
       softWrap: true,
-      textAlign: centered ? TextAlign.center : TextAlign.start,
+      textAlign: TextAlign.center,
       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
@@ -355,15 +371,21 @@ class AppDialog extends StatelessWidget {
     }
 
     return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: actions.asMap().entries.map((entry) {
         final i = entry.key;
         final action = entry.value;
+        final isFirst = i == 0;
         final isLast = i == actions.length - 1;
 
-        return Padding(
-          padding: EdgeInsets.only(right: isLast ? 0 : Spacing.sm),
-          child: buildAction(action, fullWidth: false),
+        return Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: isFirst ? 0 : Spacing.sm,
+              right: isLast ? 0 : Spacing.sm,
+            ),
+            child: buildAction(action, fullWidth: true),
+          ),
         );
       }).toList(),
     );

@@ -8,6 +8,7 @@ import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/services/groq_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
+import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
@@ -46,7 +47,6 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
 
   final TextEditingController _apiKeyController = TextEditingController();
   String _selectedModel = '';
-  bool _obscureKey = true;
 
   // Connection status: null = unknown, true = connected, false = failed.
   bool? _connectionStatus;
@@ -586,26 +586,15 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
               style: theme.textTheme.bodySmall,
             ),
             const SizedBox(height: 12),
-            TextField(
+            AppPasswordField(
               controller: _apiKeyController,
-              obscureText: _obscureKey,
-              decoration: InputDecoration(
-                labelText: 'API Key',
-                border: const OutlineInputBorder(),
-                prefixIcon: const Icon(Icons.key),
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscureKey ? Icons.visibility : Icons.visibility_off,
-                  ),
-                  tooltip: _obscureKey ? 'Show' : 'Hide',
-                  onPressed: () {
-                    setState(() => _obscureKey = !_obscureKey);
-                  },
-                ),
-                hintText: _isConfigured
-                    ? 'Enter a new key to replace'
-                    : 'Enter Groq API key',
-              ),
+              label: 'API Key',
+              prefixIcon: Icons.key,
+              hint: _isConfigured
+                  ? 'Enter a new key to replace'
+                  : 'Enter Groq API key',
+              // An API key is not a password — no autofill hints.
+              autofillHints: const [],
             ),
             const SizedBox(height: 12),
             Row(
@@ -783,15 +772,8 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Search field
-        TextField(
-          decoration: InputDecoration(
-            labelText: 'Search Models',
-            prefixIcon: const Icon(Icons.search, size: 20),
-            border: const OutlineInputBorder(),
-            contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12, vertical: 8),
-            isDense: true,
-          ),
+        AppSearchField(
+          hint: 'Search Models',
           onChanged: (value) {
             setState(() => _modelSearchQuery = value);
           },

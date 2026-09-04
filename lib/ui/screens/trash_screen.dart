@@ -15,6 +15,7 @@ import 'package:pinoy_pos/ui/widgets/app_image.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
+import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 
 class TrashScreen extends ConsumerStatefulWidget {
   const TrashScreen({super.key});
@@ -536,25 +537,14 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
         children: [
           Padding(
             padding: const EdgeInsets.all(16),
-            child: TextField(
+            child: AppSearchField(
               controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search trash...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          _filterItems();
-                        },
-                      )
-                    : null,
-              ),
+              hint: 'Search trash...',
               onChanged: (_) => _filterItems(),
+              onClear: () {
+                _searchController.clear();
+                _filterItems();
+              },
             ),
           ),
           Expanded(

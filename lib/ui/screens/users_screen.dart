@@ -12,6 +12,7 @@ import 'package:pinoy_pos/ui/widgets/app_dialog_form.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_icon_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
+import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/app_list_item.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
@@ -281,37 +282,28 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                     ),
                   ),
                   const SizedBox(height: Spacing.md),
-                  TextFormField(
+                  AppTextFormField(
                     controller: usernameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Username',
-                      border: OutlineInputBorder(),
-                    ),
+                    label: 'Username',
                     validator: (value) =>
                         Validators.required(value, 'Username'),
                     onChanged: (_) => state.markChanged(),
                   ),
                   const SizedBox(height: 12),
-                  TextFormField(
+                  AppTextFormField(
                     controller: fullNameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Full Name',
-                      border: OutlineInputBorder(),
-                    ),
+                    label: 'Full Name',
                     validator: (value) =>
                         Validators.required(value, 'Full Name'),
                     onChanged: (_) => state.markChanged(),
                   ),
                   const SizedBox(height: 12),
-                  TextFormField(
+                  AppTextFormField(
                     controller: pinController,
-                    decoration: InputDecoration(
-                      labelText: 'PIN (optional)',
-                      border: const OutlineInputBorder(),
-                      hintText: user.hasPin
-                          ? 'Enter new PIN to replace (${user.configuredPinLength} digits)'
-                          : '4-6 digits',
-                    ),
+                    label: 'PIN (optional)',
+                    hint: user.hasPin
+                        ? 'Enter new PIN to replace (${user.configuredPinLength} digits)'
+                        : '4-6 digits',
                     keyboardType: TextInputType.number,
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) return null;
@@ -320,11 +312,8 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                     onChanged: (_) => state.markChanged(),
                   ),
                   const SizedBox(height: 12),
-                  DropdownButtonFormField<UserRole>(
-                    decoration: const InputDecoration(
-                      labelText: 'Role',
-                      border: OutlineInputBorder(),
-                    ),
+                  AppDropdownField<UserRole>(
+                    label: 'Role',
                     items: roleItems
                         .map((role) => DropdownMenuItem(
                               value: role,
@@ -482,12 +471,9 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  TextFormField(
+                  AppTextFormField(
                     controller: usernameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Username',
-                      border: OutlineInputBorder(),
-                    ),
+                    label: 'Username',
                     textInputAction: TextInputAction.next,
                     validator: (value) =>
                         Validators.required(value, 'Username'),
@@ -496,12 +482,9 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                         FocusScope.of(context).nextFocus(),
                   ),
                   const SizedBox(height: 12),
-                  TextFormField(
+                  AppTextFormField(
                     controller: fullNameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Full Name',
-                      border: OutlineInputBorder(),
-                    ),
+                    label: 'Full Name',
                     textInputAction: TextInputAction.next,
                     validator: (value) =>
                         Validators.required(value, 'Full Name'),
@@ -510,13 +493,10 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                         FocusScope.of(context).nextFocus(),
                   ),
                   const SizedBox(height: 12),
-                  TextFormField(
+                  AppTextFormField(
                     controller: pinController,
-                    decoration: const InputDecoration(
-                      labelText: 'PIN (optional)',
-                      border: OutlineInputBorder(),
-                      hintText: '4-6 digits',
-                    ),
+                    label: 'PIN (optional)',
+                    hint: '4-6 digits',
                     keyboardType: TextInputType.number,
                     textInputAction: TextInputAction.next,
                     validator: (value) {
@@ -528,11 +508,8 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                         FocusScope.of(context).nextFocus(),
                   ),
                   const SizedBox(height: 12),
-                  DropdownButtonFormField<UserRole>(
-                    decoration: const InputDecoration(
-                      labelText: 'Role',
-                      border: OutlineInputBorder(),
-                    ),
+                  AppDropdownField<UserRole>(
+                    label: 'Role',
                     items: manageableRoles
                         .map((role) => DropdownMenuItem(
                               value: role,
@@ -655,29 +632,15 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
               child: Row(
                 children: [
                   Expanded(
-                    child: TextField(
+                    child: AppSearchField(
                       controller: _searchController,
-                      decoration: InputDecoration(
-                        hintText: 'Search by name or username...',
-                        prefixIcon: const Icon(Icons.search),
-                        suffixIcon: _searchQuery.isNotEmpty
-                            ? IconButton(
-                                icon: const Icon(Icons.clear),
-                                onPressed: () {
-                                  _searchController.clear();
-                                  setState(() => _searchQuery = '');
-                                },
-                              )
-                            : null,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                      ),
-                      onChanged: (value) => setState(() => _searchQuery = value),
+                      hint: 'Search by name or username...',
+                      onChanged: (value) =>
+                          setState(() => _searchQuery = value),
+                      onClear: () {
+                        _searchController.clear();
+                        setState(() => _searchQuery = '');
+                      },
                     ),
                   ),
                   const SizedBox(width: 12),

@@ -93,22 +93,33 @@ class BackupService {
   static const _backupLocationKey = 'backup_location_v2';
   static const _legacyBackupLocationKey = 'backup_location';
 
-  /// Required Pinoy POS tables that must exist in a valid backup file.
-  static const _requiredTables = [
-    'users',
-    'categories',
-    'products',
-    'sales',
-    'sale_items',
-    'stock_history',
-    'activity_logs',
-    'notifications',
+  /// Core tables that must exist in any Pinoy POS backup, including legacy
+  /// v1/v2 .db files. The value lists acceptable aliases (e.g. the legacy
+  /// `activity_log` table was renamed to `activity_logs` in v3).
+  static const _coreTableAliases = {
+    'users': ['users'],
+    'categories': ['categories'],
+    'products': ['products'],
+    'sales': ['sales'],
+    'sale_items': ['sale_items'],
+    'stock_history': ['stock_history'],
+    'notifications': ['notifications'],
+    'settings': ['settings'],
+    'activity_logs': ['activity_logs', 'activity_log'],
+  };
+
+  /// Tables that are expected only when the backup was created at the current
+  /// schema version. Older backups are allowed to miss these because the
+  /// database will run [onUpgrade] and create them after the restore.
+  static const _currentVersionOnlyTables = [
     'announcements',
-    'settings',
     'ai_usage',
+    'ai_quota',
     'trash',
     'backup_history',
     'export_history',
+    'backup_metadata',
+    'attachments',
   ];
 
   // ── Backup Location Management ───────────────────────────────────────
@@ -677,10 +688,60 @@ class BackupService {
       );
       final tableNames = tables.map((t) => t['name'] as String).toSet();
 
-      for (final required in _requiredTables) {
-        if (!tableNames.contains(required)) {
+      // Determine the schema version of the backup. Legacy .db files may be
+      // many versions behind; opening them after restore will trigger
+      // onUpgrade and create the missing tables automatically.
+      int userVersion = 0;
+      try {
+        final versionRows = await testDb.rawQuery('PRAGMA user_version');
+        if (versionRows.isNotEmpty) {
+          final raw = versionRows.first.values.first;
+          if (raw is int) {
+            userVersion = raw;
+          } else if (raw is String) {
+            userVersion = int.tryParse(raw) ?? 0;
+          }
+        }
+      } catch (e) {
+        _log('Could not read PRAGMA user_version from backup: $e');
+      }
+      _log('Backup database user_version: $userVersion');
+
+      // Core tables must be present in every supported backup (including
+      // legacy v1/v2 .db files).  Accept the legacy `activity_log` name as
+      // an alias for `activity_logs`.
+      for (final entry in _coreTableAliases.entries) {
+        final aliases = entry.value;
+        final hasAnyAlias = aliases.any(tableNames.contains);
+        if (!hasAnyAlias) {
+          _log('Backup is missing core table(s): $aliases');
           await testDb.close();
           return BackupImportResult.incompatible;
+        }
+      }
+
+      // For backups at the current schema version, also require the newer
+      // tables.  Older backups are allowed to miss them because the database
+      // will run onUpgrade after restore and create them.
+      if (userVersion >= constants.AppConstants.databaseVersion) {
+        final missing = <String>[];
+        for (final required in _currentVersionOnlyTables) {
+          if (!tableNames.contains(required)) {
+            missing.add(required);
+          }
+        }
+        if (missing.isNotEmpty) {
+          _log('Backup at current version is missing table(s): $missing');
+          await testDb.close();
+          return BackupImportResult.incompatible;
+        }
+      } else {
+        final missing = _currentVersionOnlyTables
+            .where((t) => !tableNames.contains(t))
+            .toList();
+        if (missing.isNotEmpty) {
+          _log('Legacy backup is missing newer tables (will be created by '
+              'onUpgrade after restore): $missing');
         }
       }
 
@@ -699,6 +760,7 @@ class BackupService {
           }
           final appName = metaRows.first['app_name'] as String?;
           if (appName != constants.AppConstants.appName) {
+            _log('Backup app_name mismatch: $appName');
             await testDb.close();
             return BackupImportResult.incompatible;
           }

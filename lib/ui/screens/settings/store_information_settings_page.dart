@@ -9,6 +9,7 @@ import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_form.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
+import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 
@@ -202,12 +203,9 @@ class _StoreInformationSettingsPageState
         childBuilder: (context, state) {
           final controller = state.textController('value', text: initialValue);
 
-          return TextField(
+          return AppTextFormField(
             controller: controller,
-            decoration: InputDecoration(
-              labelText: label,
-              border: const OutlineInputBorder(),
-            ),
+            label: label,
             maxLines: maxLines,
           );
         },

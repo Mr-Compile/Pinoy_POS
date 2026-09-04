@@ -52,6 +52,13 @@ class ProductService {
     return _productRepository.getById(id);
   }
 
+  Future<Product?> getProductByName(String name) async {
+    if (!_sessionManager.hasPermission('view_products')) {
+      return null;
+    }
+    return _productRepository.getByName(name);
+  }
+
   Future<bool> createProduct(Product product) async {
     if (!_sessionManager.hasPermission('edit_products')) {
       throw AuthorizationException('edit_products');
@@ -243,6 +250,7 @@ class ProductService {
     if (product.price <= 0) return false;
     if (product.stock < 0) return false;
     if (product.minStock < 0) return false;
+    if (product.categoryId == null) return false;
     return true;
   }
 }

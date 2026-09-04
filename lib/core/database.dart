@@ -411,6 +411,13 @@ class DatabaseHelper {
     if (oldVersion < 20) {
       await _migrateV20(db);
     }
+
+    // Create any tables that were introduced after the backup's original
+    // version but do not have an explicit migration block above (e.g.
+    // `announcements`, `ai_usage`).  All CREATE statements in _createTables
+    // use IF NOT EXISTS, so this is idempotent and will not overwrite or
+    // recreate tables that already exist.
+    await _createTables(db);
   }
 
   /// Backfills payment_proof_type for existing sales by detecting the actual

@@ -10,6 +10,7 @@ import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_form.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
+import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/validators.dart';
 import 'package:pinoy_pos/ui/widgets/password_strength_meter.dart';
 
@@ -76,12 +77,6 @@ class SecuritySettingsPage extends ConsumerWidget {
           final oldController = state.textController('oldPassword');
           final newController = state.textController('newPassword');
           final confirmController = state.textController('confirmPassword');
-          final obscureOld =
-              state.value<bool>('obscureOldPassword', true) ?? true;
-          final obscureNew =
-              state.value<bool>('obscureNewPassword', true) ?? true;
-          final obscureConfirm =
-              state.value<bool>('obscureConfirmPassword', true) ?? true;
           final strengthResult = PasswordStrengthService.evaluate(
             password: newController.text,
             username: user.username,
@@ -92,46 +87,18 @@ class SecuritySettingsPage extends ConsumerWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextFormField(
+                AppPasswordField(
                   controller: oldController,
-                  decoration: InputDecoration(
-                    labelText: 'Current Password',
-                    border: const OutlineInputBorder(),
-                    prefixIcon: const Icon(Icons.lock_outline),
-                    suffixIcon: IconButton(
-                      icon: Icon(obscureOld
-                          ? Icons.visibility_off
-                          : Icons.visibility),
-                      onPressed: () => state.setValue<bool>(
-                        'obscureOldPassword',
-                        !obscureOld,
-                      ),
-                      tooltip: obscureOld ? 'Show password' : 'Hide password',
-                    ),
-                  ),
-                  obscureText: obscureOld,
+                  label: 'Current Password',
+                  prefixIcon: Icons.lock_outline,
                   validator: (value) =>
                       Validators.required(value, 'Current password'),
                 ),
                 const SizedBox(height: 12),
-                TextFormField(
+                AppPasswordField(
                   controller: newController,
-                  decoration: InputDecoration(
-                    labelText: 'New Password',
-                    border: const OutlineInputBorder(),
-                    prefixIcon: const Icon(Icons.lock_outline),
-                    suffixIcon: IconButton(
-                      icon: Icon(obscureNew
-                          ? Icons.visibility_off
-                          : Icons.visibility),
-                      onPressed: () => state.setValue<bool>(
-                        'obscureNewPassword',
-                        !obscureNew,
-                      ),
-                      tooltip: obscureNew ? 'Show password' : 'Hide password',
-                    ),
-                  ),
-                  obscureText: obscureNew,
+                  label: 'New Password',
+                  prefixIcon: Icons.lock_outline,
                   onChanged: (value) {
                     state.markChanged();
                     state.setValue<bool>('newPasswordTouched', true);
@@ -156,25 +123,10 @@ class SecuritySettingsPage extends ConsumerWidget {
                   PasswordStrengthMeter(result: strengthResult),
                 ],
                 const SizedBox(height: 12),
-                TextFormField(
+                AppPasswordField(
                   controller: confirmController,
-                  decoration: InputDecoration(
-                    labelText: 'Confirm New Password',
-                    border: const OutlineInputBorder(),
-                    prefixIcon: const Icon(Icons.lock_outline),
-                    suffixIcon: IconButton(
-                      icon: Icon(obscureConfirm
-                          ? Icons.visibility_off
-                          : Icons.visibility),
-                      onPressed: () => state.setValue<bool>(
-                        'obscureConfirmPassword',
-                        !obscureConfirm,
-                      ),
-                      tooltip:
-                          obscureConfirm ? 'Show password' : 'Hide password',
-                    ),
-                  ),
-                  obscureText: obscureConfirm,
+                  label: 'Confirm New Password',
+                  prefixIcon: Icons.lock_outline,
                   onChanged: (value) {
                     state.setValue<bool>('confirmPasswordTouched', true);
                   },

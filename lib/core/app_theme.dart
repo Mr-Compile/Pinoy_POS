@@ -271,18 +271,100 @@ class AppColors {
       ),
 
       // ── Input decoration ─────────────────────────────────────────
+      // Modern filled-field design shared by every form in the app.
+      // Field radius, borders, padding, and icon colors live here so a
+      // single change updates the whole input system.
       inputDecorationTheme: InputDecorationTheme(
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
         filled: true,
         fillColor: isDark
             ? colorScheme.surfaceContainerHighest
             : colorScheme.surfaceContainerLow,
+        isDense: false,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
-          vertical: 14,
+          vertical: 16,
         ),
+        constraints: const BoxConstraints(minHeight: 56),
+
+        // Subtle unfocused border; the field reads as a filled surface
+        // rather than a heavy boxed outline.
+        border: _inputBorder(colorScheme.outlineVariant, 1.0),
+        enabledBorder: _inputBorder(colorScheme.outlineVariant, 1.0),
+        disabledBorder: _inputBorder(
+          colorScheme.outlineVariant.withValues(alpha: 0.5),
+          1.0,
+        ),
+        focusedBorder: _inputBorder(colorScheme.primary, 1.5),
+        errorBorder: _inputBorder(colorScheme.error, 1.0),
+        focusedErrorBorder: _inputBorder(colorScheme.error, 1.5),
+
+        // Floating label: primary when focused, error when invalid.
+        labelStyle: WidgetStateTextStyle.resolveWith((states) {
+          final color = states.contains(WidgetState.error)
+              ? colorScheme.error
+              : states.contains(WidgetState.disabled)
+                  ? colorScheme.onSurface.withValues(alpha: 0.38)
+                  : colorScheme.onSurfaceVariant;
+          return TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 16,
+            color: color,
+          );
+        }),
+        floatingLabelStyle: WidgetStateTextStyle.resolveWith((states) {
+          final color = states.contains(WidgetState.error)
+              ? colorScheme.error
+              : states.contains(WidgetState.focused)
+                  ? colorScheme.primary
+                  : colorScheme.onSurfaceVariant;
+          return TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: color,
+          );
+        }),
+        hintStyle: TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 14,
+          color: colorScheme.onSurfaceVariant,
+        ),
+        helperStyle: TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 12,
+          color: colorScheme.onSurfaceVariant,
+        ),
+        errorStyle: TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 12,
+          color: colorScheme.error,
+        ),
+        errorMaxLines: 2,
+
+        // Icons: muted by default, primary on focus, error when invalid.
+        prefixIconColor: WidgetStateColor.resolveWith((states) {
+          if (states.contains(WidgetState.error)) return colorScheme.error;
+          if (states.contains(WidgetState.disabled)) {
+            return colorScheme.onSurface.withValues(alpha: 0.38);
+          }
+          if (states.contains(WidgetState.focused)) return colorScheme.primary;
+          return colorScheme.onSurfaceVariant;
+        }),
+        suffixIconColor: WidgetStateColor.resolveWith((states) {
+          if (states.contains(WidgetState.error)) return colorScheme.error;
+          if (states.contains(WidgetState.disabled)) {
+            return colorScheme.onSurface.withValues(alpha: 0.38);
+          }
+          if (states.contains(WidgetState.focused)) return colorScheme.primary;
+          return colorScheme.onSurfaceVariant;
+        }),
+      ),
+
+      // ── Text selection ───────────────────────────────────────────
+      textSelectionTheme: TextSelectionThemeData(
+        cursorColor: colorScheme.primary,
+        selectionColor: colorScheme.primary.withValues(alpha: 0.3),
+        selectionHandleColor: colorScheme.primary,
       ),
 
       // ── Navigation bar (mobile bottom nav) ───────────────────────
@@ -390,6 +472,16 @@ class AppColors {
   }
 
   // ── Custom surface helpers ─────────────────────────────────────────
+
+  /// Shared input field border: 16px radius, [width]-thick [color] side.
+  /// Used by [InputDecorationTheme] so every field state keeps the same
+  /// shape while only the side color/width changes.
+  static OutlineInputBorder _inputBorder(Color color, double width) {
+    return OutlineInputBorder(
+      borderRadius: BorderRadius.circular(16),
+      borderSide: BorderSide(color: color, width: width),
+    );
+  }
 
   /// Light mode scaffold: a very subtle warm-neutral, not pure gray.
   static Color _lightScaffoldBackground(ColorScheme cs) {

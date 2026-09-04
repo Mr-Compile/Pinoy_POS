@@ -484,7 +484,7 @@ class AppButton extends StatelessWidget {
       0,
     );
 
-    final loadingColor = Colors.white;
+    final loadingColor = onMainColor;
     final idleColor = disabled ? onMainColor.withValues(alpha: 0.38) : onMainColor;
 
     final labelWidget = isLoading

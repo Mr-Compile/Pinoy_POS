@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
+import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/app_messages.dart';
 
 /// Possible user choices from the "Backup Export Failed" dialog.
@@ -1034,12 +1035,9 @@ class _VoidSaleDialogState extends State<_VoidSaleDialog> {
               : null,
         ),
       ],
-      child: TextField(
+      child: AppTextFormField(
         controller: _reasonController,
-        decoration: const InputDecoration(
-          labelText: 'Reason',
-          border: OutlineInputBorder(),
-        ),
+        label: 'Reason',
         maxLines: 2,
         onChanged: (_) => setState(() {}),
       ),

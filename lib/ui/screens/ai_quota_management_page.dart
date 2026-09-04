@@ -10,6 +10,7 @@ import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_form.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
+import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 
 /// Admin page for managing per-user AI quotas and the default daily quota.
 ///
@@ -109,13 +110,11 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                TextFormField(
+                AppTextFormField(
                   controller: controller,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'New default daily quota',
-                    helperText: 'Applies to new users unless overridden',
-                  ),
+                  label: 'New default daily quota',
+                  helperText: 'Applies to new users unless overridden',
                 ),
                 const SizedBox(height: Spacing.sm),
                 CheckboxListTile(
@@ -202,12 +201,10 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
 
           return Form(
             key: state.formKey,
-            child: TextFormField(
+            child: AppTextFormField(
               controller: controller,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Daily quota',
-              ),
+              label: 'Daily quota',
             ),
           );
         },

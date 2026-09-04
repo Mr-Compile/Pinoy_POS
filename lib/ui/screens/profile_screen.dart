@@ -10,6 +10,7 @@ import 'package:pinoy_pos/ui/widgets/app_dialog_form.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
+import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/validators.dart';
 
 /// Profile screen — shows the current user's profile information and
@@ -230,27 +231,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  TextFormField(
+                  AppTextFormField(
                     controller: fullNameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Full Name',
-                      border: OutlineInputBorder(),
-                    ),
+                    label: 'Full Name',
                     validator: (value) =>
                         Validators.required(value, 'Full Name'),
                     onChanged: (_) => state.markChanged(),
                   ),
                   const SizedBox(height: 16),
-                  TextFormField(
+                  AppTextFormField(
                     controller: usernameController,
                     readOnly: user.hasChangedUsername,
-                    decoration: InputDecoration(
-                      labelText: 'Username',
-                      border: const OutlineInputBorder(),
-                      helperText: user.hasChangedUsername
-                          ? 'You have already changed your username.'
-                          : 'You can only change your username once.',
-                    ),
+                    label: 'Username',
+                    helperText: user.hasChangedUsername
+                        ? 'You have already changed your username.'
+                        : 'You can only change your username once.',
                     validator: (value) => Validators.compose([
                       (v) => Validators.required(v, 'Username'),
                       (v) => Validators.minLength(v, 3, 'Username'),

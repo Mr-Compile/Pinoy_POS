@@ -15,6 +15,7 @@ import 'package:pinoy_pos/ui/widgets/app_dialog_form.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
+import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/app_list_item.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
@@ -87,26 +88,16 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TextField(
+          AppSearchField(
             controller: _searchController,
-            decoration: InputDecoration(
-              hintText: 'Search by name or username',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: _searchController.text.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        _searchController.clear();
-                        ref.read(staffControllerProvider.notifier).setSearch('');
-                      },
-                    )
-                  : null,
-              border: const OutlineInputBorder(),
-            ),
+            hint: 'Search by name or username',
             onChanged: (value) {
               ref.read(staffControllerProvider.notifier).setSearch(value);
             },
-            textInputAction: TextInputAction.search,
+            onClear: () {
+              _searchController.clear();
+              ref.read(staffControllerProvider.notifier).setSearch('');
+            },
           ),
           const SizedBox(height: Spacing.sm),
           Row(
@@ -363,39 +354,30 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
                   ),
                   const SizedBox(height: Spacing.md),
                 ],
-                TextFormField(
+                AppTextFormField(
                   controller: usernameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Username',
-                    border: OutlineInputBorder(),
-                  ),
+                  label: 'Username',
                   textInputAction: TextInputAction.next,
                   onChanged: (_) => state.markChanged(),
                   onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
                   validator: (value) => Validators.required(value, 'Username'),
                 ),
                 const SizedBox(height: Spacing.md),
-                TextFormField(
+                AppTextFormField(
                   controller: fullNameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Full Name',
-                    border: OutlineInputBorder(),
-                  ),
+                  label: 'Full Name',
                   textInputAction: TextInputAction.next,
                   onChanged: (_) => state.markChanged(),
                   onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
                   validator: (value) => Validators.required(value, 'Full Name'),
                 ),
                 const SizedBox(height: Spacing.md),
-                TextFormField(
+                AppTextFormField(
                   controller: pinController,
-                  decoration: InputDecoration(
-                    labelText: 'PIN (optional)',
-                    border: const OutlineInputBorder(),
-                    hintText: isEdit && staff.hasPin
-                        ? 'Enter new PIN to replace (${staff.configuredPinLength} digits)'
-                        : '4-6 digits',
-                  ),
+                  label: 'PIN (optional)',
+                  hint: isEdit && staff.hasPin
+                      ? 'Enter new PIN to replace (${staff.configuredPinLength} digits)'
+                      : '4-6 digits',
                   keyboardType: TextInputType.number,
                   textInputAction: TextInputAction.done,
                   onChanged: (_) => state.markChanged(),

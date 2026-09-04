@@ -19,6 +19,7 @@ import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_button.dart';
+import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 
 /// GCash payment flow: customer, reference, payment proof, review, confirm.
 class GcashPaymentScreen extends ConsumerStatefulWidget {
@@ -282,25 +283,19 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
           const SizedBox(height: 24),
           _buildMerchantQrSection(settings, cs),
           if (settings.customerNameVisible) ...[
-            TextFormField(
+            AppTextFormField(
               controller: _customerController,
-              decoration: const InputDecoration(
-                labelText: 'Customer Name',
-                prefixIcon: Icon(Icons.person_outline),
-                border: OutlineInputBorder(),
-              ),
+              label: 'Customer Name',
+              prefixIcon: Icons.person_outline,
               textCapitalization: TextCapitalization.words,
               validator: (value) => _validateCustomer(settings, value),
             ),
             const SizedBox(height: 16),
           ],
-          TextFormField(
+          AppTextFormField(
             controller: _referenceController,
-            decoration: const InputDecoration(
-              labelText: 'GCash Reference Number',
-              prefixIcon: Icon(Icons.numbers),
-              border: OutlineInputBorder(),
-            ),
+            label: 'GCash Reference Number',
+            prefixIcon: Icons.numbers,
             textCapitalization: TextCapitalization.characters,
             validator: (value) => _validateReference(settings, value),
           ),
