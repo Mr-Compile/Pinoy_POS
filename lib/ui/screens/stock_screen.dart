@@ -1110,8 +1110,7 @@ class _StockOperationDialogState extends State<_StockOperationDialog> {
                 prefixIcon: Icons.note,
                 maxLines: 2,
               ),
-            ],
-          ),
+          ],
         ),
       ),
     );

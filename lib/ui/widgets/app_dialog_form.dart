@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:pinoy_pos/core/modal_result.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 

@@ -524,8 +524,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                       return null;
                     },
                   ),
-                ],
-              ),
+              ],
             ),
           );
         },
