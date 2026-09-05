@@ -7,6 +7,7 @@ import 'package:pinoy_pos/data/models/product.dart';
 import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
+import 'package:pinoy_pos/ui/dialogs/category_dialog.dart';
 import 'package:pinoy_pos/ui/dialogs/product_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
@@ -54,22 +55,30 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
       _isLoading = true;
     });
 
-    final productService = ref.read(productServiceProvider);
-    final categoryService = ref.read(categoryServiceProvider);
-    final categories = await categoryService.getActiveCategories();
+    try {
+      final productService = ref.read(productServiceProvider);
+      final categoryService = ref.read(categoryServiceProvider);
+      final categories = await categoryService.getActiveCategories();
 
-    // When a search query is active, run the search at the DAO level;
-    // otherwise load all active products.
-    final products = _searchQuery.isEmpty
-        ? await productService.getActiveProducts()
-        : await productService.searchProducts(_searchQuery);
+      // When a search query is active, run the search at the DAO level;
+      // otherwise load all active products.
+      final products = _searchQuery.isEmpty
+          ? await productService.getActiveProducts()
+          : await productService.searchProducts(_searchQuery);
 
-    if (mounted) {
-      setState(() {
-        _products = products;
-        _categories = categories;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _products = products;
+          _categories = categories;
+          _isLoading = false;
+        });
+      }
+    } catch (e, st) {
+      debugPrint('ProductsScreen _loadData error: $e');
+      debugPrint(st.toString());
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -190,19 +199,42 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
           ),
           Expanded(
             child: _filteredProducts.isEmpty
-                ? EmptyState(
-                    icon: Icons.inventory_2,
-                    title: _products.isEmpty ? 'No Products Yet' : 'No Products Found',
-                    message: _products.isEmpty
-                        ? 'Add your first product to start building your inventory.'
-                        : 'No products match your search.',
-                    // No create button here — the FAB (mobile) / AppBar
-                    // action (tablet) is the single primary create action.
-                  )
+                ? _buildEmptyState()
                 : _buildProductList(canEdit, canDelete),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    final authNotifier = ref.read(authStateProvider.notifier);
+    final canEditCategories = authNotifier.hasPermission('edit_categories');
+
+    if (_products.isEmpty && _categories.isEmpty) {
+      return EmptyState(
+        icon: Icons.inventory_2,
+        title: 'Set up your inventory',
+        message: canEditCategories
+            ? 'Start with Step 1: create a category. Then add your first product.'
+            : 'No products or categories exist. Ask an administrator to create a category first.',
+        action: canEditCategories
+            ? AppButton.outlined(
+                icon: Icons.category,
+                label: 'Create Category',
+                onPressed: _showCreateCategoryDialog,
+                fullWidth: true,
+              )
+            : null,
+      );
+    }
+
+    return EmptyState(
+      icon: Icons.inventory_2,
+      title: _products.isEmpty ? 'No Products Yet' : 'No Products Found',
+      message: _products.isEmpty
+          ? 'Add your first product to start building your inventory.'
+          : 'No products match your search.',
     );
   }
 
@@ -314,6 +346,23 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
           message: product == null
               ? 'Product created successfully.'
               : 'Product updated successfully.',
+        );
+      }
+    }
+  }
+
+  Future<void> _showCreateCategoryDialog() async {
+    final result = await showCategoryDialog(context, ref);
+
+    if (!mounted) return;
+
+    if (result?.isSaved ?? false) {
+      await _loadData();
+      if (mounted) {
+        await AppDialogService.success(
+          context,
+          title: 'Category Created',
+          message: 'You can now add your first product.',
         );
       }
     }

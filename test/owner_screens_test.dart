@@ -10,7 +10,12 @@ import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/notification_provider.dart';
+import 'package:pinoy_pos/data/models/category.dart';
+import 'package:pinoy_pos/data/models/product.dart';
+import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
+import 'package:pinoy_pos/services/category_service.dart';
+import 'package:pinoy_pos/services/product_service.dart';
 import 'package:pinoy_pos/ui/screens/dashboard_screen.dart';
 import 'package:pinoy_pos/ui/screens/pos_screen.dart';
 import 'package:pinoy_pos/ui/screens/products_screen.dart';
@@ -25,6 +30,52 @@ import 'package:pinoy_pos/ui/screens/ai_advisor_screen.dart';
 import 'package:pinoy_pos/ui/screens/settings_screen.dart';
 import 'package:pinoy_pos/ui/screens/profile_screen.dart';
 import 'package:pinoy_pos/ui/screens/more_screen.dart';
+import 'package:pinoy_pos/ui/widgets/app_button.dart';
+
+class _FakeProductService extends ProductService {
+  final List<Product> _products = [];
+
+  @override
+  Future<List<Product>> getActiveProducts() async => _products;
+
+  @override
+  Future<List<Product>> searchProducts(String query) async => _products;
+}
+
+class _FakeCategoryService extends CategoryService {
+  final List<Category> _categories = [];
+
+  @override
+  Future<List<Category>> getActiveCategories() async =>
+      _categories.where((c) => c.isActive).toList();
+
+  @override
+  Future<Category?> getCategoryById(int id) async {
+    for (final category in _categories) {
+      if (category.id == id) return category;
+    }
+    return null;
+  }
+
+  @override
+  Future<Category?> getCategoryByName(String name) async {
+    for (final category in _categories) {
+      if (category.name == name) return category;
+    }
+    return null;
+  }
+
+  @override
+  Future<bool> createCategory(Category category) async {
+    if (category.name.isEmpty) return false;
+    if (_categories.any((c) => c.name == category.name)) return false;
+    _categories.add(category.copyWith(
+      id: _categories.length + 1,
+      isActive: true,
+    ));
+    return true;
+  }
+}
 
 /// Widget tests that verify every Owner screen can build and render without
 /// throwing Riverpod or runtime errors.
@@ -142,6 +193,45 @@ void main() {
     await pumpOwnerScreen(tester, const ProductsScreen(), owner: owner);
     expect(find.text('Products'), findsWidgets);
   });
+
+  testWidgets(
+    'ProductsScreen shows category-first empty state when products and categories are empty',
+    (tester) async {
+      final owner = await authenticateAsOwner();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authStateProvider.overrideWith(
+              (ref) => _TestAuthNotifier(ref, owner),
+            ),
+            notificationCountProvider.overrideWith((ref) => 0),
+            productServiceProvider.overrideWith(
+              (ref) => _FakeProductService(),
+            ),
+            categoryServiceProvider.overrideWith(
+              (ref) => _FakeCategoryService(),
+            ),
+          ],
+          child: const MaterialApp(home: ProductsScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Set up your inventory'), findsOneWidget);
+      expect(
+        find.text(
+          'Start with Step 1: create a category. Then add your first product.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.widgetWithText(AppButton, 'Create Category'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(AppButton, 'Create Category'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Add Category'), findsOneWidget);
+    },
+  );
 
   testWidgets('CategoriesScreen builds for owner', (tester) async {
     final owner = await authenticateAsOwner();

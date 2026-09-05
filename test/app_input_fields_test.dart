@@ -6,7 +6,8 @@ import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 /// Widget tests for the shared input-field components.
 ///
 /// Verifies the modern field design is applied consistently and that the
-/// password toggle, dropdown, and search field behave correctly.
+/// password toggle, dropdown, search field, and controlled dropdown behave
+/// correctly.
 void main() {
   Widget wrap(Widget child) {
     return MaterialApp(
@@ -106,6 +107,53 @@ void main() {
     await tester.pump();
     expect(find.text('Beverages'), findsWidgets);
     expect(find.text('Snacks'), findsWidgets);
+  });
+
+  testWidgets('AppDropdown shows label and selected value', (tester) async {
+    await tester.pumpWidget(
+      wrap(
+        const AppDropdown<int>(
+          label: 'Category',
+          value: 2,
+          items: [
+            DropdownMenuItem(value: 1, child: Text('Beverages')),
+            DropdownMenuItem(value: 2, child: Text('Snacks')),
+          ],
+          onChanged: null,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Category'), findsWidgets);
+    expect(find.text('Snacks'), findsOneWidget);
+  });
+
+  testWidgets('AppDropdown calls onChanged when an item is selected',
+      (tester) async {
+    int? selected;
+
+    await tester.pumpWidget(
+      wrap(
+        AppDropdown<int>(
+          label: 'Category',
+          value: 1,
+          items: const [
+            DropdownMenuItem(value: 1, child: Text('Beverages')),
+            DropdownMenuItem(value: 2, child: Text('Snacks')),
+          ],
+          onChanged: (value) => selected = value,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.byType(DropdownButton<int>));
+    await tester.pump();
+    await tester.tap(find.text('Snacks').last);
+    await tester.pump();
+
+    expect(selected, 2);
   });
 
   testWidgets('AppSearchField shows search icon and hint', (tester) async {

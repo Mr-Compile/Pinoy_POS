@@ -267,6 +267,64 @@ class AppDropdownField<T> extends StatelessWidget {
   }
 }
 
+/// A controlled dropdown that matches the shared input-field design.
+///
+/// The selected [value] is managed by the parent, so the dropdown updates
+/// whenever the parent rebuilds with a new value. Use this in filter bars,
+/// toolbars, and other places where the selection is screen state.
+///
+/// For form fields that only need an initial value, use [AppDropdownField].
+class AppDropdown<T> extends StatelessWidget {
+  const AppDropdown({
+    super.key,
+    this.label,
+    this.hint,
+    required this.value,
+    required this.items,
+    this.onChanged,
+    this.prefixIcon,
+    this.prefix,
+    this.enabled = true,
+    this.isDense = true,
+  });
+
+  final String? label;
+  final String? hint;
+  final T? value;
+  final List<DropdownMenuItem<T>> items;
+  final ValueChanged<T?>? onChanged;
+  final IconData? prefixIcon;
+  final Widget? prefix;
+  final bool enabled;
+  final bool isDense;
+
+  @override
+  Widget build(BuildContext context) {
+    return InputDecorator(
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        isDense: isDense,
+        border: const OutlineInputBorder(),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        prefixIcon: prefix ?? (prefixIcon != null ? Icon(prefixIcon) : null),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<T>(
+          value: value,
+          hint: hint != null ? Text(hint!) : null,
+          isDense: isDense,
+          isExpanded: true,
+          icon: const Icon(Icons.arrow_drop_down),
+          items: items,
+          onChanged: enabled ? onChanged : null,
+          borderRadius: BorderRadius.circular(16),
+        ),
+      ),
+    );
+  }
+}
+
 /// A compact search field that shares the app's input design language but
 /// with denser padding and a leading search icon.
 class AppSearchField extends StatelessWidget {

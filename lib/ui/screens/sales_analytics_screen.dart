@@ -14,6 +14,7 @@ import 'package:pinoy_pos/ui/screens/sale_detail_screen.dart';
 import 'package:pinoy_pos/ui/screens/settings/store_information_settings_page.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
+import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/app_section.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
@@ -483,24 +484,12 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
     required List<DropdownMenuItem<T>> items,
     required ValueChanged<T?>? onChanged,
   }) {
-    return InputDecorator(
-      decoration: InputDecoration(
-        labelText: label,
-        isDense: true,
-        border: const OutlineInputBorder(),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<T>(
-          value: value,
-          hint: Text(hint),
-          isDense: true,
-          isExpanded: true,
-          icon: const Icon(Icons.arrow_drop_down),
-          items: items,
-          onChanged: onChanged,
-        ),
-      ),
+    return AppDropdown<T>(
+      value: value,
+      label: label,
+      hint: hint,
+      items: items,
+      onChanged: onChanged,
     );
   }
 

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/data/models/product.dart';
 import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/core/payment_validation_exception.dart';
+import 'package:pinoy_pos/core/route_guard.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/cart_provider.dart';
 import 'package:pinoy_pos/providers/payment_settings_provider.dart';
@@ -11,6 +12,7 @@ import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/data/models/payment_settings.dart';
 import 'package:pinoy_pos/ui/screens/gcash_payment_screen.dart';
 import 'package:pinoy_pos/ui/screens/payment_success_screen.dart';
+import 'package:pinoy_pos/ui/screens/products_screen.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/currency_utils.dart';
@@ -286,9 +288,13 @@ class _POSScreenState extends ConsumerState<POSScreen> {
           ? AppButton.filled(
               icon: Icons.inventory_2,
               label: 'Go to Products',
-              onPressed: () {
-                // Navigate to products tab — the AppShell handles routing.
-              },
+              onPressed: () => RouteGuard.pushIfAuthorized(
+                context,
+                ref,
+                screen: const ProductsScreen(),
+                permission: 'view_products',
+                routeName: 'products',
+              ),
             )
           : null,
     );
