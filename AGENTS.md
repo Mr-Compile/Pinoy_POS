@@ -476,3 +476,45 @@ All data-entry fields use the shared components in `lib/ui/widgets/app_input_fie
 flutter analyze
 flutter test test/app_input_fields_test.dart
 ```
+
+## Role Dashboard Audit and Repair Pass
+
+### Design Decisions
+
+- **Admin dashboard is system/maintenance only.** Admin never had `view_reports`, so the sales-analytics sections in `_AdminDashboard` were dead code. They were removed rather than granting Admin business analytics.
+- **Activity logs stay self-scoped for every role.** `ActivityLogService.getRecentActivities` returns only the current user's actions. No system-wide audit view was added.
+- **Announcements reach Staff through notifications only.** Staff still lack `view_announcements`; the announcement body is now included in the notification message (`New Announcement: <title>`) because the notification is their only way to read it.
+
+### Changes Made
+
+- `lib/services/announcement_service.dart`
+  - Staff announcement notifications now carry the full announcement content, not just the title.
+
+- `lib/services/dashboard_service.dart`
+  - Added `sealed class DashboardData`; `OwnerDashboardData`, `AdminDashboardData`, and `StaffDashboardData` are its subtypes. `getDashboard` returns `Future<DashboardData?>`, so the UI switches on the payload type instead of the live session role (removes the `owner!`/`admin!`/`staff!` crash risk on mid-load account changes).
+  - `AdminDashboardData` dropped the nullable `analytics` field and gained `exportCount`, `lastExportAt`, `aiConfigured`, `aiModel`, and `aiQueriesToday`.
+  - `getAdminDashboard` no longer fetches sales analytics; it loads export-history summary, Groq configuration status (best-effort — secure storage can throw on platforms without a keychain), and today's AI query usage across active users.
+
+- `lib/providers/dashboard_provider.dart`
+  - Added `DashboardDenied` state so an authenticated user without `view_dashboard` sees an access-denied view instead of "Not authenticated".
+  - `DashboardLoaded` now carries a single `DashboardData data` field.
+  - `DashboardNotifier` takes `isAuthenticated`; the provider watches `authStateProvider.select((s) => s.user != null)` so the dashboard reloads on login/logout/account switch.
+
+- `lib/ui/screens/dashboard_screen.dart`
+  - Removed the unreachable sales-analytics sections and helpers from `_AdminDashboard` (~180 lines of dead code).
+  - `PeriodSelector` is hidden for Admin (no admin metric is period-driven).
+  - Added `_DashboardDeniedView` for the denied state.
+  - Added Admin "Export History" and "AI Service" cards plus an "AI Config" quick action.
+  - All dashboard quick actions now route through `RouteGuard.pushIfAuthorized` for consistent permission checks and denied-attempt logging.
+
+- Tests
+  - `test/analytics_dashboard_test.dart` — added "Admin dashboard returns system metrics only".
+
+### Verification
+
+```powershell
+flutter analyze
+flutter test
+```
+
+Result: `flutter analyze` reports no issues; `flutter test` passes 269/269 tests.

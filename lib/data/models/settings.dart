@@ -19,6 +19,7 @@
   final String? gcashQrImagePath;
   final String? gcashQrImageType;
   final int aiDailyQuota;
+  final int inactivityTimeoutMinutes;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -41,6 +42,7 @@
     this.gcashQrImagePath,
     this.gcashQrImageType,
     this.aiDailyQuota = 20,
+    this.inactivityTimeoutMinutes = 15,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -65,6 +67,7 @@
       'gcash_qr_image_path': gcashQrImagePath,
       'gcash_qr_image_type': gcashQrImageType,
       'ai_daily_quota': aiDailyQuota,
+      'inactivity_timeout_minutes': inactivityTimeoutMinutes,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -130,6 +133,7 @@
       gcashQrImagePath: stringOrNull('gcash_qr_image_path'),
       gcashQrImageType: stringOrNull('gcash_qr_image_type'),
       aiDailyQuota: intOrNull('ai_daily_quota') ?? 20,
+      inactivityTimeoutMinutes: intOrNull('inactivity_timeout_minutes') ?? 15,
       createdAt: parseDateTime('created_at'),
       updatedAt: parseDateTime('updated_at'),
     );
@@ -154,6 +158,7 @@
     String? gcashQrImagePath,
     String? gcashQrImageType,
     int? aiDailyQuota,
+    Object? inactivityTimeoutMinutes = _sentinel,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -180,6 +185,9 @@
       gcashQrImagePath: gcashQrImagePath ?? this.gcashQrImagePath,
       gcashQrImageType: gcashQrImageType ?? this.gcashQrImageType,
       aiDailyQuota: aiDailyQuota ?? this.aiDailyQuota,
+      inactivityTimeoutMinutes: inactivityTimeoutMinutes == _sentinel
+          ? this.inactivityTimeoutMinutes
+          : inactivityTimeoutMinutes as int,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/data/models/reporting_period.dart';
+import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/services/dashboard_service.dart';
 
 /// Dashboard UI state. The UI matches on these three subtypes only - it
@@ -37,18 +38,28 @@ class DashboardError extends DashboardState {
   });
 }
 
-class DashboardLoaded extends DashboardState {
-  final OwnerDashboardData? owner;
-  final AdminDashboardData? admin;
-  final StaffDashboardData? staff;
-
-  const DashboardLoaded({
+/// The current user is authenticated but lacks `view_dashboard`.
+/// Kept separate from [DashboardError] so a denied user sees an
+/// access-denied view instead of a misleading "Not authenticated" error.
+class DashboardDenied extends DashboardState {
+  const DashboardDenied({
     super.period,
     super.customStart,
     super.customEnd,
-    this.owner,
-    this.admin,
-    this.staff,
+  });
+}
+
+class DashboardLoaded extends DashboardState {
+  /// The role-scoped payload produced by [DashboardService.getDashboard].
+  /// The UI switches on the concrete [DashboardData] subtype, which is
+  /// guaranteed to match the role the service loaded for.
+  final DashboardData data;
+
+  const DashboardLoaded({
+    required this.data,
+    super.period,
+    super.customStart,
+    super.customEnd,
   });
 }
 
@@ -62,7 +73,11 @@ class DashboardLoaded extends DashboardState {
 class DashboardNotifier extends StateNotifier<DashboardState> {
   final DashboardService _service;
 
-  DashboardNotifier(this._service)
+  /// Whether a user is signed in. Used to distinguish "no session" from
+  /// "authenticated but denied" when the service returns null.
+  final bool isAuthenticated;
+
+  DashboardNotifier(this._service, {required this.isAuthenticated})
       : super(const DashboardLoading()) {
     load();
   }
@@ -81,37 +96,33 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
         customStart: current.customStart,
         customEnd: current.customEnd,
       );
-      switch (data) {
-        case OwnerDashboardData():
-          state = DashboardLoaded(
-            period: current.period,
-            customStart: current.customStart,
-            customEnd: current.customEnd,
-            owner: data,
-          );
-        case AdminDashboardData():
-          state = DashboardLoaded(
-            period: current.period,
-            customStart: current.customStart,
-            customEnd: current.customEnd,
-            admin: data,
-          );
-        case StaffDashboardData():
-          state = DashboardLoaded(
-            period: current.period,
-            customStart: current.customStart,
-            customEnd: current.customEnd,
-            staff: data,
-          );
-        case null:
-          state = DashboardError(
-            'Not authenticated',
-            period: current.period,
-            customStart: current.customStart,
-            customEnd: current.customEnd,
-          );
+      if (!mounted) return;
+      if (data == null) {
+        // The service returns null for two distinct cases: no session
+        // (unauthenticated) and an authenticated user without
+        // `view_dashboard` (denied). Surface them differently.
+        state = isAuthenticated
+            ? DashboardDenied(
+                period: current.period,
+                customStart: current.customStart,
+                customEnd: current.customEnd,
+              )
+            : DashboardError(
+                'Not authenticated',
+                period: current.period,
+                customStart: current.customStart,
+                customEnd: current.customEnd,
+              );
+      } else {
+        state = DashboardLoaded(
+          data: data,
+          period: current.period,
+          customStart: current.customStart,
+          customEnd: current.customEnd,
+        );
       }
     } catch (_) {
+      if (!mounted) return;
       state = DashboardError(
         'Unable to load dashboard. Please try again.',
         period: current.period,
@@ -148,7 +159,13 @@ final dashboardServiceProvider = Provider<DashboardService>((ref) {
 
 final dashboardProvider =
     StateNotifierProvider<DashboardNotifier, DashboardState>((ref) {
+  // Watching the signed-in flag recreates the notifier on login/logout/
+  // account switch, so the dashboard reloads for the new user instead of
+  // serving the previous user's cached state.
+  final isAuthenticated =
+      ref.watch(authStateProvider.select((s) => s.user != null));
   return DashboardNotifier(
     ref.watch(dashboardServiceProvider),
+    isAuthenticated: isAuthenticated,
   );
 });

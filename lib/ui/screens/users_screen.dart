@@ -311,6 +311,22 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                   onChanged: (_) => state.markChanged(),
                 ),
                 const SizedBox(height: 12),
+                AppDropdownField<int>(
+                  label: 'Inactivity timeout',
+                  hint: 'Use store default',
+                  items: const [
+                    DropdownMenuItem(value: null, child: Text('Use store default')),
+                    DropdownMenuItem(value: 5, child: Text('5 minutes')),
+                    DropdownMenuItem(value: 15, child: Text('15 minutes')),
+                    DropdownMenuItem(value: 30, child: Text('30 minutes')),
+                    DropdownMenuItem(value: 60, child: Text('60 minutes')),
+                  ],
+                  initialValue: state.value<int>('inactivityTimeout', user.inactivityTimeoutMinutes),
+                  onChanged: (value) {
+                    state.setValue<int>('inactivityTimeout', value);
+                  },
+                ),
+                const SizedBox(height: 12),
                 AppDropdownField<UserRole>(
                   label: 'Role',
                   items: roleItems
@@ -395,6 +411,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
           fullName: state.textController('fullName').text.trim(),
           role: state.value<UserRole>('role')!,
           pin: pinValue.isEmpty ? null : pinValue,
+          inactivityTimeoutMinutes: state.value<int>('inactivityTimeout'),
         );
 
     if (result.success) {
@@ -505,6 +522,22 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                         FocusScope.of(context).nextFocus(),
                   ),
                   const SizedBox(height: 12),
+                  AppDropdownField<int>(
+                    label: 'Inactivity timeout',
+                    hint: 'Use store default',
+                    items: const [
+                      DropdownMenuItem(value: null, child: Text('Use store default')),
+                      DropdownMenuItem(value: 5, child: Text('5 minutes')),
+                      DropdownMenuItem(value: 15, child: Text('15 minutes')),
+                      DropdownMenuItem(value: 30, child: Text('30 minutes')),
+                      DropdownMenuItem(value: 60, child: Text('60 minutes')),
+                    ],
+                    initialValue: state.value<int>('inactivityTimeout'),
+                    onChanged: (value) {
+                      state.setValue<int>('inactivityTimeout', value);
+                    },
+                  ),
+                  const SizedBox(height: 12),
                   AppDropdownField<UserRole>(
                     label: 'Role',
                     items: manageableRoles
@@ -577,6 +610,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
           fullName: state.textController('fullName').text.trim(),
           role: state.value<UserRole>('role')!,
           pin: pinValue.isEmpty ? null : pinValue,
+          inactivityTimeoutMinutes: state.value<int>('inactivityTimeout'),
         );
 
     if (result.success) {

@@ -317,6 +317,7 @@ class _ProductForm extends StatelessWidget {
           );
 
           return Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               imageSection,

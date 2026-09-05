@@ -7,12 +7,15 @@ import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/data/models/sales_analytics.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/data/repositories/activity_log_repository.dart';
+import 'package:pinoy_pos/data/repositories/ai_quota_repository.dart';
 import 'package:pinoy_pos/data/repositories/announcement_repository.dart';
 import 'package:pinoy_pos/data/repositories/backup_history_repository.dart';
+import 'package:pinoy_pos/data/repositories/export_history_repository.dart';
 import 'package:pinoy_pos/data/repositories/product_repository.dart';
 import 'package:pinoy_pos/data/repositories/trash_repository.dart';
 import 'package:pinoy_pos/data/repositories/user_repository.dart';
 import 'package:pinoy_pos/services/sales_analytics_service.dart';
+import 'package:pinoy_pos/services/settings_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Analytics DTOs
@@ -21,6 +24,16 @@ import 'package:pinoy_pos/services/sales_analytics_service.dart';
 // entities and have no DAO/table of their own; they aggregate real SQLite
 // rows fetched through the repositories.
 // ─────────────────────────────────────────────────────────────────────────
+
+/// Base type for the role-scoped dashboard payloads returned by
+/// [DashboardService.getDashboard].
+///
+/// The UI switches on the concrete subtype rather than the live session
+/// role, so an account change that lands while a load is in flight cannot
+/// pair the new role with the previous role's data.
+sealed class DashboardData {
+  const DashboardData();
+}
 
 /// Inventory health distribution across active products.
 class InventoryStatus {
@@ -61,7 +74,7 @@ class BackupSummary {
 }
 
 /// Aggregated Owner dashboard data. All values come from real SQLite rows.
-class OwnerDashboardData {
+class OwnerDashboardData extends DashboardData {
   final SalesAnalytics analytics;
   final int lowStockCount;
   final int outOfStockCount;
@@ -83,33 +96,42 @@ class OwnerDashboardData {
   });
 }
 
-/// Aggregated System Admin dashboard data. All values come from real
-/// SQLite rows.
-class AdminDashboardData {
-  final SalesAnalytics? analytics;
+/// Aggregated System Admin dashboard data. System/maintenance metrics only —
+/// the Admin role has no `view_reports` permission and never receives
+/// business sales analytics. All values come from real SQLite rows.
+class AdminDashboardData extends DashboardData {
   final int activeUsers;
   final int inactiveUsers;
   final int recentActivityCount;
   final UserRoleDistribution usersByRole;
   final BackupSummary backupStatus;
   final int trashCount;
+  final int exportCount;
+  final DateTime? lastExportAt;
+  final bool aiConfigured;
+  final String aiModel;
+  final int aiQueriesToday;
   final List<ActivityLog> recentActivities;
 
   const AdminDashboardData({
-    this.analytics,
     required this.activeUsers,
     required this.inactiveUsers,
     required this.recentActivityCount,
     required this.usersByRole,
     required this.backupStatus,
     required this.trashCount,
+    required this.exportCount,
+    this.lastExportAt,
+    required this.aiConfigured,
+    required this.aiModel,
+    required this.aiQueriesToday,
     required this.recentActivities,
   });
 }
 
 /// Aggregated Staff dashboard data. Sales figures are filtered to the
 /// current user only (sales.user_id = currentUser.id).
-class StaffDashboardData {
+class StaffDashboardData extends DashboardData {
   final SalesAnalytics analytics;
   final int lowStockCount;
   final int outOfStockCount;
@@ -147,16 +169,20 @@ class DashboardService {
   final ActivityLogRepository _activityLogRepository = ActivityLogRepository();
   final AnnouncementRepository _announcementRepository = AnnouncementRepository();
   final BackupHistoryRepository _backupHistoryRepository = BackupHistoryRepository();
+  final ExportHistoryRepository _exportHistoryRepository = ExportHistoryRepository();
+  final AIQuotaRepository _aiQuotaRepository = AIQuotaRepository();
   final TrashRepository _trashRepository = TrashRepository();
   final SessionManager _sessionManager = SessionManager();
   final SalesAnalyticsService _salesAnalyticsService = SalesAnalyticsService();
+  final SettingsService _settingsService = SettingsService();
 
   /// Dispatches to the correct role-scoped loader for the selected period.
   ///
-  /// Returns null when the current user lacks `view_dashboard` (defence in
-  /// depth — the UI should also be hidden, but this prevents any data leak
-  /// if it is not).
-  Future<Object?> getDashboard(
+  /// Returns null when there is no authenticated user or the current user
+  /// lacks `view_dashboard` (defence in depth — the UI should also be
+  /// hidden, but this prevents any data leak if it is not). The caller
+  /// distinguishes the two cases via the current authentication state.
+  Future<DashboardData?> getDashboard(
     ReportingPeriod period, {
     DateTime? customStart,
     DateTime? customEnd,
@@ -226,6 +252,10 @@ class DashboardService {
 
   // ── Admin ──────────────────────────────────────────────────────────
 
+  /// Admin dashboard is system/maintenance only. The [period],
+  /// [customStart], and [customEnd] parameters are accepted for interface
+  /// symmetry with the other loaders but are unused — no Admin metric is
+  /// driven by the period selector.
   Future<AdminDashboardData> getAdminDashboard(
     ReportingPeriod period, {
     DateTime? customStart,
@@ -277,19 +307,33 @@ class DashboardService {
     // Trash count.
     final trashItems = await _trashRepository.getAll();
 
-    // Operational sales analytics when the role is permitted to view reports.
-    SalesAnalytics? analytics;
-    if (_sessionManager.hasPermission('view_reports')) {
-      final bounds = periodBoundsFor(
-        period,
-        customStart: customStart,
-        customEnd: customEnd,
-      );
-      analytics = await _salesAnalyticsService.getAnalyticsForBounds(bounds);
+    // Export history summary (non-deleted rows, newest first).
+    final exports = await _exportHistoryRepository.getAllActive(limit: 200);
+
+    // AI service status: whether a Groq API key is configured, which model
+    // is selected, and how many queries active users have run today.
+    // Best-effort — secure storage can throw on platforms without a
+    // keychain (e.g. tests); an AI status failure must not take the whole
+    // dashboard down.
+    var aiConfigured = false;
+    var aiModel = '';
+    try {
+      aiConfigured = await _settingsService.isGroqConfigured();
+      if (aiConfigured) {
+        aiModel = await _settingsService.getGroqModel();
+      }
+    } catch (_) {
+      // Leave the card in its "not configured" state.
     }
+    final quotas = await _aiQuotaRepository.getForActiveUsers();
+    final aiQueriesToday = quotas
+        .where((q) =>
+            q.quotaDate.year == now.year &&
+            q.quotaDate.month == now.month &&
+            q.quotaDate.day == now.day)
+        .fold<int>(0, (sum, q) => sum + q.dailyUsage);
 
     return AdminDashboardData(
-      analytics: analytics,
       activeUsers: activeUsers.length,
       inactiveUsers: inactiveCount < 0 ? 0 : inactiveCount,
       recentActivityCount: weekActivities.length,
@@ -300,6 +344,11 @@ class DashboardService {
       ),
       backupStatus: backupSummary,
       trashCount: trashItems.length,
+      exportCount: exports.length,
+      lastExportAt: exports.isEmpty ? null : exports.first.createdAt,
+      aiConfigured: aiConfigured,
+      aiModel: aiModel,
+      aiQueriesToday: aiQueriesToday,
       recentActivities: recentActivities,
     );
   }
@@ -410,6 +459,10 @@ class DashboardService {
         usersByRole: UserRoleDistribution(owner: 0, admin: 0, staff: 0),
         backupStatus: BackupSummary(hasBackup: false),
         trashCount: 0,
+        exportCount: 0,
+        aiConfigured: false,
+        aiModel: '',
+        aiQueriesToday: 0,
         recentActivities: [],
       );
 

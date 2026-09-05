@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pinoy_pos/core/ai_config_status.dart';
 import 'package:pinoy_pos/core/constants.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
+import 'package:pinoy_pos/core/session_status.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/ai_advisor_provider.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
@@ -252,7 +253,7 @@ class _FakeBIService extends BusinessIntelligenceService {
 
 class _FakeAuthService extends AuthService {
   @override
-  Future<bool> restoreSession() async => true;
+  Future<SessionStatus> restoreSession() async => SessionStatus.active;
 
   @override
   bool hasPermission(String permission) {

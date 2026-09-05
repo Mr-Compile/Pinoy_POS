@@ -11,6 +11,7 @@ import 'package:pinoy_pos/providers/navigation_provider.dart';
 import 'package:pinoy_pos/providers/theme_provider.dart';
 import 'package:pinoy_pos/services/trash_service.dart';
 import 'package:pinoy_pos/ui/screens/splash_screen.dart';
+import 'package:pinoy_pos/ui/widgets/session_guard.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -51,6 +52,7 @@ class MyApp extends ConsumerStatefulWidget {
 
 class _MyAppState extends ConsumerState<MyApp> {
   late final NavigationRouteObserver _navigationObserver;
+  final _navigatorKey = GlobalKey<NavigatorState>();
 
   @override
   void initState() {
@@ -92,7 +94,12 @@ class _MyAppState extends ConsumerState<MyApp> {
       theme: lightTheme,
       darkTheme: darkTheme,
       themeMode: themeMode,
+      navigatorKey: _navigatorKey,
       navigatorObservers: [_navigationObserver],
+      builder: (context, child) => SessionGuard(
+        navigatorKey: _navigatorKey,
+        child: child!,
+      ),
       home: const SplashScreen(),
     );
   }

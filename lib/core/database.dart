@@ -412,6 +412,11 @@ class DatabaseHelper {
       await _migrateV20(db);
     }
 
+    // Migration from v20 → v21: add inactivity timeout settings.
+    if (oldVersion < 21) {
+      await _migrateV21(db);
+    }
+
     // Create any tables that were introduced after the backup's original
     // version but do not have an explicit migration block above (e.g.
     // `announcements`, `ai_usage`).  All CREATE statements in _createTables
@@ -569,6 +574,26 @@ class DatabaseHelper {
     await _createAttachmentsTable(db);
   }
 
+  /// Migration from v20 → v21: add per-user and store inactivity timeout
+  /// configuration.
+  Future<void> _migrateV21(Database db) async {
+    try {
+      await db.execute(
+        'ALTER TABLE users ADD COLUMN inactivity_timeout_minutes INTEGER',
+      );
+    } catch (_) {
+      // Column may already exist.
+    }
+
+    try {
+      await db.execute(
+        'ALTER TABLE settings ADD COLUMN inactivity_timeout_minutes INTEGER NOT NULL DEFAULT 15',
+      );
+    } catch (_) {
+      // Column may already exist.
+    }
+  }
+
   Future<void> _createTables(Database db) async {
     // Users table
     // NOTE: every CREATE statement uses IF NOT EXISTS so that _onCreate is
@@ -595,7 +620,8 @@ class DatabaseHelper {
         updated_at TEXT,
         deleted_at TEXT,
         must_change_password INTEGER NOT NULL DEFAULT 0,
-        has_changed_username INTEGER NOT NULL DEFAULT 0
+        has_changed_username INTEGER NOT NULL DEFAULT 0,
+        inactivity_timeout_minutes INTEGER
       )
     ''');
 
@@ -736,6 +762,7 @@ class DatabaseHelper {
         gcash_qr_image_path TEXT,
         gcash_qr_image_type TEXT,
         ai_daily_quota INTEGER NOT NULL DEFAULT 20,
+        inactivity_timeout_minutes INTEGER NOT NULL DEFAULT 15,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       )

@@ -38,6 +38,10 @@ extension UserRoleManagement on UserRole {
 }
 
 class User {
+  /// Sentinel used by [copyWith] to keep the existing value unchanged.
+  /// Pass `inactivityTimeoutSentinel` explicitly to clear the override.
+  static const Object inactivityTimeoutSentinel = Object();
+
   final int? id;
   final String username;
   final String passwordHash;
@@ -51,6 +55,7 @@ class User {
   final bool mustChangePassword;
   final bool hasChangedUsername;
   final DateTime? lastLogin;
+  final int? inactivityTimeoutMinutes;
   final DateTime createdAt;
   final DateTime? updatedAt;
   final DateTime? deletedAt;
@@ -69,6 +74,7 @@ class User {
     this.mustChangePassword = false,
     this.hasChangedUsername = false,
     this.lastLogin,
+    this.inactivityTimeoutMinutes,
     required this.createdAt,
     this.updatedAt,
     this.deletedAt,
@@ -89,6 +95,7 @@ class User {
       'must_change_password': mustChangePassword ? 1 : 0,
       'has_changed_username': hasChangedUsername ? 1 : 0,
       'last_login': lastLogin?.toIso8601String(),
+      'inactivity_timeout_minutes': inactivityTimeoutMinutes,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
       'deleted_at': deletedAt?.toIso8601String(),
@@ -115,6 +122,9 @@ class User {
       lastLogin: map['last_login'] != null
           ? DateTime.parse(map['last_login'] as String)
           : null,
+      inactivityTimeoutMinutes: map['inactivity_timeout_minutes'] is int
+          ? map['inactivity_timeout_minutes'] as int
+          : int.tryParse(map['inactivity_timeout_minutes']?.toString() ?? ''),
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: map['updated_at'] != null
           ? DateTime.parse(map['updated_at'] as String)
@@ -139,6 +149,7 @@ class User {
     bool? mustChangePassword,
     bool? hasChangedUsername,
     DateTime? lastLogin,
+    Object? inactivityTimeoutMinutes = inactivityTimeoutSentinel,
     DateTime? createdAt,
     DateTime? updatedAt,
     DateTime? deletedAt,
@@ -157,6 +168,9 @@ class User {
       mustChangePassword: mustChangePassword ?? this.mustChangePassword,
       hasChangedUsername: hasChangedUsername ?? this.hasChangedUsername,
       lastLogin: lastLogin ?? this.lastLogin,
+      inactivityTimeoutMinutes: inactivityTimeoutMinutes == inactivityTimeoutSentinel
+          ? this.inactivityTimeoutMinutes
+          : inactivityTimeoutMinutes as int?,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,

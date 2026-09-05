@@ -75,15 +75,21 @@ class AnnouncementService {
     // Owner and Admin do not receive announcement notifications because
     // the Owner is the one creating them and Admin does not have access
     // to announcements.
-    await _notifyStaffOfNewAnnouncement(title);
+    await _notifyStaffOfNewAnnouncement(title, content);
 
     return true;
   }
 
   /// Creates a "New Announcement" notification for every active Staff
-  /// user. Failures are swallowed so that a notification issue never
+  /// user. The notification carries the full announcement content because
+  /// Staff cannot open the Announcements screen (no `view_announcements`
+  /// permission) — this notification is their only way to read it.
+  /// Failures are swallowed so that a notification issue never
   /// prevents the announcement from being created.
-  Future<void> _notifyStaffOfNewAnnouncement(String title) async {
+  Future<void> _notifyStaffOfNewAnnouncement(
+    String title,
+    String content,
+  ) async {
     try {
       final staffUsers = await _userRepository.getByRole(UserRole.staff);
       final activeStaffIds = staffUsers
@@ -94,8 +100,8 @@ class AnnouncementService {
       if (activeStaffIds.isEmpty) return;
 
       await _notificationService.createNotificationForUsers(
-        title: 'New Announcement',
-        message: title,
+        title: 'New Announcement: $title',
+        message: content,
         type: 'announcement',
         userIds: activeStaffIds,
       );

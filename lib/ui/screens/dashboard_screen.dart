@@ -17,6 +17,7 @@ import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/dashboard_provider.dart';
 import 'package:pinoy_pos/services/dashboard_service.dart';
 import 'package:pinoy_pos/ui/screens/ai_advisor_screen.dart';
+import 'package:pinoy_pos/ui/screens/ai_config_screen.dart';
 import 'package:pinoy_pos/ui/screens/pos_screen.dart';
 import 'package:pinoy_pos/ui/screens/products_screen.dart';
 import 'package:pinoy_pos/ui/screens/sales_analytics_screen.dart';
@@ -41,7 +42,6 @@ import 'package:pinoy_pos/ui/widgets/payment_breakdown_view.dart';
 import 'package:pinoy_pos/ui/widgets/period_selector.dart';
 import 'package:pinoy_pos/ui/widgets/sales_line_chart.dart';
 import 'package:pinoy_pos/ui/widgets/sales_summary_cards.dart';
-import 'package:pinoy_pos/ui/widgets/sales_transactions_list.dart';
 import 'package:pinoy_pos/ui/widgets/staff_performance_list.dart';
 import 'package:pinoy_pos/ui/widgets/top_products_bar_chart.dart';
 
@@ -69,17 +69,15 @@ class DashboardScreen extends ConsumerWidget {
         onRefresh: () => ref.read(dashboardProvider.notifier).load(),
         child: switch (dashboardState) {
           DashboardLoading() => _DashboardLoadingView(user: user),
+          DashboardDenied() => const _DashboardDeniedView(),
           DashboardError(:final message) => ErrorState(
               title: 'Unable to Load Dashboard',
               message: message,
               onRetry: () => ref.read(dashboardProvider.notifier).load(),
             ),
-          DashboardLoaded(:final owner, :final admin, :final staff) =>
-            _DashboardLoadedView(
+          DashboardLoaded(:final data) => _DashboardLoadedView(
               user: user,
-              owner: owner,
-              admin: admin,
-              staff: staff,
+              data: data,
             ),
         },
       ),
@@ -93,15 +91,11 @@ class DashboardScreen extends ConsumerWidget {
 
 class _DashboardLoadedView extends ConsumerWidget {
   final User? user;
-  final OwnerDashboardData? owner;
-  final AdminDashboardData? admin;
-  final StaffDashboardData? staff;
+  final DashboardData data;
 
   const _DashboardLoadedView({
     this.user,
-    this.owner,
-    this.admin,
-    this.staff,
+    required this.data,
   });
 
   @override
@@ -111,7 +105,9 @@ class _DashboardLoadedView extends ConsumerWidget {
     }
 
     final state = ref.watch(dashboardProvider);
-    final role = user!.role;
+    // The Admin dashboard is system/maintenance only — none of its metrics
+    // are period-driven, so the selector is hidden for that role.
+    final showPeriodSelector = data is! AdminDashboardData;
 
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -120,27 +116,69 @@ class _DashboardLoadedView extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _WelcomeHeader(user: user!),
-          const SizedBox(height: Spacing.md),
-          PeriodSelector(
-            selected: state.period,
-            customStart: state.customStart,
-            customEnd: state.customEnd,
-            onSelected: (period) {
-              ref.read(dashboardProvider.notifier).selectPeriod(period);
-            },
-            onCustomRange: (range) {
-              ref
-                  .read(dashboardProvider.notifier)
-                  .setCustomRange(range.start, range.end);
-            },
-          ),
+          if (showPeriodSelector) ...[
+            const SizedBox(height: Spacing.md),
+            PeriodSelector(
+              selected: state.period,
+              customStart: state.customStart,
+              customEnd: state.customEnd,
+              onSelected: (period) {
+                ref.read(dashboardProvider.notifier).selectPeriod(period);
+              },
+              onCustomRange: (range) {
+                ref
+                    .read(dashboardProvider.notifier)
+                    .setCustomRange(range.start, range.end);
+              },
+            ),
+          ],
           const SizedBox(height: Spacing.xl),
-          switch (role) {
-            UserRole.owner => _OwnerDashboard(data: owner!),
-            UserRole.admin => _AdminDashboard(data: admin!),
-            UserRole.staff => _StaffDashboard(data: staff!),
+          // Dispatch on the loaded payload's type — guaranteed to match the
+          // role the service scoped the data for, even if the session user
+          // changed while the load was in flight.
+          switch (data) {
+            OwnerDashboardData d => _OwnerDashboard(data: d),
+            AdminDashboardData d => _AdminDashboard(data: d),
+            StaffDashboardData d => _StaffDashboard(data: d),
           },
         ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Denied view — authenticated user without `view_dashboard` permission
+// ─────────────────────────────────────────────────────────────────────────
+
+class _DashboardDeniedView extends StatelessWidget {
+  const _DashboardDeniedView();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(Spacing.xxl),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.lock_outline, size: 64, color: cs.error),
+            const SizedBox(height: Spacing.lg),
+            Text(
+              'Access Denied',
+              style: AppTypography.headlineSmallBold(context),
+            ),
+            const SizedBox(height: Spacing.sm),
+            Text(
+              'You do not have permission to view the dashboard.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -341,7 +379,7 @@ class _OwnerDashboard extends ConsumerWidget {
 
         // ── AI Advisor entry ──
         if (authNotifier.hasPermission('view_ai_advisor')) ...[
-          _buildAIAdvisorCard(context),
+          _buildAIAdvisorCard(context, ref),
           const SizedBox(height: Spacing.xxl),
         ],
       ],
@@ -500,9 +538,11 @@ class _OwnerDashboard extends ConsumerWidget {
                 alignment: Alignment.centerRight,
                 child: AppButton.text(
                   color: AppButtonColor.info,
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const StockScreen()),
+                  onPressed: () => RouteGuard.pushIfAuthorized(
+                    context, ref,
+                    screen: const StockScreen(),
+                    permission: 'add_stock',
+                    routeName: 'stock',
                   ),
                   icon: Icons.warehouse_outlined,
                   label: 'View Stock',
@@ -582,15 +622,17 @@ class _OwnerDashboard extends ConsumerWidget {
     );
   }
 
-  Widget _buildAIAdvisorCard(BuildContext context) {
+  Widget _buildAIAdvisorCard(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
     return AppSection(
       title: 'Business Advisor',
       padding: const EdgeInsets.only(bottom: Spacing.md),
       child: AppCard(
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const AIAdvisorScreen()),
+        onTap: () => RouteGuard.pushIfAuthorized(
+          context, ref,
+          screen: const AIAdvisorScreen(),
+          permission: 'view_ai_advisor',
+          routeName: 'ai_advisor',
         ),
         child: Row(
           children: [
@@ -625,9 +667,11 @@ class _OwnerDashboard extends ConsumerWidget {
               label: 'New Sale',
               color: AppButtonColor.success,
               icon: Icons.point_of_sale,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const POSScreen()),
+              onTap: () => RouteGuard.pushIfAuthorized(
+                context, ref,
+                screen: const POSScreen(),
+                permission: 'create_sales',
+                routeName: 'pos_new_sale',
               ),
             ),
           if (authNotifier.hasPermission('edit_products'))
@@ -635,9 +679,11 @@ class _OwnerDashboard extends ConsumerWidget {
               label: 'Add Product',
               color: AppButtonColor.info,
               icon: Icons.add_box_outlined,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ProductsScreen()),
+              onTap: () => RouteGuard.pushIfAuthorized(
+                context, ref,
+                screen: const ProductsScreen(),
+                permission: 'edit_products',
+                routeName: 'products',
               ),
             ),
           if (authNotifier.hasPermission('add_stock'))
@@ -657,9 +703,11 @@ class _OwnerDashboard extends ConsumerWidget {
               label: 'View Sales',
               color: AppButtonColor.neutral,
               icon: Icons.receipt_long,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SalesScreen()),
+              onTap: () => RouteGuard.pushIfAuthorized(
+                context, ref,
+                screen: const SalesScreen(),
+                permission: 'view_sales',
+                routeName: 'sales',
               ),
             ),
           if (authNotifier.hasPermission('view_reports'))
@@ -667,9 +715,11 @@ class _OwnerDashboard extends ConsumerWidget {
               label: 'Reports',
               color: AppButtonColor.neutral,
               icon: Icons.analytics_outlined,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SalesAnalyticsScreen()),
+              onTap: () => RouteGuard.pushIfAuthorized(
+                context, ref,
+                screen: const SalesAnalyticsScreen(),
+                permission: 'view_reports',
+                routeName: 'reports',
               ),
             ),
           if (authNotifier.hasPermission('manage_staff'))
@@ -688,9 +738,11 @@ class _OwnerDashboard extends ConsumerWidget {
             _QuickAction(
               label: 'AI Advisor',
               icon: Icons.auto_awesome,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const AIAdvisorScreen()),
+              onTap: () => RouteGuard.pushIfAuthorized(
+                context, ref,
+                screen: const AIAdvisorScreen(),
+                permission: 'view_ai_advisor',
+                routeName: 'ai_advisor',
               ),
             ),
         ],
@@ -709,8 +761,6 @@ class _AdminDashboard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final analytics = data.analytics;
-    final currencySymbol = CurrencyUtils.symbol();
     final authNotifier = ref.read(authStateProvider.notifier);
 
     return Column(
@@ -766,43 +816,17 @@ class _AdminDashboard extends ConsumerWidget {
         _buildAdminQuickActions(context, ref, authNotifier),
         const SizedBox(height: Spacing.xxl),
 
-        // ── Sales analytics (only when the role is permitted) ──
-        if (analytics != null) ...[
-          AppSection(
-            title: 'Sales Performance',
-            padding: const EdgeInsets.only(bottom: Spacing.md),
-            child: SalesSummaryCards(
-              analytics: analytics,
-              storeInfo: null,
-            ),
-          ),
-          const SizedBox(height: Spacing.xxl),
-          _buildSalesTrendCard(context, analytics, currencySymbol),
-          const SizedBox(height: Spacing.xxl),
-          _buildComparisonChart(context, analytics, currencySymbol),
-          const SizedBox(height: Spacing.xxl),
-          _buildPaymentAndTopProducts(context, analytics),
-          const SizedBox(height: Spacing.xxl),
-          _buildCategorySalesCard(context, analytics),
-          const SizedBox(height: Spacing.xxl),
-          if (analytics.staffSummaries.isNotEmpty) ...[
-            _buildStaffPerformanceSection(context, analytics.staffSummaries),
-            const SizedBox(height: Spacing.xxl),
-          ],
-          _buildPeakSalesCard(context, analytics.peakSalesPeriod),
-          const SizedBox(height: Spacing.xxl),
-          _buildRecentSalesCard(
-            context,
-            analytics.sales.take(5).toList(),
-            title: 'Recent Transactions',
-          ),
-          const SizedBox(height: Spacing.xxl),
-        ],
-
         // ── Two-column: user distribution + backup status ──
         _ResponsiveTwoColumn(
           left: _buildUserDistributionCard(context),
           right: _buildBackupCard(context),
+        ),
+        const SizedBox(height: Spacing.xxl),
+
+        // ── Two-column: export history + AI service status ──
+        _ResponsiveTwoColumn(
+          left: _buildExportHistoryCard(context),
+          right: _buildAiStatusCard(context),
         ),
         const SizedBox(height: Spacing.xxl),
 
@@ -812,131 +836,92 @@ class _AdminDashboard extends ConsumerWidget {
     );
   }
 
-  Widget _buildSalesTrendCard(
-    BuildContext context,
-    SalesAnalytics analytics,
-    String currencySymbol,
-  ) {
+  Widget _buildExportHistoryCard(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return AppSection(
-      title: 'Sales Trend',
+      title: 'Export History',
       padding: const EdgeInsets.only(bottom: Spacing.md),
       child: AppCard(
-        child: analytics.trend.isEmpty
-            ? const _ChartEmptyState(
-                message: 'No sales data available for this period.',
-              )
-            : SalesLineChart(
-                points: analytics.trend,
-                groupBy: analytics.bounds.groupBy,
-                valuePrefix: currencySymbol,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.file_download_outlined, color: cs.primary),
+                const SizedBox(width: Spacing.sm),
+                Expanded(
+                  child: Text(
+                    '${data.exportCount} report${data.exportCount == 1 ? '' : 's'} exported',
+                    style: AppTypography.bodyMedium(context),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: Spacing.sm),
+            Text(
+              data.lastExportAt != null
+                  ? 'Latest: ${DateFormat('MMM d, y \u00b7 h:mm a').format(data.lastExportAt!.toLocal())}'
+                  : 'No reports exported yet.',
+              style: AppTypography.bodySmall(context).copyWith(
+                color: cs.onSurfaceVariant,
               ),
-      ),
-    );
-  }
-
-  Widget _buildComparisonChart(
-    BuildContext context,
-    SalesAnalytics analytics,
-    String currencySymbol,
-  ) {
-    return AppSection(
-      title: 'Period Comparison',
-      padding: const EdgeInsets.only(bottom: Spacing.md),
-      child: AppCard(
-        child: analytics.trend.isEmpty && analytics.previousTrend.isEmpty
-            ? const _ChartEmptyState(
-                message: 'No comparison data available.',
-              )
-            : SalesComparisonChart(
-                current: analytics.trend,
-                previous: analytics.previousTrend,
-                groupBy: analytics.bounds.groupBy,
-                valuePrefix: currencySymbol,
-              ),
-      ),
-    );
-  }
-
-  Widget _buildPaymentAndTopProducts(
-    BuildContext context,
-    SalesAnalytics analytics,
-  ) {
-    return AppSection(
-      title: 'Payment & Top Products',
-      padding: const EdgeInsets.only(bottom: Spacing.md),
-      child: _ResponsiveTwoColumn(
-        left: AppCard(
-          child: PaymentBreakdownView(
-            breakdown: analytics.paymentBreakdown,
-            grandTotal: analytics.totalSales,
-          ),
-        ),
-        right: AppCard(
-          child: TopProductsBarChart(
-            products: analytics.topProducts,
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildCategorySalesCard(
-    BuildContext context,
-    SalesAnalytics analytics,
-  ) {
+  Widget _buildAiStatusCard(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
     return AppSection(
-      title: 'Sales by Category',
+      title: 'AI Service',
       padding: const EdgeInsets.only(bottom: Spacing.md),
       child: AppCard(
-        child: CategorySalesBarChart(
-          categorySales: analytics.categorySales,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStaffPerformanceSection(
-    BuildContext context,
-    List<StaffSalesSummary> summaries,
-  ) {
-    return AppSection(
-      title: 'Staff Performance',
-      padding: const EdgeInsets.only(bottom: Spacing.md),
-      child: StaffPerformanceList(
-        staff: summaries,
-        storeInfo: null,
-      ),
-    );
-  }
-
-  Widget _buildPeakSalesCard(
-    BuildContext context,
-    PeakSalesPeriod peak,
-  ) {
-    return AppSection(
-      title: 'Peak Sales',
-      padding: const EdgeInsets.only(bottom: Spacing.md),
-      child: AppCard(
-        child: PeakSalesCard(peak: peak),
-      ),
-    );
-  }
-
-  Widget _buildRecentSalesCard(
-    BuildContext context,
-    List<Sale> sales,
-    {required String title}
-  ) {
-    return AppSection(
-      title: title,
-      padding: const EdgeInsets.only(bottom: Spacing.md),
-      child: AppCard(
-        child: sales.isEmpty
-            ? const _ChartEmptyState(message: 'No transactions recorded yet.')
-            : SalesTransactionsList(
-                sales: sales,
-                storeInfo: null,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  data.aiConfigured
+                      ? Icons.check_circle
+                      : Icons.warning_amber_outlined,
+                  color: AppSemanticColors.resolve(
+                    data.aiConfigured
+                        ? AppSemanticColors.success
+                        : AppSemanticColors.warning,
+                    brightness,
+                  ),
+                ),
+                const SizedBox(width: Spacing.sm),
+                Expanded(
+                  child: Text(
+                    data.aiConfigured
+                        ? 'Groq API configured'
+                        : 'No Groq API key configured',
+                    style: AppTypography.bodyMedium(context),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: Spacing.sm),
+            Text(
+              data.aiConfigured ? 'Model: ${data.aiModel}' : 'AI Advisor is offline.',
+              style: AppTypography.bodySmall(context).copyWith(
+                color: cs.onSurfaceVariant,
               ),
+            ),
+            const SizedBox(height: Spacing.xs),
+            Text(
+              '${data.aiQueriesToday} quer${data.aiQueriesToday == 1 ? 'y' : 'ies'} today',
+              style: AppTypography.bodySmall(context).copyWith(
+                color: cs.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1102,6 +1087,18 @@ class _AdminDashboard extends ConsumerWidget {
                 screen: const ActivityLogsScreen(),
                 permission: 'view_activity_logs',
                 routeName: 'activity_logs',
+              ),
+            ),
+          if (authNotifier.hasPermission('manage_ai_config'))
+            _QuickAction(
+              label: 'AI Config',
+              color: AppButtonColor.info,
+              icon: Icons.psychology_outlined,
+              onTap: () => RouteGuard.pushIfAuthorized(
+                context, ref,
+                screen: const AIConfigScreen(),
+                permission: 'manage_ai_config',
+                routeName: 'ai_config',
               ),
             ),
           if (authNotifier.hasPermission('view_settings'))
@@ -1393,9 +1390,11 @@ class _StaffDashboard extends ConsumerWidget {
               label: 'New Sale',
               color: AppButtonColor.success,
               icon: Icons.point_of_sale,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const POSScreen()),
+              onTap: () => RouteGuard.pushIfAuthorized(
+                context, ref,
+                screen: const POSScreen(),
+                permission: 'create_sales',
+                routeName: 'pos_new_sale',
               ),
             ),
           if (authNotifier.hasPermission('add_stock'))
@@ -1415,9 +1414,11 @@ class _StaffDashboard extends ConsumerWidget {
               label: 'My Sales',
               color: AppButtonColor.neutral,
               icon: Icons.receipt_long,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SalesScreen()),
+              onTap: () => RouteGuard.pushIfAuthorized(
+                context, ref,
+                screen: const SalesScreen(),
+                permission: 'view_sales',
+                routeName: 'sales',
               ),
             ),
           if (authNotifier.hasPermission('view_reports'))
@@ -1425,9 +1426,11 @@ class _StaffDashboard extends ConsumerWidget {
               label: 'Reports',
               color: AppButtonColor.neutral,
               icon: Icons.analytics_outlined,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SalesAnalyticsScreen()),
+              onTap: () => RouteGuard.pushIfAuthorized(
+                context, ref,
+                screen: const SalesAnalyticsScreen(),
+                permission: 'view_reports',
+                routeName: 'reports',
               ),
             ),
         ],

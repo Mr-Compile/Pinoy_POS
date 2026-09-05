@@ -201,7 +201,7 @@ class _AppDialogState extends State<AppDialog> {
       if (!mounted) return;
 
       final scrollable = Scrollable.maybeOf(focusedContext);
-      if (scrollable == null || scrollable.widget.key != _bodyKey) return;
+      if (scrollable == null || scrollable.widget.controller != _scrollController) return;
 
       Scrollable.ensureVisible(
         focusedContext,
@@ -236,21 +236,12 @@ class _AppDialogState extends State<AppDialog> {
 
         final viewInsets = MediaQuery.viewInsetsOf(context);
         final keyboardHeight = viewInsets.bottom;
-        final isKeyboardVisible = keyboardHeight > 0;
         const verticalInset = 24.0;
 
-        // The form path gets a bounded max height so the body can scroll and
-        // the actions remain pinned. Alert dialogs shrink to their content.
-        final maxDialogHeight = (constraints.maxHeight -
-                keyboardHeight -
-                (verticalInset * 2) -
-                (Spacing.xxl * 2))
-            .clamp(0.0, double.infinity);
-
-        final isAlert = widget.child == null;
-        final alignment = isAlert
-            ? Alignment.center
-            : (isKeyboardVisible ? Alignment.topCenter : Alignment.center);
+        // The dialog shrinks to its content when short and scrolls when long.
+        // Account for the keyboard so the dialog never opens under it.
+        final maxDialogHeight = (constraints.maxHeight - keyboardHeight)
+            .clamp(120.0, double.infinity);
 
         return Semantics(
           label: widget.type.semanticLabel,
@@ -262,7 +253,7 @@ class _AppDialogState extends State<AppDialog> {
               curve: Curves.easeOut,
               padding: EdgeInsets.only(bottom: keyboardHeight),
               child: Dialog(
-                alignment: alignment,
+                alignment: Alignment.center,
                 insetPadding: EdgeInsets.symmetric(
                   horizontal: horizontalInset,
                   vertical: verticalInset,
@@ -271,13 +262,19 @@ class _AppDialogState extends State<AppDialog> {
                   constraints: BoxConstraints(
                     minWidth: 0,
                     maxWidth: maxDialogWidth,
-                    maxHeight: isAlert
-                        ? double.infinity
-                        : (maxDialogHeight > 200 ? maxDialogHeight : 200),
+                    maxHeight: maxDialogHeight,
                   ),
-                  child: isAlert
-                      ? _buildAlertBody(context, isTablet)
-                      : _buildFormBody(context, isTablet),
+                  child: SingleChildScrollView(
+                    controller: _scrollController,
+                    key: _bodyKey,
+                    physics: const ClampingScrollPhysics(),
+                    child: Padding(
+                      padding: const EdgeInsets.all(Spacing.xxl),
+                      child: widget.child == null
+                          ? _buildAlertBody(context, isTablet)
+                          : _buildFormBody(context, isTablet),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -288,27 +285,20 @@ class _AppDialogState extends State<AppDialog> {
   }
 
   Widget _buildFormBody(BuildContext context, bool isTablet) {
-    return Padding(
-      padding: const EdgeInsets.all(Spacing.xxl),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildFormHeader(context),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildFormHeader(context),
+        if (widget.child != null) ...[
           const SizedBox(height: Spacing.md),
-          Flexible(
-            child: SingleChildScrollView(
-              key: _bodyKey,
-              controller: _scrollController,
-              child: widget.child!,
-            ),
-          ),
-          if (widget.actions.isNotEmpty) ...[
-            const SizedBox(height: Spacing.xxl),
-            _buildActions(context, isTablet),
-          ],
+          widget.child!,
         ],
-      ),
+        if (widget.actions.isNotEmpty) ...[
+          const SizedBox(height: Spacing.xxl),
+          _buildActions(context, isTablet),
+        ],
+      ],
     );
   }
 
@@ -365,33 +355,28 @@ class _AppDialogState extends State<AppDialog> {
   }
 
   Widget _buildAlertBody(BuildContext context, bool isTablet) {
-    return Padding(
-      padding: const EdgeInsets.all(Spacing.xxl),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (widget.showIcon) ...[
-              _buildIcon(context, true),
-              const SizedBox(height: Spacing.lg),
-            ],
-            _buildTitle(context, true),
-            if (widget.message != null) ...[
-              const SizedBox(height: Spacing.sm),
-              _buildMessage(context, true),
-            ],
-            if (widget.details != null) ...[
-              const SizedBox(height: Spacing.sm),
-              _buildDetails(context),
-            ],
-            if (widget.actions.isNotEmpty) ...[
-              const SizedBox(height: Spacing.xxl),
-              _buildActions(context, isTablet),
-            ],
-          ],
-        ),
-      ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (widget.showIcon) ...[
+          _buildIcon(context, true),
+          const SizedBox(height: Spacing.lg),
+        ],
+        _buildTitle(context, true),
+        if (widget.message != null) ...[
+          const SizedBox(height: Spacing.sm),
+          _buildMessage(context, true),
+        ],
+        if (widget.details != null) ...[
+          const SizedBox(height: Spacing.sm),
+          _buildDetails(context),
+        ],
+        if (widget.actions.isNotEmpty) ...[
+          const SizedBox(height: Spacing.xxl),
+          _buildActions(context, isTablet),
+        ],
+      ],
     );
   }
 

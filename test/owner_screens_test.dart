@@ -9,7 +9,9 @@ import 'package:pinoy_pos/core/database_seeder.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/providers/dashboard_provider.dart';
 import 'package:pinoy_pos/providers/notification_provider.dart';
+import 'package:pinoy_pos/services/dashboard_service.dart';
 import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/data/models/product.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
@@ -40,6 +42,13 @@ class _FakeProductService extends ProductService {
 
   @override
   Future<List<Product>> searchProducts(String query) async => _products;
+}
+
+class _FakeDashboardNotifier extends DashboardNotifier {
+  _FakeDashboardNotifier() : super(DashboardService(), isAuthenticated: true);
+
+  @override
+  Future<void> load() async {}
 }
 
 class _FakeCategoryService extends CategoryService {
@@ -162,6 +171,12 @@ void main() {
           // Override notification count so NotificationBell doesn't
           // trigger real database queries during widget tests.
           notificationCountProvider.overrideWith((ref) => 0),
+          // Override the dashboard provider so the DashboardScreen test
+          // doesn't trigger long-running analytics queries that can leave
+          // the database locked for the next test.
+          dashboardProvider.overrideWith(
+            (ref) => _FakeDashboardNotifier(),
+          ),
         ],
         child: MaterialApp(
           home: screen,

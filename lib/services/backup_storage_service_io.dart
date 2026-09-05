@@ -92,10 +92,13 @@ class BackupStorageService {
       return _pickBackupForRestoreAndroid();
     }
 
+    // Use [FileType.any] instead of [FileType.custom] because Windows and
+    // other desktop file dialogs make SQLite .db files unclickable when the
+    // filter is restricted to the 'db' extension.  The selected file is
+    // validated by its header and schema after the pick.
     final result = await FilePicker.platform.pickFiles(
       dialogTitle: 'Restore Pinoy POS Database',
-      type: FileType.custom,
-      allowedExtensions: ['db', 'zip'],
+      type: FileType.any,
       withData: false,
     );
 
@@ -113,6 +116,13 @@ class BackupStorageService {
       return const BackupReadResult(
         success: false,
         error: 'The selected backup file is empty.',
+      );
+    }
+
+    if (!_isValidBackupFileName(file.name)) {
+      return BackupReadResult(
+        success: false,
+        error: 'Please choose a Pinoy POS .db or .zip backup file.',
       );
     }
 
@@ -697,6 +707,11 @@ class BackupStorageService {
     if (!reference.contains('://')) return reference;
     if (_isFileUri(reference)) return _decodeFileUri(reference);
     return null;
+  }
+
+  bool _isValidBackupFileName(String name) {
+    final ext = p.extension(name).toLowerCase();
+    return ext == '.db' || ext == '.zip';
   }
 
   String _makeUniqueFileName(String baseName, {Directory? existingDir}) {

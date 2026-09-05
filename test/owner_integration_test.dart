@@ -2,9 +2,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'helpers/secure_storage_test_helper.dart';
+
 import 'package:pinoy_pos/core/database.dart';
 import 'package:pinoy_pos/core/database_seeder.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
+import 'package:pinoy_pos/core/session_status.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/data/models/product.dart';
 import 'package:pinoy_pos/data/models/category.dart';
@@ -57,6 +60,7 @@ void main() {
     await seeder.seed();
 
     SharedPreferences.setMockInitialValues({});
+    SecureStorageTestHelper.setUp();
     SessionManager.resetForTest();
   });
 
@@ -736,7 +740,8 @@ void main() {
       // Restore session.
       final authService2 = AuthService();
       final restored = await authService2.restoreSession();
-      expect(restored, isTrue);
+      expect(restored, isNot(SessionStatus.none));
+      expect(restored, isNot(SessionStatus.expired));
       expect(authService2.currentUser, isNotNull);
       expect(authService2.currentUser!.role, UserRole.owner);
     });

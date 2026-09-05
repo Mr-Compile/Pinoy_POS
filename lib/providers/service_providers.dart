@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/data/models/settings.dart';
 import 'package:pinoy_pos/services/product_service.dart';
 import 'package:pinoy_pos/services/category_service.dart';
 import 'package:pinoy_pos/services/sales_service.dart';
@@ -54,6 +55,10 @@ final notificationServiceProvider = Provider<NotificationService>((ref) {
 
 final settingsServiceProvider = Provider<SettingsService>((ref) {
   return SettingsService();
+});
+
+final settingsProvider = FutureProvider<Settings>((ref) {
+  return ref.watch(settingsServiceProvider).getSettings();
 });
 
 final reportServiceProvider = Provider<ReportService>((ref) {

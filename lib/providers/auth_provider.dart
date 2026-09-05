@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/session_status.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/ai_advisor_provider.dart';
@@ -44,6 +45,8 @@ final authStateProvider = StateNotifierProvider<AuthStateNotifier, AuthState>((r
 });
 
 class AuthState {
+  static const Object _sentinel = Object();
+
   final User? user;
   final bool isLoading;
   final String? error;
@@ -57,13 +60,13 @@ class AuthState {
   });
 
   AuthState copyWith({
-    User? user,
+    Object? user = _sentinel,
     bool? isLoading,
     String? error,
     AuthSessionPhase? phase,
   }) {
     return AuthState(
-      user: user ?? this.user,
+      user: user == _sentinel ? this.user : user as User?,
       isLoading: isLoading ?? this.isLoading,
       error: error,
       phase: phase ?? this.phase,
@@ -81,20 +84,37 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
 
   Future<void> _init() async {
     state = state.copyWith(isLoading: true);
-    final restored = await _authService.restoreSession();
-    if (restored) {
-      final user = _authService.currentUser!;
-      final phase = user.mustChangePassword
-          ? AuthSessionPhase.passwordAuthenticatedPendingPasswordChange
-          : AuthSessionPhase.fullyAuthenticated;
-      state = state.copyWith(
-        user: user,
-        isLoading: false,
-        phase: phase,
-      );
-    } else {
-      state = state.copyWith(isLoading: false);
+    final status = await _authService.restoreSession();
+    final user = _authService.currentUser;
+
+    final phase = switch (status) {
+      SessionStatus.none || SessionStatus.expired => AuthSessionPhase.unauthenticated,
+      SessionStatus.locked => user != null && user.hasPin
+          ? AuthSessionPhase.passwordAuthenticatedPendingPin
+          : AuthSessionPhase.unauthenticated,
+      SessionStatus.active => _resolveActivePhase(user!),
+    };
+
+    state = state.copyWith(
+      user: status == SessionStatus.none || status == SessionStatus.expired
+          ? null
+          : user,
+      isLoading: false,
+      phase: phase,
+    );
+  }
+
+  AuthSessionPhase _resolveActivePhase(User user) {
+    if (user.mustChangePassword) {
+      return AuthSessionPhase.passwordAuthenticatedPendingPasswordChange;
     }
+    if (user.hasPin) {
+      final pinVerified = _authService.currentSessionMetadata?.pinVerified ?? false;
+      return pinVerified
+          ? AuthSessionPhase.fullyAuthenticated
+          : AuthSessionPhase.passwordAuthenticatedPendingPin;
+    }
+    return AuthSessionPhase.fullyAuthenticated;
   }
 
   Future<LoginResult> login(String username, String password) async {
@@ -161,6 +181,24 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
     state = AuthState();
   }
 
+  /// Transitions a fully authenticated session to the PIN-locked state.
+  ///
+  /// Called by the session timeout when the inactivity window expires.  If
+  /// the user does not have a PIN, this performs a full logout instead.
+  Future<void> lockSession() async {
+    final user = state.user;
+    if (user == null) return;
+    if (user.hasPin) {
+      state = state.copyWith(
+        phase: AuthSessionPhase.passwordAuthenticatedPendingPin,
+        error: null,
+      );
+      await _authService.setPinVerified(false);
+      return;
+    }
+    await logout();
+  }
+
   /// Changes the current user’s password during the forced first-login
   /// flow.  Does not require the old password.  On success, transitions
   /// to the PIN phase (if configured) or fully authenticated.
@@ -203,6 +241,7 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
         phase: phase,
         error: null,
       );
+      await _authService.setPinVerified(phase == AuthSessionPhase.fullyAuthenticated);
       // Reload per-user cached state after password change.
       _ref.invalidate(dashboardProvider);
       _ref.invalidate(notificationCountProvider);

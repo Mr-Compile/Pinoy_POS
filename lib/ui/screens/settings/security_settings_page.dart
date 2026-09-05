@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/modal_result.dart';
+import 'package:pinoy_pos/core/session_manager.dart';
+import 'package:pinoy_pos/data/models/settings.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/providers/user_provider.dart';
 import 'package:pinoy_pos/services/password_strength_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
@@ -25,6 +28,9 @@ class SecuritySettingsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authStateProvider);
     final user = authState.user;
+    final settingsAsync = ref.watch(settingsProvider);
+    final canEditTimeout =
+        SessionManager().hasPermission('edit_settings');
 
     if (user == null) {
       return Scaffold(
@@ -54,6 +60,33 @@ class SecuritySettingsPage extends ConsumerWidget {
                 subtitle: const Text('Update your login password'),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => _showChangePasswordDialog(context, ref, user),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text('Session', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            Text(
+              'How long the app waits for input before locking the screen.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 16),
+            AppCard(
+              child: ListTile(
+                leading: const Icon(Icons.timer_outlined),
+                title: const Text('Inactivity timeout'),
+                subtitle: settingsAsync.when(
+                  data: (settings) => Text(
+                    '${settings.inactivityTimeoutMinutes} minutes',
+                  ),
+                  loading: () => const Text('Loading…'),
+                  error: (_, _) => const Text('Unable to load'),
+                ),
+                trailing: canEditTimeout
+                    ? const Icon(Icons.chevron_right)
+                    : null,
+                onTap: canEditTimeout
+                    ? () => _showInactivityTimeoutDialog(context, ref, settingsAsync)
+                    : null,
               ),
             ),
           ],
@@ -199,6 +232,115 @@ class SecuritySettingsPage extends ConsumerWidget {
         context,
         title: 'Password Changed',
         message: 'Your password has been changed successfully.',
+      );
+    }
+  }
+
+  Future<void> _showInactivityTimeoutDialog(
+    BuildContext context,
+    WidgetRef ref,
+    AsyncValue<Settings> settingsAsync,
+  ) async {
+    final current = settingsAsync.valueOrNull?.inactivityTimeoutMinutes ?? 15;
+    final result = await showDialog<ModalResult<void>>(
+      context: context,
+      useRootNavigator: true,
+      builder: (dialogContext) => AppDialogForm<ModalResult<void>>(
+        type: AppDialogType.info,
+        title: 'Inactivity Timeout',
+        childBuilder: (context, state) {
+          final minutesController = state.textController(
+            'minutes',
+            text: current.toString(),
+          );
+
+          return Form(
+            key: state.formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Minutes of inactivity before the app locks. '
+                  'This is the store default; a per-user override can be set in User Management.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 12),
+                AppTextFormField(
+                  controller: minutesController,
+                  label: 'Minutes',
+                  hint: 'e.g. 15',
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Minutes is required';
+                    }
+                    final minutes = int.tryParse(value.trim());
+                    if (minutes == null || minutes < 1 || minutes > 480) {
+                      return 'Enter a number between 1 and 480';
+                    }
+                    return null;
+                  },
+                  onChanged: (_) => state.markChanged(),
+                ),
+              ],
+            ),
+          );
+        },
+        actionsBuilder: (context, state) => [
+          AppDialogAction(
+            label: 'Cancel',
+            onPressed: (dialogContext) =>
+                state.pop(const ModalResult<void>.cancelled()),
+          ),
+          AppDialogAction(
+            label: 'Save',
+            isPrimary: true,
+            isLoading: state.isSaving,
+            onPressed: (dialogContext) async {
+              if (!state.formKey.currentState!.validate()) return;
+
+              state.setSaving(true);
+
+              final minutes =
+                  int.parse(state.textController('minutes').text.trim());
+              final settings = settingsAsync.valueOrNull;
+              if (settings == null) {
+                state.setSaving(false);
+                return;
+              }
+
+              final updated = await ref
+                  .read(settingsServiceProvider)
+                  .updateSettings(
+                    settings.copyWith(inactivityTimeoutMinutes: minutes),
+                  );
+
+              if (updated) {
+                ref.invalidate(settingsProvider);
+                state.pop(const ModalResult<void>.saved());
+              } else {
+                if (dialogContext.mounted) {
+                  state.setSaving(false);
+                  await AppDialogService.error(
+                    dialogContext,
+                    title: 'Save Failed',
+                    message: 'Unable to save the inactivity timeout.',
+                  );
+                }
+              }
+            },
+          ),
+        ],
+      ),
+    );
+
+    if (!context.mounted) return;
+
+    if (result?.isSaved ?? false) {
+      await AppDialogService.success(
+        context,
+        title: 'Updated',
+        message: 'Inactivity timeout updated.',
       );
     }
   }

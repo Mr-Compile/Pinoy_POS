@@ -1,7 +1,13 @@
+import 'dart:convert';
+
 import 'package:pinoy_pos/core/security.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
+import 'package:pinoy_pos/core/session_status.dart';
+import 'package:pinoy_pos/data/models/session_metadata.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/data/repositories/user_repository.dart';
+import 'package:pinoy_pos/services/secure_storage_service.dart';
+import 'package:pinoy_pos/services/session_settings_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Result of a post-login PIN verification attempt.
@@ -39,10 +45,18 @@ enum LoginResult {
 class AuthService {
   final UserRepository _userRepository = UserRepository();
   final SessionManager _sessionManager = SessionManager();
+  final SessionSettingsService _sessionSettingsService = SessionSettingsService();
+  final SecureStorageService _secureStorage = SecureStorageService();
   static const String _sessionKey = 'user_session';
+  static const String _sessionTokenKey = 'session_token';
+
+  SessionMetadata? _currentMetadata;
+
+  AuthService();
 
   User? get currentUser => _sessionManager.currentUser;
   bool get isAuthenticated => _sessionManager.isAuthenticated;
+  SessionMetadata? get currentSessionMetadata => _currentMetadata;
 
   Future<LoginResult> login(String username, String password) async {
     try {
@@ -62,7 +76,7 @@ class AuthService {
 
       _sessionManager.setCurrentUser(user);
       await _userRepository.updateLastLogin(user.id!);
-      await _saveSession(user.id!);
+      await _createSession(user);
 
       return LoginResult.success;
     } catch (_) {
@@ -87,34 +101,65 @@ class AuthService {
 
     _sessionManager.setCurrentUser(user);
     await _userRepository.updateLastLogin(user.id!);
-    await _saveSession(user.id!);
+    await _saveSession(user, pinVerified: true);
 
     return true;
   }
 
   Future<void> logout() async {
     _sessionManager.clearCurrentUser();
+    _currentMetadata = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_sessionKey);
+    await _secureStorage.delete(key: _sessionTokenKey);
   }
 
-  Future<bool> restoreSession() async {
+  Future<SessionStatus> restoreSession() async {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getInt(_sessionKey);
 
     if (userId == null) {
-      return false;
+      return SessionStatus.none;
+    }
+
+    final metadata = await _loadSessionMetadata();
+    if (metadata == null || metadata.userId != userId) {
+      await logout();
+      return SessionStatus.none;
     }
 
     final user = await _userRepository.getById(userId);
-
     if (user == null || !user.isActive || user.isDeleted) {
       await logout();
-      return false;
+      return SessionStatus.expired;
     }
 
+    _currentMetadata = metadata;
     _sessionManager.setCurrentUser(user);
-    return true;
+
+    final now = DateTime.now();
+    if (now.isAfter(metadata.sessionExpiresAt)) {
+      await logout();
+      return SessionStatus.expired;
+    }
+
+    final inactivityTimeout =
+        await _sessionSettingsService.getEffectiveInactivityTimeout(user);
+    final inactivityExpired =
+        now.difference(metadata.lastActivityAt) > inactivityTimeout;
+
+    if (inactivityExpired) {
+      if (user.hasPin) {
+        return SessionStatus.locked;
+      }
+      await logout();
+      return SessionStatus.expired;
+    }
+
+    if (metadata.pinVerified || !user.hasPin) {
+      return SessionStatus.active;
+    }
+    return SessionStatus.locked;
   }
 
   /// Reloads the current user from the database and updates the session.
@@ -129,9 +174,94 @@ class AuthService {
     }
   }
 
-  Future<void> _saveSession(int userId) async {
+  /// Starts a new persisted session for [user] with a fresh 8-hour expiry.
+  Future<void> _createSession(User user) async {
+    final now = DateTime.now();
+    final metadata = SessionMetadata(
+      userId: user.id!,
+      sessionExpiresAt: now.add(SessionSettingsService.maxSessionLifetime),
+      lastActivityAt: now,
+      pinVerified: !user.hasPin,
+    );
+
+    _currentMetadata = metadata;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_sessionKey, userId);
+    await prefs.setInt(_sessionKey, user.id!);
+    await _persistSessionMetadata(metadata);
+  }
+
+  /// Updates the last activity timestamp on the existing persisted session.
+  Future<void> _saveSession(User user, {bool? pinVerified}) async {
+    final now = DateTime.now();
+    final existing = _currentMetadata;
+    final expiresAt = existing?.sessionExpiresAt ??
+        now.add(SessionSettingsService.maxSessionLifetime);
+
+    final metadata = SessionMetadata(
+      userId: user.id!,
+      sessionExpiresAt: expiresAt,
+      lastActivityAt: now,
+      pinVerified: pinVerified ?? existing?.pinVerified ?? !user.hasPin,
+    );
+
+    _currentMetadata = metadata;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_sessionKey, user.id!);
+    await _persistSessionMetadata(metadata);
+  }
+
+  Future<SessionMetadata?> _loadSessionMetadata() async {
+    final raw = await _secureStorage.read(key: _sessionTokenKey);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(raw) as Map<String, dynamic>;
+      return SessionMetadata.fromMap(decoded);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _persistSessionMetadata(SessionMetadata metadata) async {
+    await _secureStorage.write(
+      key: _sessionTokenKey,
+      value: _encodeMetadata(metadata),
+    );
+  }
+
+  String _encodeMetadata(SessionMetadata metadata) {
+    return jsonEncode(metadata.toMap());
+  }
+
+  /// Updates the last activity timestamp on the persisted session.
+  ///
+  /// Called by [SessionTimeoutService] after the inactivity timer resets.
+  /// The write is intentionally throttled by the caller.
+  Future<void> touchSession(DateTime lastActivityAt) async {
+    final metadata = _currentMetadata;
+    if (metadata == null) return;
+    final updated = metadata.copyWith(lastActivityAt: lastActivityAt);
+    _currentMetadata = updated;
+    await _persistSessionMetadata(updated);
+  }
+
+  /// Updates the PIN-verified flag on the persisted session.
+  Future<void> setPinVerified(bool value) async {
+    final metadata = _currentMetadata;
+    if (metadata == null) return;
+    final updated = metadata.copyWith(pinVerified: value);
+    _currentMetadata = updated;
+    await _persistSessionMetadata(updated);
+  }
+
+  Future<void> _markPinVerified(User user) async {
+    final metadata = _currentMetadata;
+    if (metadata == null) return;
+    final updated = metadata.copyWith(
+      pinVerified: true,
+      lastActivityAt: DateTime.now(),
+    );
+    _currentMetadata = updated;
+    await _persistSessionMetadata(updated);
   }
 
   bool hasPermission(String permission) {
@@ -173,6 +303,7 @@ class AuthService {
 
     // PIN is correct — update the session with the fresh user data.
     _sessionManager.setCurrentUser(user);
+    await _markPinVerified(user);
     return PinVerifyResult.success;
   }
 

@@ -117,7 +117,6 @@ class BackupService {
     'trash',
     'backup_history',
     'export_history',
-    'backup_metadata',
     'attachments',
   ];
 
@@ -746,7 +745,8 @@ class BackupService {
       }
 
       // Older backups may not have backup_metadata; allow them as long as
-      // the required data tables were present.
+      // the required data tables were present.  An empty table is treated as
+      // an unpopulated legacy backup, not as incompatible.
       if (await _hasTable(testDb, 'backup_metadata')) {
         try {
           final metaRows = await testDb.query(
@@ -754,15 +754,15 @@ class BackupService {
             where: 'id = 1',
             limit: 1,
           );
-          if (metaRows.isEmpty) {
-            await testDb.close();
-            return BackupImportResult.incompatible;
-          }
-          final appName = metaRows.first['app_name'] as String?;
-          if (appName != constants.AppConstants.appName) {
-            _log('Backup app_name mismatch: $appName');
-            await testDb.close();
-            return BackupImportResult.incompatible;
+          if (metaRows.isNotEmpty) {
+            final appName = metaRows.first['app_name'] as String?;
+            if (appName != null &&
+                appName.isNotEmpty &&
+                appName != constants.AppConstants.appName) {
+              _log('Backup app_name mismatch: $appName');
+              await testDb.close();
+              return BackupImportResult.incompatible;
+            }
           }
         } catch (e) {
           _log('Backup metadata validation failed: $e');
@@ -1127,18 +1127,17 @@ class BackupService {
   Future<void> _writeBackupMetadata(String backupPath) async {
     Database? backupDb;
     try {
-      // Open the copied database with the correct version.  Without an
-      // explicit version, sqflite treats the request as version 1 and may
-      // throw a downgrade error when the copied database is already at the
-      // current schema version.
+      // Open the copied database without forcing a version.  The copy already
+      // carries the source user_version, and forcing it to the current app
+      // version with empty onCreate/onUpgrade would run the schema forward in
+      // the header without actually applying the migrations.  Leaving the
+      // version unchanged lets the live [DatabaseHelper] run the correct
+      // onUpgrade after the restore.
       backupDb = await openDatabase(
         backupPath,
-        version: constants.AppConstants.databaseVersion,
         onConfigure: (db) async {
           await db.execute('PRAGMA foreign_keys = ON');
         },
-        onCreate: (db, version) {},
-        onUpgrade: (db, oldVersion, newVersion) {},
       );
 
       // Switch to a classic rollback journal so the metadata is written into
@@ -1154,13 +1153,32 @@ class BackupService {
           created_at TEXT NOT NULL
         )
       ''');
+
+      // Record the source schema version, not the app's current version, so
+      // the metadata stays consistent with the rest of the backup.
+      var backedUpVersion = constants.AppConstants.databaseVersion;
+      try {
+        final versionRows = await backupDb.rawQuery('PRAGMA user_version');
+        if (versionRows.isNotEmpty) {
+          final raw = versionRows.first.values.first;
+          if (raw is int) {
+            backedUpVersion = raw;
+          } else if (raw is String) {
+            backedUpVersion = int.tryParse(raw) ??
+                constants.AppConstants.databaseVersion;
+          }
+        }
+      } catch (e) {
+        _log('Could not read user_version from backup copy: $e');
+      }
+
       await backupDb.insert(
         'backup_metadata',
         {
           'id': 1,
           'app_name': constants.AppConstants.appName,
           'app_version': constants.AppConstants.appVersion,
-          'database_version': constants.AppConstants.databaseVersion,
+          'database_version': backedUpVersion,
           'created_at': DateTime.now().toIso8601String(),
         },
         conflictAlgorithm: ConflictAlgorithm.replace,

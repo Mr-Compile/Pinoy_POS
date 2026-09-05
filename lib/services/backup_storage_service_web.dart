@@ -30,10 +30,11 @@ class BackupStorageService {
 
   /// Picks a backup file for restore and returns its bytes.
   Future<BackupReadResult> pickBackupForRestore() async {
+    // Web file dialogs make some custom extensions unclickable, so we allow
+    // all files and then validate the selected file's name and header.
     final result = await FilePicker.platform.pickFiles(
       dialogTitle: 'Restore Pinoy POS Database',
-      type: FileType.custom,
-      allowedExtensions: ['db', 'zip'],
+      type: FileType.any,
       withData: true,
     );
 
@@ -48,6 +49,15 @@ class BackupStorageService {
     }
 
     final file = result.files.first;
+    final name = file.name;
+
+    if (!_isValidBackupFileName(name)) {
+      return const BackupReadResult(
+        success: false,
+        error: 'Please choose a Pinoy POS .db or .zip backup file.',
+      );
+    }
+
     final bytes = file.bytes;
     if (bytes == null || bytes.isEmpty) {
       return const BackupReadResult(
@@ -155,6 +165,11 @@ class BackupStorageService {
 
   /// No-op on web.
   Future<void> releaseUri(String reference) async {}
+
+  bool _isValidBackupFileName(String name) {
+    final lower = name.toLowerCase();
+    return lower.endsWith('.db') || lower.endsWith('.zip');
+  }
 
   String _ensureBackupExtension(String name) {
     final lower = name.toLowerCase();

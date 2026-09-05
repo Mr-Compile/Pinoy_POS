@@ -166,6 +166,25 @@ void main() {
       expect(data.analytics.totalSales, 100.0);
       expect(data.analytics.transactionCount, 1);
     });
+
+    test('Admin dashboard returns system metrics only', () async {
+      await _login('admin');
+
+      final dashboardData = await DashboardService().getDashboard(
+        ReportingPeriod.today,
+      );
+
+      expect(dashboardData, isNotNull);
+      expect(dashboardData, isA<AdminDashboardData>());
+
+      final data = dashboardData as AdminDashboardData;
+      // Seeded users: owner, admin, staff.
+      expect(data.usersByRole.total, 3);
+      expect(data.activeUsers, 3);
+      expect(data.exportCount, greaterThanOrEqualTo(0));
+      expect(data.aiQueriesToday, greaterThanOrEqualTo(0));
+      expect(data.backupStatus.hasBackup, isFalse);
+    });
   });
 }
 

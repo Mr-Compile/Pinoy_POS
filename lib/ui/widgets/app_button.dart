@@ -284,8 +284,8 @@ class AppButton extends StatelessWidget {
         ),
       AppButtonVariant.quickAction => _buildQuickAction(
           context,
+          cs,
           mainColor,
-          onMainColor,
         ),
       AppButtonVariant.gradient => _buildGradientButton(
           context,
@@ -293,7 +293,6 @@ class AppButton extends StatelessWidget {
           theme.brightness,
           padding,
           iconSize,
-          onMainColor,
         ),
       AppButtonVariant.destructive => FilledButton(
           onPressed: isLoading ? null : onPressed,
@@ -466,10 +465,10 @@ class AppButton extends StatelessWidget {
     Brightness brightness,
     EdgeInsets padding,
     double iconSize,
-    Color onMainColor,
   ) {
     final tapHandler = isLoading ? null : onPressed;
     final disabled = tapHandler == null && !isLoading;
+    final isDark = brightness == Brightness.dark;
 
     final height = switch (size) {
       AppButtonSize.small => 48.0,
@@ -484,8 +483,14 @@ class AppButton extends StatelessWidget {
       0,
     );
 
-    final loadingColor = onMainColor;
-    final idleColor = disabled ? onMainColor.withValues(alpha: 0.38) : onMainColor;
+    final labelColor = cs.onSurface;
+    final labelShadow = Shadow(
+      color: cs.surface.withValues(alpha: isDark ? 0.35 : 0.25),
+      blurRadius: 4,
+      offset: const Offset(0, 1),
+    );
+    final loadingColor = labelColor;
+    final idleColor = disabled ? labelColor.withValues(alpha: 0.38) : labelColor;
 
     final labelWidget = isLoading
         ? Text(
@@ -494,6 +499,7 @@ class AppButton extends StatelessWidget {
             style: AppTypography.titleMediumBold(context).copyWith(
               color: loadingColor,
               fontWeight: FontWeight.bold,
+              shadows: [labelShadow],
             ),
           )
         : Text(
@@ -502,6 +508,7 @@ class AppButton extends StatelessWidget {
             style: AppTypography.titleMediumBold(context).copyWith(
               color: idleColor,
               fontWeight: FontWeight.bold,
+              shadows: [labelShadow],
             ),
           );
 
@@ -535,7 +542,14 @@ class AppButton extends StatelessWidget {
       height: height,
       constraints: const BoxConstraints(minWidth: 48),
       decoration: BoxDecoration(
-        gradient: AppColors.loginGradient(brightness),
+        gradient: LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [
+            AppSemanticColors.primary,
+            AppSemanticColors.primaryDark,
+          ],
+        ),
         borderRadius: borderRadius,
         boxShadow: [
           BoxShadow(
@@ -575,24 +589,31 @@ class AppButton extends StatelessWidget {
 
   Widget _buildQuickAction(
     BuildContext context,
+    ColorScheme cs,
     Color mainColor,
-    Color onMainColor,
   ) {
     final tapHandler = isLoading ? null : onPressed;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final foreground = cs.onSurface;
+    final disabledForeground = foreground.withValues(alpha: 0.38);
     final disabledBackground = mainColor.withValues(alpha: 0.12);
-    final disabledForeground = onMainColor.withValues(alpha: 0.38);
+    final textShadow = Shadow(
+      color: cs.surface.withValues(alpha: isDark ? 0.35 : 0.25),
+      blurRadius: 4,
+      offset: const Offset(0, 1),
+    );
 
     return FilledButton(
       onPressed: tapHandler,
       style: FilledButton.styleFrom(
         backgroundColor: mainColor,
-        foregroundColor: onMainColor,
+        foregroundColor: foreground,
         disabledBackgroundColor: disabledBackground,
         disabledForegroundColor: disabledForeground,
-        iconColor: onMainColor,
+        iconColor: foreground,
         disabledIconColor: disabledForeground,
         iconSize: 28,
-        overlayColor: onMainColor,
+        overlayColor: foreground.withValues(alpha: 0.12),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
@@ -600,6 +621,8 @@ class AppButton extends StatelessWidget {
         minimumSize: const Size(64, 64),
         textStyle: AppTypography.labelMedium(context).copyWith(
           fontWeight: FontWeight.w600,
+          color: foreground,
+          shadows: [textShadow],
         ),
       ),
       child: ConstrainedBox(
@@ -608,7 +631,10 @@ class AppButton extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon!),
+            Icon(
+              icon!,
+              shadows: [textShadow],
+            ),
             const SizedBox(height: Spacing.xs),
             Text(
               label!,
