@@ -40,6 +40,7 @@ import 'package:pinoy_pos/ui/widgets/kpi_card.dart';
 import 'package:pinoy_pos/ui/widgets/peak_sales_card.dart';
 import 'package:pinoy_pos/ui/widgets/payment_breakdown_view.dart';
 import 'package:pinoy_pos/ui/widgets/period_selector.dart';
+import 'package:pinoy_pos/ui/widgets/quick_action_grid.dart';
 import 'package:pinoy_pos/ui/widgets/sales_line_chart.dart';
 import 'package:pinoy_pos/ui/widgets/sales_summary_cards.dart';
 import 'package:pinoy_pos/ui/widgets/staff_performance_list.dart';
@@ -658,9 +659,7 @@ class _OwnerDashboard extends ConsumerWidget {
     return AppSection(
       title: 'Quick Actions',
       padding: const EdgeInsets.only(bottom: Spacing.md),
-      child: Wrap(
-        spacing: Spacing.md,
-        runSpacing: Spacing.md,
+      child: QuickActionGrid(
         children: [
           if (authNotifier.hasPermission('create_sales'))
             _QuickAction(
@@ -689,7 +688,7 @@ class _OwnerDashboard extends ConsumerWidget {
           if (authNotifier.hasPermission('add_stock'))
             _QuickAction(
               label: 'Add Stock',
-              color: AppButtonColor.warning,
+              color: AppButtonColor.info,
               icon: Icons.warehouse_outlined,
               onTap: () => RouteGuard.pushIfAuthorized(
                 context, ref,
@@ -701,7 +700,7 @@ class _OwnerDashboard extends ConsumerWidget {
           if (authNotifier.hasPermission('view_sales'))
             _QuickAction(
               label: 'View Sales',
-              color: AppButtonColor.neutral,
+              color: AppButtonColor.success,
               icon: Icons.receipt_long,
               onTap: () => RouteGuard.pushIfAuthorized(
                 context, ref,
@@ -713,7 +712,7 @@ class _OwnerDashboard extends ConsumerWidget {
           if (authNotifier.hasPermission('view_reports'))
             _QuickAction(
               label: 'Reports',
-              color: AppButtonColor.neutral,
+              color: AppButtonColor.secondary,
               icon: Icons.analytics_outlined,
               onTap: () => RouteGuard.pushIfAuthorized(
                 context, ref,
@@ -725,7 +724,7 @@ class _OwnerDashboard extends ConsumerWidget {
           if (authNotifier.hasPermission('manage_staff'))
             _QuickAction(
               label: 'Manage Staff',
-              color: AppButtonColor.info,
+              color: AppButtonColor.primary,
               icon: Icons.people,
               onTap: () => RouteGuard.pushIfAuthorized(
                 context, ref,
@@ -737,6 +736,7 @@ class _OwnerDashboard extends ConsumerWidget {
           if (authNotifier.hasPermission('view_ai_advisor'))
             _QuickAction(
               label: 'AI Advisor',
+              color: AppButtonColor.secondary,
               icon: Icons.auto_awesome,
               onTap: () => RouteGuard.pushIfAuthorized(
                 context, ref,
@@ -1037,14 +1037,12 @@ class _AdminDashboard extends ConsumerWidget {
     return AppSection(
       title: 'Quick Actions',
       padding: const EdgeInsets.only(bottom: Spacing.md),
-      child: Wrap(
-        spacing: Spacing.md,
-        runSpacing: Spacing.md,
+      child: QuickActionGrid(
         children: [
           if (authNotifier.hasPermission('manage_users'))
             _QuickAction(
               label: 'Manage Users',
-              color: AppButtonColor.info,
+              color: AppButtonColor.primary,
               icon: Icons.people,
               onTap: () => RouteGuard.pushIfAuthorized(
                 context, ref,
@@ -1092,7 +1090,7 @@ class _AdminDashboard extends ConsumerWidget {
           if (authNotifier.hasPermission('manage_ai_config'))
             _QuickAction(
               label: 'AI Config',
-              color: AppButtonColor.info,
+              color: AppButtonColor.secondary,
               icon: Icons.psychology_outlined,
               onTap: () => RouteGuard.pushIfAuthorized(
                 context, ref,
@@ -1381,9 +1379,7 @@ class _StaffDashboard extends ConsumerWidget {
     return AppSection(
       title: 'Quick Actions',
       padding: const EdgeInsets.only(bottom: Spacing.md),
-      child: Wrap(
-        spacing: Spacing.md,
-        runSpacing: Spacing.md,
+      child: QuickActionGrid(
         children: [
           if (authNotifier.hasPermission('create_sales'))
             _QuickAction(
@@ -1400,7 +1396,7 @@ class _StaffDashboard extends ConsumerWidget {
           if (authNotifier.hasPermission('add_stock'))
             _QuickAction(
               label: 'Add Stock',
-              color: AppButtonColor.warning,
+              color: AppButtonColor.info,
               icon: Icons.warehouse_outlined,
               onTap: () => RouteGuard.pushIfAuthorized(
                 context, ref,
@@ -1412,7 +1408,7 @@ class _StaffDashboard extends ConsumerWidget {
           if (authNotifier.hasPermission('view_sales'))
             _QuickAction(
               label: 'My Sales',
-              color: AppButtonColor.neutral,
+              color: AppButtonColor.success,
               icon: Icons.receipt_long,
               onTap: () => RouteGuard.pushIfAuthorized(
                 context, ref,
@@ -1424,7 +1420,7 @@ class _StaffDashboard extends ConsumerWidget {
           if (authNotifier.hasPermission('view_reports'))
             _QuickAction(
               label: 'Reports',
-              color: AppButtonColor.neutral,
+              color: AppButtonColor.secondary,
               icon: Icons.analytics_outlined,
               onTap: () => RouteGuard.pushIfAuthorized(
                 context, ref,

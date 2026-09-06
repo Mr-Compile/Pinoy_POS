@@ -12,6 +12,16 @@ import 'package:pinoy_pos/ui/screens/pin_lock_screen.dart';
 /// `MaterialPageRoute` / `pushAndRemoveUntil` blocks found in
 /// [SplashScreen], [LoginScreen], [ForceChangePasswordScreen],
 /// [PinLockScreen] and [AppShell].
+///
+/// Every auth-phase transition clears the entire back stack via
+/// [pushAndRemoveUntil]. This keeps the navigation convergent: if two
+/// transitions race (e.g. the `AppShell` redirect and `SessionGuard`
+/// timeout firing in the same frame), each call pushes the target screen
+/// and removes everything below it, so the stack always collapses to the
+/// single correct phase screen. Partial stack replacement (e.g.
+/// `pushReplacement`) is intentionally not offered here because it can
+/// leave a stale `LoginScreen` or authenticated screen reachable through
+/// the system back button.
 class AuthPhaseNavigator {
   AuthPhaseNavigator._();
 
@@ -30,14 +40,6 @@ class AuthPhaseNavigator {
   /// Builds a [MaterialPageRoute] for [phase].
   static Route<void> routeForPhase(AuthSessionPhase phase) {
     return MaterialPageRoute(builder: (_) => screenForPhase(phase));
-  }
-
-  /// Replaces the current route with the screen for [phase].
-  static Future<void> pushReplacement(
-    BuildContext context,
-    AuthSessionPhase phase,
-  ) {
-    return Navigator.of(context).pushReplacement(routeForPhase(phase));
   }
 
   /// Pushes the screen for [phase] and removes all previous routes.

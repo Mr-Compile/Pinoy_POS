@@ -942,14 +942,11 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
                 Navigator.of(context, rootNavigator: true).pop(),
           ),
         ],
-        child: SizedBox(
-          height: 120,
-          child: Center(
-            child: CircularProgressIndicator(
-              color: AppSemanticColors.resolve(
-                AppSemanticColors.info,
-                Theme.of(context).brightness,
-              ),
+        child: Center(
+          child: CircularProgressIndicator(
+            color: AppSemanticColors.resolve(
+              AppSemanticColors.info,
+              Theme.of(context).brightness,
             ),
           ),
         ),

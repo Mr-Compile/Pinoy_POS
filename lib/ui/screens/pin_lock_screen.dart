@@ -44,6 +44,9 @@ class _PinLockScreenState extends ConsumerState<PinLockScreen> {
       (previous, next) {
         // Only react to actual phase transitions.
         if (previous?.phase == next.phase) return;
+        // The subscription outlives deactivation by one frame during
+        // route removal; navigating from a dead context throws.
+        if (!mounted) return;
 
         // When phase becomes fullyAuthenticated, navigate to AppShell.
         // When phase becomes unauthenticated (e.g. cancelPinFlow),

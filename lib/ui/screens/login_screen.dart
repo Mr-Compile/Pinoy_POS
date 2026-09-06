@@ -25,6 +25,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _usernameFocus = FocusNode();
   final _passwordFocus = FocusNode();
 
+  /// Prevents the self-healing redirect in [build] from scheduling more
+  /// than one navigation.
+  bool _hasNavigated = false;
+
   @override
   void initState() {
     super.initState();
@@ -69,9 +73,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     switch (result) {
       case LoginResult.success:
+        // The auth notifier has already settled user + phase by this
+        // point (state assignment is synchronous inside login()), so the
+        // phase read here is authoritative — no delay or retry needed.
         final phase = ref.read(authStateProvider).phase;
         if (phase != AuthSessionPhase.unauthenticated) {
-          await AuthPhaseNavigator.pushReplacement(context, phase);
+          // Clear the whole stack so the system back button can never
+          // return to this screen or to a previous user's dashboard.
+          _hasNavigated = true;
+          await AuthPhaseNavigator.pushAndRemoveUntil(context, phase);
         }
       case LoginResult.invalidCredentials:
         await AppDialogService.error(
@@ -99,6 +109,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final authState = ref.watch(authStateProvider);
     final colorScheme = Theme.of(context).colorScheme;
     final brightness = Theme.of(context).brightness;
+
+    // Self-healing redirect: if this screen is ever built while a session
+    // is already active — for example a stale login route resurfacing via
+    // the back stack or a transition race — route to the screen the
+    // current phase requires instead of showing the sign-in form.
+    if (!authState.isLoading &&
+        authState.phase != AuthSessionPhase.unauthenticated &&
+        !_hasNavigated) {
+      _hasNavigated = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final current = ref.read(authStateProvider);
+        if (current.isLoading ||
+            current.phase == AuthSessionPhase.unauthenticated) {
+          // The session ended between scheduling and firing; stay here.
+          _hasNavigated = false;
+          return;
+        }
+        AuthPhaseNavigator.pushAndRemoveUntil(context, current.phase);
+      });
+    }
+
     final isDark = brightness == Brightness.dark;
 
     return GestureDetector(

@@ -173,7 +173,6 @@ class AppDialog extends StatefulWidget {
 }
 
 class _AppDialogState extends State<AppDialog> {
-  final _bodyKey = GlobalKey();
   late final ScrollController _scrollController;
 
   @override
@@ -190,7 +189,7 @@ class _AppDialogState extends State<AppDialog> {
     super.dispose();
   }
 
-  /// Scrolls the form body so the currently focused field stays visible when
+  /// Scrolls the dialog body so the currently focused field stays visible when
   /// the keyboard appears or the user moves focus.
   void _onFocusChanged() {
     final focused = FocusManager.instance.primaryFocus;
@@ -201,7 +200,9 @@ class _AppDialogState extends State<AppDialog> {
       if (!mounted) return;
 
       final scrollable = Scrollable.maybeOf(focusedContext);
-      if (scrollable == null || scrollable.widget.controller != _scrollController) return;
+      if (scrollable == null || scrollable.widget.controller != _scrollController) {
+        return;
+      }
 
       Scrollable.ensureVisible(
         focusedContext,
@@ -214,86 +215,71 @@ class _AppDialogState extends State<AppDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final layout = layoutClassFor(constraints.maxWidth);
-        final isTablet = layout.isAtLeastMedium;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final layout = layoutClassFor(screenWidth);
+    final isTablet = layout.isAtLeastMedium;
 
-        final (horizontalInset, maxDialogWidth) = switch (layout) {
-          LayoutClass.compact => (
-            16.0,
-            min(360.0, max(120.0, constraints.maxWidth - 32.0))
-          ),
-          LayoutClass.medium => (
-            24.0,
-            min(480.0, max(120.0, constraints.maxWidth - 48.0))
-          ),
-          LayoutClass.expanded => (
-            24.0,
-            min(560.0, max(120.0, constraints.maxWidth - 48.0))
-          ),
-        };
+    final horizontalInset = switch (layout) {
+      LayoutClass.compact => 16.0,
+      LayoutClass.medium => 24.0,
+      LayoutClass.expanded => 24.0,
+    };
 
-        final viewInsets = MediaQuery.viewInsetsOf(context);
-        final keyboardHeight = viewInsets.bottom;
-        const verticalInset = 24.0;
+    const verticalInset = 24.0;
 
-        // The dialog shrinks to its content when short and scrolls when long.
-        // Account for the keyboard so the dialog never opens under it.
-        final maxDialogHeight = (constraints.maxHeight - keyboardHeight)
-            .clamp(120.0, double.infinity);
+    // Responsive max width. The actual width is further clamped by the
+    // available child area reported by the inner [LayoutBuilder].
+    final maxDialogWidth = switch (layout) {
+      LayoutClass.compact => min(360.0, max(120.0, screenWidth - 32.0)),
+      LayoutClass.medium => min(480.0, max(120.0, screenWidth - 48.0)),
+      LayoutClass.expanded => min(560.0, max(120.0, screenWidth - 48.0)),
+    };
 
-        return Semantics(
-          label: widget.type.semanticLabel,
-          container: true,
-          child: SafeArea(
-            minimum: EdgeInsets.zero,
-            child: AnimatedPadding(
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOut,
-              padding: EdgeInsets.only(bottom: keyboardHeight),
-              child: Dialog(
-                alignment: Alignment.center,
-                insetPadding: EdgeInsets.symmetric(
-                  horizontal: horizontalInset,
-                  vertical: verticalInset,
-                ),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minWidth: 0,
-                    maxWidth: maxDialogWidth,
-                    maxHeight: maxDialogHeight,
-                  ),
-                  child: SingleChildScrollView(
-                    controller: _scrollController,
-                    key: _bodyKey,
-                    physics: const ClampingScrollPhysics(),
-                    child: Padding(
-                      padding: const EdgeInsets.all(Spacing.xxl),
-                      child: widget.child == null
-                          ? _buildAlertBody(context, isTablet)
-                          : _buildFormBody(context, isTablet),
-                    ),
-                  ),
-                ),
+    return Semantics(
+      label: widget.type.semanticLabel,
+      container: true,
+      child: Dialog(
+        alignment: Alignment.center,
+        insetPadding: EdgeInsets.symmetric(
+          horizontal: horizontalInset,
+          vertical: verticalInset,
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: min(maxDialogWidth, constraints.maxWidth),
+                maxHeight: constraints.maxHeight,
               ),
-            ),
-          ),
-        );
-      },
+              child: Padding(
+                padding: const EdgeInsets.all(Spacing.xxl),
+                child: _buildContent(context, isTablet),
+              ),
+            );
+          },
+        ),
+      ),
     );
   }
 
-  Widget _buildFormBody(BuildContext context, bool isTablet) {
+  Widget _buildContent(BuildContext context, bool isTablet) {
+    final isForm = widget.child != null;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _buildFormHeader(context),
-        if (widget.child != null) ...[
+        if (isForm) ...[
+          _buildFormHeader(context),
           const SizedBox(height: Spacing.md),
-          widget.child!,
         ],
+        Flexible(
+          child: SingleChildScrollView(
+            controller: _scrollController,
+            physics: const ClampingScrollPhysics(),
+            child: isForm ? widget.child! : _buildAlertContent(context),
+          ),
+        ),
         if (widget.actions.isNotEmpty) ...[
           const SizedBox(height: Spacing.xxl),
           _buildActions(context, isTablet),
@@ -354,7 +340,10 @@ class _AppDialogState extends State<AppDialog> {
     );
   }
 
-  Widget _buildAlertBody(BuildContext context, bool isTablet) {
+  /// Body content for alert-style dialogs. It lives inside the scrollable
+  /// region so long messages and details can scroll while the action buttons
+  /// remain fixed at the bottom.
+  Widget _buildAlertContent(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -371,10 +360,6 @@ class _AppDialogState extends State<AppDialog> {
         if (widget.details != null) ...[
           const SizedBox(height: Spacing.sm),
           _buildDetails(context),
-        ],
-        if (widget.actions.isNotEmpty) ...[
-          const SizedBox(height: Spacing.xxl),
-          _buildActions(context, isTablet),
         ],
       ],
     );

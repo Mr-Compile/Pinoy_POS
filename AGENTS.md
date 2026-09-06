@@ -518,3 +518,14 @@ flutter test
 ```
 
 Result: `flutter analyze` reports no issues; `flutter test` passes 269/269 tests.
+
+## Dialog / Keyboard Responsiveness Pass
+
+### Verification
+
+```powershell
+flutter analyze
+flutter test --concurrency=1
+```
+
+Result: `flutter analyze` reports no issues. The full test suite passes 305/305 tests when run with `--concurrency=1` on Windows. The default parallel runner can hit `database is locked` errors in the integration tests because multiple test suites share the same `sqflite_common_ffi` database file on disk. Use `--concurrency=1` for a clean full run; targeted widget and unit tests run cleanly without it.

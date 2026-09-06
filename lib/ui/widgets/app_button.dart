@@ -5,7 +5,7 @@ import 'package:pinoy_pos/core/spacing.dart';
 /// Common button color roles. Use `primary` for primary CTAs and use
 /// semantic colors only when the action meaning matches (e.g. green for
 /// save / new sale, red for delete, amber for warnings).
-enum AppButtonColor { primary, success, warning, info, error, neutral }
+enum AppButtonColor { primary, secondary, success, warning, info, error, neutral }
 
 /// Common button variants used across the app.
 enum AppButtonVariant { filled, outlined, text, elevated, destructive, quickAction, gradient }
@@ -286,6 +286,7 @@ class AppButton extends StatelessWidget {
           context,
           cs,
           mainColor,
+          onMainColor,
         ),
       AppButtonVariant.gradient => _buildGradientButton(
           context,
@@ -327,6 +328,7 @@ class AppButton extends StatelessWidget {
   ) {
     return switch (color) {
       AppButtonColor.primary => (cs.primary, cs.onPrimary),
+      AppButtonColor.secondary => (cs.secondary, cs.onSecondary),
       AppButtonColor.success => (
           AppSemanticColors.resolve(AppSemanticColors.success, brightness),
           AppSemanticColors.resolveOn(AppSemanticColors.onSuccess, brightness)
@@ -483,7 +485,12 @@ class AppButton extends StatelessWidget {
       0,
     );
 
-    final labelColor = cs.onSurface;
+    // The gradient below is always the brand blue pair
+    // (primary -> primaryDark), which is dark in both light and dark
+    // themes. The label therefore uses the fixed light "on-primary"
+    // token; resolving it per-brightness would produce a dark label on
+    // the still-dark gradient.
+    const labelColor = AppSemanticColors.onPrimary;
     final labelShadow = Shadow(
       color: cs.surface.withValues(alpha: isDark ? 0.35 : 0.25),
       blurRadius: 4,
@@ -591,17 +598,17 @@ class AppButton extends StatelessWidget {
     BuildContext context,
     ColorScheme cs,
     Color mainColor,
+    Color onMainColor,
   ) {
     final tapHandler = isLoading ? null : onPressed;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final foreground = cs.onSurface;
+    // The icon and label sit on top of the semantic [mainColor] fill, so
+    // they must use that color's paired "on" token (white on success /
+    // error / neutral / primary, black on warning / info). Using
+    // ColorScheme.onSurface here produced dark text on dark fills in
+    // light mode and white text on lightened fills in dark mode.
+    final foreground = onMainColor;
     final disabledForeground = foreground.withValues(alpha: 0.38);
     final disabledBackground = mainColor.withValues(alpha: 0.12);
-    final textShadow = Shadow(
-      color: cs.surface.withValues(alpha: isDark ? 0.35 : 0.25),
-      blurRadius: 4,
-      offset: const Offset(0, 1),
-    );
 
     return FilledButton(
       onPressed: tapHandler,
@@ -617,12 +624,11 @@ class AppButton extends StatelessWidget {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         minimumSize: const Size(64, 64),
         textStyle: AppTypography.labelMedium(context).copyWith(
           fontWeight: FontWeight.w600,
           color: foreground,
-          shadows: [textShadow],
         ),
       ),
       child: ConstrainedBox(
@@ -631,14 +637,13 @@ class AppButton extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon!,
-              shadows: [textShadow],
-            ),
+            Icon(icon!),
             const SizedBox(height: Spacing.xs),
             Text(
               label!,
               textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),

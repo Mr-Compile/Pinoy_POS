@@ -1229,52 +1229,48 @@ class _StockHistoryDialog extends StatelessWidget {
                 ),
               )
             else
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(context).size.height * 0.5,
-                ),
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: history.length,
-                  separatorBuilder: (_, _) => const Divider(height: 1),
-                  itemBuilder: (context, index) {
-                    final entry = history[index];
-                    final opColor = _operationColor(entry.operation, cs);
-                    final diff = entry.newStock - entry.previousStock;
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: history.length,
+                separatorBuilder: (_, _) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final entry = history[index];
+                  final opColor = _operationColor(entry.operation, cs);
+                  final diff = entry.newStock - entry.previousStock;
 
-                    return ListTile(
-                      leading: Icon(
-                        entry.operation == StockOperationType.add
-                            ? Icons.add_circle
-                            : entry.operation == StockOperationType.sale
-                                ? Icons.shopping_cart
-                                : entry.operation == StockOperationType.adjust
-                                    ? Icons.tune
-                                    : Icons.undo,
-                        color: opColor,
-                        size: 28,
+                  return ListTile(
+                    leading: Icon(
+                      entry.operation == StockOperationType.add
+                          ? Icons.add_circle
+                          : entry.operation == StockOperationType.sale
+                              ? Icons.shopping_cart
+                              : entry.operation == StockOperationType.adjust
+                                  ? Icons.tune
+                                  : Icons.undo,
+                      color: opColor,
+                      size: 28,
+                    ),
+                    title: Text(
+                      '${_operationLabel(entry.operation)} ${entry.quantity > 0 ? '+' : ''}${entry.quantity}',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: Text(
+                      '${entry.previousStock} → ${entry.newStock} · ${_formatDate(entry.createdAt)}'
+                      '${entry.reason != null && entry.reason!.isNotEmpty ? '\n${entry.reason}' : ''}',
+                      style: AppTypography.bodySmall(context).copyWith(
+                        color: cs.onSurfaceVariant,
                       ),
-                      title: Text(
-                        '${_operationLabel(entry.operation)} ${entry.quantity > 0 ? '+' : ''}${entry.quantity}',
-                        style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    trailing: Text(
+                      diff >= 0 ? '+$diff' : '$diff',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: diff >= 0 ? cs.tertiary : cs.error,
                       ),
-                      subtitle: Text(
-                        '${entry.previousStock} → ${entry.newStock} · ${_formatDate(entry.createdAt)}'
-                        '${entry.reason != null && entry.reason!.isNotEmpty ? '\n${entry.reason}' : ''}',
-                        style: AppTypography.bodySmall(context).copyWith(
-                          color: cs.onSurfaceVariant,
-                        ),
-                      ),
-                      trailing: Text(
-                        diff >= 0 ? '+$diff' : '$diff',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: diff >= 0 ? cs.tertiary : cs.error,
-                        ),
-                      ),
-                    );
-                  },
-                ),
+                    ),
+                  );
+                },
               ),
           ],
         ),

@@ -26,10 +26,10 @@ class SplashScreen extends ConsumerStatefulWidget {
 
 class _SplashScreenState extends ConsumerState<SplashScreen> {
   /// Prevents multiple post-frame callbacks from triggering duplicate
-  /// `pushReplacement` calls. Duplicate navigations can cause the
-  /// Flutter framework to remove the same element from the inactive
-  /// list twice, which throws the `_elements.contains(element)`
-  /// assertion seen on app launch.
+  /// navigations. Duplicate navigations can cause the Flutter framework
+  /// to remove the same element from the inactive list twice, which
+  /// throws the `_elements.contains(element)` assertion seen on app
+  /// launch.
   bool _hasNavigated = false;
 
   @override
@@ -50,7 +50,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         if (current.isLoading) return;
 
         _hasNavigated = true;
-        AuthPhaseNavigator.pushReplacement(context, current.phase);
+        AuthPhaseNavigator.pushAndRemoveUntil(context, current.phase);
       });
     }
 

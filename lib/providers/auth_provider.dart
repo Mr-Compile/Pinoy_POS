@@ -140,8 +140,10 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
         // reload with the new user’s data.  Without this, the dashboard
         // and notification badge show stale data (or the "Not
         // authenticated" error left over from the previous logout).
-        _ref.invalidate(dashboardProvider);
-        _ref.invalidate(notificationCountProvider);
+        // Container-level: `dashboardProvider` watches `authStateProvider`,
+        // so element-level `_ref.invalidate` throws CircularDependencyError.
+        _ref.container.invalidate(dashboardProvider);
+        _ref.container.invalidate(notificationCountProvider);
       case LoginResult.invalidCredentials:
         state = state.copyWith(isLoading: false, error: 'Username or password is incorrect.');
       case LoginResult.inactiveAccount:
@@ -163,8 +165,8 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
           phase: AuthSessionPhase.fullyAuthenticated,
         );
         // Reload per-user cached state for the new session.
-        _ref.invalidate(dashboardProvider);
-        _ref.invalidate(notificationCountProvider);
+        _ref.container.invalidate(dashboardProvider);
+        _ref.container.invalidate(notificationCountProvider);
       } else {
         state = state.copyWith(isLoading: false, error: 'Incorrect username or PIN.');
       }
@@ -177,8 +179,14 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
 
   Future<void> logout() async {
     await _authService.logout();
-    _invalidateAllCachedProviders();
+    // Reset the auth state BEFORE invalidating cached providers. Any
+    // provider that recreates itself during invalidation must observe a
+    // fully cleared session (user == null, phase == unauthenticated);
+    // doing this after the invalidation would leave them reading a
+    // half-torn-down state where AuthState still holds the old user while
+    // the SessionManager singleton has already been cleared.
     state = AuthState();
+    _invalidateAllCachedProviders();
   }
 
   /// Transitions a fully authenticated session to the PIN-locked state.
@@ -243,8 +251,8 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
       );
       await _authService.setPinVerified(phase == AuthSessionPhase.fullyAuthenticated);
       // Reload per-user cached state after password change.
-      _ref.invalidate(dashboardProvider);
-      _ref.invalidate(notificationCountProvider);
+      _ref.container.invalidate(dashboardProvider);
+      _ref.container.invalidate(notificationCountProvider);
     }
     return result;
   }
@@ -261,8 +269,8 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
         error: null,
       );
       // Reload per-user cached state after PIN verification.
-      _ref.invalidate(dashboardProvider);
-      _ref.invalidate(notificationCountProvider);
+      _ref.container.invalidate(dashboardProvider);
+      _ref.container.invalidate(notificationCountProvider);
     }
     return result;
   }
@@ -271,33 +279,46 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
   /// Clears all temporary authentication/session state.
   Future<void> cancelPinFlow() async {
     await _authService.logout();
-    _invalidateAllCachedProviders();
+    // See [logout]: the auth state is cleared before cached providers are
+    // invalidated so they never observe a partially torn-down session.
     state = AuthState();
+    _invalidateAllCachedProviders();
   }
 
   /// Discards cached state tied to the current user. Called by [logout]
   /// and [cancelPinFlow] so the next session starts with fresh providers.
+  ///
+  /// Invalidation goes through [ProviderContainer.invalidate] rather than
+  /// [Ref.invalidate]: several of these providers (e.g. `dashboardProvider`)
+  /// `watch` `authStateProvider`, and the element-level `ref.invalidate`
+  /// throws `CircularDependencyError` for targets that depend on this
+  /// element. In debug builds that throw aborted logout before the auth
+  /// state was cleared. Container-level invalidation performs the same
+  /// invalidate without the caller-dependency check — this is safe here
+  /// because the relationship is one-way (dashboard watches auth; auth
+  /// never reads dashboard).
   void _invalidateAllCachedProviders() {
-    _ref.invalidate(productServiceProvider);
-    _ref.invalidate(categoryServiceProvider);
-    _ref.invalidate(salesServiceProvider);
-    _ref.invalidate(stockServiceProvider);
-    _ref.invalidate(activityLogServiceProvider);
-    _ref.invalidate(notificationServiceProvider);
-    _ref.invalidate(notificationCountProvider);
-    _ref.invalidate(settingsServiceProvider);
-    _ref.invalidate(reportServiceProvider);
-    _ref.invalidate(backupServiceProvider);
-    _ref.invalidate(aiUsageServiceProvider);
-    _ref.invalidate(aiAdvisorServiceProvider);
-    _ref.invalidate(aiAdvisorChatProvider);
-    _ref.invalidate(groqServiceProvider);
-    _ref.invalidate(trashServiceProvider);
-    _ref.invalidate(announcementServiceProvider);
-    _ref.invalidate(userServiceProvider);
-    _ref.invalidate(userControllerProvider);
-    _ref.invalidate(dashboardProvider);
-    _ref.invalidate(cartProvider);
+    final container = _ref.container;
+    container.invalidate(productServiceProvider);
+    container.invalidate(categoryServiceProvider);
+    container.invalidate(salesServiceProvider);
+    container.invalidate(stockServiceProvider);
+    container.invalidate(activityLogServiceProvider);
+    container.invalidate(notificationServiceProvider);
+    container.invalidate(notificationCountProvider);
+    container.invalidate(settingsServiceProvider);
+    container.invalidate(reportServiceProvider);
+    container.invalidate(backupServiceProvider);
+    container.invalidate(aiUsageServiceProvider);
+    container.invalidate(aiAdvisorServiceProvider);
+    container.invalidate(aiAdvisorChatProvider);
+    container.invalidate(groqServiceProvider);
+    container.invalidate(trashServiceProvider);
+    container.invalidate(announcementServiceProvider);
+    container.invalidate(userServiceProvider);
+    container.invalidate(userControllerProvider);
+    container.invalidate(dashboardProvider);
+    container.invalidate(cartProvider);
   }
 
   /// Called after the current user’s own record is edited (e.g. by

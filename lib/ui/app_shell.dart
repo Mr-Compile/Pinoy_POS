@@ -46,10 +46,17 @@ class _AppShellState extends ConsumerState<AppShell> {
       authStateProvider,
       (previous, next) {
         if (previous?.user?.id != next.user?.id) {
+          // This callback can fire while the shell is being removed during
+          // an auth-phase transition (e.g. logout). setState on an
+          // unmounted element throws, and jumpToPage throws when the
+          // PageView has not attached to the controller yet.
+          if (!mounted) return;
           setState(() {
             _selectedIndex = 0;
           });
-          _pageController.jumpToPage(0);
+          if (_pageController.hasClients) {
+            _pageController.jumpToPage(0);
+          }
           _updateCurrentDestination();
         }
       },

@@ -48,6 +48,9 @@ class _ForceChangePasswordScreenState
         // which may lead to framework assertion failures when the old
         // route is removed more than once.
         if (previous?.phase == next.phase) return;
+        // Skip navigation if this screen is mid-removal; the target
+        // screen pushed by the winning transition is already correct.
+        if (!mounted) return;
 
         if (next.phase == AuthSessionPhase.fullyAuthenticated ||
             next.phase == AuthSessionPhase.passwordAuthenticatedPendingPin ||

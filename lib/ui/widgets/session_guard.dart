@@ -131,16 +131,12 @@ class _SessionGuardState extends ConsumerState<SessionGuard>
       if (state.user!.hasPin) {
         _pushAuthPhaseAndUpdate(
           AuthSessionPhase.passwordAuthenticatedPendingPin,
-          () {
-            ref.read(authStateProvider.notifier).lockSession();
-          },
+          () => ref.read(authStateProvider.notifier).lockSession(),
         );
       } else {
         _pushAuthPhaseAndUpdate(
           AuthSessionPhase.unauthenticated,
-          () {
-            ref.read(authStateProvider.notifier).logout();
-          },
+          () => ref.read(authStateProvider.notifier).logout(),
         );
       }
       return;
@@ -149,40 +145,41 @@ class _SessionGuardState extends ConsumerState<SessionGuard>
     // Already on a PIN or forced-change screen; treat as full logout.
     _pushAuthPhaseAndUpdate(
       AuthSessionPhase.unauthenticated,
-      () {
-        ref.read(authStateProvider.notifier).logout();
-      },
+      () => ref.read(authStateProvider.notifier).logout(),
     );
   }
 
   void _handleSessionExpired() {
     _pushAuthPhaseAndUpdate(
       AuthSessionPhase.unauthenticated,
-      () {
-        ref.read(authStateProvider.notifier).logout();
-      },
+      () => ref.read(authStateProvider.notifier).logout(),
     );
   }
 
-  /// Pushes the target auth phase route before updating `AuthState`.
+  /// Settles `AuthState` first, then pushes the target auth-phase route.
   ///
-  /// This order prevents the existing `AppShell`/`SplashScreen` redirect logic
-  /// from racing with the session timeout.
+  /// The order matters: the pushed screen and every auth listener (the
+  /// `AppShell` redirect, the `PinLockScreen`/`ForceChangePasswordScreen`
+  /// subscriptions, and `LoginScreen`'s self-redirect) must observe the new
+  /// phase before the transition begins. Pushing first would let the new
+  /// screen build under the previous user's still-authenticated state and
+  /// could bounce (e.g. a fresh `LoginScreen` redirecting straight back to
+  /// the dashboard). If [updateState] throws, the navigation still runs so
+  /// the user is never stranded on an authenticated screen.
   void _pushAuthPhaseAndUpdate(
     AuthSessionPhase phase,
-    void Function() updateState,
+    Future<void> Function() updateState,
   ) {
-    final navigator = widget.navigatorKey.currentState;
-    if (navigator == null) {
-      updateState();
-      return;
-    }
-
-    navigator.pushAndRemoveUntil(
-      AuthPhaseNavigator.routeForPhase(phase),
-      (_) => false,
-    );
-    updateState();
+    unawaited(() async {
+      try {
+        await updateState();
+      } finally {
+        widget.navigatorKey.currentState?.pushAndRemoveUntil(
+          AuthPhaseNavigator.routeForPhase(phase),
+          (_) => false,
+        );
+      }
+    }());
   }
 
   @override
