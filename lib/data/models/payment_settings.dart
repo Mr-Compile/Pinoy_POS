@@ -42,11 +42,17 @@ class PaymentSettings {
   bool get paymentProofRequired => gcashPaymentProofRequirement == 'required';
   bool get paymentProofVisible => gcashPaymentProofRequirement != 'off';
 
+  /// Whether Staff-tendered GCash payments must be verified before the sale
+  /// is finalized. The Owner's own sales are never held for verification —
+  /// see [PaymentVerificationService.requiresVerificationFor].
   bool get verificationRequired => gcashVerificationMode != 'immediate';
 
-  bool get requiresOwnerVerification =>
-      gcashVerificationMode == 'owner' || gcashVerificationMode == 'owner_admin';
-
-  bool get requiresAdminVerification =>
-      gcashVerificationMode == 'admin' || gcashVerificationMode == 'owner_admin';
+  /// Whether a System Admin is an authorized verifier under the configured
+  /// mode. The Owner is always an authorized verifier while verification is
+  /// enabled. The legacy 'admin' mode is treated as 'owner_admin' because
+  /// an Admin-only configuration would leave sales unverifiable (the Owner
+  /// must always retain the ability to verify).
+  bool get adminCanVerify =>
+      gcashVerificationMode == 'admin' ||
+      gcashVerificationMode == 'owner_admin';
 }

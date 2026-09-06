@@ -20,6 +20,7 @@ import 'package:pinoy_pos/services/trash_service.dart';
 import 'package:pinoy_pos/services/announcement_service.dart';
 import 'package:pinoy_pos/services/user_service.dart';
 import 'package:pinoy_pos/services/image_service.dart';
+import 'package:pinoy_pos/services/payment_verification_service.dart';
 
 final productServiceProvider = Provider<ProductService>((ref) {
   return ProductService();
@@ -108,4 +109,9 @@ final userServiceProvider = Provider<UserService>((ref) {
 
 final imageServiceProvider = Provider<ImageService>((ref) {
   return ImageService();
+});
+
+final paymentVerificationServiceProvider =
+    Provider<PaymentVerificationService>((ref) {
+  return PaymentVerificationService();
 });

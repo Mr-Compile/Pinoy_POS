@@ -8,6 +8,7 @@ import 'package:pinoy_pos/core/auth_navigation.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/services/session_settings_service.dart';
 import 'package:pinoy_pos/services/session_timeout_service.dart';
+import 'package:pinoy_pos/ui/dialogs/session_expiring_dialog.dart';
 
 /// Root-level widget that watches user input and app lifecycle to enforce
 /// inactivity and absolute session expiry.
@@ -33,6 +34,11 @@ class _SessionGuardState extends ConsumerState<SessionGuard>
   late final SessionTimeoutService _sessionTimeoutService;
   late final ProviderSubscription<AuthState> _authSubscription;
 
+  /// The currently displayed session-expiry warning route, if any.
+  /// Tracked so the warning can never be shown twice and can be removed
+  /// precisely (e.g. when the session ends while the dialog is up).
+  DialogRoute<void>? _warningRoute;
+
   @override
   void initState() {
     super.initState();
@@ -44,6 +50,7 @@ class _SessionGuardState extends ConsumerState<SessionGuard>
       sessionSettingsService: SessionSettingsService(),
       onInactivityTimeout: _handleInactivityTimeout,
       onSessionExpired: _handleSessionExpired,
+      onWarning: _handleSessionWarning,
     );
 
     _authSubscription = ref.listenManual(
@@ -118,6 +125,56 @@ class _SessionGuardState extends ConsumerState<SessionGuard>
         next.user!,
         resetActivity: next.phase != AuthSessionPhase.fullyAuthenticated,
       ),
+    );
+  }
+
+  /// Shows the "Session Expiring" modal on the root navigator.
+  ///
+  /// The guard lives above the [Navigator] (it is the `MaterialApp.builder`
+  /// wrapper), so the dialog must be pushed directly on
+  /// [GlobalKey<NavigatorState>.currentState] — `Navigator.of` from the
+  /// guard's own context cannot reach the navigator below it.
+  ///
+  /// The dialog is a pure view of the service's state: the countdown is
+  /// computed from the absolute [SessionTimeoutService.inactivityDeadlineAt]
+  /// and the service's own warning timer fires the actual timeout, so
+  /// suspending/resuming the app cannot drift the countdown or strand the
+  /// dialog. Any auth-phase navigation ([pushAndRemoveUntil]) removes the
+  /// dialog route along with the rest of the stack.
+  void _handleSessionWarning() {
+    if (!mounted || _warningRoute != null) return;
+
+    final navigator = widget.navigatorKey.currentState;
+    final navigatorContext = widget.navigatorKey.currentContext;
+    final deadline = _sessionTimeoutService.inactivityDeadlineAt;
+    if (navigator == null || navigatorContext == null || deadline == null) {
+      return;
+    }
+
+    final route = DialogRoute<void>(
+      context: navigatorContext,
+      barrierDismissible: false,
+      builder: (_) => SessionExpiringDialog(
+        deadline: deadline,
+        warningDuration: _sessionTimeoutService.warningThreshold,
+        onContinue: _sessionTimeoutService.continueSession,
+        onLogout: _handleWarningLogout,
+      ),
+    );
+    _warningRoute = route;
+    unawaited(navigator.push(route).whenComplete(() {
+      _warningRoute = null;
+    }));
+  }
+
+  /// "Log Out" from the warning dialog — a full logout, not a PIN lock.
+  /// Idempotent: [endSession] and the auth-phase navigation both tolerate
+  /// being driven more than once.
+  void _handleWarningLogout() {
+    unawaited(_sessionTimeoutService.endSession());
+    _pushAuthPhaseAndUpdate(
+      AuthSessionPhase.unauthenticated,
+      () => ref.read(authStateProvider.notifier).logout(),
     );
   }
 

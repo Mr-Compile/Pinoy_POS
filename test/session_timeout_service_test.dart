@@ -32,12 +32,17 @@ class _FakeAuthService extends AuthService {
 }
 
 class _FakeSessionSettingsService extends SessionSettingsService {
-  _FakeSessionSettingsService(this._timeout);
+  _FakeSessionSettingsService(this._timeout,
+      {this._warning = Duration.zero});
 
   final Duration _timeout;
+  final Duration _warning;
 
   @override
   Future<Duration> getEffectiveInactivityTimeout(User user) async => _timeout;
+
+  @override
+  Future<Duration> getEffectiveWarningThreshold(User user) async => _warning;
 }
 
 void main() {
@@ -69,6 +74,7 @@ void main() {
           sessionSettingsService: settings,
           onInactivityTimeout: () => fired = true,
           onSessionExpired: () {},
+          onWarning: () {},
           clock: clock.now,
         );
 
@@ -99,6 +105,7 @@ void main() {
           sessionSettingsService: settings,
           onInactivityTimeout: () => fired = true,
           onSessionExpired: () {},
+          onWarning: () {},
           clock: clock.now,
         );
 
@@ -135,6 +142,7 @@ void main() {
           sessionSettingsService: settings,
           onInactivityTimeout: () {},
           onSessionExpired: () => expired = true,
+          onWarning: () {},
           clock: clock.now,
         );
 
@@ -165,6 +173,7 @@ void main() {
           sessionSettingsService: settings,
           onInactivityTimeout: () => locked = true,
           onSessionExpired: () {},
+          onWarning: () {},
           clock: clock.now,
         );
 
@@ -200,6 +209,7 @@ void main() {
           sessionSettingsService: settings,
           onInactivityTimeout: () {},
           onSessionExpired: () => expired = true,
+          onWarning: () {},
           clock: clock.now,
         );
 
@@ -233,6 +243,7 @@ void main() {
           sessionSettingsService: settings,
           onInactivityTimeout: () {},
           onSessionExpired: () {},
+          onWarning: () {},
           clock: clock.now,
         );
 
@@ -264,6 +275,7 @@ void main() {
           sessionSettingsService: settings,
           onInactivityTimeout: () => fired = true,
           onSessionExpired: () {},
+          onWarning: () {},
           clock: clock.now,
         );
 
@@ -275,6 +287,185 @@ void main() {
 
         async.elapse(const Duration(minutes: 2));
         expect(fired, isFalse);
+      });
+    });
+
+    test('warning fires at the threshold and timeout still fires at the '
+        'deadline', () {
+      fakeAsync((async) {
+        final now = clock.now();
+        final metadata = SessionMetadata(
+          userId: 1,
+          sessionExpiresAt: now.add(const Duration(minutes: 10)),
+          lastActivityAt: now,
+          pinVerified: true,
+        );
+        final auth = _FakeAuthService(metadata);
+        final settings = _FakeSessionSettingsService(
+          const Duration(minutes: 1),
+          warning: const Duration(seconds: 30),
+        );
+        bool warned = false;
+        bool fired = false;
+
+        final service = SessionTimeoutService(
+          authService: auth,
+          sessionSettingsService: settings,
+          onInactivityTimeout: () => fired = true,
+          onSessionExpired: () {},
+          onWarning: () => warned = true,
+          clock: clock.now,
+        );
+
+        unawaited(service.startSession(user, resetActivity: true));
+        async.flushMicrotasks();
+
+        expect(service.isWarningActive, isFalse);
+        expect(service.inactivityDeadlineAt, isNotNull);
+        expect(service.warningThreshold, const Duration(seconds: 30));
+
+        // Warning fires when 30 seconds remain.
+        async.elapse(const Duration(seconds: 30));
+        expect(warned, isTrue);
+        expect(fired, isFalse);
+        expect(service.isWarningActive, isTrue);
+
+        // Timeout still fires at the full deadline.
+        async.elapse(const Duration(seconds: 30));
+        expect(fired, isTrue);
+        expect(service.isWarningActive, isFalse);
+      });
+    });
+
+    test('activity during the warning window does not reset the session', () {
+      fakeAsync((async) {
+        final now = clock.now();
+        final metadata = SessionMetadata(
+          userId: 1,
+          sessionExpiresAt: now.add(const Duration(minutes: 10)),
+          lastActivityAt: now,
+          pinVerified: true,
+        );
+        final auth = _FakeAuthService(metadata);
+        final settings = _FakeSessionSettingsService(
+          const Duration(minutes: 1),
+          warning: const Duration(seconds: 30),
+        );
+        bool fired = false;
+
+        final service = SessionTimeoutService(
+          authService: auth,
+          sessionSettingsService: settings,
+          onInactivityTimeout: () => fired = true,
+          onSessionExpired: () {},
+          onWarning: () {},
+          clock: clock.now,
+        );
+
+        unawaited(service.startSession(user, resetActivity: true));
+        async.flushMicrotasks();
+
+        // Enter the warning window, then interact — the warning must stay
+        // active and the deadline must not move.
+        async.elapse(const Duration(seconds: 31));
+        expect(service.isWarningActive, isTrue);
+
+        service.userDidInteract();
+        service.userDidInteract();
+        async.elapse(const Duration(seconds: 10));
+        service.userDidInteract();
+
+        // The session still ends at the original deadline.
+        async.elapse(const Duration(seconds: 20));
+        expect(fired, isTrue);
+      });
+    });
+
+    test('continueSession ends the warning and restores the full timeout',
+        () {
+      fakeAsync((async) {
+        final now = clock.now();
+        final metadata = SessionMetadata(
+          userId: 1,
+          sessionExpiresAt: now.add(const Duration(minutes: 10)),
+          lastActivityAt: now,
+          pinVerified: true,
+        );
+        final auth = _FakeAuthService(metadata);
+        final settings = _FakeSessionSettingsService(
+          const Duration(minutes: 1),
+          warning: const Duration(seconds: 30),
+        );
+        int warnings = 0;
+        bool fired = false;
+
+        final service = SessionTimeoutService(
+          authService: auth,
+          sessionSettingsService: settings,
+          onInactivityTimeout: () => fired = true,
+          onSessionExpired: () {},
+          onWarning: () => warnings++,
+          clock: clock.now,
+        );
+
+        unawaited(service.startSession(user, resetActivity: true));
+        async.flushMicrotasks();
+
+        async.elapse(const Duration(seconds: 31));
+        expect(service.isWarningActive, isTrue);
+
+        // Continuing at t=31 restores the full 60s timeout: new deadline
+        // t=91, next warning at t=61.
+        service.continueSession();
+        expect(service.isWarningActive, isFalse);
+
+        async.elapse(const Duration(seconds: 29)); // t=60
+        expect(warnings, 1);
+        expect(fired, isFalse);
+
+        // The warning fires again only inside the new window.
+        async.elapse(const Duration(seconds: 2)); // t=62
+        expect(warnings, 2);
+        expect(fired, isFalse);
+
+        async.elapse(const Duration(seconds: 28)); // t=90
+        expect(fired, isFalse);
+        async.elapse(const Duration(seconds: 2)); // t=92 — past deadline
+        expect(fired, isTrue);
+      });
+    });
+
+    test('a zero warning threshold produces no warning phase', () {
+      fakeAsync((async) {
+        final now = clock.now();
+        final metadata = SessionMetadata(
+          userId: 1,
+          sessionExpiresAt: now.add(const Duration(minutes: 10)),
+          lastActivityAt: now,
+          pinVerified: true,
+        );
+        final auth = _FakeAuthService(metadata);
+        final settings = _FakeSessionSettingsService(
+          const Duration(minutes: 1),
+        );
+        bool warned = false;
+        bool fired = false;
+
+        final service = SessionTimeoutService(
+          authService: auth,
+          sessionSettingsService: settings,
+          onInactivityTimeout: () => fired = true,
+          onSessionExpired: () {},
+          onWarning: () => warned = true,
+          clock: clock.now,
+        );
+
+        unawaited(service.startSession(user, resetActivity: true));
+        async.flushMicrotasks();
+
+        async.elapse(const Duration(minutes: 1));
+        expect(warned, isFalse);
+        expect(fired, isTrue);
       });
     });
   });

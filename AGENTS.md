@@ -529,3 +529,144 @@ flutter test --concurrency=1
 ```
 
 Result: `flutter analyze` reports no issues. The full test suite passes 305/305 tests when run with `--concurrency=1` on Windows. The default parallel runner can hit `database is locked` errors in the integration tests because multiple test suites share the same `sqflite_common_ffi` database file on disk. Use `--concurrency=1` for a clean full run; targeted widget and unit tests run cleanly without it.
+
+## POS Payment Riverpod Crash + At-Till GCash Verification
+
+### Root Cause
+
+`_PaymentDialogState.initState()` called `ref.invalidate(paymentSettingsProvider)`. In flutter_riverpod 2.6.x, `ref.invalidate` on a `ConsumerState` resolves the lazy `ConsumerStatefulElement._container` via `ProviderScope.containerOf(context)` with `listen: true`, which calls `dependOnInheritedWidgetOfExactType<UncontrolledProviderScope>()`. Inherited-widget dependency registration is illegal before `initState()` completes, so the dialog crashed on open. `ref.read`/`ref.refresh` are safe in `initState` because they resolve the container with `listen: false`.
+
+Separately, the GCash verification model was inconsistent:
+
+1. `gcash_verification_mode != immediate` marked **every** GCash sale `pending`, including the Owner's own sales, forcing the Owner to self-verify.
+2. The `admin` and `owner_admin` modes were dead configuration: the System Admin lacked `verify_payments` (and has no `view_sales`/POS access), so only an Owner could ever confirm a pending sale.
+3. The payment-settings dropdown conflated "who must verify" with "who can verify".
+
+### Changes Made
+
+- `lib/ui/screens/pos_screen.dart`
+  - Removed `ref.invalidate` from `_PaymentDialogState.initState()`.
+  - `_checkout()` now invalidates `paymentSettingsProvider` in the event handler before `showDialog`, preserving "fresh settings on each open" without a lifecycle violation.
+
+- `lib/services/payment_verification_service.dart` (new)
+  - Single authority for the verification policy. Distinguishes **operator** (the logged-in user tendering the sale) from **verifier** (who may approve).
+  - `requiresVerificationFor(operatorRole, paymentMethod, settings)`: GCash only; `UserRole.owner` is always exempt; other operators require verification only when the policy is enabled.
+  - `canRoleVerify(role, settings)`: Owner always verifies; System Admin verifies when `adminCanVerify`.
+  - `authenticateVerifier(username, password, settings)`: validates a verifier's own credentials **without** changing the session (at-till approval). Generic "incorrect username or password" for credential failures; explicit "not authorized" for valid credentials with the wrong role; self-verification is rejected.
+
+- `lib/ui/dialogs/gcash_verification_dialog.dart` (new)
+  - `showGcashVerificationDialog` uses `AppDialogForm` + `ModalResult<User>`; shows amount, operator, and method; collects verifier username/password; cancel/dismiss returns cancelled so the caller aborts without touching the cart.
+
+- `lib/services/sales_service.dart`
+  - `createSale` accepts `verifiedByUserId`. When the operator requires verification, a missing or unauthorized verifier throws `PaymentValidationException` **before** the sale is inserted — no pending row, no stock deduction, cart preserved. On success the sale is `confirmed` with `verified_at`/`verified_by` set.
+  - New sales are never created as `pending`; `getPendingPayments`/`confirmGcashPayment`/`rejectGcashPayment` remain for legacy pending rows.
+  - `_canVerify` delegates to `PaymentVerificationService.currentUserCanVerify`.
+
+- `lib/data/models/payment_settings.dart`
+  - Removed `requiresOwnerVerification`/`requiresAdminVerification`; added `adminCanVerify` (legacy `admin` is treated as `owner_admin`).
+
+- `lib/core/session_manager.dart`
+  - `_systemAdminPermissions` now includes `verify_payments` so the Admin can act as an at-till verifier when the policy allows. Admin still cannot view sales.
+
+- `lib/ui/screens/gcash_payment_screen.dart`
+  - `_completeSale` runs the verification gate before `createSale`; a cancelled dialog returns to the review step with cart/proof intact.
+  - The review banner now reflects the actual policy for the current operator and names the authorized verifier roles.
+
+- `lib/ui/screens/payment_settings_page.dart`
+  - Replaced the four-option dropdown with a "Verify staff GCash sales" toggle plus a "Who can verify" dropdown (`Owner only` / `Owner or System Admin`). This is the single authoritative verification policy; the Owner never appears as someone who must verify their own sale.
+
+- `lib/core/database.dart` / `lib/core/constants.dart`
+  - Database version bumped to 22. v22 migration normalizes `gcash_verification_mode = 'admin'` to `'owner_admin'`. Valid stored values: `immediate`, `owner`, `owner_admin`.
+
+- `test/gcash_payment_service_test.dart`
+  - New coverage: owner exemption, staff-requires-verifier (throws, no sale, no stock movement), staff+verifier confirmed, unauthorized/owner-only verifier rejection, `authenticateVerifier` accept/reject matrix.
+  - Legacy pending confirm/reject tests now seed pending rows directly via `SaleRepository`/`SaleItemRepository` since `createSale` no longer creates pending sales.
+
+### Verification
+
+```powershell
+flutter analyze
+flutter test
+```
+
+Result: `flutter analyze` reports no issues; `flutter test` passes 312/312 tests.
+
+### Flow Summary
+
+```text
+OWNER
+POS → GCash → Confirm → DONE (no verification)
+
+STAFF
+POS → GCash → Verify (Owner/Admin credentials) → APPROVED → DONE
+                                    ↓
+                            REJECT/CANCEL → NO SALE, CART REMAINS
+```
+
+
+## Dynamic Session Timeout & Expiry Warning
+
+### What Was Already in Place
+
+- `SessionTimeoutService` is the single timer authority: one inactivity timer and one absolute-expiry timer, both computed from wall-clock timestamps (`lastActivityAt`, `sessionExpiresAt` from persisted `SessionMetadata`). Lifecycle pause persists `lastActivityAt` and cancels timers; resume recomputes from the wall clock.
+- `SessionGuard` (root widget in `MaterialApp.builder`) captures global pointer + keyboard input and auth changes via `ref.listenManual`.
+- `settings.inactivity_timeout_minutes` (v21) is editable in Settings > Security; Admin and Owner both hold `edit_settings`. A per-user override (`users.inactivity_timeout_minutes`) wins over the store default.
+
+### Changes Made
+
+- `lib/services/session_timeout_service.dart`
+  - Added a warning phase between "idle" and "expired": the inactivity timer now fires at `timeout - warningThreshold`, enters the warning window (`onWarning` callback), and arms a final countdown timer that fires `onInactivityTimeout` at the absolute deadline.
+  - `userDidInteract` is ignored while the warning is active — the countdown requires an explicit choice; stray taps/keys do not silently extend the session.
+  - `continueSession()` clears the warning, resets the inactivity clock to the full configured timeout, and persists the new activity timestamp.
+  - `isWarningActive` / `inactivityDeadlineAt` exposed for the UI.
+  - All timers cancelled together; `endSession` and lifecycle pause clear the warning flag.
+
+- `lib/services/session_settings_service.dart`
+  - `getWarningThreshold()` reads `settings.session_warning_seconds` (default 30).
+  - `getEffectiveWarningThreshold(user)` clamps the warning below the effective inactivity timeout (a warning can never be >= the timeout; returns zero when there is no room).
+
+- `lib/data/models/settings.dart` / `lib/core/database.dart` / `lib/core/constants.dart`
+  - New `session_warning_seconds INTEGER NOT NULL DEFAULT 30` column (v23 migration, try/catch idempotent; also added to the `settings` CREATE TABLE). `databaseVersion` bumped to 23.
+  - `Settings.sessionWarningSeconds` (default 30) plumbed through `toMap`/`fromMap`/`copyWith`.
+
+- `lib/ui/widgets/app_countdown_ring.dart` (new)
+  - Reusable circular countdown indicator: full-track + remaining-arc
+    `CircularProgressIndicator` pair with a centered label, warning-semantic
+    color, theme-aware track. Pure view — owns no timer; callers pass the
+    remaining fraction (0.0–1.0).
+
+- `lib/ui/dialogs/session_expiring_dialog.dart` (new)
+  - "Session Expiring" modal on the existing `AppDialog` design (warning type, non-dismissible, no close button).
+  - A single 250 ms ticker recomputes the remaining time from the absolute deadline; the same value drives both the centered number (ceil to whole seconds, singular/plural label) and the `AppCountdownRing` arc (remaining / warning-window fraction). Suspend/resume safe.
+  - `Semantics` live region, "Continue Session" (primary) and "Log Out" (destructive) actions. `clock` is injectable for tests.
+
+- `lib/ui/widgets/session_guard.dart`
+  - `onWarning` pushes a `DialogRoute` directly on `navigatorKey.currentState` (the guard sits *above* the root navigator, so `Navigator.of` cannot reach it).
+  - The route is tracked in `_warningRoute` so the dialog can never be shown twice; it self-pops via its buttons or when the countdown reaches zero, and any auth-phase `pushAndRemoveUntil` removes it with the rest of the stack.
+  - "Log Out" performs a full logout (not a PIN lock) through the existing `_pushAuthPhaseAndUpdate`/`logout()` path; "Continue Session" calls `continueSession()`.
+
+- `lib/ui/screens/settings/security_settings_page.dart`
+  - New "Session warning" tile + edit dialog (seconds, validated >= 5 and < the inactivity timeout), same `edit_settings` gate as the timeout tile.
+
+- `test/session_timeout_service_test.dart`
+  - `_FakeSessionSettingsService` accepts a `warning` duration; all constructors updated for the new `onWarning` callback.
+  - New tests: warning fires at threshold then timeout at deadline; activity during warning does not reset; `continueSession` restores the full timeout; zero threshold skips the warning phase.
+
+- `test/session_expiring_dialog_test.dart` (new)
+  - Widget tests for the warning modal: full/half ring fractions, singular "1 second" label, Continue/Log Out dismissal + callbacks (deterministic via the injected `clock`).
+
+### Behaviour
+
+- Timeout and warning are configured per store (`settings`) with optional per-user timeout override; changes apply to new sessions and the next timer restart.
+- Activity = global pointer + keyboard input; navigation/scrolls count; provider rebuilds do not.
+- Warning appears at the configured threshold (default 30s) before expiry; countdown is absolute-time based.
+- Manual logout, PIN lock, and the 8-hour absolute lifetime are unchanged.
+
+### Verification
+
+```powershell
+flutter analyze
+flutter test
+```
+
+Result: `flutter analyze` reports no issues; `flutter test` passes 321/321 tests (11/11 in `session_timeout_service_test.dart`, 5/5 in `session_expiring_dialog_test.dart`).

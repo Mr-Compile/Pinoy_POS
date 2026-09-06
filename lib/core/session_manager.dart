@@ -127,6 +127,11 @@ class SessionManager {
   /// POS, products, categories, stock, sales, business reports, business
   /// analytics, or announcements.
   ///
+  /// `verify_payments` is granted so the Admin can act as an authorized
+  /// verifier for Staff-tendered GCash payments at the point of sale (when
+  /// the configured verification policy includes Admin). It does not grant
+  /// access to the sales list or sale detail screens.
+  ///
   /// AI access: Admin can CONFIGURE the Groq AI integration
   /// (`manage_ai_config`) and USE the AI System Assistant (`use_ai_advisor`)
   /// for system administration insights. Admin cannot see business sales or
@@ -145,6 +150,7 @@ class SessionManager {
     'manage_ai_config',
     'view_ai_advisor',
     'use_ai_advisor',
+    'verify_payments',
     'view_trash',
     'restore_trash',
     'view_activity_logs',

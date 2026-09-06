@@ -10,10 +10,16 @@ import 'package:pinoy_pos/core/payment_validation_exception.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/data/models/product.dart';
+import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/data/models/sale_item.dart';
 import 'package:pinoy_pos/data/models/user.dart';
+import 'package:pinoy_pos/data/repositories/product_repository.dart';
+import 'package:pinoy_pos/data/repositories/sale_item_repository.dart';
+import 'package:pinoy_pos/data/repositories/sale_repository.dart';
+import 'package:pinoy_pos/data/repositories/user_repository.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
 import 'package:pinoy_pos/services/category_service.dart';
+import 'package:pinoy_pos/services/payment_verification_service.dart';
 import 'package:pinoy_pos/services/product_service.dart';
 import 'package:pinoy_pos/services/receipt_service.dart';
 import 'package:pinoy_pos/services/sales_service.dart';
@@ -22,8 +28,10 @@ import 'package:pinoy_pos/services/settings_service.dart';
 /// Integration tests for the GCash payment flow.
 ///
 /// - Owner creates a product and category, logs in, and sets payment rules.
-/// - Staff creates a GCash sale.
-/// - Owner/Admin confirms or rejects pending GCash payments.
+/// - Staff creates a GCash sale (requires an authorized verifier when the
+///   verification policy is enabled; the Owner's own sales never require
+///   verification).
+/// - Owner/Admin confirms or rejects legacy pending GCash payments.
 /// - Duplicate references and validation rules are rejected.
 void main() {
   setUpAll(() {
@@ -184,9 +192,47 @@ void main() {
       );
     });
 
-    test('creates a pending GCash sale when verification mode requires it',
-        () async {
-      await login('owner', 'owner123');
+    /// Inserts a legacy-style pending GCash sale directly (with its items)
+    /// and deducts stock to simulate a held sale. Used to cover the
+    /// confirm/reject flow for rows created before at-till verification.
+    Future<int> seedPendingSale({
+      required int productId,
+      required int quantity,
+      required double unitPrice,
+      required int operatorUserId,
+      required String reference,
+    }) async {
+      final productRepository = ProductRepository();
+      final product = (await productRepository.getById(productId))!;
+      await productRepository.updateStock(
+          productId, product.stock - quantity);
+
+      final saleId = await SaleRepository().insert(Sale(
+        totalAmount: unitPrice * quantity,
+        cashReceived: unitPrice * quantity,
+        change: 0,
+        paymentMethod: 'GCash',
+        paymentStatus: 'pending',
+        referenceNumber: reference,
+        userId: operatorUserId,
+        createdAt: DateTime.now(),
+        receiptNumber: 'RCP-TEST-$reference',
+      ));
+
+      await SaleItemRepository().insert(SaleItem(
+        saleId: saleId,
+        productId: productId,
+        quantity: quantity,
+        unitPrice: unitPrice,
+        totalPrice: unitPrice * quantity,
+      ));
+
+      return saleId;
+    }
+
+    test('owner GCash sale is confirmed immediately even when verification '
+        'is enabled', () async {
+      final owner = await login('owner', 'owner123');
       final productService = ProductService();
       final categoryService = CategoryService();
       final salesService = SalesService();
@@ -211,19 +257,293 @@ void main() {
         items: items,
         totalAmount: 50.0,
         paymentMethod: 'GCash',
-        referenceNumber: 'GCASH-PENDING-001',
+        referenceNumber: 'GCASH-OWNER-001',
       );
 
       expect(success, isTrue);
 
-      final sales = await salesService.getPendingPayments();
-      expect(sales, isNotEmpty);
-      expect(sales.first.paymentStatus, 'pending');
-      expect(sales.first.referenceNumber, 'GCASH-PENDING-001');
+      final sale = (await salesService.getSales()).first;
+      // The Owner is the operator: no verification, no pending state.
+      expect(sale.paymentStatus, 'confirmed');
+      expect(sale.verifiedBy, isNull);
+      expect(sale.userId, owner.id);
+      expect(await salesService.getPendingPayments(), isEmpty);
     });
 
-    test('owner can confirm a pending GCash sale and deduct stock', () async {
+    test('staff GCash sale requires an authorized verifier when '
+        'verification is enabled', () async {
       await login('owner', 'owner123');
+      final productService = ProductService();
+      final categoryService = CategoryService();
+      final salesService = SalesService();
+      final settingsService = SettingsService();
+
+      final currentSettings = await settingsService.getSettings();
+      await settingsService.updateSettings(
+        currentSettings.copyWith(gcashVerificationMode: 'owner_admin'),
+      );
+
+      final productId = await createProduct(productService, categoryService);
+      final productBefore =
+          (await productService.getProductById(productId))!;
+
+      SessionManager.resetForTest();
+      await login('staff', 'staff123');
+
+      final items = [
+        SaleItem(
+          productId: productId,
+          quantity: 1,
+          unitPrice: 50.0,
+          totalPrice: 50.0,
+        ),
+      ];
+
+      // No verifier was supplied: the sale must not be created.
+      expect(
+        () => salesService.createSale(
+          items: items,
+          totalAmount: 50.0,
+          paymentMethod: 'GCash',
+          referenceNumber: 'GCASH-STAFF-NOVERIFIER',
+        ),
+        throwsA(isA<PaymentValidationException>()),
+      );
+
+      // No sale, no stock movement.
+      expect(await salesService.getSales(), isEmpty);
+      expect(
+        (await productService.getProductById(productId))!.stock,
+        productBefore.stock,
+      );
+    });
+
+    test('staff GCash sale is confirmed when an authorized verifier '
+        'approves', () async {
+      final owner = await login('owner', 'owner123');
+      final productService = ProductService();
+      final categoryService = CategoryService();
+      final salesService = SalesService();
+      final settingsService = SettingsService();
+
+      final currentSettings = await settingsService.getSettings();
+      await settingsService.updateSettings(
+        currentSettings.copyWith(gcashVerificationMode: 'owner_admin'),
+      );
+
+      final productId = await createProduct(productService, categoryService);
+      final productBefore =
+          (await productService.getProductById(productId))!;
+
+      SessionManager.resetForTest();
+      final staff = await login('staff', 'staff123');
+
+      final items = [
+        SaleItem(
+          productId: productId,
+          quantity: 2,
+          unitPrice: 50.0,
+          totalPrice: 100.0,
+        ),
+      ];
+
+      final success = await salesService.createSale(
+        items: items,
+        totalAmount: 100.0,
+        paymentMethod: 'GCash',
+        referenceNumber: 'GCASH-STAFF-VERIFIED',
+        verifiedByUserId: owner.id,
+      );
+
+      expect(success, isTrue);
+
+      final sale = (await salesService.getSales()).first;
+      expect(sale.paymentStatus, 'confirmed');
+      expect(sale.verifiedBy, owner.id);
+      expect(sale.verifiedAt, isNotNull);
+      expect(sale.userId, staff.id);
+
+      final productAfter =
+          (await productService.getProductById(productId))!;
+      expect(productAfter.stock, productBefore.stock - 2);
+    });
+
+    test('staff GCash sale is rejected when the verifier is not authorized',
+        () async {
+      await login('owner', 'owner123');
+      final productService = ProductService();
+      final categoryService = CategoryService();
+      final salesService = SalesService();
+      final settingsService = SettingsService();
+
+      final currentSettings = await settingsService.getSettings();
+      await settingsService.updateSettings(
+        currentSettings.copyWith(gcashVerificationMode: 'owner_admin'),
+      );
+
+      final productId = await createProduct(productService, categoryService);
+      final staffUser =
+          (await UserRepository().getByUsername('staff'))!;
+
+      SessionManager.resetForTest();
+      await login('staff', 'staff123');
+
+      final items = [
+        SaleItem(
+          productId: productId,
+          quantity: 1,
+          unitPrice: 50.0,
+          totalPrice: 50.0,
+        ),
+      ];
+
+      // A Staff account is not an authorized verifier.
+      expect(
+        () => salesService.createSale(
+          items: items,
+          totalAmount: 50.0,
+          paymentMethod: 'GCash',
+          referenceNumber: 'GCASH-STAFF-BADVERIFIER',
+          verifiedByUserId: staffUser.id,
+        ),
+        throwsA(isA<PaymentValidationException>()),
+      );
+
+      expect(await salesService.getSales(), isEmpty);
+    });
+
+    test('admin can verify a staff GCash sale when the policy allows',
+        () async {
+      await login('owner', 'owner123');
+      final productService = ProductService();
+      final categoryService = CategoryService();
+      final salesService = SalesService();
+      final settingsService = SettingsService();
+
+      final currentSettings = await settingsService.getSettings();
+      await settingsService.updateSettings(
+        currentSettings.copyWith(gcashVerificationMode: 'owner_admin'),
+      );
+
+      final productId = await createProduct(productService, categoryService);
+      final adminUser =
+          (await UserRepository().getByUsername('admin'))!;
+
+      SessionManager.resetForTest();
+      await login('staff', 'staff123');
+
+      final success = await salesService.createSale(
+        items: [
+          SaleItem(
+            productId: productId,
+            quantity: 1,
+            unitPrice: 50.0,
+            totalPrice: 50.0,
+          ),
+        ],
+        totalAmount: 50.0,
+        paymentMethod: 'GCash',
+        referenceNumber: 'GCASH-ADMIN-VERIFIED',
+        verifiedByUserId: adminUser.id,
+      );
+
+      expect(success, isTrue);
+      final sale = (await salesService.getSales()).first;
+      expect(sale.paymentStatus, 'confirmed');
+      expect(sale.verifiedBy, adminUser.id);
+    });
+
+    test('admin cannot verify when the policy is Owner only', () async {
+      await login('owner', 'owner123');
+      final productService = ProductService();
+      final categoryService = CategoryService();
+      final salesService = SalesService();
+      final settingsService = SettingsService();
+
+      final currentSettings = await settingsService.getSettings();
+      await settingsService.updateSettings(
+        currentSettings.copyWith(gcashVerificationMode: 'owner'),
+      );
+
+      final productId = await createProduct(productService, categoryService);
+      final adminUser =
+          (await UserRepository().getByUsername('admin'))!;
+
+      SessionManager.resetForTest();
+      await login('staff', 'staff123');
+
+      expect(
+        () => salesService.createSale(
+          items: [
+            SaleItem(
+              productId: productId,
+              quantity: 1,
+              unitPrice: 50.0,
+              totalPrice: 50.0,
+            ),
+          ],
+          totalAmount: 50.0,
+          paymentMethod: 'GCash',
+          referenceNumber: 'GCASH-ADMIN-OWNERONLY',
+          verifiedByUserId: adminUser.id,
+        ),
+        throwsA(isA<PaymentValidationException>()),
+      );
+    });
+
+    test('authenticateVerifier accepts an authorized verifier and rejects '
+        'others', () async {
+      await login('owner', 'owner123');
+      final settingsService = SettingsService();
+      final verificationService = PaymentVerificationService();
+
+      final currentSettings = await settingsService.getSettings();
+      await settingsService.updateSettings(
+        currentSettings.copyWith(gcashVerificationMode: 'owner_admin'),
+      );
+      final paymentSettings =
+          await settingsService.getPaymentSettings();
+
+      // The operator is Staff; verifiers approve the staff sale at the till.
+      SessionManager.resetForTest();
+      await login('staff', 'staff123');
+
+      // Owner credentials authenticate as a verifier.
+      final ownerResult = await verificationService.authenticateVerifier(
+        username: 'owner',
+        password: 'owner123',
+        settings: paymentSettings,
+      );
+      expect(ownerResult.isSuccess, isTrue);
+
+      // Admin credentials authenticate when the policy includes Admin.
+      final adminResult = await verificationService.authenticateVerifier(
+        username: 'admin',
+        password: 'admin123',
+        settings: paymentSettings,
+      );
+      expect(adminResult.isSuccess, isTrue);
+
+      // Wrong password is rejected without revealing which part failed.
+      final badPassword = await verificationService.authenticateVerifier(
+        username: 'owner',
+        password: 'wrong-password',
+        settings: paymentSettings,
+      );
+      expect(badPassword.isSuccess, isFalse);
+
+      // Staff credentials are valid login credentials but not a verifier —
+      // and the operator can never verify their own sale.
+      final staffResult = await verificationService.authenticateVerifier(
+        username: 'staff',
+        password: 'staff123',
+        settings: paymentSettings,
+      );
+      expect(staffResult.isSuccess, isFalse);
+    });
+
+    test('owner can confirm a pending GCash sale', () async {
+      final owner = await login('owner', 'owner123');
       final productService = ProductService();
       final categoryService = CategoryService();
       final salesService = SalesService();
@@ -237,29 +557,24 @@ void main() {
       final productId = await createProduct(productService, categoryService);
       final productBefore = (await productService.getProductById(productId))!;
 
-      final items = [
-        SaleItem(
-          productId: productId,
-          quantity: 3,
-          unitPrice: 50.0,
-          totalPrice: 150.0,
-        ),
-      ];
-
-      await salesService.createSale(
-        items: items,
-        totalAmount: 150.0,
-        paymentMethod: 'GCash',
-        referenceNumber: 'GCASH-PENDING-002',
+      final saleId = await seedPendingSale(
+        productId: productId,
+        quantity: 3,
+        unitPrice: 50.0,
+        operatorUserId: owner.id!,
+        reference: 'GCASH-PENDING-002',
       );
 
       final sale = (await salesService.getPendingPayments()).first;
-      final confirmed = await salesService.confirmGcashPayment(sale.id!);
+      expect(sale.id, saleId);
+      final confirmed = await salesService.confirmGcashPayment(saleId);
       expect(confirmed, isTrue);
 
-      final confirmedSale = await salesService.getSaleById(sale.id!);
+      final confirmedSale = await salesService.getSaleById(saleId);
       expect(confirmedSale!.paymentStatus, 'confirmed');
 
+      // Stock was already deducted when the pending sale was seeded; a
+      // confirmation must not deduct again.
       final productAfterConfirm =
           (await productService.getProductById(productId))!;
       expect(productAfterConfirm.stock, productBefore.stock - 3);
@@ -280,27 +595,20 @@ void main() {
       final productId = await createProduct(productService, categoryService);
       final productBefore = (await productService.getProductById(productId))!;
 
-      final items = [
-        SaleItem(
-          productId: productId,
-          quantity: 3,
-          unitPrice: 50.0,
-          totalPrice: 150.0,
-        ),
-      ];
-
-      await salesService.createSale(
-        items: items,
-        totalAmount: 150.0,
-        paymentMethod: 'GCash',
-        referenceNumber: 'GCASH-PENDING-002B',
+      final ownerUser =
+          (await UserRepository().getByUsername('owner'))!;
+      final saleId = await seedPendingSale(
+        productId: productId,
+        quantity: 3,
+        unitPrice: 50.0,
+        operatorUserId: ownerUser.id!,
+        reference: 'GCASH-PENDING-002B',
       );
 
-      final sale = (await salesService.getPendingPayments()).first;
-      final rejected = await salesService.rejectGcashPayment(sale.id!);
+      final rejected = await salesService.rejectGcashPayment(saleId);
       expect(rejected, isTrue);
 
-      final rejectedSale = await salesService.getSaleById(sale.id!);
+      final rejectedSale = await salesService.getSaleById(saleId);
       expect(rejectedSale!.paymentStatus, 'cancelled');
 
       final productAfterReject =
@@ -393,7 +701,7 @@ void main() {
     });
 
     test('staff cannot confirm or reject pending GCash payments', () async {
-      await login('owner', 'owner123');
+      final owner = await login('owner', 'owner123');
       final productService = ProductService();
       final categoryService = CategoryService();
       final salesService = SalesService();
@@ -406,24 +714,17 @@ void main() {
 
       final productId = await createProduct(productService, categoryService);
 
-      // Owner creates a pending sale directly using owner account.
-      final items = [
-        SaleItem(
-          productId: productId,
-          quantity: 1,
-          unitPrice: 50.0,
-          totalPrice: 50.0,
-        ),
-      ];
-
-      await salesService.createSale(
-        items: items,
-        totalAmount: 50.0,
-        paymentMethod: 'GCash',
-        referenceNumber: 'GCASH-PENDING-003',
+      // Seed a legacy pending sale directly.
+      final saleId = await seedPendingSale(
+        productId: productId,
+        quantity: 1,
+        unitPrice: 50.0,
+        operatorUserId: owner.id!,
+        reference: 'GCASH-PENDING-003',
       );
 
       final sale = (await salesService.getPendingPayments()).first;
+      expect(sale.id, saleId);
 
       // Log in as staff.
       SessionManager.resetForTest();

@@ -17,6 +17,7 @@ import 'package:pinoy_pos/data/repositories/user_repository.dart';
 import 'package:pinoy_pos/data/models/stock_history.dart';
 import 'package:pinoy_pos/services/activity_log_service.dart';
 import 'package:pinoy_pos/services/image_service.dart';
+import 'package:pinoy_pos/services/payment_verification_service.dart';
 import 'package:pinoy_pos/services/settings_service.dart';
 import 'package:pinoy_pos/services/stock_service.dart';
 import 'package:sqflite/sqflite.dart';
@@ -33,6 +34,8 @@ class SalesService {
   final SettingsService _settingsService = SettingsService();
   final ImageService _imageService = ImageService();
   final UserRepository _userRepository = UserRepository();
+  final PaymentVerificationService _verificationService =
+      PaymentVerificationService();
 
   /// Returns the current user's non-null id.
   ///
@@ -272,13 +275,21 @@ class SalesService {
   /// Steps:
   /// 1. Validate all items have sufficient stock (pre-check).
   /// 2. Validate payment rules (cash, GCash reference, customer, proof).
-  /// 3. Insert sale record.
-  /// 4. Insert sale_items.
-  /// 5. Deduct stock for each item.
-  /// 6. If any step fails, the transaction rolls back automatically.
+  /// 3. Enforce the GCash verification policy: when the operator's sale
+  ///    requires verification, [verifiedByUserId] must identify an
+  ///    authorized verifier (see [PaymentVerificationService]).
+  /// 4. Insert sale record.
+  /// 5. Insert sale_items.
+  /// 6. Deduct stock for each item.
+  /// 7. If any step fails, the transaction rolls back automatically.
+  ///
+  /// Verification happens before the sale is finalized: no 'pending' sale
+  /// is created at the till. The Owner's own sales are never held for
+  /// verification.
   ///
   /// Throws [PaymentValidationException] for validation errors such as
-  /// missing required GCash fields or duplicate reference numbers.
+  /// missing required GCash fields, duplicate reference numbers, or a
+  /// missing/unauthorized verifier.
   Future<bool> createSale({
     required List<SaleItem> items,
     required double totalAmount,
@@ -289,6 +300,7 @@ class SalesService {
     String? customerName,
     String? paymentProofPath,
     String? paymentProofType,
+    int? verifiedByUserId,
   }) async {
     if (!_sessionManager.hasPermission('create_sales')) {
       await _activityLogService.logActivity(
@@ -340,7 +352,7 @@ class SalesService {
       received = totalAmount;
     }
 
-    String paymentStatus = 'confirmed';
+    const paymentStatus = 'confirmed';
     DateTime? verifiedAt;
     int? verifiedBy;
 
@@ -380,8 +392,37 @@ class SalesService {
         );
       }
 
-      if (paymentSettings.verificationRequired) {
-        paymentStatus = 'pending';
+      // Enforce the verification policy before the sale is written.
+      // The Owner's own sales are exempt; other operators (e.g. Staff)
+      // must present an authorized verifier when the policy is enabled.
+      final needsVerification =
+          _verificationService.requiresVerificationFor(
+        operatorRole: _sessionManager.currentUser?.role,
+        paymentMethod: paymentMethod,
+        settings: paymentSettings,
+      );
+
+      if (needsVerification) {
+        if (verifiedByUserId == null) {
+          throw PaymentValidationException(
+            'GCash verification required',
+            details: 'An authorized verifier must approve this payment before the sale can be completed.',
+          );
+        }
+
+        final verifier = await _userRepository.getById(verifiedByUserId);
+        if (verifier == null ||
+            verifier.id == _sessionManager.currentUser?.id ||
+            !_verificationService.canRoleVerify(
+                verifier.role, paymentSettings)) {
+          throw PaymentValidationException(
+            'Verifier is not authorized',
+            details: 'The selected verifier cannot approve GCash payments.',
+          );
+        }
+
+        verifiedAt = DateTime.now();
+        verifiedBy = verifiedByUserId;
       }
     }
 
@@ -596,17 +637,7 @@ class SalesService {
   /// Returns true when the current user is allowed to verify GCash
   /// payments for the configured verification mode.
   Future<bool> _canVerify() async {
-    if (!_sessionManager.hasPermission('verify_payments')) return false;
-
-    final paymentSettings = await _settingsService.getPaymentSettings();
-    final currentUser = _sessionManager.currentUser;
-    if (currentUser == null) return false;
-
-    final mode = paymentSettings.gcashVerificationMode;
-    if (mode == 'owner' && currentUser.role != UserRole.owner) return false;
-    if (mode == 'admin' && currentUser.role != UserRole.admin) return false;
-
-    return true;
+    return _verificationService.currentUserCanVerify();
   }
 
   /// Returns all GCash payments that are pending owner/admin verification.

@@ -11,6 +11,7 @@ import 'package:pinoy_pos/providers/cart_provider.dart';
 import 'package:pinoy_pos/providers/payment_settings_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/services/image_service.dart';
+import 'package:pinoy_pos/ui/dialogs/gcash_verification_dialog.dart';
 import 'package:pinoy_pos/ui/screens/payment_settings_page.dart';
 import 'package:pinoy_pos/ui/screens/payment_success_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
@@ -132,7 +133,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
     setState(() => _isReviewing = false);
   }
 
-  Future<void> _completeSale() async {
+  Future<void> _completeSale(PaymentSettings settings) async {
     final cart = ref.read(cartProvider);
     if (cart.isEmpty) {
       AppDialogService.error(
@@ -141,6 +142,39 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
         message: 'The cart is empty. Add products before checkout.',
       );
       return;
+    }
+
+    // Enforce the verification policy before any sale is written. When the
+    // operator (e.g. Staff) requires verification, an authorized verifier
+    // must approve the payment at the till. The Owner's own sales are
+    // exempt. Cancelling the dialog leaves the cart intact and creates no
+    // sale.
+    int? verifiedByUserId;
+    final verificationService =
+        ref.read(paymentVerificationServiceProvider);
+    final operator = SessionManager().currentUser;
+    final needsVerification =
+        verificationService.requiresVerificationFor(
+      operatorRole: operator?.role,
+      paymentMethod: 'GCash',
+      settings: settings,
+    );
+
+    if (needsVerification) {
+      final result = await showGcashVerificationDialog(
+        context,
+        total: widget.total,
+        operatorName: operator?.fullName ?? 'Staff',
+        settings: settings,
+      );
+
+      if (!mounted) return;
+      if (result == null || !result.isSaved || result.value == null) {
+        // Verification was cancelled — abort the sale. The cart, form and
+        // attached proof remain untouched so the operator can retry.
+        return;
+      }
+      verifiedByUserId = result.value!.id;
     }
 
     setState(() => _isProcessing = true);
@@ -157,6 +191,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
             paymentProofPath: _paymentProofPath,
             paymentProofType: _paymentProofType,
             notes: null,
+            verifiedByUserId: verifiedByUserId,
           );
 
       if (!mounted) return;
@@ -611,7 +646,13 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        if (settings.verificationRequired)
+        if (ref
+            .read(paymentVerificationServiceProvider)
+            .requiresVerificationFor(
+              operatorRole: SessionManager().currentUser?.role,
+              paymentMethod: 'GCash',
+              settings: settings,
+            ))
           AppCard(
             color: cs.secondaryContainer,
             child: Padding(
@@ -622,7 +663,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'This payment requires owner/admin verification before it is treated as a completed sale.',
+                      'This GCash payment must be approved by ${settings.adminCanVerify ? 'an Owner or System Admin' : 'the Owner'} before the sale is completed.',
                       style: TextStyle(color: cs.onSecondaryContainer),
                     ),
                   ),
@@ -643,7 +684,8 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
             Expanded(
               child: LoadingButton(
                 isLoading: _isProcessing,
-                onPressed: _isProcessing ? null : _completeSale,
+                onPressed:
+                    _isProcessing ? null : () => _completeSale(settings),
                 label: 'Confirm Payment',
               ),
             ),

@@ -417,6 +417,31 @@ class DatabaseHelper {
       await _migrateV21(db);
     }
 
+    // Migration from v21 → v22: normalize the GCash verification mode.
+    // The legacy 'admin' value was a dead configuration — the System Admin
+    // could not reach pending sales — and under the at-till verification
+    // flow the Owner must always remain an authorized verifier, so 'admin'
+    // is folded into 'owner_admin'. Valid values are now 'immediate'
+    // (verification off), 'owner', and 'owner_admin'.
+    if (oldVersion < 22) {
+      await db.execute(
+        "UPDATE settings SET gcash_verification_mode = 'owner_admin' WHERE gcash_verification_mode = 'admin'",
+      );
+    }
+
+    // Migration from v22 → v23: add the session-expiry warning threshold.
+    // Default 30 seconds; always clamped below the inactivity timeout at
+    // runtime by SessionSettingsService.
+    if (oldVersion < 23) {
+      try {
+        await db.execute(
+          'ALTER TABLE settings ADD COLUMN session_warning_seconds INTEGER NOT NULL DEFAULT 30',
+        );
+      } catch (_) {
+        // Column may already exist.
+      }
+    }
+
     // Create any tables that were introduced after the backup's original
     // version but do not have an explicit migration block above (e.g.
     // `announcements`, `ai_usage`).  All CREATE statements in _createTables
@@ -763,6 +788,7 @@ class DatabaseHelper {
         gcash_qr_image_type TEXT,
         ai_daily_quota INTEGER NOT NULL DEFAULT 20,
         inactivity_timeout_minutes INTEGER NOT NULL DEFAULT 15,
+        session_warning_seconds INTEGER NOT NULL DEFAULT 30,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       )

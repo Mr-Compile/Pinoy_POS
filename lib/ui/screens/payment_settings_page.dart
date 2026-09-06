@@ -15,9 +15,12 @@ import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 
 /// GCash / payment configuration page.
 ///
-/// Requires `edit_settings` permission. Allows Owner and Admin to enable
-/// GCash, require reference numbers / customer names / payment proof, and
-/// choose whether pending payments need owner/admin verification.
+/// Requires `edit_settings` permission (Owner only for business settings).
+/// Controls whether GCash is enabled, the reference / customer / proof
+/// requirements, and the single authoritative verification policy:
+/// whether Staff-tendered GCash sales need an authorized verifier's
+/// approval, and who is allowed to verify. The Owner's own sales never
+/// require verification.
 class PaymentSettingsPage extends ConsumerStatefulWidget {
   const PaymentSettingsPage({super.key});
 
@@ -211,7 +214,8 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
   late bool _gcashReferenceRequired;
   late String _customerNameRequirement;
   late String _paymentProofRequirement;
-  late String _verificationMode;
+  late bool _verificationRequired;
+  late String _verifierScope;
   late int _referenceMinLength;
 
   @override
@@ -221,34 +225,44 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
     _gcashReferenceRequired = widget.settings.gcashReferenceRequired;
     _customerNameRequirement = widget.settings.gcashCustomerNameRequirement;
     _paymentProofRequirement = widget.settings.gcashPaymentProofRequirement;
-    _verificationMode = widget.settings.gcashVerificationMode;
+    // The stored mode distinguishes "who can verify" ('owner' vs
+    // 'owner_admin'); 'immediate' means verification is off. The legacy
+    // 'admin' value is folded into 'owner_admin' because the Owner must
+    // always remain an authorized verifier.
+    _verificationRequired =
+        widget.settings.gcashVerificationMode != 'immediate';
+    _verifierScope =
+        widget.settings.gcashVerificationMode == 'owner_admin' ||
+                widget.settings.gcashVerificationMode == 'admin'
+            ? 'owner_admin'
+            : 'owner';
     _referenceMinLength = widget.settings.gcashReferenceMinLength;
   }
 
   static const _customerNameOptions = ['off', 'optional', 'required'];
   static const _proofOptions = ['off', 'optional', 'required'];
-  static const _verificationOptions = ['immediate', 'owner', 'admin', 'owner_admin'];
+  static const _verifierOptions = ['owner', 'owner_admin'];
 
   String _label(String key) {
     return switch (key) {
       'off' => 'Off',
       'optional' => 'Optional',
       'required' => 'Required',
-      'immediate' => 'Immediate Confirmation',
-      'owner' => 'Require Owner Verification',
-      'admin' => 'Require Admin Verification',
-      'owner_admin' => 'Require Owner or Admin Verification',
+      'owner' => 'Owner only',
+      'owner_admin' => 'Owner or System Admin',
       _ => key,
     };
   }
 
-  String _verificationInfoText(String mode) {
-    return switch (mode) {
-      'owner' => 'Only an Owner can confirm pending GCash sales.',
-      'admin' => 'Only an Admin can confirm pending GCash sales.',
-      'owner_admin' => 'An Owner or Admin can confirm pending GCash sales.',
-      _ => 'GCash sales are confirmed automatically.',
-    };
+  String get _verificationInfoText {
+    if (!_verificationRequired) {
+      return 'GCash sales are confirmed immediately for every operator.';
+    }
+    final verifier =
+        _verifierScope == 'owner_admin' ? 'an Owner or System Admin' : 'the Owner';
+    return 'GCash sales tendered by Staff must be approved by $verifier '
+        'before the sale is completed. Sales tendered by the Owner are '
+        'always confirmed immediately and never require verification.';
   }
 
   Widget _buildGcashQrSection(BuildContext context) {
@@ -341,7 +355,8 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
       gcashReferenceRequired: _gcashReferenceRequired,
       gcashCustomerNameRequirement: _customerNameRequirement,
       gcashPaymentProofRequirement: _paymentProofRequirement,
-      gcashVerificationMode: _verificationMode,
+      gcashVerificationMode:
+          _verificationRequired ? _verifierScope : 'immediate',
       gcashReferenceMinLength: _referenceMinLength,
     );
     widget.onSave(updated);
@@ -424,50 +439,36 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
                   ),
                 ),
                 const Divider(),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Verification',
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        decoration: BoxDecoration(
-                          border: Border.all(color: cs.outline),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: DropdownButton<String>(
-                          isExpanded: true,
-                          value: _verificationMode,
-                          underline: const SizedBox(),
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          onChanged: widget.isLoading
-                              ? null
-                              : (value) {
-                                  if (value == null) return;
-                                  setState(() => _verificationMode = value);
-                                },
-                          items: _verificationOptions
-                              .map((v) => DropdownMenuItem(
-                                    value: v,
-                                    child: Text(_label(v)),
-                                  ))
-                              .toList(),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Choose who must confirm pending GCash payments.',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: cs.onSurfaceVariant,
-                            ),
-                      ),
-                    ],
-                  ),
+                SwitchListTile(
+                  title: const Text('Verify staff GCash sales'),
+                  subtitle: const Text(
+                      'Staff GCash payments must be approved by an authorized verifier before the sale is completed.'),
+                  value: _verificationRequired,
+                  onChanged: widget.isLoading
+                      ? null
+                      : (value) =>
+                          setState(() => _verificationRequired = value),
                 ),
+                if (_verificationRequired)
+                  ListTile(
+                    title: const Text('Who can verify'),
+                    subtitle: Text(_label(_verifierScope)),
+                    trailing: DropdownButton<String>(
+                      value: _verifierScope,
+                      onChanged: widget.isLoading
+                          ? null
+                          : (value) {
+                              if (value == null) return;
+                              setState(() => _verifierScope = value);
+                            },
+                      items: _verifierOptions
+                          .map((v) => DropdownMenuItem(
+                                value: v,
+                                child: Text(_label(v)),
+                              ))
+                          .toList(),
+                    ),
+                  ),
                 const Divider(),
                 ListTile(
                   title: const Text('Minimum reference length'),
@@ -492,25 +493,24 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
             ),
           ),
           const SizedBox(height: 24),
-          if (_verificationMode != 'immediate')
-            AppCard(
-              color: cs.secondaryContainer,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline, color: cs.onSecondaryContainer),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        _verificationInfoText(_verificationMode),
-                        style: TextStyle(color: cs.onSecondaryContainer),
-                      ),
+          AppCard(
+            color: cs.secondaryContainer,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: cs.onSecondaryContainer),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _verificationInfoText,
+                      style: TextStyle(color: cs.onSecondaryContainer),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
+          ),
           const SizedBox(height: 24),
           SizedBox(
             width: double.infinity,

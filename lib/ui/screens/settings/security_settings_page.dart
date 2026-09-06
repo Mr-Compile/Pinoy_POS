@@ -66,27 +66,50 @@ class SecuritySettingsPage extends ConsumerWidget {
             Text('Session', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
             Text(
-              'How long the app waits for input before locking the screen.',
+              'How long the app waits for input before ending the session, '
+              'and how early the expiry warning appears.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 16),
             AppCard(
-              child: ListTile(
-                leading: const Icon(Icons.timer_outlined),
-                title: const Text('Inactivity timeout'),
-                subtitle: settingsAsync.when(
-                  data: (settings) => Text(
-                    '${settings.inactivityTimeoutMinutes} minutes',
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.timer_outlined),
+                    title: const Text('Inactivity timeout'),
+                    subtitle: settingsAsync.when(
+                      data: (settings) => Text(
+                        '${settings.inactivityTimeoutMinutes} minutes',
+                      ),
+                      loading: () => const Text('Loading…'),
+                      error: (_, _) => const Text('Unable to load'),
+                    ),
+                    trailing: canEditTimeout
+                        ? const Icon(Icons.chevron_right)
+                        : null,
+                    onTap: canEditTimeout
+                        ? () => _showInactivityTimeoutDialog(context, ref, settingsAsync)
+                        : null,
                   ),
-                  loading: () => const Text('Loading…'),
-                  error: (_, _) => const Text('Unable to load'),
-                ),
-                trailing: canEditTimeout
-                    ? const Icon(Icons.chevron_right)
-                    : null,
-                onTap: canEditTimeout
-                    ? () => _showInactivityTimeoutDialog(context, ref, settingsAsync)
-                    : null,
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.notification_important_outlined),
+                    title: const Text('Session warning'),
+                    subtitle: settingsAsync.when(
+                      data: (settings) => Text(
+                        'Warn ${settings.sessionWarningSeconds} seconds before logout',
+                      ),
+                      loading: () => const Text('Loading…'),
+                      error: (_, _) => const Text('Unable to load'),
+                    ),
+                    trailing: canEditTimeout
+                        ? const Icon(Icons.chevron_right)
+                        : null,
+                    onTap: canEditTimeout
+                        ? () => _showSessionWarningDialog(context, ref, settingsAsync)
+                        : null,
+                  ),
+                ],
               ),
             ),
           ],
@@ -341,6 +364,124 @@ class SecuritySettingsPage extends ConsumerWidget {
         context,
         title: 'Updated',
         message: 'Inactivity timeout updated.',
+      );
+    }
+  }
+
+  Future<void> _showSessionWarningDialog(
+    BuildContext context,
+    WidgetRef ref,
+    AsyncValue<Settings> settingsAsync,
+  ) async {
+    final currentSettings = settingsAsync.valueOrNull;
+    final current = currentSettings?.sessionWarningSeconds ?? 30;
+    // The warning must always be shorter than the inactivity timeout.
+    final maxSeconds =
+        ((currentSettings?.inactivityTimeoutMinutes ?? 15) * 60) - 1;
+    final result = await showDialog<ModalResult<void>>(
+      context: context,
+      useRootNavigator: true,
+      builder: (dialogContext) => AppDialogForm<ModalResult<void>>(
+        type: AppDialogType.info,
+        title: 'Session Warning',
+        childBuilder: (context, state) {
+          final secondsController = state.textController(
+            'seconds',
+            text: current.toString(),
+          );
+
+          return Form(
+            key: state.formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'How many seconds before automatic logout the '
+                  '"Session Expiring" warning appears. Must be shorter '
+                  'than the inactivity timeout.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 12),
+                AppTextFormField(
+                  controller: secondsController,
+                  label: 'Seconds',
+                  hint: 'e.g. 30',
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Seconds is required';
+                    }
+                    final seconds = int.tryParse(value.trim());
+                    if (seconds == null || seconds < 5) {
+                      return 'Enter at least 5 seconds';
+                    }
+                    if (seconds > maxSeconds) {
+                      return 'Must be less than the inactivity timeout '
+                          '($maxSeconds seconds)';
+                    }
+                    return null;
+                  },
+                  onChanged: (_) => state.markChanged(),
+                ),
+              ],
+            ),
+          );
+        },
+        actionsBuilder: (context, state) => [
+          AppDialogAction(
+            label: 'Cancel',
+            onPressed: (dialogContext) =>
+                state.pop(const ModalResult<void>.cancelled()),
+          ),
+          AppDialogAction(
+            label: 'Save',
+            isPrimary: true,
+            isLoading: state.isSaving,
+            onPressed: (dialogContext) async {
+              if (!state.formKey.currentState!.validate()) return;
+
+              state.setSaving(true);
+
+              final seconds =
+                  int.parse(state.textController('seconds').text.trim());
+              final settings = settingsAsync.valueOrNull;
+              if (settings == null) {
+                state.setSaving(false);
+                return;
+              }
+
+              final updated = await ref
+                  .read(settingsServiceProvider)
+                  .updateSettings(
+                    settings.copyWith(sessionWarningSeconds: seconds),
+                  );
+
+              if (updated) {
+                ref.invalidate(settingsProvider);
+                state.pop(const ModalResult<void>.saved());
+              } else {
+                if (dialogContext.mounted) {
+                  state.setSaving(false);
+                  await AppDialogService.error(
+                    dialogContext,
+                    title: 'Save Failed',
+                    message: 'Unable to save the session warning.',
+                  );
+                }
+              }
+            },
+          ),
+        ],
+      ),
+    );
+
+    if (!context.mounted) return;
+
+    if (result?.isSaved ?? false) {
+      await AppDialogService.success(
+        context,
+        title: 'Updated',
+        message: 'Session warning updated.',
       );
     }
   }

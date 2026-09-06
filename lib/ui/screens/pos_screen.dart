@@ -150,6 +150,11 @@ class _POSScreenState extends ConsumerState<POSScreen> {
       return;
     }
 
+    // Always refresh payment settings when checkout starts so the tender
+    // dialog shows the latest GCash QR, enable state, and rules.
+    // Safe here: this is an event handler, not a lifecycle method.
+    ref.invalidate(paymentSettingsProvider);
+
     final total = cart.total;
     final result = await showDialog<_PaymentResult>(
       context: context,
@@ -898,14 +903,6 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
   final _customerNameController = TextEditingController();
 
   String _paymentMethod = 'Cash';
-
-  @override
-  void initState() {
-    super.initState();
-    // Always refresh payment settings when the tender dialog opens so the
-    // staff sees the latest GCash QR, enable state, and rules.
-    ref.invalidate(paymentSettingsProvider);
-  }
 
   @override
   void dispose() {

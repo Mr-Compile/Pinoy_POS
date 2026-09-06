@@ -20,6 +20,7 @@
   final String? gcashQrImageType;
   final int aiDailyQuota;
   final int inactivityTimeoutMinutes;
+  final int sessionWarningSeconds;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -43,6 +44,7 @@
     this.gcashQrImageType,
     this.aiDailyQuota = 20,
     this.inactivityTimeoutMinutes = 15,
+    this.sessionWarningSeconds = 30,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -68,6 +70,7 @@
       'gcash_qr_image_type': gcashQrImageType,
       'ai_daily_quota': aiDailyQuota,
       'inactivity_timeout_minutes': inactivityTimeoutMinutes,
+      'session_warning_seconds': sessionWarningSeconds,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -134,6 +137,7 @@
       gcashQrImageType: stringOrNull('gcash_qr_image_type'),
       aiDailyQuota: intOrNull('ai_daily_quota') ?? 20,
       inactivityTimeoutMinutes: intOrNull('inactivity_timeout_minutes') ?? 15,
+      sessionWarningSeconds: intOrNull('session_warning_seconds') ?? 30,
       createdAt: parseDateTime('created_at'),
       updatedAt: parseDateTime('updated_at'),
     );
@@ -159,6 +163,7 @@
     String? gcashQrImageType,
     int? aiDailyQuota,
     Object? inactivityTimeoutMinutes = _sentinel,
+    int? sessionWarningSeconds,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -188,6 +193,8 @@
       inactivityTimeoutMinutes: inactivityTimeoutMinutes == _sentinel
           ? this.inactivityTimeoutMinutes
           : inactivityTimeoutMinutes as int,
+      sessionWarningSeconds:
+          sessionWarningSeconds ?? this.sessionWarningSeconds,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
