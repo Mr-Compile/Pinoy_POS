@@ -928,17 +928,24 @@ class BusinessIntelligenceService {
     );
     final activeSales = sales.where((s) => !s.isDeleted).toList();
 
-    // Group by day of week (1=Monday ... 7=Sunday).
+    // Group by day of week with Sunday as the first day.
     final dayTotals = <int, double>{};
     final dayCounts = <int, int>{};
     for (final s in activeSales) {
-      final weekday = s.createdAt.weekday;
+      final weekday = s.createdAt.weekday % 7;
       dayTotals[weekday] = (dayTotals[weekday] ?? 0) + s.totalAmount;
       dayCounts[weekday] = (dayCounts[weekday] ?? 0) + 1;
     }
 
-    const dayNames = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday',
-        'Friday', 'Saturday', 'Sunday'];
+    const dayNames = [
+      'Sunday',
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+    ];
 
     final buf = StringBuffer();
     buf.writeln('--- BUSIEST PERIOD DATA (last 30 days) ---');
@@ -947,7 +954,7 @@ class BusinessIntelligenceService {
       buf.writeln('No sales data available for the last 30 days.');
     } else {
       buf.writeln('Sales by day of week:');
-      for (var i = 1; i <= 7; i++) {
+      for (var i = 0; i < 7; i++) {
         final total = dayTotals[i] ?? 0;
         final count = dayCounts[i] ?? 0;
         buf.writeln('  - ${dayNames[i]}: PHP ${_formatMoney(total)} ($count transactions)');

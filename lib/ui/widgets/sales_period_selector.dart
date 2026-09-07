@@ -4,6 +4,7 @@ import 'package:pinoy_pos/core/date_utils.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/sales_period.dart';
 import 'package:pinoy_pos/providers/sales_period_filter_provider.dart';
+import 'package:pinoy_pos/ui/widgets/app_button.dart';
 
 /// Calendar-based period selector used by the Dashboard and Sales Analytics
 /// screens.
@@ -34,74 +35,112 @@ class _SalesPeriodSelectorState extends ConsumerState<SalesPeriodSelector> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Period label and navigation
-        Row(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.chevron_left),
-              onPressed: () => notifier.moveByStep(-1),
-            ),
-            Expanded(
+        if (filter.period != SalesPeriod.custom)
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.chevron_left),
+                onPressed: () => notifier.moveByStep(-1),
+              ),
+              Expanded(
+                child: Text(
+                  formatSalesPeriodLabel(filter),
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.chevron_right),
+                onPressed: () => notifier.moveByStep(1),
+              ),
+            ],
+          )
+        else
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
+            child: Center(
               child: Text(
                 formatSalesPeriodLabel(filter),
-                textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
               ),
             ),
-            IconButton(
-              icon: const Icon(Icons.chevron_right),
-              onPressed: () => notifier.moveByStep(1),
-            ),
-          ],
-        ),
-        const SizedBox(height: Spacing.sm),
+          ),
         // Today shortcut
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            TextButton.icon(
-              onPressed: notifier.today,
-              icon: const Icon(Icons.today, size: 18),
-              label: const Text('Today'),
-            ),
-          ],
-        ),
-        const SizedBox(height: Spacing.sm),
-        // Granularity toggles
-        Row(
-          children: [
-            Expanded(
-              child: SegmentedButton<SalesPeriod>(
-                multiSelectionEnabled: false,
-                emptySelectionAllowed: false,
-                selected: {filter.period},
-                onSelectionChanged: (selected) {
-                  if (selected.isNotEmpty) {
-                    notifier.selectPeriod(selected.first);
-                  }
-                },
-                segments: const [
-                  ButtonSegment(
-                    value: SalesPeriod.daily,
-                    label: Text('Daily'),
-                  ),
-                  ButtonSegment(
-                    value: SalesPeriod.weekly,
-                    label: Text('Weekly'),
-                  ),
-                  ButtonSegment(
-                    value: SalesPeriod.monthly,
-                    label: Text('Monthly'),
-                  ),
-                  ButtonSegment(
-                    value: SalesPeriod.custom,
-                    label: Text('Range'),
-                  ),
-                ],
+        if (filter.period != SalesPeriod.custom)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              TextButton.icon(
+                onPressed: notifier.today,
+                icon: const Icon(Icons.today, size: 18),
+                label: const Text('Today'),
               ),
-            ),
-          ],
+            ],
+          ),
+        const SizedBox(height: Spacing.sm),
+        // Granularity toggles + Custom button, matching the sales screen
+        // PeriodSelector layout.
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isCompact = constraints.maxWidth < 360;
+            final toggles = SegmentedButton<SalesPeriod>(
+              multiSelectionEnabled: false,
+              emptySelectionAllowed: true,
+              selected: filter.period == SalesPeriod.custom
+                  ? const {}
+                  : {filter.period},
+              onSelectionChanged: (selected) {
+                if (selected.isNotEmpty) {
+                  notifier.selectPeriod(selected.first);
+                }
+              },
+              segments: const [
+                ButtonSegment(
+                  value: SalesPeriod.daily,
+                  label: Text('Daily'),
+                ),
+                ButtonSegment(
+                  value: SalesPeriod.weekly,
+                  label: Text('Weekly'),
+                ),
+                ButtonSegment(
+                  value: SalesPeriod.monthly,
+                  label: Text('Monthly'),
+                ),
+              ],
+            );
+            final customButton = AppButton.outlined(
+              onPressed: () => _pickCustomRange(context, filter, notifier),
+              icon: Icons.date_range,
+              label: 'Custom',
+              size: AppButtonSize.small,
+              fullWidth: isCompact,
+            );
+
+            if (isCompact) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  toggles,
+                  const SizedBox(height: Spacing.sm),
+                  customButton,
+                ],
+              );
+            }
+
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: toggles),
+                const SizedBox(width: Spacing.sm),
+                customButton,
+              ],
+            );
+          },
         ),
         const SizedBox(height: Spacing.md),
         // Calendar for fixed periods, range picker for custom.
@@ -158,14 +197,17 @@ class _SalesPeriodSelectorState extends ConsumerState<SalesPeriodSelector> {
               ],
             ),
             const SizedBox(height: Spacing.md),
-            ElevatedButton.icon(
+            AppButton.outlined(
               onPressed: () => _pickCustomRange(context, filter, notifier),
-              icon: const Icon(Icons.date_range, size: 18),
-              label: const Text('Choose date range'),
+              icon: Icons.date_range,
+              label: 'Choose date range',
+              size: AppButtonSize.small,
             ),
             const SizedBox(height: Spacing.sm),
             Text(
-              '${_shortDate(start)} – ${_shortDate(end)}',
+              filter.customEnd != null
+                  ? '${_shortDate(start)} – ${_shortDate(end)}'
+                  : 'Choose a date range',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: cs.onSurfaceVariant,
                   ),
@@ -186,16 +228,25 @@ class _SalesPeriodSelectorState extends ConsumerState<SalesPeriodSelector> {
     SalesPeriodFilterNotifier notifier,
   ) async {
     final now = DateTime.now();
-    final initialRange = DateTimeRange(
-      start: filter.selectedDate,
-      end: filter.customEnd ?? filter.selectedDate,
-    );
+    final today = startOfDay(now);
+    final first = today.subtract(const Duration(days: 365 * 2));
+    final last = today.add(const Duration(days: 1));
+
+    final initial = filter.customEnd != null
+        ? DateTimeRange(
+            start: filter.selectedDate,
+            end: filter.customEnd!,
+          )
+        : DateTimeRange(
+            start: today.subtract(const Duration(days: 30)),
+            end: today,
+          );
 
     final picked = await showDateRangePicker(
       context: context,
-      firstDate: DateTime(now.year - 5, now.month, 1),
-      lastDate: now.add(const Duration(days: 365)),
-      initialDateRange: initialRange,
+      firstDate: first,
+      lastDate: last,
+      initialDateRange: initial,
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -203,7 +254,11 @@ class _SalesPeriodSelectorState extends ConsumerState<SalesPeriodSelector> {
                   backgroundColor: Theme.of(context).colorScheme.surface,
                 ),
           ),
-          child: child!,
+          child: Localizations.override(
+            context: context,
+            locale: const Locale('en', 'US'),
+            child: child!,
+          ),
         );
       },
     );

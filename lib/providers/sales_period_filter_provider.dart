@@ -14,6 +14,16 @@ class SalesPeriodFilterNotifier extends StateNotifier<SalesPeriodFilter> {
         ));
 
   void selectPeriod(SalesPeriod period) {
+    if (period == SalesPeriod.custom && state.customEnd == null) {
+      final today = startOfDay(DateTime.now());
+      state = state.copyWith(
+        period: SalesPeriod.custom,
+        selectedDate: today.subtract(const Duration(days: 30)),
+        customEnd: today,
+      );
+      return;
+    }
+
     state = state.copyWith(
       period: period,
       clearCustomEnd: period != SalesPeriod.custom,

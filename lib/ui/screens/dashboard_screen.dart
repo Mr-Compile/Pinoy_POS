@@ -112,6 +112,12 @@ class _DashboardLoadedView extends ConsumerWidget {
       return const Center(child: Text('Not authenticated'));
     }
 
+    final analytics = switch (data) {
+      OwnerDashboardData d => d.analytics,
+      StaffDashboardData d => d.analytics,
+      AdminDashboardData _ => null,
+    };
+
     // The Admin dashboard is system/maintenance only — none of its metrics
     // are period-driven, so the selector is hidden for that role.
     final showPeriodSelector = data is! AdminDashboardData;
@@ -122,6 +128,19 @@ class _DashboardLoadedView extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (analytics != null) ...[
+            AppSection(
+              title: data is OwnerDashboardData
+                  ? 'Key Performance Indicators'
+                  : 'My Performance',
+              padding: const EdgeInsets.only(bottom: Spacing.md),
+              child: SalesSummaryCards(
+                analytics: analytics,
+                storeInfo: null,
+              ),
+            ),
+            const SizedBox(height: Spacing.xl),
+          ],
           _WelcomeHeader(user: user!),
           if (showPeriodSelector) ...[
             const SizedBox(height: Spacing.md),
@@ -308,17 +327,6 @@ class _OwnerDashboard extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── Primary KPIs ──
-        AppSection(
-          title: 'Key Performance Indicators',
-          padding: const EdgeInsets.only(bottom: Spacing.md),
-          child: SalesSummaryCards(
-            analytics: analytics,
-            storeInfo: null,
-          ),
-        ),
-        const SizedBox(height: Spacing.xxl),
-
         // ── Quick actions ──
         _buildOwnerQuickActions(context, ref, authNotifier),
         const SizedBox(height: Spacing.xxl),
@@ -1058,17 +1066,6 @@ class _StaffDashboard extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── Primary KPIs (own sales only) ──
-        AppSection(
-          title: 'My Performance',
-          padding: const EdgeInsets.only(bottom: Spacing.md),
-          child: SalesSummaryCards(
-            analytics: analytics,
-            storeInfo: null,
-          ),
-        ),
-        const SizedBox(height: Spacing.xxl),
-
         // ── Quick actions ──
         _buildStaffQuickActions(context, ref, authNotifier),
         const SizedBox(height: Spacing.xxl),

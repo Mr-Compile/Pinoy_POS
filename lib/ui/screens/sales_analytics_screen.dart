@@ -88,8 +88,6 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: Spacing.md),
-            const SalesPeriodSelector(),
-            const SizedBox(height: Spacing.md),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
               child: AppSection(
@@ -100,6 +98,8 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: Spacing.md),
+            const SalesPeriodSelector(),
             const SizedBox(height: Spacing.md),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: Spacing.md),

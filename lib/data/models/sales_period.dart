@@ -190,7 +190,8 @@ String formatSalesPeriodLabel(SalesPeriodFilter filter) {
     case SalesPeriod.monthly:
       return _shortMonthYear(selected);
     case SalesPeriod.custom:
-      final end = filter.customEnd ?? selected;
+      final end = filter.customEnd;
+      if (end == null) return 'Custom Range';
       return '${_shortDate(selected)} – ${_shortDate(end)}';
   }
 }

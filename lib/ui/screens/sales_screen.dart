@@ -506,15 +506,17 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     if (diff == 0) return 'Today';
     if (diff == 1) return 'Yesterday';
     if (diff < 7) {
-      return [
+      // Sunday is the first day of the week.
+      const dayNames = [
+        'Sunday',
         'Monday',
         'Tuesday',
         'Wednesday',
         'Thursday',
         'Friday',
         'Saturday',
-        'Sunday'
-      ][local.weekday - 1];
+      ];
+      return dayNames[local.weekday % 7];
     }
     return '${local.month}/${local.day}/${local.year}';
   }
