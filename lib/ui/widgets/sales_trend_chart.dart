@@ -33,12 +33,34 @@ class SalesTrendChart extends StatelessWidget {
     }
 
     final points = trend.map(_toBarPoint).toList();
+    final highlightIndex = _highlightIndex(points);
 
     if (points.length <= 12) {
-      return MiniBarChart(points: points, valuePrefix: valuePrefix);
+      return MiniBarChart(
+        points: points,
+        valuePrefix: valuePrefix,
+        highlightIndex: highlightIndex,
+      );
     }
 
-    return _ScrollableBarChart(points: points, valuePrefix: valuePrefix);
+    return _ScrollableBarChart(
+      points: points,
+      valuePrefix: valuePrefix,
+      highlightIndex: highlightIndex,
+    );
+  }
+
+  /// Highlights the bar with the highest sales. For daily periods this is the
+  /// single selected day; for weekly/monthly it identifies the best day or week.
+  int _highlightIndex(List<BarChartPoint> points) {
+    if (points.isEmpty) return -1;
+    var maxIndex = 0;
+    for (var i = 1; i < points.length; i++) {
+      if (points[i].value > points[maxIndex].value) {
+        maxIndex = i;
+      }
+    }
+    return maxIndex;
   }
 
   BarChartPoint _toBarPoint(DailySalesPoint point) {
@@ -58,6 +80,8 @@ class SalesTrendChart extends StatelessWidget {
         case SalesPeriod.monthly:
           final week = ((date.day - 1) / 7).floor() + 1;
           return 'W$week';
+        case SalesPeriod.custom:
+          return '${date.month}/${date.day}';
       }
     }
 
@@ -71,8 +95,9 @@ class SalesTrendChart extends StatelessWidget {
   }
 
   String _weekdayShort(int weekday) {
-    const names = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-    return names[weekday - 1];
+    // Sunday = 7 in Dart, so map Sunday -> 0, Monday -> 1, ... Saturday -> 6.
+    const names = ['Su', 'M', 'T', 'W', 'Th', 'F', 'Sa'];
+    return names[weekday % 7];
   }
 
   String _monthName(int month) {
@@ -85,8 +110,13 @@ class SalesTrendChart extends StatelessWidget {
 class _ScrollableBarChart extends StatelessWidget {
   final List<BarChartPoint> points;
   final String? valuePrefix;
+  final int highlightIndex;
 
-  const _ScrollableBarChart({required this.points, this.valuePrefix});
+  const _ScrollableBarChart({
+    required this.points,
+    this.valuePrefix,
+    this.highlightIndex = -1,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -115,7 +145,7 @@ class _ScrollableBarChart extends StatelessWidget {
                       _Bar(
                         value: points[i].value,
                         maxValue: maxValue,
-                        color: i == points.length - 1
+                        color: i == highlightIndex
                             ? cs.tertiary
                             : cs.primary,
                       ),

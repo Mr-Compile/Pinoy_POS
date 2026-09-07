@@ -89,6 +89,22 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
           children: [
             const SizedBox(height: Spacing.md),
             const SalesPeriodSelector(),
+            const SizedBox(height: Spacing.md),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
+              child: AppSection(
+                title: 'Key Performance Indicators',
+                child: SalesSummaryCards(
+                  analytics: analytics,
+                  storeInfo: state.storeInfo,
+                ),
+              ),
+            ),
+            const SizedBox(height: Spacing.md),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
+              child: _buildPeriodHeader(context, state, filter),
+            ),
             const SizedBox(height: Spacing.sm),
             ResponsiveBuilder(
               builder: (context, layout) {
@@ -108,18 +124,6 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
                   ),
                 );
               },
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
-              child: _buildPeriodHeader(context, state, filter),
-            ),
-            const SizedBox(height: Spacing.md),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
-              child: SalesSummaryCards(
-                analytics: analytics,
-                storeInfo: state.storeInfo,
-              ),
             ),
             const SizedBox(height: Spacing.lg),
             Padding(

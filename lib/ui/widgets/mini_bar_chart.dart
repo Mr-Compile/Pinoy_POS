@@ -23,12 +23,14 @@ class MiniBarChart extends StatelessWidget {
   final List<BarChartPoint> points;
   final String? valuePrefix;
   final double height;
+  final int highlightIndex;
 
   const MiniBarChart({
     super.key,
     required this.points,
     this.valuePrefix,
     this.height = 160,
+    this.highlightIndex = -1,
   });
 
   @override
@@ -60,7 +62,9 @@ class MiniBarChart extends StatelessWidget {
                           child: _Bar(
                             value: points[i].value,
                             max: maxValue,
-                            color: i == points.length - 1 ? cs.tertiary : cs.primary,
+                            color: i == highlightIndex
+                                ? cs.tertiary
+                                : cs.primary,
                           ),
                         ),
                       ),

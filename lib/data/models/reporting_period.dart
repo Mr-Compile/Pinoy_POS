@@ -269,8 +269,8 @@ String formatPeriodLabel(ReportingPeriodBounds bounds, {String? customLabel}) {
 }
 
 DateTime startOfWeek(DateTime date) {
-  // Week starts on Monday (weekday 1 = Monday, 7 = Sunday).
-  final offset = date.weekday - DateTime.monday;
+  // Week starts on Sunday (weekday 7 = Sunday).
+  final offset = date.weekday % 7;
   return startOfDay(date.subtract(Duration(days: offset)));
 }
 

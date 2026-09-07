@@ -4,7 +4,7 @@ DateTime startOfDay(DateTime date) {
   return DateTime(date.year, date.month, date.day);
 }
 
-/// Returns the Monday of the week containing [date].
+/// Returns the Sunday of the week containing [date].
 DateTime startOfWeek(DateTime date) {
-  return startOfDay(date.subtract(Duration(days: date.weekday - 1)));
+  return startOfDay(date.subtract(Duration(days: date.weekday % 7)));
 }

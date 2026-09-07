@@ -14,19 +14,41 @@ class SalesPeriodFilterNotifier extends StateNotifier<SalesPeriodFilter> {
         ));
 
   void selectPeriod(SalesPeriod period) {
-    state = state.copyWith(period: period);
+    state = state.copyWith(
+      period: period,
+      clearCustomEnd: period != SalesPeriod.custom,
+    );
   }
 
   void selectDate(DateTime date) {
-    state = state.copyWith(selectedDate: startOfDay(date));
+    state = state.copyWith(
+      selectedDate: startOfDay(date),
+      clearCustomEnd: true,
+    );
   }
 
   void today() {
-    state = state.copyWith(selectedDate: startOfDay(DateTime.now()));
+    state = state.copyWith(
+      selectedDate: startOfDay(DateTime.now()),
+      clearCustomEnd: true,
+    );
+  }
+
+  /// Sets a custom start/end date range.
+  void setCustomRange(DateTime start, DateTime end) {
+    final normalizedStart = startOfDay(start);
+    final normalizedEnd = startOfDay(end);
+    state = state.copyWith(
+      period: SalesPeriod.custom,
+      selectedDate: normalizedStart,
+      customEnd:
+          normalizedEnd.isBefore(normalizedStart) ? normalizedStart : normalizedEnd,
+    );
   }
 
   /// Moves the selected period one step forward ([step] = 1) or backward
   /// ([step] = -1) along the current [period] granularity.
+  /// Custom ranges do not support stepping.
   void moveByStep(int step) {
     final selected = state.selectedDate;
     late final DateTime next;
@@ -44,8 +66,13 @@ class SalesPeriodFilterNotifier extends StateNotifier<SalesPeriodFilter> {
           targetMonth,
           selected.day.clamp(1, lastDay),
         );
+      case SalesPeriod.custom:
+        return;
     }
-    state = state.copyWith(selectedDate: startOfDay(next));
+    state = state.copyWith(
+      selectedDate: startOfDay(next),
+      clearCustomEnd: true,
+    );
   }
 }
 

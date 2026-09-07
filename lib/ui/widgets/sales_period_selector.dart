@@ -94,27 +94,122 @@ class _SalesPeriodSelectorState extends ConsumerState<SalesPeriodSelector> {
                     value: SalesPeriod.monthly,
                     label: Text('Monthly'),
                   ),
+                  ButtonSegment(
+                    value: SalesPeriod.custom,
+                    label: Text('Range'),
+                  ),
                 ],
               ),
             ),
           ],
         ),
         const SizedBox(height: Spacing.md),
-        // Calendar
-        Card(
-          clipBehavior: Clip.antiAlias,
-          margin: EdgeInsets.zero,
-          color: cs.surface,
-          child: CalendarDatePicker(
-            key: ValueKey(filter),
-            initialDate: filter.selectedDate,
-            firstDate: firstDate,
-            lastDate: lastDate,
-            currentDate: now,
-            onDateChanged: (date) => notifier.selectDate(startOfDay(date)),
+        // Calendar for fixed periods, range picker for custom.
+        if (filter.period == SalesPeriod.custom)
+          _buildCustomRangeCard(context, filter, notifier)
+        else
+          Card(
+            clipBehavior: Clip.antiAlias,
+            margin: EdgeInsets.zero,
+            color: cs.surface,
+            child: Localizations.override(
+              context: context,
+              locale: const Locale('en', 'US'),
+              child: CalendarDatePicker(
+                key: ValueKey(filter),
+                initialDate: filter.selectedDate,
+                firstDate: firstDate,
+                lastDate: lastDate,
+                currentDate: now,
+                onDateChanged: (date) => notifier.selectDate(startOfDay(date)),
+              ),
+            ),
           ),
-        ),
       ],
     );
+  }
+
+  Widget _buildCustomRangeCard(
+    BuildContext context,
+    SalesPeriodFilter filter,
+    SalesPeriodFilterNotifier notifier,
+  ) {
+    final cs = Theme.of(context).colorScheme;
+    final start = filter.selectedDate;
+    final end = filter.customEnd ?? start;
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      margin: EdgeInsets.zero,
+      color: cs.surface,
+      child: Padding(
+        padding: const EdgeInsets.all(Spacing.md),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  formatSalesPeriodLabel(filter),
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ],
+            ),
+            const SizedBox(height: Spacing.md),
+            ElevatedButton.icon(
+              onPressed: () => _pickCustomRange(context, filter, notifier),
+              icon: const Icon(Icons.date_range, size: 18),
+              label: const Text('Choose date range'),
+            ),
+            const SizedBox(height: Spacing.sm),
+            Text(
+              '${_shortDate(start)} – ${_shortDate(end)}',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _shortDate(DateTime date) {
+    return '${date.month}/${date.day}/${date.year}';
+  }
+
+  Future<void> _pickCustomRange(
+    BuildContext context,
+    SalesPeriodFilter filter,
+    SalesPeriodFilterNotifier notifier,
+  ) async {
+    final now = DateTime.now();
+    final initialRange = DateTimeRange(
+      start: filter.selectedDate,
+      end: filter.customEnd ?? filter.selectedDate,
+    );
+
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(now.year - 5, now.month, 1),
+      lastDate: now.add(const Duration(days: 365)),
+      initialDateRange: initialRange,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            appBarTheme: Theme.of(context).appBarTheme.copyWith(
+                  backgroundColor: Theme.of(context).colorScheme.surface,
+                ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      notifier.setCustomRange(picked.start, picked.end);
+    }
   }
 }

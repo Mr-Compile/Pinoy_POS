@@ -3,24 +3,27 @@ import 'package:pinoy_pos/data/models/reporting_period.dart' hide startOfWeek;
 
 /// The canonical calendar-based sales analytics granularities.
 ///
-/// The dashboard and sales analytics screens use only these three values.
-/// Hourly and preset ranges (Today, This Week, etc.) are intentionally
-/// avoided in the active analytics UI.
+/// The dashboard and sales analytics screens use these values plus a custom
+/// date range option. Hourly and preset ranges (Today, This Week, etc.) are
+/// intentionally avoided in the active analytics UI.
 enum SalesPeriod {
   daily,
   weekly,
-  monthly;
+  monthly,
+  custom;
 
   String get displayName => switch (this) {
         daily => 'Daily',
         weekly => 'Weekly',
         monthly => 'Monthly',
+        custom => 'Custom',
       };
 
   String get shortName => switch (this) {
         daily => 'D',
         weekly => 'W',
         monthly => 'M',
+        custom => 'C',
       };
 }
 
@@ -34,19 +37,27 @@ enum SalesPeriod {
 class SalesPeriodFilter {
   final SalesPeriod period;
   final DateTime selectedDate;
+  final DateTime? customEnd;
 
   SalesPeriodFilter({
     required this.period,
     required DateTime selectedDate,
-  }) : selectedDate = startOfDay(selectedDate);
+    DateTime? customEnd,
+  })  : selectedDate = startOfDay(selectedDate),
+        customEnd = customEnd != null ? startOfDay(customEnd) : null;
 
   SalesPeriodFilter copyWith({
     SalesPeriod? period,
     DateTime? selectedDate,
+    DateTime? customEnd,
+    bool clearCustomEnd = false,
   }) {
     return SalesPeriodFilter(
       period: period ?? this.period,
       selectedDate: selectedDate != null ? startOfDay(selectedDate) : this.selectedDate,
+      customEnd: clearCustomEnd
+          ? null
+          : (customEnd != null ? startOfDay(customEnd) : this.customEnd),
     );
   }
 
@@ -62,10 +73,22 @@ class SalesPeriodFilter {
         SalesPeriod.daily => selectedDate,
         SalesPeriod.weekly => startOfWeek(selectedDate),
         SalesPeriod.monthly => DateTime(selectedDate.year, selectedDate.month, 1),
+        SalesPeriod.custom => selectedDate,
+      };
+
+  /// For [SalesPeriod.custom], returns the selected end date. For other periods
+  /// it returns the computed exclusive end of the period.
+  DateTime get endOfPeriod => switch (period) {
+        SalesPeriod.daily => selectedDate.add(const Duration(days: 1)),
+        SalesPeriod.weekly => startOfWeek(selectedDate).add(const Duration(days: 7)),
+        SalesPeriod.monthly =>
+          DateTime(selectedDate.year, selectedDate.month + 1, 1),
+        SalesPeriod.custom =>
+          (customEnd ?? selectedDate).add(const Duration(days: 1)),
       };
 
   @override
-  String toString() => 'SalesPeriodFilter($period, $selectedDate)';
+  String toString() => 'SalesPeriodFilter($period, $selectedDate, $customEnd)';
 
   @override
   bool operator ==(Object other) =>
@@ -74,7 +97,10 @@ class SalesPeriodFilter {
           other.period == period &&
           other.selectedDate.year == selectedDate.year &&
           other.selectedDate.month == selectedDate.month &&
-          other.selectedDate.day == selectedDate.day;
+          other.selectedDate.day == selectedDate.day &&
+          other.customEnd?.year == customEnd?.year &&
+          other.customEnd?.month == customEnd?.month &&
+          other.customEnd?.day == customEnd?.day;
 
   @override
   int get hashCode => Object.hash(
@@ -82,6 +108,9 @@ class SalesPeriodFilter {
         selectedDate.year,
         selectedDate.month,
         selectedDate.day,
+        customEnd?.year,
+        customEnd?.month,
+        customEnd?.day,
       );
 }
 
@@ -128,6 +157,23 @@ ReportingPeriodBounds boundsForSalesFilter(SalesPeriodFilter filter) {
         groupBy: ReportGroupBy.week,
         weekAnchor: start,
       );
+    case SalesPeriod.custom:
+      final start = selected;
+      final end = filter.endOfPeriod;
+      final days = end.difference(start).inDays;
+      final groupBy = days <= 31
+          ? ReportGroupBy.day
+          : days <= 120
+              ? ReportGroupBy.week
+              : ReportGroupBy.month;
+      return ReportingPeriodBounds(
+        start: start,
+        end: end,
+        previousStart: start.subtract(Duration(days: days)),
+        previousEnd: start,
+        groupBy: groupBy,
+        weekAnchor: groupBy == ReportGroupBy.week ? start : null,
+      );
   }
 }
 
@@ -143,6 +189,9 @@ String formatSalesPeriodLabel(SalesPeriodFilter filter) {
       return '${_shortDate(start)} – ${_shortDate(end)}';
     case SalesPeriod.monthly:
       return _shortMonthYear(selected);
+    case SalesPeriod.custom:
+      final end = filter.customEnd ?? selected;
+      return '${_shortDate(selected)} – ${_shortDate(end)}';
   }
 }
 
