@@ -3,12 +3,11 @@ import 'package:pinoy_pos/data/models/calendar_day_sales.dart';
 import 'package:pinoy_pos/data/models/category_sales_result.dart';
 import 'package:pinoy_pos/data/models/daily_sales_point.dart';
 import 'package:pinoy_pos/data/models/payment_breakdown.dart';
-import 'package:pinoy_pos/data/models/peak_sales_period.dart';
 import 'package:pinoy_pos/data/models/reporting_period.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/data/models/sale_item.dart';
 import 'package:pinoy_pos/data/models/sales_analytics.dart';
-import 'package:pinoy_pos/data/models/sales_by_hour_point.dart';
+import 'package:pinoy_pos/data/models/sales_period.dart';
 import 'package:pinoy_pos/data/models/staff_sales_summary.dart';
 import 'package:pinoy_pos/data/models/top_product_result.dart';
 import 'package:pinoy_pos/data/models/user.dart';
@@ -44,27 +43,25 @@ class SalesAnalyticsService {
   bool get _canViewStaffPerformance =>
       _sessionManager.hasPermission('view_staff_performance');
 
-  /// Complete analytics for the selected [period].
-  Future<SalesAnalytics> getAnalytics(
-    ReportingPeriod period, {
-    DateTime? customStart,
-    DateTime? customEnd,
+  /// Complete analytics for the selected calendar [filter].
+  ///
+  /// This is the primary entry point for the Dashboard and Sales Analytics
+  /// screens. It maps [SalesPeriodFilter] to [ReportingPeriodBounds] and then
+  /// shares the same calculation path as the rest of the analytics service.
+  Future<SalesAnalytics> getAnalyticsForFilter(
+    SalesPeriodFilter filter, {
     String? paymentMethod,
     String? paymentStatus,
-    int? selectedStaffId,
   }) async {
-    if (!_canViewReports) return _emptyAnalytics(period, customStart, customEnd);
+    if (!_canViewReports) {
+      return SalesAnalytics.empty(boundsForSalesFilter(filter));
+    }
 
-    final bounds = periodBoundsFor(
-      period,
-      customStart: customStart,
-      customEnd: customEnd,
-    );
+    final bounds = boundsForSalesFilter(filter);
     return _analyticsForBounds(
       bounds,
       paymentMethod: paymentMethod,
       paymentStatus: paymentStatus,
-      selectedStaffId: selectedStaffId,
     );
   }
 
@@ -196,21 +193,19 @@ class SalesAnalyticsService {
     int? targetUserId,
     String? paymentMethod,
     String? paymentStatus,
-    int? selectedStaffId,
   }) async {
     final useFiltered = (paymentMethod != null && paymentMethod.isNotEmpty) ||
-        (paymentStatus != null && paymentStatus != 'confirmed') ||
-        (selectedStaffId != null);
+        (paymentStatus != null && paymentStatus != 'confirmed');
     if (useFiltered) {
       return _filteredAnalyticsForBounds(
         bounds,
         paymentMethod: paymentMethod,
         paymentStatus: paymentStatus,
-        userId: selectedStaffId ?? targetUserId ?? _scopedUserId,
+        userId: targetUserId ?? _scopedUserId,
       );
     }
 
-    final userId = selectedStaffId ?? targetUserId ?? _scopedUserId;
+    final userId = targetUserId ?? _scopedUserId;
 
     final currentSummary = await _saleRepository.getSalesSummary(
       bounds.start,
@@ -272,6 +267,7 @@ class SalesAnalyticsService {
       previousStart: bounds.previousStart,
       previousEnd: bounds.previousEnd,
       groupBy: bounds.groupBy,
+      weekAnchor: bounds.groupBy == ReportGroupBy.week ? bounds.previousStart : null,
     );
     final previousTrend = _fillTrendGaps(rawPreviousTrend, previousBounds);
 
@@ -312,12 +308,6 @@ class SalesAnalyticsService {
       limit: 100,
     );
 
-    final peakSalesPeriod = await _computePeakSalesPeriod(
-      rawTrend,
-      bounds,
-      userId: userId,
-    );
-
     return SalesAnalytics(
       bounds: bounds,
       totalSales: totalSales,
@@ -331,11 +321,10 @@ class SalesAnalyticsService {
       topProducts: topProducts,
       categorySales: categorySales,
       staffSummaries: staffSummaries,
-      peakSalesPeriod: peakSalesPeriod,
       sales: sales,
       paymentMethod: paymentMethod,
       paymentStatus: paymentStatus,
-      staffUserId: selectedStaffId ?? targetUserId,
+      staffUserId: userId,
     );
   }
 
@@ -433,6 +422,7 @@ class SalesAnalyticsService {
       previousStart: bounds.previousStart,
       previousEnd: bounds.previousEnd,
       groupBy: bounds.groupBy,
+      weekAnchor: bounds.groupBy == ReportGroupBy.week ? bounds.previousStart : null,
     );
     final previousTrend = _trendFromSales(previousSales, previousBounds);
 
@@ -442,7 +432,6 @@ class SalesAnalyticsService {
         await _categorySalesFromSales(currentSales, currentItems);
     final staffSummaries =
         await _staffSummariesFromSales(currentSales, userId);
-    final peakSalesPeriod = _peakSalesPeriodFromSales(currentSales, trend);
 
     return SalesAnalytics(
       bounds: bounds,
@@ -457,7 +446,6 @@ class SalesAnalyticsService {
       topProducts: topProducts,
       categorySales: categorySales,
       staffSummaries: staffSummaries,
-      peakSalesPeriod: peakSalesPeriod,
       sales: sales,
       paymentMethod: paymentMethod,
       paymentStatus: paymentStatus,
@@ -471,7 +459,7 @@ class SalesAnalyticsService {
   ) {
     final grouped = <DateTime, DailySalesPoint>{};
     for (final sale in sales) {
-      final key = _trendKey(sale.createdAt, bounds.groupBy);
+      final key = _trendKey(sale.createdAt, bounds.groupBy, bounds.weekAnchor);
       final existing = grouped[key];
       grouped[key] = DailySalesPoint(
         date: key,
@@ -595,45 +583,6 @@ class SalesAnalyticsService {
     return summaries..sort((a, b) => b.totalSales.compareTo(a.totalSales));
   }
 
-  PeakSalesPeriod _peakSalesPeriodFromSales(
-    List<Sale> sales,
-    List<DailySalesPoint> trend,
-  ) {
-    final hourly = <int, SalesByHourPoint>{};
-    for (final sale in sales) {
-      final hour = sale.createdAt.hour;
-      final existing = hourly[hour];
-      hourly[hour] = SalesByHourPoint(
-        hour: hour,
-        total: (existing?.total ?? 0.0) + sale.totalAmount,
-        count: (existing?.count ?? 0) + 1,
-      );
-    }
-
-    SalesByHourPoint? peakHourPoint;
-    for (final point in hourly.values) {
-      if (peakHourPoint == null || point.total > peakHourPoint.total) {
-        peakHourPoint = point;
-      }
-    }
-
-    DailySalesPoint? peakDay;
-    for (final point in trend) {
-      if (peakDay == null || point.total > peakDay.total) {
-        peakDay = point;
-      }
-    }
-
-    return PeakSalesPeriod(
-      peakHour: peakHourPoint?.hour,
-      peakHourSales: peakHourPoint?.total ?? 0.0,
-      peakHourTransactions: peakHourPoint?.count ?? 0,
-      peakDay: peakDay?.date,
-      peakDaySales: peakDay?.total ?? 0.0,
-      peakDayTransactions: peakDay?.count ?? 0,
-    );
-  }
-
   List<DailySalesPoint> _fillTrendGaps(
     List<DailySalesPoint> points,
     ReportingPeriodBounds bounds,
@@ -641,37 +590,44 @@ class SalesAnalyticsService {
     // For week-level grouping the DAO returns daily rows, so collapse them
     // to week starts before filling.
     if (bounds.groupBy == ReportGroupBy.week) {
-      points = _collapseToWeek(points);
+      points = _collapseToWeek(points, bounds.weekAnchor);
     }
 
     final map = <DateTime, DailySalesPoint>{};
     for (final p in points) {
-      map[_trendKey(p.date, bounds.groupBy)] = p;
+      map[_trendKey(p.date, bounds.groupBy, bounds.weekAnchor)] = p;
     }
 
     final filled = <DailySalesPoint>[];
-    var cursor = _trendKey(bounds.start, bounds.groupBy);
+    var cursor = _trendKey(bounds.start, bounds.groupBy, bounds.weekAnchor);
     final end = bounds.end;
 
     while (cursor.isBefore(end)) {
-      final key = _trendKey(cursor, bounds.groupBy);
+      final key = _trendKey(cursor, bounds.groupBy, bounds.weekAnchor);
       final existing = map[key];
       if (existing != null) {
         filled.add(existing);
       } else {
         filled.add(DailySalesPoint(date: cursor, total: 0.0, count: 0));
       }
-      cursor = _nextTrendStep(cursor, bounds.groupBy);
+      cursor = _nextTrendStep(cursor, bounds.groupBy, bounds.weekAnchor);
     }
 
     return filled;
   }
 
-  /// Collapses daily sales points into week-start (Monday) buckets.
-  List<DailySalesPoint> _collapseToWeek(List<DailySalesPoint> points) {
+  /// Collapses daily sales points into week-start buckets.
+  ///
+  /// When [anchor] is provided the buckets are 7-day blocks counted from that
+  /// anchor (used for monthly analytics). Otherwise the buckets are calendar
+  /// Mondays.
+  List<DailySalesPoint> _collapseToWeek(
+    List<DailySalesPoint> points, [
+    DateTime? anchor,
+  ]) {
     final byWeek = <DateTime, DailySalesPoint>{};
     for (final p in points) {
-      final week = startOfWeek(p.date);
+      final week = _weekKey(p.date, anchor);
       final existing = byWeek[week];
       if (existing == null) {
         byWeek[week] = p.copyWith(date: week);
@@ -686,23 +642,27 @@ class SalesAnalyticsService {
       ..sort((a, b) => a.date.compareTo(b.date));
   }
 
-  DateTime _trendKey(DateTime date, ReportGroupBy groupBy) {
+  DateTime _trendKey(
+    DateTime date,
+    ReportGroupBy groupBy, [
+    DateTime? anchor,
+  ]) {
     switch (groupBy) {
-      case ReportGroupBy.hour:
-        return DateTime(date.year, date.month, date.day, date.hour);
       case ReportGroupBy.day:
         return DateTime(date.year, date.month, date.day);
       case ReportGroupBy.week:
-        return startOfWeek(date);
+        return _weekKey(date, anchor);
       case ReportGroupBy.month:
         return DateTime(date.year, date.month, 1);
     }
   }
 
-  DateTime _nextTrendStep(DateTime date, ReportGroupBy groupBy) {
+  DateTime _nextTrendStep(
+    DateTime date,
+    ReportGroupBy groupBy, [
+    DateTime? anchor,
+  ]) {
     switch (groupBy) {
-      case ReportGroupBy.hour:
-        return date.add(const Duration(hours: 1));
       case ReportGroupBy.day:
         return date.add(const Duration(days: 1));
       case ReportGroupBy.week:
@@ -713,43 +673,12 @@ class SalesAnalyticsService {
     }
   }
 
-  /// Computes the busiest hour-of-day and the busiest calendar bucket for the
-  /// selected [bounds].
-  Future<PeakSalesPeriod> _computePeakSalesPeriod(
-    List<DailySalesPoint> trend,
-    ReportingPeriodBounds bounds, {
-    int? userId,
-  }) async {
-    // Hour-of-day aggregation is meaningful for any range.
-    final hourly = await _saleRepository.getSalesByHourOfDay(
-      bounds.start,
-      bounds.end,
-      userId: userId,
-    );
-
-    SalesByHourPoint? peakHour;
-    for (final h in hourly) {
-      if (peakHour == null || h.total > peakHour.total) {
-        peakHour = h;
-      }
-    }
-
-    // Peak day/month is the largest point in the current period trend.
-    DailySalesPoint? peakDay;
-    for (final p in trend) {
-      if (peakDay == null || p.total > peakDay.total) {
-        peakDay = p;
-      }
-    }
-
-    return PeakSalesPeriod(
-      peakHour: peakHour?.hour,
-      peakHourSales: peakHour?.total ?? 0.0,
-      peakHourTransactions: peakHour?.count ?? 0,
-      peakDay: peakDay?.date,
-      peakDaySales: peakDay?.total ?? 0.0,
-      peakDayTransactions: peakDay?.count ?? 0,
-    );
+  /// Returns the start of the 7-day bucket containing [date].
+  DateTime _weekKey(DateTime date, DateTime? anchor) {
+    if (anchor == null) return startOfWeek(date);
+    final days = date.difference(anchor).inDays;
+    final block = days ~/ 7;
+    return anchor.add(Duration(days: block * 7));
   }
 
   /// Staff performance for the given period.

@@ -6,7 +6,6 @@ import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/modal_result.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/activity_log.dart';
-import 'package:pinoy_pos/data/models/reporting_period.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/staff_provider.dart';
@@ -130,7 +129,6 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
                 child: AppSection(
                   title: 'Sales Trend',
-                  subtitle: _trendSubtitle(state.analytics!.bounds),
                   child: SalesTrendChart(
                     trend: state.analytics!.trend,
                     groupBy: state.analytics!.bounds.groupBy,
@@ -319,15 +317,6 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
           ),
       ],
     );
-  }
-
-  String _trendSubtitle(ReportingPeriodBounds bounds) {
-    return switch (bounds.groupBy) {
-      ReportGroupBy.day => 'Daily',
-      ReportGroupBy.hour => 'Hourly',
-      ReportGroupBy.week => 'Weekly',
-      ReportGroupBy.month => 'Monthly',
-    };
   }
 
   void _openSale(Sale sale) {

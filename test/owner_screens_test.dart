@@ -45,7 +45,8 @@ class _FakeProductService extends ProductService {
 }
 
 class _FakeDashboardNotifier extends DashboardNotifier {
-  _FakeDashboardNotifier() : super(DashboardService(), isAuthenticated: true);
+  _FakeDashboardNotifier(Ref ref)
+      : super(DashboardService(), ref, isAuthenticated: true);
 
   @override
   Future<void> load() async {}
@@ -175,7 +176,7 @@ void main() {
           // doesn't trigger long-running analytics queries that can leave
           // the database locked for the next test.
           dashboardProvider.overrideWith(
-            (ref) => _FakeDashboardNotifier(),
+            (ref) => _FakeDashboardNotifier(ref),
           ),
         ],
         child: MaterialApp(

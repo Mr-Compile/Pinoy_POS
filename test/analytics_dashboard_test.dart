@@ -7,8 +7,8 @@ import 'package:pinoy_pos/core/database_seeder.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/data/models/product.dart';
-import 'package:pinoy_pos/data/models/reporting_period.dart';
 import 'package:pinoy_pos/data/models/sale_item.dart';
+import 'package:pinoy_pos/data/models/sales_period.dart';
 import 'package:pinoy_pos/data/repositories/product_repository.dart';
 import 'package:pinoy_pos/data/repositories/sale_repository.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
@@ -60,8 +60,8 @@ void main() {
       final success = await _createSale(product, 3);
       expect(success, isTrue);
 
-      final analytics = await SalesAnalyticsService().getAnalytics(
-        ReportingPeriod.today,
+      final analytics = await SalesAnalyticsService().getAnalyticsForFilter(
+        SalesPeriodFilter(period: SalesPeriod.daily, selectedDate: DateTime.now()),
       );
 
       expect(analytics.totalSales, product.price * 3);
@@ -76,8 +76,6 @@ void main() {
       expect(analytics.topProducts.first.productName, 'Adobo Rice');
       expect(analytics.topProducts.first.totalQuantity, 3);
       expect(analytics.categorySales, isNotEmpty);
-      expect(analytics.peakSalesPeriod.peakHour, isNotNull);
-      expect(analytics.peakSalesPeriod.peakDay, isNotNull);
     });
 
     test('excludes cancelled and soft-deleted sales', () async {
@@ -96,8 +94,8 @@ void main() {
       );
       await SaleRepository().update(cancelled);
 
-      final analytics = await SalesAnalyticsService().getAnalytics(
-        ReportingPeriod.today,
+      final analytics = await SalesAnalyticsService().getAnalyticsForFilter(
+        SalesPeriodFilter(period: SalesPeriod.daily, selectedDate: DateTime.now()),
       );
 
       expect(analytics.totalSales, 120.0);
@@ -116,8 +114,8 @@ void main() {
       await _login('staff');
       await _createSale(product, 1);
 
-      final staffAnalytics = await SalesAnalyticsService().getAnalytics(
-        ReportingPeriod.today,
+      final staffAnalytics = await SalesAnalyticsService().getAnalyticsForFilter(
+        SalesPeriodFilter(period: SalesPeriod.daily, selectedDate: DateTime.now()),
       );
 
       expect(staffAnalytics.totalSales, 95.0);
@@ -134,7 +132,7 @@ void main() {
       await _createSale(product, 1);
 
       final dashboardData = await DashboardService().getDashboard(
-        ReportingPeriod.today,
+        SalesPeriodFilter(period: SalesPeriod.daily, selectedDate: DateTime.now()),
       );
 
       expect(dashboardData, isNotNull);
@@ -156,7 +154,7 @@ void main() {
       await _createSale(product, 1);
 
       final dashboardData = await DashboardService().getDashboard(
-        ReportingPeriod.today,
+        SalesPeriodFilter(period: SalesPeriod.daily, selectedDate: DateTime.now()),
       );
 
       expect(dashboardData, isNotNull);
@@ -171,7 +169,7 @@ void main() {
       await _login('admin');
 
       final dashboardData = await DashboardService().getDashboard(
-        ReportingPeriod.today,
+        SalesPeriodFilter(period: SalesPeriod.daily, selectedDate: DateTime.now()),
       );
 
       expect(dashboardData, isNotNull);

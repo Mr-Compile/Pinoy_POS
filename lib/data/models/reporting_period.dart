@@ -50,13 +50,11 @@ enum ReportingPeriod {
 
 /// How the trend data should be grouped for a selected period.
 enum ReportGroupBy {
-  hour,
   day,
   week,
   month;
 
   String get displayName => switch (this) {
-        hour => 'By Hour',
         day => 'By Day',
         week => 'By Week',
         month => 'By Month',
@@ -80,12 +78,20 @@ class ReportingPeriodBounds {
   /// The natural grouping for trend data for these bounds.
   final ReportGroupBy groupBy;
 
+  /// Optional anchor for week-level grouping.
+  ///
+  /// When set, week buckets are 7-day blocks counted from this anchor instead
+  /// of calendar Mondays. This is used for monthly analytics where the bars
+  /// should align with the first day of the month ("Week 1", "Week 2", ...).
+  final DateTime? weekAnchor;
+
   const ReportingPeriodBounds({
     required this.start,
     required this.end,
     required this.previousStart,
     required this.previousEnd,
     required this.groupBy,
+    this.weekAnchor,
   });
 
   /// Whether this is a custom range (used for labeling).
@@ -96,7 +102,7 @@ class ReportingPeriodBounds {
 
   @override
   String toString() {
-    return 'ReportingPeriodBounds($start → $end, prev $previousStart → $previousEnd, $groupBy)';
+    return 'ReportingPeriodBounds($start → $end, prev $previousStart → $previousEnd, $groupBy${weekAnchor != null ? ', anchor $weekAnchor' : ''})';
   }
 }
 
@@ -140,7 +146,7 @@ ReportingPeriodBounds periodBoundsFor(
         end: today.add(const Duration(days: 1)),
         previousStart: today.subtract(const Duration(days: 1)),
         previousEnd: today,
-        groupBy: ReportGroupBy.hour,
+        groupBy: ReportGroupBy.day,
       );
     case ReportingPeriod.yesterday:
       final start = today.subtract(const Duration(days: 1));
@@ -149,7 +155,7 @@ ReportingPeriodBounds periodBoundsFor(
         end: today,
         previousStart: start.subtract(const Duration(days: 1)),
         previousEnd: start,
-        groupBy: ReportGroupBy.hour,
+        groupBy: ReportGroupBy.day,
       );
     case ReportingPeriod.thisWeek:
       final start = startOfWeek(today);
@@ -275,7 +281,6 @@ DateTime _previousPeriodStart(DateTime start, DateTime end) {
 
 ReportGroupBy _groupByForRange(DateTime start, DateTime end) {
   final days = end.difference(start).inDays;
-  if (days <= 1) return ReportGroupBy.hour;
   if (days <= 31) return ReportGroupBy.day;
   if (days <= 120) return ReportGroupBy.week;
   return ReportGroupBy.month;

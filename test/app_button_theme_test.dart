@@ -2,18 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/quick_action_theme.dart';
 import 'package:pinoy_pos/ui/widgets/app_button.dart';
+import 'package:pinoy_pos/ui/widgets/app_quick_action_card.dart';
 import 'package:pinoy_pos/ui/widgets/quick_action_grid.dart';
 
-/// Regression tests for the shared button theming:
+/// Regression tests for the shared button theming and quick action color
+/// system:
 ///
 /// - The "Sign In" gradient button previously painted its label with
 ///   `ColorScheme.onSurface`, which is near-black in light mode and made
 ///   the label unreadable on the dark brand gradient.
-/// - Quick actions painted `ColorScheme.onSurface` on top of semantic
-///   fills, producing dark text on dark fills in light mode and white
-///   text on lightened fills in dark mode. They must use the semantic
-///   role's paired "on" color in both themes.
+/// - Filled semantic buttons now use [AppSemanticColors.resolveSurface] so
+///   they render deep, intentional surfaces in dark mode with a
+///   contrast-computed foreground instead of pale accent fills with black
+///   text.
+/// - Quick actions resolve their colors through [QuickActionType] and the
+///   centralized [resolveQuickActionStyle] so every role sees the same
+///   semantic colors with correct light/dark foregrounds.
 void main() {
   Widget wrap(Widget child, ThemeData theme) {
     return MaterialApp(
@@ -40,27 +46,42 @@ void main() {
     }
   });
 
-  group('AppButton.quickAction foreground', () {
+  group('AppButton.filled surfaces', () {
     final cases = <AppButtonColor, (Color, Color)>{
       AppButtonColor.success: (
-        AppSemanticColors.success,
-        AppSemanticColors.onSuccess,
+        AppSemanticColors.successSurface,
+        AppSemanticColors.resolveSurface(
+          AppSemanticColors.successSurface,
+          Brightness.dark,
+        ),
       ),
       AppButtonColor.warning: (
-        AppSemanticColors.warning,
-        AppSemanticColors.onWarning,
+        AppSemanticColors.warningSurface,
+        AppSemanticColors.resolveSurface(
+          AppSemanticColors.warningSurface,
+          Brightness.dark,
+        ),
       ),
       AppButtonColor.error: (
-        AppSemanticColors.error,
-        AppSemanticColors.onError,
+        AppSemanticColors.errorSurface,
+        AppSemanticColors.resolveSurface(
+          AppSemanticColors.errorSurface,
+          Brightness.dark,
+        ),
       ),
       AppButtonColor.info: (
-        AppSemanticColors.info,
-        AppSemanticColors.onInfo,
+        AppSemanticColors.infoSurface,
+        AppSemanticColors.resolveSurface(
+          AppSemanticColors.infoSurface,
+          Brightness.dark,
+        ),
       ),
       AppButtonColor.neutral: (
-        AppSemanticColors.neutral,
-        AppSemanticColors.onNeutral,
+        AppSemanticColors.neutralSurface,
+        AppSemanticColors.resolveSurface(
+          AppSemanticColors.neutralSurface,
+          Brightness.dark,
+        ),
       ),
     };
 
@@ -70,11 +91,10 @@ void main() {
     ]) {
       for (final entry in cases.entries) {
         testWidgets(
-            '${entry.key.name} uses its semantic on-color in $name theme',
+            '${entry.key.name} filled button uses a surface in $name theme',
             (tester) async {
           await tester.pumpWidget(wrap(
-            AppButton.quickAction(
-              icon: Icons.star,
+            AppButton.filled(
               label: 'Action',
               color: entry.key,
               onPressed: () {},
@@ -82,14 +102,10 @@ void main() {
             theme,
           ));
 
-          final expectedForeground = AppSemanticColors.resolveOn(
-            entry.value.$2,
-            brightness,
-          );
-          final expectedBackground = AppSemanticColors.resolve(
-            entry.value.$1,
-            brightness,
-          );
+          final expectedBackground =
+              AppSemanticColors.resolveSurface(entry.value.$1, brightness);
+          final expectedForeground =
+              AppSemanticColors.contrastFor(expectedBackground);
 
           final button = tester.widget<FilledButton>(
             find.byType(FilledButton),
@@ -104,7 +120,7 @@ void main() {
             style.foregroundColor?.resolve({WidgetState.focused}),
             expectedForeground,
           );
-          // The foreground must never be the surface text color — that was
+          // The foreground must not be the surface text color — that was
           // the contrast bug this regression test guards.
           expect(
             style.foregroundColor?.resolve({WidgetState.focused}),
@@ -113,29 +129,93 @@ void main() {
         });
       }
     }
+  });
 
-    testWidgets('disabled quick action is dimmed on the semantic fill',
+  group('QuickActionTheme resolves theme-aware styles', () {
+    test('light mode trash is amber with black foreground', () {
+      final style = resolveQuickActionStyleForBrightness(
+        Brightness.light,
+        QuickActionType.trash,
+      );
+      expect(style.background, AppSemanticColors.warningSurface);
+      expect(style.foreground, Colors.black);
+    });
+
+    test('dark mode trash is deep amber with white foreground', () {
+      final style = resolveQuickActionStyleForBrightness(
+        Brightness.dark,
+        QuickActionType.trash,
+      );
+      expect(style.background, const Color(0xFF92400E));
+      expect(style.foreground, Colors.white);
+    });
+
+    test('dark mode manage users is deep blue with white foreground', () {
+      final style = resolveQuickActionStyleForBrightness(
+        Brightness.dark,
+        QuickActionType.manageUsers,
+      );
+      expect(style.background, const Color(0xFF1E3A8A));
+      expect(style.foreground, Colors.white);
+    });
+
+    test('dark mode activity logs is deep purple with white foreground', () {
+      final style = resolveQuickActionStyleForBrightness(
+        Brightness.dark,
+        QuickActionType.activityLogs,
+      );
+      expect(style.background, const Color(0xFF5B21B6));
+      expect(style.foreground, Colors.white);
+    });
+
+    test('dark mode ai config is deep violet with white foreground', () {
+      final style = resolveQuickActionStyleForBrightness(
+        Brightness.dark,
+        QuickActionType.aiConfig,
+      );
+      expect(style.background, const Color(0xFF4C1D95));
+      expect(style.foreground, Colors.white);
+    });
+
+    test('dark mode settings is dark slate with white foreground', () {
+      final style = resolveQuickActionStyleForBrightness(
+        Brightness.dark,
+        QuickActionType.settings,
+      );
+      expect(style.background, const Color(0xFF334155));
+      expect(style.foreground, Colors.white);
+    });
+  });
+
+  group('AppQuickActionCard rendering', () {
+    testWidgets('Trash action renders the resolved background and foreground',
         (tester) async {
       await tester.pumpWidget(wrap(
-        const AppButton.quickAction(
-          icon: Icons.star,
-          label: 'Action',
-          color: AppButtonColor.success,
-          onPressed: null,
+        const AppQuickActionCard(
+          type: QuickActionType.trash,
+          onTap: null,
         ),
-        AppColors.getLightTheme(),
+        AppColors.getDarkTheme(),
       ));
 
-      final button = tester.widget<FilledButton>(find.byType(FilledButton));
-      final style = button.style!;
-      expect(
-        style.backgroundColor?.resolve({WidgetState.disabled}),
-        AppSemanticColors.success.withValues(alpha: 0.12),
+      final style = resolveQuickActionStyleForBrightness(
+        Brightness.dark,
+        QuickActionType.trash,
       );
-      expect(
-        style.foregroundColor?.resolve({WidgetState.disabled}),
-        AppSemanticColors.onSuccess.withValues(alpha: 0.38),
+
+      final container = tester.widget<Material>(
+        find.descendant(
+          of: find.byType(AppQuickActionCard),
+          matching: find.byType(Material),
+        ),
       );
+      expect(container.color, style.background);
+
+      final icon = tester.widget<Icon>(find.byIcon(Icons.delete_outline));
+      expect(icon.color, style.foreground);
+
+      final label = tester.widget<Text>(find.text('Trash'));
+      expect(label.style?.color, style.foreground);
     });
   });
 

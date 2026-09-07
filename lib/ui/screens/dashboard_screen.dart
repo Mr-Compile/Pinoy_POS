@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/currency_utils.dart';
+import 'package:pinoy_pos/core/quick_action_theme.dart';
 import 'package:pinoy_pos/core/route_guard.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/activity_log.dart';
@@ -10,11 +11,12 @@ import 'package:pinoy_pos/data/models/announcement.dart';
 import 'package:pinoy_pos/data/models/product.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/data/models/sales_analytics.dart';
+import 'package:pinoy_pos/data/models/sales_period.dart';
 import 'package:pinoy_pos/data/models/staff_sales_summary.dart';
-import 'package:pinoy_pos/data/models/peak_sales_period.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/dashboard_provider.dart';
+import 'package:pinoy_pos/providers/sales_period_filter_provider.dart';
 import 'package:pinoy_pos/services/dashboard_service.dart';
 import 'package:pinoy_pos/ui/screens/ai_advisor_screen.dart';
 import 'package:pinoy_pos/ui/screens/ai_config_screen.dart';
@@ -31,18 +33,18 @@ import 'package:pinoy_pos/ui/screens/backup_restore_screen.dart';
 import 'package:pinoy_pos/ui/screens/activity_logs_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
+import 'package:pinoy_pos/ui/widgets/app_quick_action_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_section.dart';
 import 'package:pinoy_pos/ui/widgets/category_sales_bar_chart.dart';
 import 'package:pinoy_pos/ui/widgets/donut_chart.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/kpi_card.dart';
-import 'package:pinoy_pos/ui/widgets/peak_sales_card.dart';
 import 'package:pinoy_pos/ui/widgets/payment_breakdown_view.dart';
-import 'package:pinoy_pos/ui/widgets/period_selector.dart';
 import 'package:pinoy_pos/ui/widgets/quick_action_grid.dart';
-import 'package:pinoy_pos/ui/widgets/sales_line_chart.dart';
+import 'package:pinoy_pos/ui/widgets/sales_period_selector.dart';
 import 'package:pinoy_pos/ui/widgets/sales_summary_cards.dart';
+import 'package:pinoy_pos/ui/widgets/sales_trend_chart.dart';
 import 'package:pinoy_pos/ui/widgets/staff_performance_list.dart';
 import 'package:pinoy_pos/ui/widgets/top_products_bar_chart.dart';
 
@@ -63,6 +65,11 @@ class DashboardScreen extends ConsumerWidget {
     final authState = ref.watch(authStateProvider);
     final user = authState.user;
     final dashboardState = ref.watch(dashboardProvider);
+
+    // Reload dashboard data whenever the shared sales period filter changes.
+    ref.listen(salesPeriodFilterProvider, (_, _) {
+      ref.read(dashboardProvider.notifier).load();
+    });
 
     return Scaffold(
       appBar: const AppHeader(title: 'Dashboard'),
@@ -105,7 +112,6 @@ class _DashboardLoadedView extends ConsumerWidget {
       return const Center(child: Text('Not authenticated'));
     }
 
-    final state = ref.watch(dashboardProvider);
     // The Admin dashboard is system/maintenance only — none of its metrics
     // are period-driven, so the selector is hidden for that role.
     final showPeriodSelector = data is! AdminDashboardData;
@@ -119,19 +125,7 @@ class _DashboardLoadedView extends ConsumerWidget {
           _WelcomeHeader(user: user!),
           if (showPeriodSelector) ...[
             const SizedBox(height: Spacing.md),
-            PeriodSelector(
-              selected: state.period,
-              customStart: state.customStart,
-              customEnd: state.customEnd,
-              onSelected: (period) {
-                ref.read(dashboardProvider.notifier).selectPeriod(period);
-              },
-              onCustomRange: (range) {
-                ref
-                    .read(dashboardProvider.notifier)
-                    .setCustomRange(range.start, range.end);
-              },
-            ),
+            const SalesPeriodSelector(),
           ],
           const SizedBox(height: Spacing.xl),
           // Dispatch on the loaded payload's type — guaranteed to match the
@@ -307,6 +301,7 @@ class _OwnerDashboard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final analytics = data.analytics;
+    final filter = ref.watch(salesPeriodFilterProvider);
     final currencySymbol = CurrencyUtils.symbol();
     final authNotifier = ref.read(authStateProvider.notifier);
 
@@ -329,11 +324,7 @@ class _OwnerDashboard extends ConsumerWidget {
         const SizedBox(height: Spacing.xxl),
 
         // ── Sales trend ──
-        _buildSalesTrendCard(context, analytics, currencySymbol),
-        const SizedBox(height: Spacing.xxl),
-
-        // ── Period comparison ──
-        _buildComparisonChart(context, analytics, currencySymbol),
+        _buildSalesTrendCard(context, analytics, filter.period, currencySymbol),
         const SizedBox(height: Spacing.xxl),
 
         // ── Two-column: payment breakdown + top products ──
@@ -349,10 +340,6 @@ class _OwnerDashboard extends ConsumerWidget {
           _buildStaffPerformanceSection(context, analytics.staffSummaries),
           const SizedBox(height: Spacing.xxl),
         ],
-
-        // ── Peak sales ──
-        _buildPeakSalesCard(context, analytics.peakSalesPeriod),
-        const SizedBox(height: Spacing.xxl),
 
         // ── Low stock alert ──
         _buildLowStockAlert(context, ref, data.lowStockProducts),
@@ -390,44 +377,19 @@ class _OwnerDashboard extends ConsumerWidget {
   Widget _buildSalesTrendCard(
     BuildContext context,
     SalesAnalytics analytics,
+    SalesPeriod period,
     String currencySymbol,
   ) {
     return AppSection(
       title: 'Sales Trend',
       padding: const EdgeInsets.only(bottom: Spacing.md),
       child: AppCard(
-        child: analytics.trend.isEmpty
-            ? const _ChartEmptyState(
-                message: 'No sales data available for this period.',
-              )
-            : SalesLineChart(
-                points: analytics.trend,
-                groupBy: analytics.bounds.groupBy,
-                valuePrefix: currencySymbol,
-              ),
-      ),
-    );
-  }
-
-  Widget _buildComparisonChart(
-    BuildContext context,
-    SalesAnalytics analytics,
-    String currencySymbol,
-  ) {
-    return AppSection(
-      title: 'Period Comparison',
-      padding: const EdgeInsets.only(bottom: Spacing.md),
-      child: AppCard(
-        child: analytics.trend.isEmpty && analytics.previousTrend.isEmpty
-            ? const _ChartEmptyState(
-                message: 'No comparison data available.',
-              )
-            : SalesComparisonChart(
-                current: analytics.trend,
-                previous: analytics.previousTrend,
-                groupBy: analytics.bounds.groupBy,
-                valuePrefix: currencySymbol,
-              ),
+        child: SalesTrendChart(
+          trend: analytics.trend,
+          groupBy: analytics.bounds.groupBy,
+          period: period,
+          valuePrefix: currencySymbol,
+        ),
       ),
     );
   }
@@ -480,19 +442,6 @@ class _OwnerDashboard extends ConsumerWidget {
       child: StaffPerformanceList(
         staff: summaries,
         storeInfo: null,
-      ),
-    );
-  }
-
-  Widget _buildPeakSalesCard(
-    BuildContext context,
-    PeakSalesPeriod peak,
-  ) {
-    return AppSection(
-      title: 'Peak Sales',
-      padding: const EdgeInsets.only(bottom: Spacing.md),
-      child: AppCard(
-        child: PeakSalesCard(peak: peak),
       ),
     );
   }
@@ -662,10 +611,8 @@ class _OwnerDashboard extends ConsumerWidget {
       child: QuickActionGrid(
         children: [
           if (authNotifier.hasPermission('create_sales'))
-            _QuickAction(
-              label: 'New Sale',
-              color: AppButtonColor.success,
-              icon: Icons.point_of_sale,
+            AppQuickActionCard(
+              type: QuickActionType.newSale,
               onTap: () => RouteGuard.pushIfAuthorized(
                 context, ref,
                 screen: const POSScreen(),
@@ -674,10 +621,8 @@ class _OwnerDashboard extends ConsumerWidget {
               ),
             ),
           if (authNotifier.hasPermission('edit_products'))
-            _QuickAction(
-              label: 'Add Product',
-              color: AppButtonColor.info,
-              icon: Icons.add_box_outlined,
+            AppQuickActionCard(
+              type: QuickActionType.addProduct,
               onTap: () => RouteGuard.pushIfAuthorized(
                 context, ref,
                 screen: const ProductsScreen(),
@@ -686,10 +631,8 @@ class _OwnerDashboard extends ConsumerWidget {
               ),
             ),
           if (authNotifier.hasPermission('add_stock'))
-            _QuickAction(
-              label: 'Add Stock',
-              color: AppButtonColor.info,
-              icon: Icons.warehouse_outlined,
+            AppQuickActionCard(
+              type: QuickActionType.addStock,
               onTap: () => RouteGuard.pushIfAuthorized(
                 context, ref,
                 screen: const StockScreen(),
@@ -698,10 +641,8 @@ class _OwnerDashboard extends ConsumerWidget {
               ),
             ),
           if (authNotifier.hasPermission('view_sales'))
-            _QuickAction(
-              label: 'View Sales',
-              color: AppButtonColor.success,
-              icon: Icons.receipt_long,
+            AppQuickActionCard(
+              type: QuickActionType.viewSales,
               onTap: () => RouteGuard.pushIfAuthorized(
                 context, ref,
                 screen: const SalesScreen(),
@@ -710,10 +651,8 @@ class _OwnerDashboard extends ConsumerWidget {
               ),
             ),
           if (authNotifier.hasPermission('view_reports'))
-            _QuickAction(
-              label: 'Reports',
-              color: AppButtonColor.secondary,
-              icon: Icons.analytics_outlined,
+            AppQuickActionCard(
+              type: QuickActionType.reports,
               onTap: () => RouteGuard.pushIfAuthorized(
                 context, ref,
                 screen: const SalesAnalyticsScreen(),
@@ -722,10 +661,8 @@ class _OwnerDashboard extends ConsumerWidget {
               ),
             ),
           if (authNotifier.hasPermission('manage_staff'))
-            _QuickAction(
-              label: 'Manage Staff',
-              color: AppButtonColor.primary,
-              icon: Icons.people,
+            AppQuickActionCard(
+              type: QuickActionType.manageStaff,
               onTap: () => RouteGuard.pushIfAuthorized(
                 context, ref,
                 screen: const StaffManagementScreen(),
@@ -734,10 +671,8 @@ class _OwnerDashboard extends ConsumerWidget {
               ),
             ),
           if (authNotifier.hasPermission('view_ai_advisor'))
-            _QuickAction(
-              label: 'AI Advisor',
-              color: AppButtonColor.secondary,
-              icon: Icons.auto_awesome,
+            AppQuickActionCard(
+              type: QuickActionType.aiAdvisor,
               onTap: () => RouteGuard.pushIfAuthorized(
                 context, ref,
                 screen: const AIAdvisorScreen(),
@@ -1040,10 +975,8 @@ class _AdminDashboard extends ConsumerWidget {
       child: QuickActionGrid(
         children: [
           if (authNotifier.hasPermission('manage_users'))
-            _QuickAction(
-              label: 'Manage Users',
-              color: AppButtonColor.primary,
-              icon: Icons.people,
+            AppQuickActionCard(
+              type: QuickActionType.manageUsers,
               onTap: () => RouteGuard.pushIfAuthorized(
                 context, ref,
                 screen: const UsersScreen(),
@@ -1052,10 +985,8 @@ class _AdminDashboard extends ConsumerWidget {
               ),
             ),
           if (authNotifier.hasPermission('backup_restore'))
-            _QuickAction(
-              label: 'Backup & Restore',
-              color: AppButtonColor.neutral,
-              icon: Icons.backup,
+            AppQuickActionCard(
+              type: QuickActionType.backupRestore,
               onTap: () => RouteGuard.pushIfAuthorized(
                 context, ref,
                 screen: const BackupRestoreScreen(),
@@ -1064,10 +995,8 @@ class _AdminDashboard extends ConsumerWidget {
               ),
             ),
           if (authNotifier.hasPermission('view_trash'))
-            _QuickAction(
-              label: 'Trash',
-              color: AppButtonColor.warning,
-              icon: Icons.delete_outline,
+            AppQuickActionCard(
+              type: QuickActionType.trash,
               onTap: () => RouteGuard.pushIfAuthorized(
                 context, ref,
                 screen: const TrashScreen(),
@@ -1076,10 +1005,8 @@ class _AdminDashboard extends ConsumerWidget {
               ),
             ),
           if (authNotifier.hasPermission('view_activity_logs'))
-            _QuickAction(
-              label: 'Activity Logs',
-              color: AppButtonColor.neutral,
-              icon: Icons.history,
+            AppQuickActionCard(
+              type: QuickActionType.activityLogs,
               onTap: () => RouteGuard.pushIfAuthorized(
                 context, ref,
                 screen: const ActivityLogsScreen(),
@@ -1088,10 +1015,8 @@ class _AdminDashboard extends ConsumerWidget {
               ),
             ),
           if (authNotifier.hasPermission('manage_ai_config'))
-            _QuickAction(
-              label: 'AI Config',
-              color: AppButtonColor.secondary,
-              icon: Icons.psychology_outlined,
+            AppQuickActionCard(
+              type: QuickActionType.aiConfig,
               onTap: () => RouteGuard.pushIfAuthorized(
                 context, ref,
                 screen: const AIConfigScreen(),
@@ -1100,10 +1025,8 @@ class _AdminDashboard extends ConsumerWidget {
               ),
             ),
           if (authNotifier.hasPermission('view_settings'))
-            _QuickAction(
-              label: 'Settings',
-              color: AppButtonColor.neutral,
-              icon: Icons.settings,
+            AppQuickActionCard(
+              type: QuickActionType.settings,
               onTap: () => RouteGuard.pushIfAuthorized(
                 context, ref,
                 screen: const SettingsScreen(),
@@ -1128,6 +1051,7 @@ class _StaffDashboard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final analytics = data.analytics;
+    final filter = ref.watch(salesPeriodFilterProvider);
     final currencySymbol = CurrencyUtils.symbol();
     final authNotifier = ref.read(authStateProvider.notifier);
 
@@ -1150,10 +1074,11 @@ class _StaffDashboard extends ConsumerWidget {
         const SizedBox(height: Spacing.xxl),
 
         // ── My sales trend ──
-        _buildSalesTrendCard(
+        _buildStaffSalesTrendCard(
           context,
           analytics,
           currencySymbol,
+          filter: filter,
           title: 'My Sales Trend',
         ),
         const SizedBox(height: Spacing.xxl),
@@ -1164,10 +1089,6 @@ class _StaffDashboard extends ConsumerWidget {
 
         // ── Payment breakdown ──
         _buildPaymentBreakdown(context, analytics),
-        const SizedBox(height: Spacing.xxl),
-
-        // ── Peak sales ──
-        _buildPeakSalesCard(context, analytics.peakSalesPeriod),
         const SizedBox(height: Spacing.xxl),
 
         // ── Inventory status ──
@@ -1184,25 +1105,23 @@ class _StaffDashboard extends ConsumerWidget {
     );
   }
 
-  Widget _buildSalesTrendCard(
+  Widget _buildStaffSalesTrendCard(
     BuildContext context,
     SalesAnalytics analytics,
     String currencySymbol, {
+    required SalesPeriodFilter filter,
     required String title,
   }) {
     return AppSection(
       title: title,
       padding: const EdgeInsets.only(bottom: Spacing.md),
       child: AppCard(
-        child: analytics.trend.isEmpty
-            ? const _ChartEmptyState(
-                message: 'No sales data available for this period.',
-              )
-            : SalesLineChart(
-                points: analytics.trend,
-                groupBy: analytics.bounds.groupBy,
-                valuePrefix: currencySymbol,
-              ),
+        child: SalesTrendChart(
+          trend: analytics.trend,
+          groupBy: analytics.bounds.groupBy,
+          period: filter.period,
+          valuePrefix: currencySymbol,
+        ),
       ),
     );
   }
@@ -1234,19 +1153,6 @@ class _StaffDashboard extends ConsumerWidget {
           breakdown: analytics.paymentBreakdown,
           grandTotal: analytics.totalSales,
         ),
-      ),
-    );
-  }
-
-  Widget _buildPeakSalesCard(
-    BuildContext context,
-    PeakSalesPeriod peak,
-  ) {
-    return AppSection(
-      title: 'Peak Sales',
-      padding: const EdgeInsets.only(bottom: Spacing.md),
-      child: AppCard(
-        child: PeakSalesCard(peak: peak),
       ),
     );
   }
@@ -1382,10 +1288,8 @@ class _StaffDashboard extends ConsumerWidget {
       child: QuickActionGrid(
         children: [
           if (authNotifier.hasPermission('create_sales'))
-            _QuickAction(
-              label: 'New Sale',
-              color: AppButtonColor.success,
-              icon: Icons.point_of_sale,
+            AppQuickActionCard(
+              type: QuickActionType.newSale,
               onTap: () => RouteGuard.pushIfAuthorized(
                 context, ref,
                 screen: const POSScreen(),
@@ -1394,10 +1298,8 @@ class _StaffDashboard extends ConsumerWidget {
               ),
             ),
           if (authNotifier.hasPermission('add_stock'))
-            _QuickAction(
-              label: 'Add Stock',
-              color: AppButtonColor.info,
-              icon: Icons.warehouse_outlined,
+            AppQuickActionCard(
+              type: QuickActionType.addStock,
               onTap: () => RouteGuard.pushIfAuthorized(
                 context, ref,
                 screen: const StockScreen(),
@@ -1406,10 +1308,8 @@ class _StaffDashboard extends ConsumerWidget {
               ),
             ),
           if (authNotifier.hasPermission('view_sales'))
-            _QuickAction(
-              label: 'My Sales',
-              color: AppButtonColor.success,
-              icon: Icons.receipt_long,
+            AppQuickActionCard(
+              type: QuickActionType.mySales,
               onTap: () => RouteGuard.pushIfAuthorized(
                 context, ref,
                 screen: const SalesScreen(),
@@ -1418,10 +1318,8 @@ class _StaffDashboard extends ConsumerWidget {
               ),
             ),
           if (authNotifier.hasPermission('view_reports'))
-            _QuickAction(
-              label: 'Reports',
-              color: AppButtonColor.secondary,
-              icon: Icons.analytics_outlined,
+            AppQuickActionCard(
+              type: QuickActionType.reports,
               onTap: () => RouteGuard.pushIfAuthorized(
                 context, ref,
                 screen: const SalesAnalyticsScreen(),
@@ -1644,31 +1542,6 @@ class _ActivityTile extends StatelessWidget {
     );
   }
 }
-
-class _QuickAction extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
-  final AppButtonColor color;
-
-  const _QuickAction({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-    this.color = AppButtonColor.primary,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AppButton.quickAction(
-      onPressed: onTap,
-      color: color,
-      icon: icon,
-      label: label,
-    );
-  }
-}
-
 
 /// Two-column layout that stacks vertically on mobile and goes side-by-side
 /// on tablet/desktop (≥600px). Each column gets equal width.

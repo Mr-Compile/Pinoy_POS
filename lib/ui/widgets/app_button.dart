@@ -8,17 +8,17 @@ import 'package:pinoy_pos/core/spacing.dart';
 enum AppButtonColor { primary, secondary, success, warning, info, error, neutral }
 
 /// Common button variants used across the app.
-enum AppButtonVariant { filled, outlined, text, elevated, destructive, quickAction, gradient }
+enum AppButtonVariant { filled, outlined, text, elevated, destructive, gradient }
 
 /// Common button sizes. All sizes still respect the 48 dp touch target.
 enum AppButtonSize { small, medium, large }
 
 /// A unified, accessible button component.
 ///
-/// Supports primary, secondary, outlined, text, elevated, destructive,
-/// quick-action, and gradient variants, plus an optional loading state that
-/// disables the button and swaps the label for a spinner. All sizes keep a
-/// minimum 48 x 48 touch target.
+/// Supports filled, outlined, text, elevated, destructive and gradient
+/// variants, plus an optional loading state that disables the button and
+/// swaps the label for a spinner. All sizes keep a minimum 48 x 48 touch
+/// target.
 ///
 /// Use the named color constructors ([AppButton.success], [AppButton.warning],
 /// [AppButton.info], [AppButton.neutral]) or the [color] parameter to make
@@ -172,22 +172,6 @@ class AppButton extends StatelessWidget {
   })  : color = AppButtonColor.neutral,
         variant = AppButtonVariant.filled;
 
-  /// A compact, vertically-stacked quick action used in Dashboard grids.
-  ///
-  /// The [icon] is rendered above the [label] and both automatically inherit
-  /// the resolved foreground color for the chosen semantic [color].
-  const AppButton.quickAction({
-    super.key,
-    required this.icon,
-    required this.label,
-    this.onPressed,
-    this.color = AppButtonColor.primary,
-    this.isLoading = false,
-  })  : child = null,
-        size = AppButtonSize.medium,
-        fullWidth = false,
-        variant = AppButtonVariant.quickAction;
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -216,12 +200,16 @@ class AppButton extends StatelessWidget {
     final textStyle = resolved.$2;
     final iconSize = resolved.$3;
 
-    final (mainColor, onMainColor) = _resolveColors(cs, theme.brightness, color);
+    final (mainColor, onMainColor) = _resolveColors(
+      cs,
+      theme.brightness,
+      color,
+      variant,
+    );
     final labelColor = switch (variant) {
       AppButtonVariant.filled ||
       AppButtonVariant.elevated ||
       AppButtonVariant.destructive ||
-      AppButtonVariant.quickAction ||
       AppButtonVariant.gradient =>
         onMainColor,
       _ => mainColor,
@@ -282,12 +270,6 @@ class AppButton extends StatelessWidget {
           ),
           child: buttonChild,
         ),
-      AppButtonVariant.quickAction => _buildQuickAction(
-          context,
-          cs,
-          mainColor,
-          onMainColor,
-        ),
       AppButtonVariant.gradient => _buildGradientButton(
           context,
           cs,
@@ -319,9 +301,55 @@ class AppButton extends StatelessWidget {
     return button;
   }
 
-  /// Resolves the main and foreground colors for the chosen semantic role,
-  /// adapting each tone to the current brightness.
+  /// Resolves the main and foreground colors for the chosen semantic role
+  /// and button variant.
+  ///
+  /// Filled and destructive buttons sit on a solid surface, so they use
+  /// [AppSemanticColors.resolveSurface] with a contrast-computed foreground.
+  /// Outlined, text and elevated buttons are transparent or lightly tinted,
+  /// so they keep the visible accent color.
   (Color, Color) _resolveColors(
+    ColorScheme cs,
+    Brightness brightness,
+    AppButtonColor color,
+    AppButtonVariant variant,
+  ) {
+    final isSolid = variant == AppButtonVariant.filled ||
+        variant == AppButtonVariant.destructive;
+
+    if (isSolid) {
+      return _resolveSurfaceColors(brightness, color);
+    }
+
+    return _resolveAccentColors(cs, brightness, color);
+  }
+
+  /// Surface color and its high-contrast foreground for solid buttons.
+  (Color, Color) _resolveSurfaceColors(
+    Brightness brightness,
+    AppButtonColor color,
+  ) {
+    final surface = switch (color) {
+      AppButtonColor.primary =>
+        AppSemanticColors.resolveSurface(AppSemanticColors.primarySurface, brightness),
+      AppButtonColor.secondary =>
+        AppSemanticColors.resolveSurface(AppSemanticColors.secondarySurface, brightness),
+      AppButtonColor.success =>
+        AppSemanticColors.resolveSurface(AppSemanticColors.successSurface, brightness),
+      AppButtonColor.warning =>
+        AppSemanticColors.resolveSurface(AppSemanticColors.warningSurface, brightness),
+      AppButtonColor.info =>
+        AppSemanticColors.resolveSurface(AppSemanticColors.infoSurface, brightness),
+      AppButtonColor.error =>
+        AppSemanticColors.resolveSurface(AppSemanticColors.errorSurface, brightness),
+      AppButtonColor.neutral =>
+        AppSemanticColors.resolveSurface(AppSemanticColors.neutralSurface, brightness),
+    };
+    return (surface, AppSemanticColors.contrastFor(surface));
+  }
+
+  /// Accent color and its canonical on-color for transparent/tinted buttons.
+  (Color, Color) _resolveAccentColors(
     ColorScheme cs,
     Brightness brightness,
     AppButtonColor color,
@@ -589,63 +617,6 @@ class AppButton extends StatelessWidget {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQuickAction(
-    BuildContext context,
-    ColorScheme cs,
-    Color mainColor,
-    Color onMainColor,
-  ) {
-    final tapHandler = isLoading ? null : onPressed;
-    // The icon and label sit on top of the semantic [mainColor] fill, so
-    // they must use that color's paired "on" token (white on success /
-    // error / neutral / primary, black on warning / info). Using
-    // ColorScheme.onSurface here produced dark text on dark fills in
-    // light mode and white text on lightened fills in dark mode.
-    final foreground = onMainColor;
-    final disabledForeground = foreground.withValues(alpha: 0.38);
-    final disabledBackground = mainColor.withValues(alpha: 0.12);
-
-    return FilledButton(
-      onPressed: tapHandler,
-      style: FilledButton.styleFrom(
-        backgroundColor: mainColor,
-        foregroundColor: foreground,
-        disabledBackgroundColor: disabledBackground,
-        disabledForegroundColor: disabledForeground,
-        iconColor: foreground,
-        disabledIconColor: disabledForeground,
-        iconSize: 28,
-        overlayColor: foreground.withValues(alpha: 0.12),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        minimumSize: const Size(64, 64),
-        textStyle: AppTypography.labelMedium(context).copyWith(
-          fontWeight: FontWeight.w600,
-          color: foreground,
-        ),
-      ),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minWidth: 64, minHeight: 48),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon!),
-            const SizedBox(height: Spacing.xs),
-            Text(
-              label!,
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
         ),
       ),
     );

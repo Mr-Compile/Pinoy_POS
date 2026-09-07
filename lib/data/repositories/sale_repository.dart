@@ -5,7 +5,6 @@ import 'package:pinoy_pos/data/models/daily_sales_point.dart';
 import 'package:pinoy_pos/data/models/payment_breakdown.dart';
 import 'package:pinoy_pos/data/models/reporting_period.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
-import 'package:pinoy_pos/data/models/sales_by_hour_point.dart';
 import 'package:pinoy_pos/data/models/staff_sales_summary.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:sqflite/sqflite.dart';
@@ -114,13 +113,6 @@ class SaleRepository {
     int? userId,
   }) =>
       _saleDao.getCategorySales(start, end, userId: userId);
-
-  Future<List<SalesByHourPoint>> getSalesByHourOfDay(
-    DateTime start,
-    DateTime end, {
-    int? userId,
-  }) =>
-      _saleDao.getSalesByHourOfDay(start, end, userId: userId);
 
   Future<List<CalendarDaySales>> getCalendarDaySales(
     DateTime start,

@@ -118,6 +118,50 @@ class AppSemanticColors {
   static Color resolveOn(Color lightOn, Brightness brightness) {
     return resolve(lightOn, brightness);
   }
+
+  // ── Semantic surfaces for filled buttons / quick actions ───────────────
+
+  /// Surface tints for solid UI elements in light mode. They are deliberately
+  /// chosen from the same family as the status accents but tuned so the
+  /// foreground is readable (white on deep colors, black on amber/cyan/teal).
+  /// In dark mode they are mapped to deep, rich versions so filled surfaces
+  /// do not look like light mode cards dropped on a dark scaffold.
+  static const Color primarySurface = Color(0xFF3B82F6); // Blue 500
+  static const Color secondarySurface = Color(0xFF4F46E5); // Indigo 600
+  static const Color successSurface = Color(0xFF047857); // Emerald 700
+  static const Color warningSurface = Color(0xFFF59E0B); // Amber 500
+  static const Color infoSurface = Color(0xFF06B6D4); // Cyan 500
+  static const Color errorSurface = Color(0xFFDC2626); // Red 600
+  static const Color neutralSurface = Color(0xFF475569); // Slate 600
+
+  static final Map<Color, Color> _darkSurfaceForLight = {
+    primarySurface: const Color(0xFF1E3A8A), // Blue 900
+    secondarySurface: const Color(0xFF312E81), // Indigo 900
+    successSurface: const Color(0xFF065F46), // Emerald 900
+    warningSurface: const Color(0xFF92400E), // Amber 900
+    infoSurface: const Color(0xFF155E75), // Cyan 900
+    errorSurface: const Color(0xFF991B1B), // Red 800
+    neutralSurface: const Color(0xFF334155), // Slate 700
+  };
+
+  /// Returns the dark-mode surface color for a light-mode semantic [surface].
+  ///
+  /// In light mode the original color is returned; in dark mode the surface is
+  /// deepened so white foreground stays readable and the component looks
+  /// intentional in a dark interface.
+  static Color resolveSurface(Color surface, Brightness brightness) {
+    if (brightness == Brightness.light) return surface;
+    return _darkSurfaceForLight[surface] ?? surface;
+  }
+
+  /// Returns black or white depending on [background]'s relative luminance.
+  ///
+  /// Use this for text/icons on a filled surface instead of assuming the
+  /// theme's on-color. Light amber, cyan and teal get black; all deep
+  /// surfaces get white.
+  static Color contrastFor(Color background) {
+    return background.computeLuminance() > 0.4 ? Colors.black : Colors.white;
+  }
 }
 
 /// Centralized color and theme definitions.
@@ -374,13 +418,23 @@ class AppColors {
             : colorScheme.surface,
         surfaceTintColor: isDark ? Colors.transparent : null,
         indicatorColor: colorScheme.primaryContainer,
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return IconThemeData(
+              color: colorScheme.onPrimaryContainer,
+            );
+          }
+          return IconThemeData(
+            color: colorScheme.onSurfaceVariant,
+          );
+        }),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
             return TextStyle(
               fontFamily: 'Inter',
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: colorScheme.onSurface,
+              color: colorScheme.onPrimaryContainer,
             );
           }
           return TextStyle(

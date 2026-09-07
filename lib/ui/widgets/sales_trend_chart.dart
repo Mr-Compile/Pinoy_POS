@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/daily_sales_point.dart';
 import 'package:pinoy_pos/data/models/reporting_period.dart';
+import 'package:pinoy_pos/data/models/sales_period.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/mini_bar_chart.dart';
 
@@ -10,12 +11,14 @@ import 'package:pinoy_pos/ui/widgets/mini_bar_chart.dart';
 class SalesTrendChart extends StatelessWidget {
   final List<DailySalesPoint> trend;
   final ReportGroupBy groupBy;
+  final SalesPeriod? period;
   final String? valuePrefix;
 
   const SalesTrendChart({
     super.key,
     required this.trend,
     required this.groupBy,
+    this.period,
     this.valuePrefix,
   });
 
@@ -40,23 +43,36 @@ class SalesTrendChart extends StatelessWidget {
 
   BarChartPoint _toBarPoint(DailySalesPoint point) {
     return BarChartPoint(
-      label: _labelFor(point.date, groupBy),
+      label: _labelFor(point.date, groupBy, period),
       value: point.total,
     );
   }
 
-  String _labelFor(DateTime date, ReportGroupBy groupBy) {
+  String _labelFor(DateTime date, ReportGroupBy groupBy, SalesPeriod? period) {
+    if (period != null) {
+      switch (period) {
+        case SalesPeriod.daily:
+          return '${date.month}/${date.day}';
+        case SalesPeriod.weekly:
+          return _weekdayShort(date.weekday);
+        case SalesPeriod.monthly:
+          final week = ((date.day - 1) / 7).floor() + 1;
+          return 'W$week';
+      }
+    }
+
     switch (groupBy) {
-      case ReportGroupBy.hour:
-        final hour = date.hour % 12 == 0 ? 12 : date.hour % 12;
-        final amPm = date.hour < 12 ? 'AM' : 'PM';
-        return '$hour$amPm';
       case ReportGroupBy.day:
         return '${date.month}/${date.day}';
       case ReportGroupBy.week:
       case ReportGroupBy.month:
         return _monthName(date.month);
     }
+  }
+
+  String _weekdayShort(int weekday) {
+    const names = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    return names[weekday - 1];
   }
 
   String _monthName(int month) {

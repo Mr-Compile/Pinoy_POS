@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import 'package:pinoy_pos/data/models/backup_location.dart';
+import 'package:pinoy_pos/services/backup_storage_exception.dart';
 import 'package:pinoy_pos/services/file_export_service.dart';
 
 /// Platform-specific backup storage implementation for Android, iOS,
@@ -763,10 +764,4 @@ class BackupStorageService {
   }
 }
 
-class BackupStorageException implements Exception {
-  final String message;
-  BackupStorageException(this.message);
 
-  @override
-  String toString() => message;
-}

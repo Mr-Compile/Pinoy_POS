@@ -6,7 +6,6 @@ import 'package:pinoy_pos/data/models/daily_sales_point.dart';
 import 'package:pinoy_pos/data/models/payment_breakdown.dart';
 import 'package:pinoy_pos/data/models/reporting_period.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
-import 'package:pinoy_pos/data/models/sales_by_hour_point.dart';
 import 'package:pinoy_pos/data/models/staff_sales_summary.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:sqflite/sqflite.dart';
@@ -369,10 +368,6 @@ class SaleDao extends BaseDao<Sale> {
     late String pattern;
 
     switch (groupBy) {
-      case ReportGroupBy.hour:
-        select = "substr(s.created_at, 1, 13) as bucket";
-        groupBySql = 'bucket';
-        pattern = "yyyy-MM-ddTHH";
       case ReportGroupBy.day:
         select = "substr(s.created_at, 1, 10) as bucket";
         groupBySql = 'bucket';
@@ -407,34 +402,6 @@ class SaleDao extends BaseDao<Sale> {
         count: (row['count'] as num?)?.toInt() ?? 0,
       );
     }).toList();
-  }
-
-  /// Returns sales and transaction count for each hour of the day (0-23)
-  /// across the given range, aggregated from confirmed sales.
-  Future<List<SalesByHourPoint>> getSalesByHourOfDay(
-    DateTime start,
-    DateTime end, {
-    int? userId,
-  }) async {
-    final database = await db;
-    final conditions = _confirmedRangeConditions(
-      start,
-      end,
-      userId,
-      tableAlias: 's',
-    );
-
-    final result = await database.rawQuery('''
-      SELECT CAST(substr(s.created_at, 12, 2) AS INTEGER) as hour,
-             COALESCE(SUM(s.total_amount), 0) as total,
-             COUNT(*) as count
-      FROM sales s
-      WHERE ${conditions.where}
-      GROUP BY hour
-      ORDER BY hour
-    ''', conditions.args);
-
-    return result.map(SalesByHourPoint.fromMap).toList();
   }
 
   /// Returns payment-method totals for confirmed sales in a range.
@@ -588,8 +555,6 @@ class SaleDao extends BaseDao<Sale> {
 
   DateTime _parseBucket(String bucket, String pattern) {
     switch (pattern) {
-      case 'yyyy-MM-ddTHH':
-        return DateTime.parse('$bucket:00:00.000');
       case 'yyyy-MM-dd':
         return DateTime.parse('${bucket}T00:00:00.000');
       case 'yyyy-MM':

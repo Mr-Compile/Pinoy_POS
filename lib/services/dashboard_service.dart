@@ -5,6 +5,7 @@ import 'package:pinoy_pos/data/models/product.dart';
 import 'package:pinoy_pos/data/models/reporting_period.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/data/models/sales_analytics.dart';
+import 'package:pinoy_pos/data/models/sales_period.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/data/repositories/activity_log_repository.dart';
 import 'package:pinoy_pos/data/repositories/ai_quota_repository.dart';
@@ -182,22 +183,18 @@ class DashboardService {
   /// lacks `view_dashboard` (defence in depth — the UI should also be
   /// hidden, but this prevents any data leak if it is not). The caller
   /// distinguishes the two cases via the current authentication state.
-  Future<DashboardData?> getDashboard(
-    ReportingPeriod period, {
-    DateTime? customStart,
-    DateTime? customEnd,
-  }) async {
+  Future<DashboardData?> getDashboard(SalesPeriodFilter filter) async {
     if (!_sessionManager.hasPermission('view_dashboard')) {
       return null;
     }
     final role = _sessionManager.currentUser?.role;
     switch (role) {
       case UserRole.owner:
-        return getOwnerDashboard(period, customStart: customStart, customEnd: customEnd);
+        return getOwnerDashboard(filter);
       case UserRole.admin:
-        return getAdminDashboard(period, customStart: customStart, customEnd: customEnd);
+        return getAdminDashboard(filter);
       case UserRole.staff:
-        return getStaffDashboard(period, customStart: customStart, customEnd: customEnd);
+        return getStaffDashboard(filter);
       case null:
         return null;
     }
@@ -205,21 +202,12 @@ class DashboardService {
 
   // ── Owner ──────────────────────────────────────────────────────────
 
-  Future<OwnerDashboardData> getOwnerDashboard(
-    ReportingPeriod period, {
-    DateTime? customStart,
-    DateTime? customEnd,
-  }) async {
+  Future<OwnerDashboardData> getOwnerDashboard(SalesPeriodFilter filter) async {
     if (!_sessionManager.hasPermission('view_dashboard')) {
       return _emptyOwner();
     }
 
-    final bounds = periodBoundsFor(
-      period,
-      customStart: customStart,
-      customEnd: customEnd,
-    );
-    final analytics = await _salesAnalyticsService.getAnalyticsForBounds(bounds);
+    final analytics = await _salesAnalyticsService.getAnalyticsForFilter(filter);
 
     // Inventory status from active products.
     final products = await _productRepository.getActiveProducts();
@@ -252,15 +240,10 @@ class DashboardService {
 
   // ── Admin ──────────────────────────────────────────────────────────
 
-  /// Admin dashboard is system/maintenance only. The [period],
-  /// [customStart], and [customEnd] parameters are accepted for interface
-  /// symmetry with the other loaders but are unused — no Admin metric is
-  /// driven by the period selector.
-  Future<AdminDashboardData> getAdminDashboard(
-    ReportingPeriod period, {
-    DateTime? customStart,
-    DateTime? customEnd,
-  }) async {
+  /// Admin dashboard is system/maintenance only. The [filter] parameter is
+  /// accepted for interface symmetry with the other loaders but is unused —
+  /// no Admin metric is driven by the period selector.
+  Future<AdminDashboardData> getAdminDashboard(SalesPeriodFilter filter) async {
     if (!_sessionManager.hasPermission('view_dashboard')) {
       return _emptyAdmin();
     }
@@ -355,23 +338,14 @@ class DashboardService {
 
   // ── Staff ──────────────────────────────────────────────────────────
 
-  Future<StaffDashboardData> getStaffDashboard(
-    ReportingPeriod period, {
-    DateTime? customStart,
-    DateTime? customEnd,
-  }) async {
+  Future<StaffDashboardData> getStaffDashboard(SalesPeriodFilter filter) async {
     final user = _sessionManager.currentUser;
     if (!_sessionManager.hasPermission('view_dashboard') || user == null) {
       return _emptyStaff();
     }
 
-    final bounds = periodBoundsFor(
-      period,
-      customStart: customStart,
-      customEnd: customEnd,
-    );
     // SalesAnalyticsService automatically scopes Staff to the current user.
-    final analytics = await _salesAnalyticsService.getAnalyticsForBounds(bounds);
+    final analytics = await _salesAnalyticsService.getAnalyticsForFilter(filter);
 
     // Inventory status (Staff may view products/stock).
     final products = await _productRepository.getActiveProducts();

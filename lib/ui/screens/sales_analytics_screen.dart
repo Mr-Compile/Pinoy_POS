@@ -3,12 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/spacing.dart';
-import 'package:pinoy_pos/data/models/reporting_period.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
+import 'package:pinoy_pos/data/models/sales_period.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/sales_analytics_provider.dart';
-import 'package:pinoy_pos/providers/staff_provider.dart';
+import 'package:pinoy_pos/providers/sales_period_filter_provider.dart';
 import 'package:pinoy_pos/services/report_export_service.dart';
 import 'package:pinoy_pos/ui/screens/sale_detail_screen.dart';
 import 'package:pinoy_pos/ui/screens/settings/store_information_settings_page.dart';
@@ -20,10 +20,9 @@ import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/category_sales_bar_chart.dart';
 import 'package:pinoy_pos/ui/widgets/payment_breakdown_view.dart';
-import 'package:pinoy_pos/ui/widgets/peak_sales_card.dart';
-import 'package:pinoy_pos/ui/widgets/period_selector.dart';
-import 'package:pinoy_pos/ui/widgets/sales_line_chart.dart';
+import 'package:pinoy_pos/ui/widgets/sales_period_selector.dart';
 import 'package:pinoy_pos/ui/widgets/sales_summary_cards.dart';
+import 'package:pinoy_pos/ui/widgets/sales_trend_chart.dart';
 import 'package:pinoy_pos/ui/widgets/sales_transactions_list.dart';
 import 'package:pinoy_pos/ui/widgets/staff_performance_list.dart';
 import 'package:pinoy_pos/ui/widgets/top_products_bar_chart.dart';
@@ -42,25 +41,19 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(salesPeriodFilterProvider, (_, _) {
+      ref.read(salesAnalyticsProvider.notifier).load();
+    });
+
     final state = ref.watch(salesAnalyticsProvider);
-    final staffState = ref.watch(staffControllerProvider);
     final canExport =
         ref.read(authStateProvider.notifier).hasPermission('export_reports');
-    final canViewStaff =
-        ref.read(authStateProvider.notifier).hasPermission('view_staff_performance');
 
     return Scaffold(
       appBar: const AppHeader(title: 'Reports'),
       body: state.isLoading && state.analytics == null
           ? const LoadingState(message: 'Loading sales analytics...')
-          : _buildBody(
-              context,
-              state,
-              canExport,
-              staffState.staff,
-              staffState.isLoading,
-              canViewStaff,
-            ),
+          : _buildBody(context, state, canExport),
     );
   }
 
@@ -68,9 +61,6 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
     BuildContext context,
     SalesAnalyticsState state,
     bool canExport,
-    List<User> staff,
-    bool staffLoading,
-    bool canViewStaff,
   ) {
     if (state.error != null) {
       return ErrorState(
@@ -88,6 +78,8 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
       );
     }
 
+    final filter = ref.watch(salesPeriodFilterProvider);
+
     return RefreshIndicator(
       onRefresh: () async => ref.read(salesAnalyticsProvider.notifier).load(),
       child: SingleChildScrollView(
@@ -96,16 +88,7 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: Spacing.md),
-            PeriodSelector(
-              selected: state.period,
-              onSelected: (p) =>
-                  ref.read(salesAnalyticsProvider.notifier).selectPeriod(p),
-              customStart: state.customStart,
-              customEnd: state.customEnd,
-              onCustomRange: (range) => ref
-                  .read(salesAnalyticsProvider.notifier)
-                  .setCustomRange(range.start, range.end),
-            ),
+            const SalesPeriodSelector(),
             const SizedBox(height: Spacing.sm),
             ResponsiveBuilder(
               builder: (context, layout) {
@@ -114,23 +97,13 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
                     context,
                     state,
                     canExport,
-                    canViewStaff,
                   );
-                }
-                if (staff.isEmpty && !staffLoading) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted) {
-                      ref.read(staffControllerProvider.notifier).loadStaff();
-                    }
-                  });
                 }
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
                   child: _buildFilterBar(
                     context,
                     state,
-                    staff,
-                    canViewStaff,
                     isCompact: false,
                   ),
                 );
@@ -138,7 +111,7 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
-              child: _buildPeriodHeader(context, state),
+              child: _buildPeriodHeader(context, state, filter),
             ),
             const SizedBox(height: Spacing.md),
             Padding(
@@ -153,24 +126,10 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
               padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
               child: AppSection(
                 title: 'Sales Trend',
-                subtitle: _trendSubtitle(analytics.bounds),
-                child: SalesLineChart(
-                  points: analytics.trend,
+                child: SalesTrendChart(
+                  trend: analytics.trend,
                   groupBy: analytics.bounds.groupBy,
-                  valuePrefix: CurrencyUtils.symbol(currency: state.storeInfo?.currency),
-                ),
-              ),
-            ),
-            const SizedBox(height: Spacing.lg),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
-              child: AppSection(
-                title: 'Sales vs Previous Period',
-                subtitle: _trendSubtitle(analytics.bounds),
-                child: SalesComparisonChart(
-                  current: analytics.trend,
-                  previous: analytics.previousTrend,
-                  groupBy: analytics.bounds.groupBy,
+                  period: filter.period,
                   valuePrefix: CurrencyUtils.symbol(currency: state.storeInfo?.currency),
                 ),
               ),
@@ -224,14 +183,6 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
               child: AppSection(
-                title: 'Peak Sales Period',
-                child: PeakSalesCard(peak: analytics.peakSalesPeriod),
-              ),
-            ),
-            const SizedBox(height: Spacing.lg),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
-              child: AppSection(
                 title: 'Recent Transactions',
                 subtitle: 'Confirmed sales for the selected period',
                 child: SalesTransactionsList(
@@ -251,11 +202,7 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
     );
   }
 
-  void _showFilterBottomSheet(
-    SalesAnalyticsState state,
-    List<User> staff,
-    bool canViewStaff,
-  ) {
+  void _showFilterBottomSheet(SalesAnalyticsState state) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -266,12 +213,6 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
             child: Consumer(
               builder: (context, ref, _) {
                 final analyticsState = ref.watch(salesAnalyticsProvider);
-                final staffState = ref.watch(staffControllerProvider);
-                if (staffState.staff.isEmpty && !staffState.isLoading) {
-                  Future.microtask(() {
-                    ref.read(staffControllerProvider.notifier).loadStaff();
-                  });
-                }
 
                 return Column(
                   mainAxisSize: MainAxisSize.min,
@@ -296,21 +237,7 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
                     _buildFilterBar(
                       context,
                       analyticsState,
-                      staffState.staff,
-                      canViewStaff,
                       isCompact: true,
-                      currentMethod: analyticsState.paymentMethod,
-                      currentStatus: analyticsState.paymentStatus,
-                      currentStaff: analyticsState.selectedStaffId,
-                      onMethodChanged: (v) => ref
-                          .read(salesAnalyticsProvider.notifier)
-                          .setPaymentMethod(v),
-                      onStatusChanged: (v) => ref
-                          .read(salesAnalyticsProvider.notifier)
-                          .setPaymentStatus(v),
-                      onStaffChanged: (v) => ref
-                          .read(salesAnalyticsProvider.notifier)
-                          .setStaff(v),
                     ),
                     const SizedBox(height: Spacing.md),
                     Row(
@@ -343,21 +270,18 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
 
   Widget _buildFilterBar(
     BuildContext context,
-    SalesAnalyticsState state,
-    List<User> staff,
-    bool canViewStaff, {
+    SalesAnalyticsState state, {
     required bool isCompact,
-    String? currentMethod,
-    String? currentStatus,
-    int? currentStaff,
-    ValueChanged<String?>? onMethodChanged,
-    ValueChanged<String?>? onStatusChanged,
-    ValueChanged<int?>? onStaffChanged,
   }) {
     final children = <Widget>[
-      if (canViewStaff) _buildStaffDropdown(currentStaff, staff, onStaffChanged),
-      _buildPaymentMethodDropdown(currentMethod, onMethodChanged),
-      _buildPaymentStatusDropdown(currentStatus, onStatusChanged),
+      _buildPaymentMethodDropdown(
+        state.paymentMethod,
+        (v) => ref.read(salesAnalyticsProvider.notifier).setPaymentMethod(v),
+      ),
+      _buildPaymentStatusDropdown(
+        state.paymentStatus,
+        (v) => ref.read(salesAnalyticsProvider.notifier).setPaymentStatus(v),
+      ),
     ];
 
     if (isCompact) {
@@ -389,14 +313,13 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
     BuildContext context,
     SalesAnalyticsState state,
     bool canExport,
-    bool canViewStaff,
   ) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
       child: Row(
         children: [
           TextButton.icon(
-            onPressed: () => _showFilterBottomSheet(state, [], canViewStaff),
+            onPressed: () => _showFilterBottomSheet(state),
             icon: const Icon(Icons.filter_alt_outlined),
             label: const Text('Filters'),
           ),
@@ -409,26 +332,6 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
             ),
         ],
       ),
-    );
-  }
-
-  Widget _buildStaffDropdown(
-    int? value,
-    List<User> staff,
-    ValueChanged<int?>? onChanged,
-  ) {
-    final items = [
-      const DropdownMenuItem<int>(value: null, child: Text('All staff')),
-      ...staff
-          .where((u) => u.id != null)
-          .map((u) => DropdownMenuItem<int>(value: u.id, child: Text(u.fullName))),
-    ];
-    return _buildDropdown<int>(
-      value: value,
-      label: 'Staff',
-      hint: 'All staff',
-      items: items,
-      onChanged: onChanged,
     );
   }
 
@@ -493,7 +396,11 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
     );
   }
 
-  Widget _buildPeriodHeader(BuildContext context, SalesAnalyticsState state) {
+  Widget _buildPeriodHeader(
+    BuildContext context,
+    SalesAnalyticsState state,
+    SalesPeriodFilter filter,
+  ) {
     final cs = Theme.of(context).colorScheme;
     return Row(
       children: [
@@ -502,7 +409,7 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                state.periodLabel,
+                formatSalesPeriodLabel(filter),
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
@@ -526,15 +433,6 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
           ),
       ],
     );
-  }
-
-  String _trendSubtitle(ReportingPeriodBounds bounds) {
-    return switch (bounds.groupBy) {
-      ReportGroupBy.hour => 'By hour',
-      ReportGroupBy.day => 'By day',
-      ReportGroupBy.week => 'By week',
-      ReportGroupBy.month => 'By month',
-    };
   }
 
   String _formatDate(DateTime date) {

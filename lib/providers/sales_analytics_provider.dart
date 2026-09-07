@@ -1,57 +1,41 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pinoy_pos/data/models/reporting_period.dart';
 import 'package:pinoy_pos/data/models/sales_analytics.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
+import 'package:pinoy_pos/providers/sales_period_filter_provider.dart';
 import 'package:pinoy_pos/services/sales_analytics_service.dart';
 import 'package:pinoy_pos/services/settings_service.dart';
 
 /// UI state for the Sales Analytics / Reports screen.
 class SalesAnalyticsState {
-  final ReportingPeriod period;
-  final DateTime? customStart;
-  final DateTime? customEnd;
   final SalesAnalytics? analytics;
   final bool isLoading;
   final String? error;
   final Settings? storeInfo;
   final String? paymentMethod;
   final String? paymentStatus;
-  final int? selectedStaffId;
 
   const SalesAnalyticsState({
-    this.period = ReportingPeriod.thisMonth,
-    this.customStart,
-    this.customEnd,
     this.analytics,
     this.isLoading = true,
     this.error,
     this.storeInfo,
     this.paymentMethod,
     this.paymentStatus = 'confirmed',
-    this.selectedStaffId,
   });
 
   SalesAnalyticsState copyWith({
-    ReportingPeriod? period,
-    DateTime? customStart,
-    DateTime? customEnd,
     SalesAnalytics? analytics,
     bool? isLoading,
     String? error,
     Settings? storeInfo,
     String? paymentMethod,
     String? paymentStatus,
-    int? selectedStaffId,
-    bool clearCustomRange = false,
     bool clearError = false,
     bool clearAnalytics = false,
     bool clearFilters = false,
   }) {
     return SalesAnalyticsState(
-      period: period ?? this.period,
-      customStart: clearCustomRange ? null : (customStart ?? this.customStart),
-      customEnd: clearCustomRange ? null : (customEnd ?? this.customEnd),
       analytics: clearAnalytics ? null : (analytics ?? this.analytics),
       isLoading: isLoading ?? this.isLoading,
       error: clearError ? null : (error ?? this.error),
@@ -60,39 +44,21 @@ class SalesAnalyticsState {
       paymentStatus: clearFilters
           ? 'confirmed'
           : (paymentStatus ?? this.paymentStatus),
-      selectedStaffId:
-          clearFilters ? null : (selectedStaffId ?? this.selectedStaffId),
     );
   }
-
-  bool get hasCustomRange =>
-      customStart != null &&
-      customEnd != null &&
-      period == ReportingPeriod.custom;
 
   bool get hasFilters =>
       (paymentMethod != null && paymentMethod!.isNotEmpty) ||
-      (paymentStatus != null && paymentStatus != 'confirmed') ||
-      selectedStaffId != null;
-
-  String get periodLabel {
-    final analytics = this.analytics;
-    if (analytics != null) return formatPeriodLabel(analytics.bounds);
-    final bounds = periodBoundsFor(
-      period,
-      customStart: customStart,
-      customEnd: customEnd,
-    );
-    return formatPeriodLabel(bounds);
-  }
+      (paymentStatus != null && paymentStatus != 'confirmed');
 }
 
 /// Notifier that loads role-scoped sales analytics for the selected period.
 class SalesAnalyticsNotifier extends StateNotifier<SalesAnalyticsState> {
   final SalesAnalyticsService _service;
   final SettingsService _settingsService;
+  final Ref _ref;
 
-  SalesAnalyticsNotifier()
+  SalesAnalyticsNotifier(this._ref)
       : _service = SalesAnalyticsService(),
         _settingsService = SettingsService(),
         super(const SalesAnalyticsState()) {
@@ -109,13 +75,11 @@ class SalesAnalyticsNotifier extends StateNotifier<SalesAnalyticsState> {
     try {
       final storeInfo = await _settingsService.getStoreInfo();
       if (!mounted) return;
-      final analytics = await _service.getAnalytics(
-        state.period,
-        customStart: state.customStart,
-        customEnd: state.customEnd,
+      final filter = _ref.read(salesPeriodFilterProvider);
+      final analytics = await _service.getAnalyticsForFilter(
+        filter,
         paymentMethod: state.paymentMethod,
         paymentStatus: state.paymentStatus,
-        selectedStaffId: state.selectedStaffId,
       );
       if (!mounted) return;
       state = state.copyWith(
@@ -133,23 +97,6 @@ class SalesAnalyticsNotifier extends StateNotifier<SalesAnalyticsState> {
     }
   }
 
-  void selectPeriod(ReportingPeriod period) {
-    state = state.copyWith(
-      period: period,
-      clearCustomRange: period != ReportingPeriod.custom,
-    );
-    load();
-  }
-
-  void setCustomRange(DateTime start, DateTime end) {
-    state = state.copyWith(
-      period: ReportingPeriod.custom,
-      customStart: start,
-      customEnd: end,
-    );
-    load();
-  }
-
   void setPaymentMethod(String? method) {
     state = state.copyWith(paymentMethod: method);
     load();
@@ -157,11 +104,6 @@ class SalesAnalyticsNotifier extends StateNotifier<SalesAnalyticsState> {
 
   void setPaymentStatus(String? status) {
     state = state.copyWith(paymentStatus: status);
-    load();
-  }
-
-  void setStaff(int? staffId) {
-    state = state.copyWith(selectedStaffId: staffId);
     load();
   }
 
@@ -189,5 +131,5 @@ class SalesAnalyticsNotifier extends StateNotifier<SalesAnalyticsState> {
 
 final salesAnalyticsProvider =
     StateNotifierProvider<SalesAnalyticsNotifier, SalesAnalyticsState>((ref) {
-  return SalesAnalyticsNotifier();
+  return SalesAnalyticsNotifier(ref);
 });
