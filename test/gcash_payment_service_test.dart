@@ -412,7 +412,7 @@ void main() {
       expect(await salesService.getSales(), isEmpty);
     });
 
-    test('admin can verify a staff GCash sale when the policy allows',
+    test('admin cannot verify a staff GCash sale even when legacy mode is set',
         () async {
       await login('owner', 'owner123');
       final productService = ProductService();
@@ -432,25 +432,24 @@ void main() {
       SessionManager.resetForTest();
       await login('staff', 'staff123');
 
-      final success = await salesService.createSale(
-        items: [
-          SaleItem(
-            productId: productId,
-            quantity: 1,
-            unitPrice: 50.0,
-            totalPrice: 50.0,
-          ),
-        ],
-        totalAmount: 50.0,
-        paymentMethod: 'GCash',
-        referenceNumber: 'GCASH-ADMIN-VERIFIED',
-        verifiedByUserId: adminUser.id,
+      expect(
+        () => salesService.createSale(
+          items: [
+            SaleItem(
+              productId: productId,
+              quantity: 1,
+              unitPrice: 50.0,
+              totalPrice: 50.0,
+            ),
+          ],
+          totalAmount: 50.0,
+          paymentMethod: 'GCash',
+          referenceNumber: 'GCASH-ADMIN-VERIFIED',
+          verifiedByUserId: adminUser.id,
+        ),
+        throwsA(isA<PaymentValidationException>()),
       );
-
-      expect(success, isTrue);
-      final sale = (await salesService.getSales()).first;
-      expect(sale.paymentStatus, 'confirmed');
-      expect(sale.verifiedBy, adminUser.id);
+      expect(await salesService.getSales(), isEmpty);
     });
 
     test('admin cannot verify when the policy is Owner only', () async {
@@ -516,13 +515,14 @@ void main() {
       );
       expect(ownerResult.isSuccess, isTrue);
 
-      // Admin credentials authenticate when the policy includes Admin.
+      // Admin credentials are never valid for verification, regardless of
+      // the configured verification mode.
       final adminResult = await verificationService.authenticateVerifier(
         username: 'admin',
         password: 'admin123',
         settings: paymentSettings,
       );
-      expect(adminResult.isSuccess, isTrue);
+      expect(adminResult.isSuccess, isFalse);
 
       // Wrong password is rejected without revealing which part failed.
       final badPassword = await verificationService.authenticateVerifier(

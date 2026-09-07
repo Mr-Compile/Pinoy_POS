@@ -4,14 +4,11 @@ import 'package:pinoy_pos/data/models/payment_settings.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/data/repositories/settings_repository.dart';
-import 'package:flutter/foundation.dart';
 import 'package:pinoy_pos/services/groq_service.dart';
 import 'package:pinoy_pos/services/image_service.dart';
 import 'package:pinoy_pos/services/secure_storage_service.dart';
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
+import 'package:pinoy_pos/services/trash_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:io';
 
 class SettingsService {
   final SettingsRepository _settingsRepository = SettingsRepository();
@@ -21,6 +18,30 @@ class SettingsService {
   static const String _groqApiKeySecureKey = 'groq_api_key';
   Settings? _currentSettings;
   Settings? _storeInfo;
+
+  SettingsService() {
+    // Register the merchant QR restore handler so that restoring a QR from
+    // Trash wires the image path back into the settings table.
+    TrashService().registerRestoreHandler(
+      'merchant_qr',
+      (trash) async {
+        final snapshot = trash.snapshotMap;
+        if (snapshot == null) return;
+        final path = snapshot['path'] as String?;
+        final type = snapshot['type'] as String?;
+        if (path == null || path.isEmpty) return;
+
+        final current = await getSettings();
+        await updateSettings(
+          current.copyWith(
+            gcashQrImagePath: path,
+            gcashQrImageType: type,
+          ),
+        );
+        await refreshStoreInfo();
+      },
+    );
+  }
 
   /// Cached list of available Groq models (refreshed by Admin).
   List<GroqModel> _cachedModels = [];
@@ -138,9 +159,10 @@ class SettingsService {
       );
     }
 
+    // Pick with a unique filename so the new image never overwrites an
+    // existing QR that is about to be moved to Trash.
     final result = await ImageService().pickAndStoreImage(
       directory: 'gcash_qr',
-      fileName: 'gcash_qr',
       maxWidth: 1024,
       maxHeight: 1024,
     );
@@ -148,7 +170,11 @@ class SettingsService {
     if (!result.isSuccess) return result;
 
     final current = await getSettings();
-    await _deleteGcashQrFile(current.gcashQrImagePath);
+    final oldPath = current.gcashQrImagePath;
+    final oldType = current.gcashQrImageType;
+    if (oldPath != null && oldPath.isNotEmpty) {
+      await TrashService().moveQrToTrash(oldPath, oldType);
+    }
     await updateSettings(
       current.copyWith(
         gcashQrImagePath: result.filePath,
@@ -169,24 +195,17 @@ class SettingsService {
     }
 
     final current = await getSettings();
-    await _deleteGcashQrFile(current.gcashQrImagePath);
+    final oldPath = current.gcashQrImagePath;
+    final oldType = current.gcashQrImageType;
+    if (oldPath != null && oldPath.isNotEmpty) {
+      await TrashService().moveQrToTrash(oldPath, oldType);
+    }
     await updateSettings(
       current.copyWith(
         gcashQrImagePath: null,
         gcashQrImageType: null,
       ),
     );
-  }
-
-  Future<void> _deleteGcashQrFile(String? relativePath) async {
-    if (relativePath == null || relativePath.isEmpty || kIsWeb) return;
-    try {
-      final appDir = await getApplicationDocumentsDirectory();
-      final file = File(p.join(appDir.path, relativePath));
-      if (await file.exists()) await file.delete();
-    } catch (_) {
-      // Best-effort cleanup; don't block settings updates.
-    }
   }
 
   /// Returns the store information (name, address, contact, currency) to use

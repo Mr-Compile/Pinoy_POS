@@ -159,8 +159,14 @@ class AppSemanticColors {
   /// Use this for text/icons on a filled surface instead of assuming the
   /// theme's on-color. Light amber, cyan and teal get black; all deep
   /// surfaces get white.
-  static Color contrastFor(Color background) {
-    return background.computeLuminance() > 0.4 ? Colors.black : Colors.white;
+  ///
+  /// [threshold] lets callers tune the switch point. The default (0.4)
+  /// treats primary blue as light, while 0.5 keeps white text on the
+  /// brand blue header where it reads better.
+  static Color contrastFor(Color background, {double threshold = 0.4}) {
+    return background.computeLuminance() > threshold
+        ? Colors.black
+        : Colors.white;
   }
 }
 
@@ -218,6 +224,14 @@ class AppColors {
 
     final isDark = brightness == Brightness.dark;
 
+    // Compute the header background and foreground once so AppBar icons,
+    // leading actions, and title share a single high-contrast color. The
+    // surface is deepened in dark mode so white foreground stays readable.
+    final appBarBackground = AppSemanticColors.resolveSurface(
+        AppSemanticColors.primarySurface, brightness);
+    final appBarForeground =
+        AppSemanticColors.contrastFor(appBarBackground, threshold: 0.5);
+
     return ThemeData(
       useMaterial3: true,
       fontFamily: 'Inter',
@@ -252,19 +266,24 @@ class AppColors {
       ),
 
       // ── App Bar theme ────────────────────────────────────────────
+      // The header is a colored surface (brand blue in light, deep blue in
+      // dark). All foreground elements (title, leading icon, action icons)
+      // share the same theme-aware color so the header feels unified and
+      // updates immediately when the theme changes.
       appBarTheme: AppBarTheme(
         centerTitle: false,
-        backgroundColor: colorScheme.surface,
-        surfaceTintColor: isDark
-            ? Colors.transparent
-            : colorScheme.primary.withValues(alpha: 0.05),
+        backgroundColor: appBarBackground,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: isDark ? 0 : 1,
+        foregroundColor: appBarForeground,
+        iconTheme: IconThemeData(color: appBarForeground),
+        actionsIconTheme: IconThemeData(color: appBarForeground),
         titleTextStyle: TextStyle(
           fontFamily: 'Inter',
-          fontSize: 20,
-          fontWeight: FontWeight.w600,
-          color: colorScheme.onSurface,
+          fontSize: 22,
+          fontWeight: FontWeight.bold,
+          color: appBarForeground,
         ),
       ),
 

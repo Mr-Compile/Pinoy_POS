@@ -34,30 +34,29 @@ class _NotificationBellState extends ConsumerState<NotificationBell> {
       orElse: () => 0,
     );
 
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final brightness = theme.brightness;
+    final brightness = Theme.of(context).brightness;
 
-    // The bell icon uses onSurfaceVariant so it stays visible in both
-    // light and dark mode. The AppBar's IconTheme is also overridden
-    // here to guarantee contrast regardless of the inherited theme.
-    final iconColor = colorScheme.onSurfaceVariant;
-    final activeIconColor = colorScheme.primary;
-
+    // The bell color is driven by the AppBar icon theme so it matches the
+    // header title and other action icons. The badge uses the error surface
+    // family so it stays a strong, readable red (red 600 in light, red 800 in
+    // dark) with an explicit white number at all times.
     return IconButton(
       key: _iconKey,
       tooltip: 'Notifications${
           unreadCount > 0 ? ' ($unreadCount unread)' : ''}',
       icon: Badge(
         isLabelVisible: unreadCount > 0,
-        backgroundColor:
-            AppSemanticColors.resolve(AppSemanticColors.error, brightness),
-        textColor: AppSemanticColors.resolveOn(
-            AppSemanticColors.onError, brightness),
+        backgroundColor: AppSemanticColors.resolveSurface(
+            AppSemanticColors.errorSurface, brightness),
+        textColor: Colors.white,
         label: Text(
           _formatBadge(unreadCount),
+          // The Badge textColor is ignored when the Text style supplies a
+          // color, so the style must explicitly be white. The background is
+          // red, so white is the only readable foreground.
           style: AppTypography.labelSmall(context).copyWith(
             fontWeight: FontWeight.bold,
+            color: Colors.white,
           ),
           textScaler: TextScaler.noScaling,
         ),
@@ -65,7 +64,10 @@ class _NotificationBellState extends ConsumerState<NotificationBell> {
           unreadCount > 0
               ? Icons.notifications_rounded
               : Icons.notifications_outlined,
-          color: unreadCount > 0 ? activeIconColor : iconColor,
+          // Use the surrounding icon theme color. In the AppBar this is the
+          // theme-aware header foreground (white on the blue header) and it
+          // updates immediately when light/dark mode changes.
+          color: IconTheme.of(context).color,
           size: 24,
         ),
       ),

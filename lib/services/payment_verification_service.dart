@@ -38,9 +38,8 @@ class VerifierAuthResult {
 ///   is the highest authorized operational role.
 /// - Any other operator (e.g. Staff) requires verification only when
 ///   [PaymentSettings.verificationRequired] is enabled.
-/// - The Owner is always an authorized verifier. A System Admin is an
-///   authorized verifier only when the policy allows it
-///   ([PaymentSettings.adminCanVerify]).
+/// - The Owner is always the only authorized verifier. System Admins may not
+///   verify GCash payments.
 class PaymentVerificationService {
   final SettingsService _settingsService = SettingsService();
   final SessionManager _sessionManager = SessionManager();
@@ -79,12 +78,11 @@ class PaymentVerificationService {
 
   /// Whether a user with [role] is an authorized verifier under [settings].
   ///
-  /// The Owner can always verify while verification is enabled. A System
-  /// Admin can verify only when the configured policy includes them.
+  /// The Owner is the only user who can verify Staff-tendered GCash payments
+  /// while verification is enabled.
   bool canRoleVerify(UserRole? role, PaymentSettings settings) {
     if (!settings.verificationRequired) return false;
     if (role == UserRole.owner) return true;
-    if (role == UserRole.admin) return settings.adminCanVerify;
     return false;
   }
 

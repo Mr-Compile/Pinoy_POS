@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/ui/widgets/notification_bell.dart';
 import 'package:pinoy_pos/ui/widgets/profile_menu.dart';
 import 'package:pinoy_pos/ui/widgets/theme_toggle.dart';
@@ -62,14 +61,16 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
       if (showProfileMenu) const ProfileMenu(),
     ];
 
+    final headerForeground =
+        Theme.of(context).appBarTheme.foregroundColor ?? Colors.white;
+
     return AppBar(
-      title: Text(
-        title,
-        style: AppTypography.titleLargeBold(context),
-      ),
+      // Let AppBarTheme.titleTextStyle carry the size, weight, and color
+      // so the title uses the same foreground as the header icons.
+      title: Text(title),
       leading: showBackButton
           ? IconButton(
-              icon: const Icon(Icons.arrow_back_rounded),
+              icon: Icon(Icons.arrow_back_rounded, color: headerForeground),
               tooltip: 'Back',
               onPressed: () => Navigator.of(context).maybePop(),
             )

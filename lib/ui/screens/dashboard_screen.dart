@@ -128,7 +128,9 @@ class _DashboardLoadedView extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          _WelcomeHeader(user: user!),
           if (analytics != null) ...[
+            const SizedBox(height: Spacing.xl),
             AppSection(
               title: data is OwnerDashboardData
                   ? 'Key Performance Indicators'
@@ -141,7 +143,6 @@ class _DashboardLoadedView extends ConsumerWidget {
             ),
             const SizedBox(height: Spacing.xl),
           ],
-          _WelcomeHeader(user: user!),
           if (showPeriodSelector) ...[
             const SizedBox(height: Spacing.md),
             const SalesPeriodSelector(),

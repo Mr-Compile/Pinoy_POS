@@ -7,6 +7,7 @@ import 'package:pinoy_pos/core/payment_validation_exception.dart';
 import 'package:pinoy_pos/core/route_guard.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/cart_provider.dart';
+import 'package:pinoy_pos/providers/catalog_provider.dart';
 import 'package:pinoy_pos/providers/payment_settings_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/data/models/payment_settings.dart';
@@ -23,6 +24,8 @@ import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_icon_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
+import 'package:pinoy_pos/ui/widgets/app_payment_qr_preview.dart';
+import 'package:pinoy_pos/ui/widgets/app_payment_qr_viewer.dart';
 import 'package:pinoy_pos/ui/widgets/app_status_chip.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
@@ -40,6 +43,14 @@ class _POSScreenState extends ConsumerState<POSScreen> {
   List<Product> _products = [];
   List<Category> _categories = [];
   bool _isLoading = true;
+  String? _loadError;
+
+  // This screen is kept alive inside the app shell's PageView, so
+  // initState only runs once. Listening to catalogRevisionProvider reloads
+  // the catalog whenever products, categories, or stock change elsewhere
+  // in the app (product management, stock, trash restore, sales, backup
+  // restore).
+  ProviderSubscription<int>? _catalogSubscription;
 
   // Search + filter state
   final _searchController = TextEditingController();
@@ -50,31 +61,68 @@ class _POSScreenState extends ConsumerState<POSScreen> {
   @override
   void initState() {
     super.initState();
+    _catalogSubscription = ref.listenManual<int>(
+      catalogRevisionProvider,
+      (previous, next) => _refreshCatalog(),
+    );
     _loadData();
   }
 
   @override
   void dispose() {
+    _catalogSubscription?.close();
+    _catalogSubscription = null;
     _searchController.dispose();
     _debounce?.cancel();
     super.dispose();
   }
 
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+    await _refreshCatalog();
+  }
 
-    final productService = ref.read(productServiceProvider);
-    final categoryService = ref.read(categoryServiceProvider);
+  /// Fetches active products and categories through the service layer and
+  /// applies them to the screen. Safe to call while the tab is kept alive
+  /// but not visible: it refreshes silently without flashing the loading
+  /// spinner, and keeps previously loaded data if the refresh fails.
+  Future<void> _refreshCatalog() async {
+    try {
+      final productService = ref.read(productServiceProvider);
+      final categoryService = ref.read(categoryServiceProvider);
 
-    final categories = await categoryService.getActiveCategories();
-    final products = await productService.getActiveProducts();
+      final categories = await categoryService.getActiveCategories();
+      final products = await productService.getActiveProducts();
 
-    if (mounted) {
+      debugPrint(
+        'POSScreen: loaded ${products.length} active products, '
+        '${categories.length} active categories',
+      );
+
+      if (!mounted) return;
       setState(() {
         _categories = categories;
         _products = products;
         _isLoading = false;
+        _loadError = null;
       });
+      // Keep cart items in sync with the latest product data (stock changes).
+      ref.read(cartProvider.notifier).refreshProducts(products);
+    } catch (e, st) {
+      debugPrint('POSScreen catalog load error: $e\n$st');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          // Only surface the error state when there is no data to show;
+          // a failed background refresh keeps the previous catalog.
+          if (_products.isEmpty) {
+            _loadError = 'Unable to load products. Please try again.';
+          }
+        });
+      }
     }
   }
 
@@ -214,7 +262,9 @@ class _POSScreenState extends ConsumerState<POSScreen> {
             );
           }
 
-          await _loadProducts();
+          // The sale decremented stock: bump the catalog revision so this
+          // screen (via its listener) and every other catalog screen reload.
+          bumpCatalogRevision(ref);
         } else {
           ref.read(cartProvider.notifier).setProcessing(false);
           AppDialogService.error(context,
@@ -240,18 +290,6 @@ class _POSScreenState extends ConsumerState<POSScreen> {
     }
   }
 
-  Future<void> _loadProducts() async {
-    final productService = ref.read(productServiceProvider);
-    final products = await productService.getActiveProducts();
-    if (mounted) {
-      setState(() {
-        _products = products;
-      });
-      // Keep cart items in sync with the latest product data (stock changes).
-      ref.read(cartProvider.notifier).refreshProducts(products);
-    }
-  }
-
   // ── Build ──────────────────────────────────────────────────────────
 
   @override
@@ -265,6 +303,22 @@ class _POSScreenState extends ConsumerState<POSScreen> {
       return Scaffold(
         appBar: AppHeader(title: 'POS'),
         body: const LoadingState(),
+      );
+    }
+
+    if (_loadError != null) {
+      return Scaffold(
+        appBar: AppHeader(title: 'POS'),
+        body: EmptyState(
+          icon: Icons.error_outline,
+          title: 'Unable to Load Products',
+          message: _loadError,
+          action: AppButton.filled(
+            icon: Icons.refresh,
+            label: 'Retry',
+            onPressed: _loadData,
+          ),
+        ),
       );
     }
 
@@ -924,6 +978,18 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
     return const ['Cash', 'Card', 'Other'];
   }
 
+  void _openQrViewer(String qrPath) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AppPaymentQrViewer(
+          imagePath: qrPath,
+          title: 'Scan to Pay',
+          caption: 'Scan this GCash QR code to pay',
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final paymentSettingsAsync = ref.watch(paymentSettingsProvider);
@@ -1076,6 +1142,20 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
                   setState(() => _paymentMethod = value);
                 },
               ),
+              // QR preview for GCash
+              if (currentMethod == 'GCash') ...[
+                const SizedBox(height: Spacing.md),
+                AppPaymentQrPreview(
+                  imagePath: settings.gcashQrImagePath,
+                  onTap: settings.gcashQrImagePath != null &&
+                          settings.gcashQrImagePath!.isNotEmpty
+                      ? () => _openQrViewer(settings.gcashQrImagePath!)
+                      : null,
+                  maxHeight: 180,
+                  emptyTitle: 'GCash QR not configured',
+                  emptySubtitle: 'The Owner must upload the business GCash QR.',
+                ),
+              ],
               const SizedBox(height: Spacing.lg),
               // Cash received (Cash only)
               if (currentMethod == 'Cash') ...[

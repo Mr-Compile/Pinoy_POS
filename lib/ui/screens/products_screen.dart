@@ -6,6 +6,7 @@ import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/product.dart';
 import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/providers/catalog_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/dialogs/category_dialog.dart';
 import 'package:pinoy_pos/ui/dialogs/product_dialog.dart';
@@ -38,14 +39,24 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
   String _searchQuery = '';
   int? _selectedCategoryId;
 
+  // Kept alive inside the app shell's PageView: reload whenever catalog
+  // data changes elsewhere (POS sale, stock adjustment, trash restore).
+  ProviderSubscription<int>? _catalogSubscription;
+
   @override
   void initState() {
     super.initState();
+    _catalogSubscription = ref.listenManual<int>(
+      catalogRevisionProvider,
+      (previous, next) => _loadData(),
+    );
     _loadData();
   }
 
   @override
   void dispose() {
+    _catalogSubscription?.close();
+    _catalogSubscription = null;
     _searchController.dispose();
     super.dispose();
   }
@@ -115,7 +126,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
       await productService.deleteProduct(product.id!);
         if (mounted) {
           await AppDialogService.success(context, title: 'Deleted', message: 'Product deleted successfully.');
-          _loadData();
+          bumpCatalogRevision(ref);
         }
       } catch (e) {
         if (mounted) {
@@ -338,7 +349,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     if (!mounted) return;
 
     if (result?.isSaved ?? false) {
-      await _loadData();
+      // The catalog-revision listener reloads this screen and the POS.
+      bumpCatalogRevision(ref);
       if (mounted) {
         await AppDialogService.success(
           context,
@@ -357,7 +369,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     if (!mounted) return;
 
     if (result?.isSaved ?? false) {
-      await _loadData();
+      bumpCatalogRevision(ref);
       if (mounted) {
         await AppDialogService.success(
           context,

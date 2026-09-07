@@ -48,11 +48,7 @@ class PaymentSettings {
   bool get verificationRequired => gcashVerificationMode != 'immediate';
 
   /// Whether a System Admin is an authorized verifier under the configured
-  /// mode. The Owner is always an authorized verifier while verification is
-  /// enabled. The legacy 'admin' mode is treated as 'owner_admin' because
-  /// an Admin-only configuration would leave sales unverifiable (the Owner
-  /// must always retain the ability to verify).
-  bool get adminCanVerify =>
-      gcashVerificationMode == 'admin' ||
-      gcashVerificationMode == 'owner_admin';
+  /// mode. Admin verification has been removed; only the Owner may verify
+  /// Staff-tendered GCash payments.
+  bool get adminCanVerify => false;
 }

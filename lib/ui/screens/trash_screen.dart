@@ -1,21 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import 'package:pinoy_pos/core/currency_utils.dart';
+import 'package:pinoy_pos/core/session_manager.dart';
+import 'package:pinoy_pos/data/models/announcement.dart';
 import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/data/models/product.dart';
 import 'package:pinoy_pos/data/models/trash_item.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/providers/catalog_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
+import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
-import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 
 class TrashScreen extends ConsumerStatefulWidget {
   const TrashScreen({super.key});
@@ -24,77 +28,43 @@ class TrashScreen extends ConsumerStatefulWidget {
   ConsumerState<TrashScreen> createState() => _TrashScreenState();
 }
 
-class _TrashTab {
-  final String label;
-  final String entityType;
-  final IconData icon;
-  final WidgetBuilder builder;
-
-  const _TrashTab({
-    required this.label,
-    required this.entityType,
-    required this.icon,
-    required this.builder,
-  });
-}
-
-class _TrashScreenState extends ConsumerState<TrashScreen>
-    with SingleTickerProviderStateMixin {
-  TabController? _tabController;
-  List<_TrashTab> _visibleTabs = [];
-
+class _TrashScreenState extends ConsumerState<TrashScreen> {
   List<TrashItem> _trashItems = [];
   List<TrashItem> _filteredItems = [];
   bool _isLoading = true;
   String? _loadError;
   final _searchController = TextEditingController();
-
   final Set<int> _selectedIds = {};
   bool _selectionMode = false;
+  String _filterType = 'all';
+  List<String> _allowedTypes = [];
+  final _dateFormat = DateFormat('MMM d, y h:mm a');
 
   @override
   void initState() {
     super.initState();
-    _initTabs();
+    _computeAllowedTypes();
     _loadTrash();
   }
 
   @override
   void dispose() {
-    _tabController?.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
-  void _initTabs() {
+  void _computeAllowedTypes() {
     final authNotifier = ref.read(authStateProvider.notifier);
-    _visibleTabs = [
-      if (authNotifier.hasPermission('view_products'))
-        _TrashTab(
-          label: 'Products',
-          entityType: 'product',
-          icon: Icons.inventory_2_outlined,
-          builder: (_) => _buildProductsTab(),
-        ),
-      if (authNotifier.hasPermission('view_categories'))
-        _TrashTab(
-          label: 'Categories',
-          entityType: 'category',
-          icon: Icons.category_outlined,
-          builder: (_) => _buildCategoriesTab(),
-        ),
-      if (authNotifier.hasPermission('view_users'))
-        _TrashTab(
-          label: 'Users',
-          entityType: 'user',
-          icon: Icons.people_outline,
-          builder: (_) => _buildUsersTab(),
-        ),
+    _allowedTypes = [
+      if (authNotifier.hasPermission('view_products')) 'product',
+      if (authNotifier.hasPermission('view_categories')) 'category',
+      if (authNotifier.hasPermission('view_users')) 'user',
+      if (authNotifier.hasPermission('view_settings')) 'merchant_qr',
+      if (authNotifier.hasPermission('view_announcements')) 'announcement',
     ];
-    _tabController?.dispose();
-    _tabController = _visibleTabs.isEmpty
-        ? null
-        : TabController(length: _visibleTabs.length, vsync: this);
+    if (!_allowedTypes.contains(_filterType) && _filterType != 'all') {
+      _filterType = 'all';
+    }
   }
 
   Future<void> _loadTrash() async {
@@ -128,15 +98,18 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
 
   void _filterItems() {
     final query = _searchController.text.trim().toLowerCase();
-    if (query.isEmpty) {
-      setState(() => _filteredItems = List.unmodifiable(_trashItems));
-      return;
-    }
-
     setState(() {
       _filteredItems = _trashItems.where((item) {
+        if (!_allowedTypes.contains(item.entityType)) {
+          return false;
+        }
+        if (_filterType != 'all' && item.entityType != _filterType) {
+          return false;
+        }
+        if (query.isEmpty) return true;
+
         final name = (item.entityName ?? '').toLowerCase();
-        final type = item.entityType.toLowerCase();
+        final typeLabel = _labelForType(item.entityType).toLowerCase();
         final snapshot = item.snapshotMap;
         final snapshotText = snapshot != null
             ? snapshot.values
@@ -145,90 +118,14 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
                 .join(' ')
             : '';
         return name.contains(query) ||
-            type.contains(query) ||
+            typeLabel.contains(query) ||
             snapshotText.contains(query);
       }).toList();
     });
   }
 
-  List<TrashItem> _itemsForType(String entityType) {
-    return _filteredItems.where((i) => i.entityType == entityType).toList();
-  }
-
-  String? _currentTabEntityType() {
-    if (_tabController == null || _visibleTabs.isEmpty) return null;
-    final index = _tabController!.index;
-    if (index < 0 || index >= _visibleTabs.length) return null;
-    return _visibleTabs[index].entityType;
-  }
-
   List<TrashItem> _selectedItems() {
     return _filteredItems.where((i) => _selectedIds.contains(i.id)).toList();
-  }
-
-  List<Widget> _buildNormalActions(AuthStateNotifier authNotifier) {
-    final actions = <Widget>[];
-    if (_visibleTabs.isNotEmpty) {
-      actions.add(
-        IconButton(
-          icon: const Icon(Icons.check_circle_outlined),
-          tooltip: 'Select items',
-          onPressed: () => setState(() => _selectionMode = true),
-        ),
-      );
-    }
-    if (authNotifier.hasPermission('empty_trash')) {
-      actions.add(
-        IconButton(
-          icon: const Icon(Icons.delete_sweep),
-          tooltip: 'Empty Trash',
-          onPressed: _emptyTrash,
-        ),
-      );
-    }
-    return actions;
-  }
-
-  List<Widget> _buildSelectionActions(AuthStateNotifier authNotifier) {
-    final selected = _selectedItems();
-    final canRestoreAll = selected.isNotEmpty &&
-        authNotifier.hasPermission('restore_trash') &&
-        selected.every((i) =>
-            authNotifier.hasPermission(_viewPermissionFor(i.entityType)));
-    final canDeleteAll = selected.isNotEmpty &&
-        selected.every((i) =>
-            authNotifier.hasPermission(_deletePermissionFor(i.entityType)));
-
-    return [
-      IconButton(
-        icon: const Icon(Icons.select_all),
-        tooltip: 'Select all',
-        onPressed: _selectAllOnCurrentTab,
-      ),
-      IconButton(
-        icon: const Icon(Icons.clear),
-        tooltip: 'Clear selection',
-        onPressed: _clearSelection,
-      ),
-      if (canRestoreAll)
-        IconButton(
-          icon: const Icon(Icons.restore),
-          tooltip: 'Restore selected',
-          onPressed: _restoreSelected,
-        ),
-      if (canDeleteAll)
-        IconButton(
-          icon: Icon(Icons.delete_forever,
-              color: Theme.of(context).colorScheme.error),
-          tooltip: 'Delete selected',
-          onPressed: _deleteSelected,
-        ),
-      IconButton(
-        icon: const Icon(Icons.close),
-        tooltip: 'Cancel selection',
-        onPressed: _exitSelectionMode,
-      ),
-    ];
   }
 
   void _exitSelectionMode() {
@@ -242,12 +139,9 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
     setState(() => _selectedIds.clear());
   }
 
-  void _selectAllOnCurrentTab() {
-    final currentType = _currentTabEntityType();
-    if (currentType == null) return;
-    final items = _itemsForType(currentType);
+  void _selectAll() {
     setState(() {
-      for (final item in items) {
+      for (final item in _filteredItems) {
         if (item.id != null) _selectedIds.add(item.id!);
       }
     });
@@ -293,6 +187,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
             title: 'Restored',
             message: 'Selected items restored successfully.',
           );
+          bumpCatalogRevision(ref);
           await _loadTrash();
         } else {
           AppDialogService.error(
@@ -328,6 +223,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
             title: 'Deleted',
             message: 'Selected items permanently deleted.',
           );
+          bumpCatalogRevision(ref);
           await _loadTrash();
         } else {
           AppDialogService.error(
@@ -342,25 +238,12 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
     }
   }
 
-  String _expiryText(TrashItem item) {
-    final expiry = item.expiresAt;
-    if (expiry == null) return 'No expiry';
-    final remaining = expiry.difference(DateTime.now());
-    if (remaining.isNegative) return 'Expired';
-    final days = remaining.inDays;
-    if (days == 0) {
-      if (remaining.inHours > 1) {
-        return 'Expires in ${remaining.inHours} hours';
-      }
-      return 'Expires in less than an hour';
-    }
-    return 'Expires in $days day${days == 1 ? '' : 's'}';
-  }
-
   Future<void> _restoreItem(TrashItem item) async {
     final authNotifier = ref.read(authStateProvider.notifier);
     if (!authNotifier.hasPermission('restore_trash') ||
-        !authNotifier.hasPermission(_viewPermissionFor(item.entityType))) {
+        !authNotifier.hasPermission(_viewPermissionFor(item.entityType)) ||
+        (item.entityType == 'merchant_qr' &&
+            !SessionManager().canEditBusinessSettings())) {
       AppDialogService.accessDenied(context);
       return;
     }
@@ -382,7 +265,8 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
                 ? '${item.entityName} restored successfully.'
                 : 'Item restored successfully.',
           );
-          _loadTrash();
+          bumpCatalogRevision(ref);
+          await _loadTrash();
         } else {
           AppDialogService.error(
             context,
@@ -398,7 +282,9 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
 
   Future<void> _permanentlyDeleteItem(TrashItem item) async {
     final authNotifier = ref.read(authStateProvider.notifier);
-    if (!authNotifier.hasPermission(_deletePermissionFor(item.entityType))) {
+    if (!authNotifier.hasPermission(_deletePermissionFor(item.entityType)) ||
+        (item.entityType == 'merchant_qr' &&
+            !SessionManager().canEditBusinessSettings())) {
       AppDialogService.accessDenied(context);
       return;
     }
@@ -420,7 +306,8 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
                 ? '${item.entityName} permanently deleted.'
                 : 'Item permanently deleted.',
           );
-          _loadTrash();
+          bumpCatalogRevision(ref);
+          await _loadTrash();
         } else {
           AppDialogService.error(
             context,
@@ -441,7 +328,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
       return;
     }
 
-    if (_trashItems.isEmpty) {
+    if (_filteredItems.isEmpty) {
       AppDialogService.warning(
         context,
         title: 'Trash is Empty',
@@ -450,14 +337,27 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
       return;
     }
 
+    final itemName = _filterType == 'all' && _searchController.text.isEmpty
+        ? 'all items in trash'
+        : 'all visible items in trash';
+
     final confirmed = await AppDialogService.permanentDeleteConfirm(
       context,
-      itemName: 'all items in trash',
+      itemName: itemName,
     );
 
     if (confirmed == true && mounted) {
-      final trashService = ref.read(trashServiceProvider);
-      final result = await trashService.emptyTrash();
+      final ids = _filteredItems
+          .where((i) => _canDeleteItem(i, authNotifier))
+          .map((i) => i.id!)
+          .toList();
+      if (ids.isEmpty) {
+        AppDialogService.accessDenied(context);
+        return;
+      }
+
+      final result =
+          await ref.read(trashServiceProvider).bulkPermanentDelete(ids);
       if (mounted) {
         if (result.success) {
           await AppDialogService.success(
@@ -465,7 +365,8 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
             title: 'Emptied',
             message: 'Trash has been emptied.',
           );
-          _loadTrash();
+          bumpCatalogRevision(ref);
+          await _loadTrash();
         } else {
           AppDialogService.error(
             context,
@@ -477,6 +378,21 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
         }
       }
     }
+  }
+
+  String _expiryText(TrashItem item) {
+    final expiry = item.expiresAt;
+    if (expiry == null) return 'No expiry';
+    final remaining = expiry.difference(DateTime.now());
+    if (remaining.isNegative) return 'Expired';
+    final days = remaining.inDays;
+    if (days == 0) {
+      if (remaining.inHours > 1) {
+        return 'Expires in ${remaining.inHours} hours';
+      }
+      return 'Expires in less than an hour';
+    }
+    return 'Expires in $days day${days == 1 ? '' : 's'}';
   }
 
   @override
@@ -499,7 +415,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
       );
     }
 
-    if (_visibleTabs.isEmpty) {
+    if (_allowedTypes.isEmpty) {
       return Scaffold(
         appBar: AppHeader(title: 'Trash Bin', showBackButton: true),
         body: const EmptyState(
@@ -525,106 +441,97 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
         showThemeToggle: !_selectionMode,
         showNotificationBell: !_selectionMode,
         showProfileMenu: !_selectionMode,
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: _visibleTabs
-              .map((tab) => Tab(icon: Icon(tab.icon), text: tab.label))
-              .toList(),
-        ),
         actions: appBarActions,
       ),
       body: Column(
         children: [
           Padding(
             padding: const EdgeInsets.all(16),
-            child: AppSearchField(
-              controller: _searchController,
-              hint: 'Search trash...',
-              onChanged: (_) => _filterItems(),
-              onClear: () {
-                _searchController.clear();
-                _filterItems();
-              },
+            child: Row(
+              children: [
+                Expanded(
+                  child: AppSearchField(
+                    controller: _searchController,
+                    hint: 'Search trash...',
+                    onChanged: (_) => _filterItems(),
+                    onClear: () {
+                      _searchController.clear();
+                      _filterItems();
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                SizedBox(
+                  width: 150,
+                  child: AppDropdown<String>(
+                    label: 'Filter',
+                    value: _filterType,
+                    items: _buildFilterItems(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() {
+                          _filterType = value;
+                        });
+                        _filterItems();
+                      }
+                    },
+                    isDense: true,
+                  ),
+                ),
+              ],
             ),
           ),
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: _visibleTabs.map((t) => t.builder(context)).toList(),
-            ),
+            child: _buildBody(),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildProductsTab() {
-    final items = _itemsForType('product');
+  List<DropdownMenuItem<String>> _buildFilterItems() {
+    return [
+      const DropdownMenuItem(value: 'all', child: Text('All')),
+      for (final type in _allowedTypes)
+        DropdownMenuItem(value: type, child: Text(_labelForType(type))),
+    ];
+  }
 
-    if (items.isEmpty) {
-      return const EmptyState(
-        icon: Icons.inventory_2,
-        title: 'No Deleted Products',
-        message: 'Deleted products will appear here for recovery',
+  Widget _buildBody() {
+    if (_filteredItems.isEmpty) {
+      final hasFilters =
+          _filterType != 'all' || _searchController.text.isNotEmpty;
+      return EmptyState(
+        icon: Icons.delete_outline,
+        title: hasFilters ? 'No Matching Items' : 'Trash is Empty',
+        message: hasFilters
+            ? 'Try adjusting your search or filter.'
+            : 'Deleted products, categories, users, QR images, and '
+                'announcements will appear here.',
       );
     }
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: items.length,
-      itemBuilder: (context, index) {
-        final item = items[index];
-        final product = _parseProduct(item);
-        final title = product?.name ?? item.entityName ?? 'Unknown product';
-        final subtitle = product != null
-            ? '${CurrencyUtils.format(product.price)} • Stock: ${product.stock} • ${_expiryText(item)}'
-            : 'Deleted ${item.deletedAt} • ${_expiryText(item)}';
-        return _buildEntityCard(
-          item: item,
-          title: title,
-          subtitle: subtitle,
-          leading: _selectionMode
-              ? Checkbox(
-                  value: _selectedIds.contains(item.id),
-                  onChanged: (_) => _toggleSelection(item.id!),
-                )
-              : SizedBox(
-                  width: 56,
-                  height: 56,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: AppImage(
-                      imagePath: product?.imageUrl,
-                      placeholderIcon: Icons.inventory_2,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                ),
-        );
-      },
+      itemCount: _filteredItems.length,
+      itemBuilder: (context, index) => _buildTrashCard(_filteredItems[index]),
     );
   }
 
-  Widget _buildEntityCard({
-    required TrashItem item,
-    required String title,
-    required String subtitle,
-    required Widget leading,
-  }) {
+  Widget _buildTrashCard(TrashItem item) {
     final authNotifier = ref.read(authStateProvider.notifier);
-    final canRestore = authNotifier.hasPermission('restore_trash') &&
-        authNotifier.hasPermission(_viewPermissionFor(item.entityType));
-    final canDelete =
-        authNotifier.hasPermission(_deletePermissionFor(item.entityType));
+    final canRestore = _canRestoreItem(item, authNotifier);
+    final canDelete = _canDeleteItem(item, authNotifier);
 
     return AppCard(
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
-        leading: leading,
-        title: Text(title),
-        subtitle: Text(subtitle),
-        trailing: !_selectionMode && (canRestore || canDelete)
-            ? Row(
+        leading: _buildLeading(item),
+        title: Text(_titleForItem(item)),
+        subtitle: _buildSubtitle(item),
+        trailing: _selectionMode || (canRestore == false && canDelete == false)
+            ? null
+            : Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (canRestore)
@@ -641,94 +548,156 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
                       onPressed: () => _permanentlyDeleteItem(item),
                     ),
                 ],
-              )
-            : null,
+              ),
         onTap: _selectionMode ? () => _toggleSelection(item.id!) : null,
         onLongPress: item.id != null ? () => _startSelection(item.id!) : null,
       ),
     );
   }
 
-  Widget _buildCategoriesTab() {
-    final items = _itemsForType('category');
-
-    if (items.isEmpty) {
-      return const EmptyState(
-        icon: Icons.category,
-        title: 'No Deleted Categories',
-        message: 'Deleted categories will appear here for recovery',
+  Widget _buildLeading(TrashItem item) {
+    if (_selectionMode) {
+      return Checkbox(
+        value: _selectedIds.contains(item.id),
+        onChanged: (_) => _toggleSelection(item.id!),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: items.length,
-      itemBuilder: (context, index) {
-        final item = items[index];
-        final category = _parseCategory(item);
-        final title = category?.name ?? item.entityName ?? 'Unknown category';
-        final description =
-            (category != null && category.description.isNotEmpty)
-                ? category.description
-                : 'No description';
-        final subtitle = '$description • ${_expiryText(item)}';
-        return _buildEntityCard(
-          item: item,
-          title: title,
-          subtitle: subtitle,
-          leading: _selectionMode
-              ? Checkbox(
-                  value: _selectedIds.contains(item.id),
-                  onChanged: (_) => _toggleSelection(item.id!),
-                )
-              : const CircleAvatar(
-                  child: Icon(Icons.category),
-                ),
+    const size = 56.0;
+    switch (item.entityType) {
+      case 'product':
+        final product = _parseProduct(item);
+        return SizedBox(
+          width: size,
+          height: size,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: AppImage(
+              imagePath: product?.imageUrl,
+              placeholderIcon: Icons.inventory_2,
+              fit: BoxFit.cover,
+              cacheWidth: 512,
+            ),
+          ),
         );
-      },
+      case 'category':
+        return const SizedBox(
+          width: size,
+          height: size,
+          child: CircleAvatar(
+            child: Icon(Icons.category),
+          ),
+        );
+      case 'user':
+        final user = _parseUser(item);
+        return SizedBox(
+          width: size,
+          height: size,
+          child: CircleAvatar(
+            child: Text(
+              user != null && user.fullName.isNotEmpty
+                  ? user.fullName[0].toUpperCase()
+                  : '?',
+            ),
+          ),
+        );
+      case 'merchant_qr':
+        final snapshot = item.snapshotMap;
+        final path = snapshot?['path'] as String?;
+        return SizedBox(
+          width: size,
+          height: size,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: AppImage(
+              imagePath: path,
+              placeholderIcon: Icons.qr_code,
+              fit: BoxFit.contain,
+              cacheWidth: null,
+            ),
+          ),
+        );
+      case 'announcement':
+        return const SizedBox(
+          width: size,
+          height: size,
+          child: CircleAvatar(
+            child: Icon(Icons.campaign),
+          ),
+        );
+      default:
+        return const SizedBox(
+          width: size,
+          height: size,
+          child: CircleAvatar(
+            child: Icon(Icons.delete),
+          ),
+        );
+    }
+  }
+
+  Widget _buildSubtitle(TrashItem item) {
+    final theme = Theme.of(context);
+    final description = _descriptionForItem(item);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (description.isNotEmpty)
+          Text(
+            description,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodyMedium,
+          ),
+        if (description.isNotEmpty) const SizedBox(height: 4),
+        Text(
+          'Deleted by ${item.deletedByName ?? 'Unknown'} '
+          '• ${_dateFormat.format(item.deletedAt)} '
+          '• ${_expiryText(item)}',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildUsersTab() {
-    final items = _itemsForType('user');
+  String _titleForItem(TrashItem item) {
+    return switch (item.entityType) {
+      'product' => _parseProduct(item)?.name ?? item.entityName ?? 'Unknown product',
+      'category' => _parseCategory(item)?.name ?? item.entityName ?? 'Unknown category',
+      'user' => _parseUser(item)?.fullName ?? item.entityName ?? 'Unknown user',
+      'merchant_qr' => item.entityName ?? 'Merchant QR',
+      'announcement' => _parseAnnouncement(item)?.title ?? item.entityName ?? 'Unknown announcement',
+      _ => item.entityName ?? 'Unknown item',
+    };
+  }
 
-    if (items.isEmpty) {
-      return const EmptyState(
-        icon: Icons.people,
-        title: 'No Deleted Users',
-        message: 'Deleted users will appear here for recovery',
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: items.length,
-      itemBuilder: (context, index) {
-        final item = items[index];
+  String _descriptionForItem(TrashItem item) {
+    switch (item.entityType) {
+      case 'product':
+        final product = _parseProduct(item);
+        if (product == null) return '';
+        return '${CurrencyUtils.format(product.price)} • Stock: ${product.stock}';
+      case 'category':
+        final category = _parseCategory(item);
+        return category?.description ?? 'No description';
+      case 'user':
         final user = _parseUser(item);
-        final title = user?.fullName ?? item.entityName ?? 'Unknown user';
-        final subtitle = user != null
-            ? '${user.username} • ${user.role.displayName} • ${_expiryText(item)}'
-            : 'Deleted by: ${item.deletedByName ?? 'Unknown'} • ${_expiryText(item)}';
-        return _buildEntityCard(
-          item: item,
-          title: title,
-          subtitle: subtitle,
-          leading: _selectionMode
-              ? Checkbox(
-                  value: _selectedIds.contains(item.id),
-                  onChanged: (_) => _toggleSelection(item.id!),
-                )
-              : CircleAvatar(
-                  child: Text(
-                    user != null && user.fullName.isNotEmpty
-                        ? user.fullName[0].toUpperCase()
-                        : '?',
-                  ),
-                ),
-        );
-      },
-    );
+        if (user == null) return '';
+        return '${user.username} • ${user.role.displayName}';
+      case 'merchant_qr':
+        final snapshot = item.snapshotMap;
+        final type = snapshot?['type'] as String?;
+        return type ?? 'Merchant QR image';
+      case 'announcement':
+        final announcement = _parseAnnouncement(item);
+        if (announcement == null) return '';
+        return announcement.content;
+      default:
+        return '';
+    }
   }
 
   Product? _parseProduct(TrashItem item) {
@@ -761,11 +730,92 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
     }
   }
 
+  Announcement? _parseAnnouncement(TrashItem item) {
+    final snapshot = item.snapshotMap;
+    if (snapshot == null) return null;
+    try {
+      return Announcement.fromMap(snapshot);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  List<Widget> _buildNormalActions(AuthStateNotifier authNotifier) {
+    return [
+      if (_allowedTypes.isNotEmpty)
+        IconButton(
+          icon: const Icon(Icons.check_circle_outlined),
+          tooltip: 'Select items',
+          onPressed: () => setState(() => _selectionMode = true),
+        ),
+      if (authNotifier.hasPermission('empty_trash'))
+        IconButton(
+          icon: const Icon(Icons.delete_sweep),
+          tooltip: 'Empty Trash',
+          onPressed: _emptyTrash,
+        ),
+    ];
+  }
+
+  List<Widget> _buildSelectionActions(AuthStateNotifier authNotifier) {
+    final selected = _selectedItems();
+    final canRestoreAll = selected.isNotEmpty &&
+        selected.every((i) => _canRestoreItem(i, authNotifier));
+    final canDeleteAll = selected.isNotEmpty &&
+        selected.every((i) => _canDeleteItem(i, authNotifier));
+
+    return [
+      IconButton(
+        icon: const Icon(Icons.select_all),
+        tooltip: 'Select all',
+        onPressed: _selectAll,
+      ),
+      IconButton(
+        icon: const Icon(Icons.clear),
+        tooltip: 'Clear selection',
+        onPressed: _clearSelection,
+      ),
+      if (canRestoreAll)
+        IconButton(
+          icon: const Icon(Icons.restore),
+          tooltip: 'Restore selected',
+          onPressed: _restoreSelected,
+        ),
+      if (canDeleteAll)
+        IconButton(
+          icon: Icon(Icons.delete_forever,
+              color: Theme.of(context).colorScheme.error),
+          tooltip: 'Delete selected',
+          onPressed: _deleteSelected,
+        ),
+      IconButton(
+        icon: const Icon(Icons.close),
+        tooltip: 'Cancel selection',
+        onPressed: _exitSelectionMode,
+      ),
+    ];
+  }
+
+  bool _canRestoreItem(TrashItem item, AuthStateNotifier authNotifier) {
+    return authNotifier.hasPermission('restore_trash') &&
+        authNotifier.hasPermission(_viewPermissionFor(item.entityType)) &&
+        (item.entityType != 'merchant_qr' ||
+            SessionManager().canEditBusinessSettings());
+  }
+
+  bool _canDeleteItem(TrashItem item, AuthStateNotifier authNotifier) {
+    return authNotifier.hasPermission(_deletePermissionFor(item.entityType)) &&
+        (item.entityType != 'merchant_qr' ||
+            SessionManager().canEditBusinessSettings());
+  }
+
   String _viewPermissionFor(String entityType) {
     return switch (entityType) {
       'product' => 'view_products',
       'category' => 'view_categories',
       'user' => 'view_users',
+      'merchant_qr' => 'view_settings',
+      'announcement' => 'view_announcements',
       _ => 'view_trash',
     };
   }
@@ -775,7 +825,20 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
       'product' => 'delete_products',
       'category' => 'delete_categories',
       'user' => 'delete_users',
+      'merchant_qr' => 'edit_settings',
+      'announcement' => 'manage_announcements',
       _ => 'view_trash',
+    };
+  }
+
+  String _labelForType(String type) {
+    return switch (type) {
+      'product' => 'Products',
+      'category' => 'Categories',
+      'user' => 'Users',
+      'merchant_qr' => 'QR',
+      'announcement' => 'Announcements',
+      _ => 'Other',
     };
   }
 }

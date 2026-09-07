@@ -8,6 +8,7 @@ import 'package:pinoy_pos/core/payment_validation_exception.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/payment_settings.dart';
 import 'package:pinoy_pos/providers/cart_provider.dart';
+import 'package:pinoy_pos/providers/catalog_provider.dart';
 import 'package:pinoy_pos/providers/payment_settings_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/services/image_service.dart';
@@ -17,7 +18,8 @@ import 'package:pinoy_pos/ui/screens/payment_success_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
-import 'package:pinoy_pos/ui/widgets/app_image.dart';
+import 'package:pinoy_pos/ui/widgets/app_payment_qr_preview.dart';
+import 'package:pinoy_pos/ui/widgets/app_payment_qr_viewer.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
@@ -200,6 +202,8 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
         _committed = true;
         ref.read(cartProvider.notifier).clear();
         ref.read(cartProvider.notifier).setProcessing(false);
+        // The sale decremented stock — refresh every catalog screen.
+        bumpCatalogRevision(ref);
 
         // Load the created sale to pass to the success screen.
         // The most recent sale by the current user is the one just created.
@@ -380,15 +384,24 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
     );
   }
 
-  Widget _buildMerchantQrSection(PaymentSettings settings, ColorScheme cs) {
-    final qrPath = settings.gcashQrImagePath;
-    if (qrPath != null && qrPath.isNotEmpty) {
-      return _buildMerchantQrCard(qrPath, cs);
-    }
-    return _buildMissingQrCard(cs);
+  void _openQrViewer(String qrPath) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AppPaymentQrViewer(
+          imagePath: qrPath,
+          title: 'Scan to Pay',
+          caption: 'Scan this GCash QR code to pay',
+        ),
+      ),
+    );
   }
 
-  Widget _buildMerchantQrCard(String qrPath, ColorScheme cs) {
+  Widget _buildMerchantQrSection(PaymentSettings settings, ColorScheme cs) {
+    final qrPath = settings.gcashQrImagePath;
+    final hasImage = qrPath != null && qrPath.isNotEmpty;
+    final safeQrPath = hasImage ? qrPath : null;
+    final canConfigure = SessionManager().canEditBusinessSettings();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -408,66 +421,15 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 240),
-                  child: AspectRatio(
-                    aspectRatio: 1,
-                    child: AppImage(
-                      imagePath: qrPath,
-                      placeholderIcon: Icons.qr_code,
-                      fit: BoxFit.contain,
-                      cacheWidth: null,
-                      semanticLabel: 'GCash merchant QR code',
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'After paying, enter the reference number below.',
-                  style: TextStyle(color: cs.onPrimaryContainer),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 24),
-      ],
-    );
-  }
-
-  Widget _buildMissingQrCard(ColorScheme cs) {
-    final canConfigure = SessionManager().canEditBusinessSettings();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        AppCard(
-          color: cs.errorContainer,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Icon(Icons.qr_code, color: cs.onErrorContainer),
-                const SizedBox(height: 8),
-                Text(
-                  'GCash QR not configured',
-                  style: TextStyle(
-                    color: cs.onErrorContainer,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  canConfigure
+                AppPaymentQrPreview(
+                  imagePath: qrPath,
+                  onTap: safeQrPath != null ? () => _openQrViewer(safeQrPath) : null,
+                  emptyTitle: 'GCash QR not configured',
+                  emptySubtitle: canConfigure
                       ? 'Upload the business GCash QR so customers can scan it.'
                       : 'The Owner must upload the business GCash QR before customers can scan it.',
-                  style: TextStyle(color: cs.onErrorContainer),
-                  textAlign: TextAlign.center,
                 ),
-                if (canConfigure) ...[
+                if (!hasImage && canConfigure) ...[
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
                     onPressed: () {
@@ -481,6 +443,12 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
                     label: const Text('Configure GCash QR'),
                   ),
                 ],
+                const SizedBox(height: 8),
+                Text(
+                  'After paying, enter the reference number below.',
+                  style: TextStyle(color: cs.onPrimaryContainer),
+                  textAlign: TextAlign.center,
+                ),
               ],
             ),
           ),
@@ -663,7 +631,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'This GCash payment must be approved by ${settings.adminCanVerify ? 'an Owner or System Admin' : 'the Owner'} before the sale is completed.',
+                      'This GCash payment must be approved by the Owner before the sale is completed.',
                       style: TextStyle(color: cs.onSecondaryContainer),
                     ),
                   ),

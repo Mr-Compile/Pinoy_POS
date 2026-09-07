@@ -7,6 +7,7 @@ import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/reporting_period.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/providers/catalog_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/screens/sale_detail_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_button.dart';
@@ -141,6 +142,8 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
               title: 'Done',
               message: 'Sale voided successfully.',
             );
+            // Voiding a sale restores product stock.
+            bumpCatalogRevision(ref);
             _loadSales();
           } else {
             AppDialogService.error(

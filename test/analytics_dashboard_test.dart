@@ -165,6 +165,64 @@ void main() {
       expect(data.analytics.transactionCount, 1);
     });
 
+    test('Owner dashboard with custom range over 120 days does not throw', () async {
+      await _login('owner');
+
+      final today = DateTime.now();
+      final start = today.subtract(const Duration(days: 365));
+      final dashboardData = await DashboardService().getDashboard(
+        SalesPeriodFilter(
+          period: SalesPeriod.custom,
+          selectedDate: start,
+          customEnd: today,
+        ),
+      );
+
+      expect(dashboardData, isNotNull);
+      expect(dashboardData, isA<OwnerDashboardData>());
+    });
+
+    test('Owner dashboard with custom range and no sales does not throw', () async {
+      await _login('owner');
+
+      final today = DateTime.now();
+      final start = today.subtract(const Duration(days: 30));
+      final dashboardData = await DashboardService().getDashboard(
+        SalesPeriodFilter(
+          period: SalesPeriod.custom,
+          selectedDate: start,
+          customEnd: today,
+        ),
+      );
+
+      expect(dashboardData, isNotNull);
+      expect(dashboardData, isA<OwnerDashboardData>());
+    });
+
+    test('Owner dashboard returns custom range analytics', () async {
+      await _login('owner');
+      final product = await _createProduct('Tocilog', 130.0, 20);
+      await _createSale(product, 1);
+
+      final today = DateTime.now();
+      final start = today.subtract(const Duration(days: 30));
+      final dashboardData = await DashboardService().getDashboard(
+        SalesPeriodFilter(
+          period: SalesPeriod.custom,
+          selectedDate: start,
+          customEnd: today,
+        ),
+      );
+
+      expect(dashboardData, isNotNull);
+      expect(dashboardData, isA<OwnerDashboardData>());
+
+      final data = dashboardData as OwnerDashboardData;
+      expect(data.analytics.totalSales, product.price);
+      expect(data.analytics.transactionCount, 1);
+      expect(data.analytics.trend.isNotEmpty, isTrue);
+    });
+
     test('Admin dashboard returns system metrics only', () async {
       await _login('admin');
 

@@ -11,6 +11,7 @@ import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/providers/user_provider.dart';
 import 'package:pinoy_pos/providers/dashboard_provider.dart';
 import 'package:pinoy_pos/providers/cart_provider.dart';
+import 'package:pinoy_pos/providers/catalog_provider.dart';
 import 'package:pinoy_pos/providers/payment_settings_provider.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/ai_advisor_provider.dart';
@@ -500,6 +501,10 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
     ref.invalidate(paymentSettingsProvider);
     ref.invalidate(authStateProvider);
     ref.invalidate(aiAdvisorChatProvider);
+
+    // Screens that keep catalog data in local state (POS, products, stock,
+    // categories) reload via their catalog-revision listener.
+    bumpCatalogRevision(ref);
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────

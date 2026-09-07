@@ -159,8 +159,8 @@
     String? gcashPaymentProofRequirement,
     String? gcashVerificationMode,
     int? gcashReferenceMinLength,
-    String? gcashQrImagePath,
-    String? gcashQrImageType,
+    Object? gcashQrImagePath = _sentinel,
+    Object? gcashQrImageType = _sentinel,
     int? aiDailyQuota,
     Object? inactivityTimeoutMinutes = _sentinel,
     int? sessionWarningSeconds,
@@ -187,8 +187,12 @@
           gcashPaymentProofRequirement ?? this.gcashPaymentProofRequirement,
       gcashVerificationMode: gcashVerificationMode ?? this.gcashVerificationMode,
       gcashReferenceMinLength: gcashReferenceMinLength ?? this.gcashReferenceMinLength,
-      gcashQrImagePath: gcashQrImagePath ?? this.gcashQrImagePath,
-      gcashQrImageType: gcashQrImageType ?? this.gcashQrImageType,
+      gcashQrImagePath: gcashQrImagePath == _sentinel
+          ? this.gcashQrImagePath
+          : gcashQrImagePath as String?,
+      gcashQrImageType: gcashQrImageType == _sentinel
+          ? this.gcashQrImageType
+          : gcashQrImageType as String?,
       aiDailyQuota: aiDailyQuota ?? this.aiDailyQuota,
       inactivityTimeoutMinutes: inactivityTimeoutMinutes == _sentinel
           ? this.inactivityTimeoutMinutes

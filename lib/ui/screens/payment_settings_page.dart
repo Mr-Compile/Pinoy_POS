@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
-import 'package:pinoy_pos/providers/payment_settings_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
-import 'package:pinoy_pos/ui/widgets/app_image.dart';
+import 'package:pinoy_pos/ui/widgets/app_payment_qr_preview.dart';
+import 'package:pinoy_pos/ui/widgets/app_payment_qr_viewer.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
@@ -15,73 +15,59 @@ import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 
 /// GCash / payment configuration page.
 ///
-/// Requires `edit_settings` permission (Owner only for business settings).
-/// Controls whether GCash is enabled, the reference / customer / proof
-/// requirements, and the single authoritative verification policy:
-/// whether Staff-tendered GCash sales need an authorized verifier's
-/// approval, and who is allowed to verify. The Owner's own sales never
-/// require verification.
-class PaymentSettingsPage extends ConsumerStatefulWidget {
+/// Requires business-Owner privileges (see [SessionManager.canEditBusinessSettings]).
+/// The page is Riverpod-driven: it watches [settingsProvider], refreshes
+/// automatically on save, and keeps the previous UI visible while a save or
+/// QR upload is in flight.
+class PaymentSettingsPage extends ConsumerWidget {
   const PaymentSettingsPage({super.key});
 
   @override
-  ConsumerState<PaymentSettingsPage> createState() =>
-      _PaymentSettingsPageState();
-}
-
-class _PaymentSettingsPageState extends ConsumerState<PaymentSettingsPage> {
-  Settings? _settings;
-  bool _isLoading = true;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadSettings();
-  }
-
-  Future<void> _loadSettings() async {
+  Widget build(BuildContext context, WidgetRef ref) {
     if (!SessionManager().canEditBusinessSettings()) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _error = 'You do not have permission to access Payment Settings.';
-        });
-      }
-      return;
+      return const Scaffold(
+        appBar: AppHeader(
+          title: 'Payment Settings',
+          showBackButton: true,
+        ),
+        body: ErrorState(
+          title: 'Access Denied',
+          message: 'You do not have permission to access Payment Settings.',
+        ),
+      );
     }
 
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    final settingsValue = ref.watch(settingsProvider);
 
-    try {
-      final settingsService = ref.read(settingsServiceProvider);
-      final settings = await settingsService.getSettings();
-      if (mounted) {
-        setState(() {
-          _settings = settings;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _error = 'Failed to load payment settings.';
-        });
-      }
-    }
+    return Scaffold(
+      appBar: const AppHeader(
+        title: 'Payment Settings',
+        showBackButton: true,
+      ),
+      body: settingsValue.when(
+        loading: () => const LoadingState(),
+        error: (error, _) => ErrorState(
+          title: 'Failed to Load',
+          message: 'Failed to load payment settings.',
+          onRetry: () => ref.invalidate(settingsProvider),
+        ),
+        data: (settings) => _PaymentSettingsForm(
+          settings: settings,
+          isLoading: settingsValue.isLoading,
+          onSave: (updated) => _save(context, ref, updated),
+          onUploadGcashQr: () => _uploadGcashQr(context, ref),
+          onClearGcashQr: () => _clearGcashQr(context, ref),
+        ),
+      ),
+    );
   }
 
-  Future<void> _save(Settings updated) async {
-    setState(() => _isLoading = true);
+  Future<void> _save(BuildContext context, WidgetRef ref, Settings updated) async {
     try {
-      final settingsService = ref.read(settingsServiceProvider);
-      await settingsService.updateSettings(updated);
-      if (mounted) {
-        setState(() => _isLoading = false);
+      await ref.read(settingsServiceProvider).updateSettings(updated);
+      ref.invalidate(settingsProvider);
+      await ref.read(settingsProvider.future);
+      if (context.mounted) {
         await AppDialogService.success(
           context,
           title: 'Saved',
@@ -89,8 +75,7 @@ class _PaymentSettingsPageState extends ConsumerState<PaymentSettingsPage> {
         );
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
+      if (context.mounted) {
         AppDialogService.error(
           context,
           title: 'Error',
@@ -100,23 +85,22 @@ class _PaymentSettingsPageState extends ConsumerState<PaymentSettingsPage> {
     }
   }
 
-  Future<void> _uploadGcashQr() async {
-    setState(() => _isLoading = true);
+  Future<void> _uploadGcashQr(BuildContext context, WidgetRef ref) async {
     try {
-      final settingsService = ref.read(settingsServiceProvider);
-      final result = await settingsService.updateGcashQrImage();
-      if (!mounted) return;
+      final result = await ref.read(settingsServiceProvider).updateGcashQrImage();
+      if (!context.mounted) return;
 
       if (result.isSuccess) {
-        ref.invalidate(paymentSettingsProvider);
-        await AppDialogService.success(
-          context,
-          title: 'QR Image Saved',
-          message: 'The GCash QR image has been uploaded.',
-        );
-        await _loadSettings();
+        ref.invalidate(settingsProvider);
+        await ref.read(settingsProvider.future);
+        if (context.mounted) {
+          await AppDialogService.success(
+            context,
+            title: 'QR Image Saved',
+            message: 'The GCash QR image has been uploaded.',
+          );
+        }
       } else {
-        setState(() => _isLoading = false);
         AppDialogService.error(
           context,
           title: 'Upload Failed',
@@ -124,8 +108,7 @@ class _PaymentSettingsPageState extends ConsumerState<PaymentSettingsPage> {
         );
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
+      if (context.mounted) {
         AppDialogService.error(
           context,
           title: 'Upload Failed',
@@ -135,22 +118,26 @@ class _PaymentSettingsPageState extends ConsumerState<PaymentSettingsPage> {
     }
   }
 
-  Future<void> _clearGcashQr() async {
+  Future<void> _clearGcashQr(BuildContext context, WidgetRef ref) async {
     final confirmed = await AppDialogService.deleteConfirm(
       context,
       itemName: 'GCash QR image',
     );
-    if (confirmed != true || !mounted) return;
+    if (confirmed != true) return;
 
-    setState(() => _isLoading = true);
     try {
-      final settingsService = ref.read(settingsServiceProvider);
-      await settingsService.clearGcashQrImage();
-      ref.invalidate(paymentSettingsProvider);
-      await _loadSettings();
+      await ref.read(settingsServiceProvider).clearGcashQrImage();
+      ref.invalidate(settingsProvider);
+      await ref.read(settingsProvider.future);
+      if (context.mounted) {
+        await AppDialogService.success(
+          context,
+          title: 'Removed',
+          message: 'The GCash QR image has been removed.',
+        );
+      }
     } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
+      if (context.mounted) {
         AppDialogService.error(
           context,
           title: 'Error',
@@ -158,35 +145,6 @@ class _PaymentSettingsPageState extends ConsumerState<PaymentSettingsPage> {
         );
       }
     }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final settings = _settings;
-
-    return Scaffold(
-      appBar: const AppHeader(
-        title: 'Payment Settings',
-        showBackButton: true,
-      ),
-      body: _isLoading && settings == null
-          ? const LoadingState()
-          : _error != null
-              ? ErrorState(
-                  title: 'Failed to Load',
-                  message: _error!,
-                  onRetry: _loadSettings,
-                )
-              : settings == null
-                  ? const Center(child: Text('No settings found.'))
-                  : _PaymentSettingsForm(
-                      settings: settings,
-                      onSave: _save,
-                      onUploadGcashQr: _uploadGcashQr,
-                      onClearGcashQr: _clearGcashQr,
-                      isLoading: _isLoading,
-                    ),
-    );
   }
 }
 
@@ -215,41 +173,39 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
   late String _customerNameRequirement;
   late String _paymentProofRequirement;
   late bool _verificationRequired;
-  late String _verifierScope;
   late int _referenceMinLength;
+
+  static const _customerNameOptions = ['off', 'optional', 'required'];
+  static const _proofOptions = ['off', 'optional', 'required'];
 
   @override
   void initState() {
     super.initState();
+    _syncFromSettings();
+  }
+
+  @override
+  void didUpdateWidget(covariant _PaymentSettingsForm oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.settings != oldWidget.settings) {
+      _syncFromSettings();
+    }
+  }
+
+  void _syncFromSettings() {
     _gcashEnabled = widget.settings.gcashEnabled;
     _gcashReferenceRequired = widget.settings.gcashReferenceRequired;
     _customerNameRequirement = widget.settings.gcashCustomerNameRequirement;
     _paymentProofRequirement = widget.settings.gcashPaymentProofRequirement;
-    // The stored mode distinguishes "who can verify" ('owner' vs
-    // 'owner_admin'); 'immediate' means verification is off. The legacy
-    // 'admin' value is folded into 'owner_admin' because the Owner must
-    // always remain an authorized verifier.
-    _verificationRequired =
-        widget.settings.gcashVerificationMode != 'immediate';
-    _verifierScope =
-        widget.settings.gcashVerificationMode == 'owner_admin' ||
-                widget.settings.gcashVerificationMode == 'admin'
-            ? 'owner_admin'
-            : 'owner';
+    _verificationRequired = widget.settings.gcashVerificationMode != 'immediate';
     _referenceMinLength = widget.settings.gcashReferenceMinLength;
   }
-
-  static const _customerNameOptions = ['off', 'optional', 'required'];
-  static const _proofOptions = ['off', 'optional', 'required'];
-  static const _verifierOptions = ['owner', 'owner_admin'];
 
   String _label(String key) {
     return switch (key) {
       'off' => 'Off',
       'optional' => 'Optional',
       'required' => 'Required',
-      'owner' => 'Owner only',
-      'owner_admin' => 'Owner or System Admin',
       _ => key,
     };
   }
@@ -258,18 +214,28 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
     if (!_verificationRequired) {
       return 'GCash sales are confirmed immediately for every operator.';
     }
-    final verifier =
-        _verifierScope == 'owner_admin' ? 'an Owner or System Admin' : 'the Owner';
-    return 'GCash sales tendered by Staff must be approved by $verifier '
+    return 'GCash sales tendered by Staff must be approved by the Owner '
         'before the sale is completed. Sales tendered by the Owner are '
         'always confirmed immediately and never require verification.';
   }
 
+  void _openQrViewer(BuildContext context, String qrPath) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AppPaymentQrViewer(
+          imagePath: qrPath,
+          title: 'Merchant QR Code',
+          caption: 'Scan this QR code to pay',
+        ),
+      ),
+    );
+  }
+
   Widget _buildGcashQrSection(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final hasImage =
-        widget.settings.gcashQrImagePath != null &&
-        widget.settings.gcashQrImagePath!.isNotEmpty;
+    final qrPath = widget.settings.gcashQrImagePath;
+    final hasImage = qrPath != null && qrPath.isNotEmpty;
+    final safeQrPath = hasImage ? qrPath : null;
 
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -281,20 +247,14 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
             style: Theme.of(context).textTheme.titleSmall,
           ),
           const SizedBox(height: 8),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 240),
-            child: AspectRatio(
-              aspectRatio: 1,
-              child: hasImage
-                  ? AppImage(
-                      imagePath: widget.settings.gcashQrImagePath,
-                      placeholderIcon: Icons.qr_code,
-                      fit: BoxFit.contain,
-                      cacheWidth: null,
-                      semanticLabel: 'GCash merchant QR code',
-                    )
-                  : _buildQrPlaceholder(cs),
-            ),
+          AppPaymentQrPreview(
+            imagePath: qrPath,
+            onTap: safeQrPath != null ? () => _openQrViewer(context, safeQrPath) : null,
+            emptyTitle: 'No GCash QR image uploaded',
+            emptySubtitle: 'Upload a QR image so customers can scan it.',
+            maxHeight: 240,
+            emptyColor: cs.surfaceContainerHighest,
+            emptyForegroundColor: cs.onSurfaceVariant,
           ),
           const SizedBox(height: 12),
           Row(
@@ -302,9 +262,7 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
               Expanded(
                 child: LoadingButton(
                   isLoading: widget.isLoading,
-                  onPressed: widget.isLoading
-                      ? null
-                      : () => widget.onUploadGcashQr(),
+                  onPressed: widget.isLoading ? null : widget.onUploadGcashQr,
                   label: hasImage ? 'Change QR Image' : 'Upload QR Image',
                 ),
               ),
@@ -313,9 +271,7 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
                 Expanded(
                   child: LoadingButton(
                     isLoading: widget.isLoading,
-                    onPressed: widget.isLoading
-                        ? null
-                        : () => widget.onClearGcashQr(),
+                    onPressed: widget.isLoading ? null : widget.onClearGcashQr,
                     label: 'Remove',
                   ),
                 ),
@@ -327,36 +283,13 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
     );
   }
 
-  Widget _buildQrPlaceholder(ColorScheme cs) {
-    return Container(
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.qr_code, size: 48, color: cs.outline),
-            const SizedBox(height: 8),
-            Text(
-              'No GCash QR image uploaded',
-              style: TextStyle(color: cs.onSurfaceVariant),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   void _submit() {
     final updated = widget.settings.copyWith(
       gcashEnabled: _gcashEnabled,
       gcashReferenceRequired: _gcashReferenceRequired,
       gcashCustomerNameRequirement: _customerNameRequirement,
       gcashPaymentProofRequirement: _paymentProofRequirement,
-      gcashVerificationMode:
-          _verificationRequired ? _verifierScope : 'immediate',
+      gcashVerificationMode: _verificationRequired ? 'owner' : 'immediate',
       gcashReferenceMinLength: _referenceMinLength,
     );
     widget.onSave(updated);
@@ -442,33 +375,13 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
                 SwitchListTile(
                   title: const Text('Verify staff GCash sales'),
                   subtitle: const Text(
-                      'Staff GCash payments must be approved by an authorized verifier before the sale is completed.'),
+                      'Staff GCash payments must be approved by the Owner before the sale is completed.'),
                   value: _verificationRequired,
                   onChanged: widget.isLoading
                       ? null
                       : (value) =>
                           setState(() => _verificationRequired = value),
                 ),
-                if (_verificationRequired)
-                  ListTile(
-                    title: const Text('Who can verify'),
-                    subtitle: Text(_label(_verifierScope)),
-                    trailing: DropdownButton<String>(
-                      value: _verifierScope,
-                      onChanged: widget.isLoading
-                          ? null
-                          : (value) {
-                              if (value == null) return;
-                              setState(() => _verifierScope = value);
-                            },
-                      items: _verifierOptions
-                          .map((v) => DropdownMenuItem(
-                                value: v,
-                                child: Text(_label(v)),
-                              ))
-                          .toList(),
-                    ),
-                  ),
                 const Divider(),
                 ListTile(
                   title: const Text('Minimum reference length'),

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:sqflite/sqflite.dart';
@@ -6,10 +7,12 @@ import 'package:pinoy_pos/core/authorization_exception.dart';
 import 'package:pinoy_pos/core/database.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/core/trash_operation_result.dart';
+import 'package:pinoy_pos/data/models/announcement.dart';
 import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/data/models/product.dart';
 import 'package:pinoy_pos/data/models/trash_item.dart';
 import 'package:pinoy_pos/data/models/user.dart';
+import 'package:pinoy_pos/data/repositories/announcement_repository.dart';
 import 'package:pinoy_pos/data/repositories/category_repository.dart';
 import 'package:pinoy_pos/data/repositories/product_repository.dart';
 import 'package:pinoy_pos/data/repositories/sale_item_repository.dart';
@@ -23,15 +26,22 @@ import 'package:pinoy_pos/services/file_storage_service.dart';
 
 /// Central owner of the soft-delete / restore / permanent-delete lifecycle.
 ///
-/// All entity deletion flows (product, category, user) must record a Trash
-/// snapshot through this service. The Trash UI reads from here; restore and
-/// permanent-delete actions must also go through here so that attachment
-/// records and physical files stay consistent.
+/// All entity deletion flows (product, category, user, announcement) must
+/// record a Trash snapshot through this service. The Trash UI reads from here;
+/// restore and permanent-delete actions must also go through here so that
+/// attachment records and physical files stay consistent.
+///
+/// Merchant QR images are a special case: there is no database row to
+/// soft-delete, so the physical file is preserved and only a Trash record is
+/// created.  A registered restore handler (supplied by [SettingsService]) is
+/// responsible for wiring the restored path back into the settings table.
 class TrashService {
   final TrashRepository _trashRepository = TrashRepository();
   final ProductRepository _productRepository = ProductRepository();
   final CategoryRepository _categoryRepository = CategoryRepository();
   final UserRepository _userRepository = UserRepository();
+  final AnnouncementRepository _announcementRepository =
+      AnnouncementRepository();
   final SaleRepository _saleRepository = SaleRepository();
   final SaleItemRepository _saleItemRepository = SaleItemRepository();
   final StockHistoryRepository _stockHistoryRepository =
@@ -45,8 +55,21 @@ class TrashService {
   static const String _entityProduct = 'product';
   static const String _entityCategory = 'category';
   static const String _entityUser = 'user';
+  static const String _entityQr = 'merchant_qr';
+  static const String _entityAnnouncement = 'announcement';
 
   static const Duration _retentionPeriod = Duration(days: 30);
+
+  final Map<String, FutureOr<void> Function(TrashItem)> _restoreHandlers = {};
+
+  /// Registers a handler that is responsible for restoring a non-DB entity
+  /// (e.g. the GCash/merchant QR image) from its trash snapshot.
+  void registerRestoreHandler(
+    String entityType,
+    FutureOr<void> Function(TrashItem) handler,
+  ) {
+    _restoreHandlers[entityType] = handler;
+  }
 
   /// Returns all visible trash items.
   Future<List<TrashItem>> getAllTrash() async {
@@ -168,6 +191,59 @@ class TrashService {
     }
   }
 
+  /// Moves the current GCash/merchant QR image to trash without deleting the
+  /// physical file. This is used when the QR is replaced or cleared from
+  /// Settings.
+  Future<TrashOperationResult> moveQrToTrash(
+    String filePath,
+    String? imageType,
+  ) async {
+    if (!_sessionManager.canEditBusinessSettings()) {
+      throw AuthorizationException(
+        'edit_settings',
+        'Only the Owner can move the GCash QR image to trash.',
+      );
+    }
+
+    if (filePath.isEmpty) {
+      return const TrashOperationResult(success: true);
+    }
+
+    final sizeBytes = await _fileStorageService.getFileSize(filePath);
+
+    final trash = TrashItem(
+      entityType: _entityQr,
+      entityId: 0,
+      entityName: 'Merchant QR',
+      snapshotJson: jsonEncode({'path': filePath, 'type': imageType}),
+      deletedBy: _sessionManager.currentUser?.id,
+      deletedAt: DateTime.now(),
+      expiresAt: DateTime.now().add(_retentionPeriod),
+      attachmentCount: 1,
+      totalSizeBytes: sizeBytes,
+    );
+
+    try {
+      // QR trash rows always insert; do not replace an existing row because
+      // multiple historical QR images may be in the bin at once.
+      await _trashRepository.insert(trash);
+
+      await _activityLogService.logActivity(
+        action: 'move_to_trash',
+        entity: _entityQr,
+        entityId: 0,
+        details: 'Moved Merchant QR to trash: $filePath',
+      );
+
+      return const TrashOperationResult(success: true);
+    } catch (e) {
+      return TrashOperationResult(
+        success: false,
+        message: 'Failed to move Merchant QR to trash: $e',
+      );
+    }
+  }
+
   /// Restores an entity from trash by [trashId].
   Future<TrashOperationResult> restoreFromTrash(int trashId) async {
     final trash = await _trashRepository.getById(trashId);
@@ -186,6 +262,36 @@ class TrashService {
     }
     if (!_sessionManager.hasPermission(_viewPermissionFor(entityType))) {
       throw AuthorizationException(_viewPermissionFor(entityType));
+    }
+
+    if (entityType == _entityQr && !_sessionManager.canEditBusinessSettings()) {
+      throw AuthorizationException(
+        'edit_settings',
+        'Only the Owner can restore the GCash QR image.',
+      );
+    }
+
+    // Type-specific registered restore handler (e.g. merchant_qr).
+    final handler = _restoreHandlers[entityType];
+    if (handler != null) {
+      try {
+        await handler(trash);
+        await _trashRepository.delete(trashId);
+
+        await _activityLogService.logActivity(
+          action: 'restore_from_trash',
+          entity: entityType,
+          entityId: entityId,
+          details: 'Restored ${trash.entityName} from trash',
+        );
+
+        return const TrashOperationResult(success: true);
+      } catch (e) {
+        return TrashOperationResult(
+          success: false,
+          message: 'Failed to restore ${trash.entityName}: $e',
+        );
+      }
     }
 
     // Type-specific validation.
@@ -286,6 +392,14 @@ class TrashService {
       throw AuthorizationException(_deletePermissionFor(entityType));
     }
 
+    if (entityType == _entityQr &&
+        !_sessionManager.canEditBusinessSettings()) {
+      throw AuthorizationException(
+        'edit_settings',
+        'Only the Owner can permanently delete the GCash QR image.',
+      );
+    }
+
     final validation = await _validatePermanentDelete(
       entityType,
       entityId,
@@ -297,7 +411,8 @@ class TrashService {
     final attachmentPaths =
         await _attachmentService.getAttachments(entityType, entityId)
             .then((list) => list.map((a) => a.filePath).toList());
-    final legacyPaths = await _legacyPathsForEntity(entityType, entityId);
+    final legacyPaths =
+        await _legacyPathsForEntity(entityType, entityId, trash: trash);
     final allPaths = {...attachmentPaths, ...legacyPaths}.toList();
 
     final db = await _dbHelper.database;
@@ -405,8 +520,8 @@ class TrashService {
     return deleted;
   }
 
-  /// Creates trash records for every soft-deleted product, category, or
-  /// user that does not already have one.
+  /// Creates trash records for every soft-deleted product, category, user, or
+  /// announcement that does not already have one.
   ///
   /// This is a system migration/backfill helper. It can run at startup
   /// before a session exists. The original entity's [deleted_at] is used
@@ -477,6 +592,29 @@ class TrashService {
       count++;
     }
 
+    final announcements = await _announcementRepository.getDeleted();
+    for (final announcement in announcements) {
+      if (announcement.id == null) continue;
+      final existing = await _trashRepository.getByEntity(
+        _entityAnnouncement,
+        announcement.id!,
+      );
+      if (existing != null) continue;
+
+      final deletedAt = announcement.deletedAt ?? now;
+      final trash = TrashItem(
+        entityType: _entityAnnouncement,
+        entityId: announcement.id!,
+        entityName: announcement.title,
+        snapshotJson: snapshotForAnnouncement(announcement),
+        deletedBy: _sessionManager.currentUser?.id,
+        deletedAt: deletedAt,
+        expiresAt: deletedAt.add(_retentionPeriod),
+      );
+      await _trashRepository.insert(trash);
+      count++;
+    }
+
     return count;
   }
 
@@ -527,7 +665,8 @@ class TrashService {
       final trash = await _trashRepository.getById(id);
       if (trash == null) continue;
 
-      if (!_sessionManager.hasPermission(_deletePermissionFor(trash.entityType))) {
+      if (!_sessionManager.hasPermission(
+          _deletePermissionFor(trash.entityType))) {
         failed.add(trash.entityName ?? 'Item #$id');
         continue;
       }
@@ -590,6 +729,8 @@ class TrashService {
         await _categoryRepository.softDelete(entityId, txn: txn);
       case _entityUser:
         await _userRepository.softDelete(entityId, txn: txn);
+      case _entityAnnouncement:
+        await _announcementRepository.softDelete(entityId, txn: txn);
     }
   }
 
@@ -605,6 +746,8 @@ class TrashService {
         await _categoryRepository.restore(entityId, txn: txn);
       case _entityUser:
         await _userRepository.restore(entityId, txn: txn);
+      case _entityAnnouncement:
+        await _announcementRepository.restore(entityId, txn: txn);
     }
   }
 
@@ -620,6 +763,8 @@ class TrashService {
         await _categoryRepository.delete(entityId, txn: txn);
       case _entityUser:
         await _userRepository.permanentlyDelete(entityId, txn: txn);
+      case _entityAnnouncement:
+        await _announcementRepository.delete(entityId, txn: txn);
     }
   }
 
@@ -657,6 +802,8 @@ class TrashService {
             }
           }
         }
+      case _entityAnnouncement:
+        return const TrashOperationResult(success: true);
     }
     return const TrashOperationResult(success: true);
   }
@@ -666,6 +813,11 @@ class TrashService {
     int entityId,
     TrashItem trash,
   ) async {
+    // Merchant QR has no soft-deleted database row; skip the entity check.
+    if (entityType == _entityQr) {
+      return const TrashOperationResult(success: true);
+    }
+
     // Ensure the entity is actually soft-deleted.
     final entity = await _getEntity(entityType, entityId, withDeleted: true);
     if (entity == null) {
@@ -681,6 +833,8 @@ class TrashService {
     } else if (entity is Category) {
       deletedAt = entity.deletedAt;
     } else if (entity is User) {
+      deletedAt = entity.deletedAt;
+    } else if (entity is Announcement) {
       deletedAt = entity.deletedAt;
     } else {
       deletedAt = null;
@@ -709,8 +863,7 @@ class TrashService {
         }
       case _entityUser:
         final user = entity as User;
-        final sales =
-            await _saleRepository.getByUserId(user.id!, limit: 1);
+        final sales = await _saleRepository.getByUserId(user.id!, limit: 1);
         final stockHistory =
             await _stockHistoryRepository.getByUserId(user.id!, limit: 1);
         if (sales.isNotEmpty || stockHistory.isNotEmpty) {
@@ -737,6 +890,8 @@ class TrashService {
         return _categoryRepository.getById(entityId);
       case _entityUser:
         return _userRepository.getByIdWithDeleted(entityId);
+      case _entityAnnouncement:
+        return _announcementRepository.getById(entityId);
     }
     return null;
   }
@@ -761,8 +916,9 @@ class TrashService {
 
   Future<List<String>> _legacyPathsForEntity(
     String entityType,
-    int entityId,
-  ) async {
+    int entityId, {
+    TrashItem? trash,
+  }) async {
     final paths = <String>[];
     switch (entityType) {
       case _entityProduct:
@@ -774,6 +930,18 @@ class TrashService {
         final user = await _userRepository.getByIdWithDeleted(entityId);
         if (user?.profileImagePath != null) {
           paths.add(user!.profileImagePath!);
+        }
+      case _entityQr:
+        final snapshot = trash?.snapshotMap;
+        final path = snapshot?['path'] as String?;
+        if (path != null && path.isNotEmpty) {
+          paths.add(path);
+        }
+      case _entityAnnouncement:
+        final snapshot = trash?.snapshotMap;
+        final path = snapshot?['image_url'] as String?;
+        if (path != null && path.isNotEmpty) {
+          paths.add(path);
         }
     }
     return paths;
@@ -812,6 +980,10 @@ class TrashService {
       legacyPath = snapshot?['image_url'] as String?;
     } else if (entityType == _entityUser) {
       legacyPath = snapshot?['profile_image_path'] as String?;
+    } else if (entityType == _entityQr) {
+      legacyPath = snapshot?['path'] as String?;
+    } else if (entityType == _entityAnnouncement) {
+      legacyPath = snapshot?['image_url'] as String?;
     }
 
     if (legacyPath != null &&
@@ -833,6 +1005,8 @@ class TrashService {
       _entityProduct => 'delete_products',
       _entityCategory => 'delete_categories',
       _entityUser => 'delete_users',
+      _entityQr => 'edit_settings',
+      _entityAnnouncement => 'manage_announcements',
       _ => 'restore_trash',
     };
   }
@@ -842,6 +1016,8 @@ class TrashService {
       _entityProduct => 'view_products',
       _entityCategory => 'view_categories',
       _entityUser => 'view_users',
+      _entityQr => 'view_settings',
+      _entityAnnouncement => 'view_announcements',
       _ => 'view_trash',
     };
   }
@@ -859,6 +1035,10 @@ class TrashService {
   /// Builds a JSON snapshot for a category.
   static String snapshotForCategory(Category category) =>
       jsonEncode(category.toMap());
+
+  /// Builds a JSON snapshot for an announcement.
+  static String snapshotForAnnouncement(Announcement announcement) =>
+      jsonEncode(announcement.toMap());
 
   /// Builds a JSON snapshot for a user.  A placeholder password hash is
   /// stored so the snapshot can be parsed with [User.fromMap] for UI

@@ -6,6 +6,7 @@ import 'package:pinoy_pos/data/repositories/announcement_repository.dart';
 import 'package:pinoy_pos/data/repositories/user_repository.dart';
 import 'package:pinoy_pos/services/activity_log_service.dart';
 import 'package:pinoy_pos/services/notification_service.dart';
+import 'package:pinoy_pos/services/trash_service.dart';
 
 class AnnouncementService {
   final AnnouncementRepository _announcementRepository = AnnouncementRepository();
@@ -135,14 +136,17 @@ class AnnouncementService {
       throw AuthorizationException('manage_announcements');
     }
 
-    await _announcementRepository.softDelete(id);
-    await _activityLogService.logActivity(
-      action: 'delete_announcement',
-      entity: 'announcement',
+    final announcement = await _announcementRepository.getById(id);
+    if (announcement == null) return false;
+
+    final result = await TrashService().moveToTrash(
+      entityType: 'announcement',
       entityId: id,
-      details: 'Soft-deleted announcement',
+      entityName: announcement.title,
+      snapshotJson: TrashService.snapshotForAnnouncement(announcement),
     );
-    return true;
+
+    return result.success;
   }
 
   Future<bool> togglePin(int id, bool isPinned) async {

@@ -5,6 +5,7 @@ import 'package:pinoy_pos/data/models/product.dart';
 import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/data/models/stock_history.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/providers/catalog_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
@@ -40,14 +41,24 @@ class _StockScreenState extends ConsumerState<StockScreen> {
   int? _selectedCategoryId;
   Timer? _debounce;
 
+  // Kept alive inside the app shell's PageView: reload whenever catalog
+  // data changes elsewhere (product save, POS sale, trash restore).
+  ProviderSubscription<int>? _catalogSubscription;
+
   @override
   void initState() {
     super.initState();
+    _catalogSubscription = ref.listenManual<int>(
+      catalogRevisionProvider,
+      (previous, next) => _loadData(),
+    );
     _loadData();
   }
 
   @override
   void dispose() {
+    _catalogSubscription?.close();
+    _catalogSubscription = null;
     _searchController.dispose();
     _debounce?.cancel();
     super.dispose();
@@ -182,7 +193,7 @@ class _StockScreenState extends ConsumerState<StockScreen> {
             title: 'Stock Added',
             message: '${product.name} stock updated from ${product.stock} to ${product.stock + result.quantity} units.',
           );
-          _loadData();
+          bumpCatalogRevision(ref);
         } else {
           AppDialogService.error(context,
               title: 'Operation Failed',
@@ -247,7 +258,7 @@ class _StockScreenState extends ConsumerState<StockScreen> {
             title: 'Stock Adjusted',
             message: '${product.name} stock updated from ${product.stock} to ${result.newStock} units.',
           );
-          _loadData();
+          bumpCatalogRevision(ref);
         } else {
           AppDialogService.error(context,
               title: 'Operation Failed',

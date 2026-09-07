@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/providers/catalog_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/dialogs/category_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_button.dart';
@@ -32,14 +33,24 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
   CategoryFilter _categoryFilter = CategoryFilter.all;
   Timer? _debounce;
 
+  // Kept alive inside the app shell's PageView: reload whenever catalog
+  // data changes elsewhere (product dialog, POS, trash restore).
+  ProviderSubscription<int>? _catalogSubscription;
+
   @override
   void initState() {
     super.initState();
+    _catalogSubscription = ref.listenManual<int>(
+      catalogRevisionProvider,
+      (previous, next) => _loadCategories(),
+    );
     _loadCategories();
   }
 
   @override
   void dispose() {
+    _catalogSubscription?.close();
+    _catalogSubscription = null;
     _searchController.dispose();
     _debounce?.cancel();
     super.dispose();
@@ -135,7 +146,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
         if (mounted) {
           if (success) {
             await AppDialogService.success(context, title: 'Done', message: category.isActive ? 'Category deactivated.' : 'Category activated.');
-            _loadCategories();
+            bumpCatalogRevision(ref);
           } else {
             AppDialogService.error(context, title: 'Error', message: 'Failed to update category status.');
           }
@@ -166,7 +177,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
         await categoryService.deleteCategory(category.id!);
         if (mounted) {
           await AppDialogService.success(context, title: 'Deleted', message: 'Category deleted successfully.');
-          _loadCategories();
+          bumpCatalogRevision(ref);
         }
       } catch (e) {
         if (mounted) {
@@ -410,7 +421,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
             ? 'Category created successfully.'
             : 'Category updated successfully.',
       );
-      if (mounted) _loadCategories();
+      if (mounted) bumpCatalogRevision(ref);
     }
   }
 }

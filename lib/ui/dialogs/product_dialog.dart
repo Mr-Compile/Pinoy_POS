@@ -8,6 +8,7 @@ import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/data/models/product.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/providers/catalog_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/services/image_service.dart';
 import 'package:pinoy_pos/ui/dialogs/category_dialog.dart';
@@ -82,6 +83,7 @@ class _ProductDialogState extends ConsumerState<_ProductDialog> {
   Future<void> _createCategory() async {
     final result = await showCategoryDialog(context, widget.ref);
     if (result?.isSaved ?? false) {
+      bumpCatalogRevision(widget.ref);
       await _refreshCategories();
     }
   }
