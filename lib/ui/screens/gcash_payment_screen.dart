@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/currency_utils.dart';
@@ -27,6 +28,10 @@ import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 
 /// GCash payment flow: customer, reference, payment proof, review, confirm.
+///
+/// The GCash QR shown here is the merchant's uploaded static QR. It is *not*
+/// regenerated with customer or amount data; the transaction amount and customer
+/// name are stored with the sale and displayed to the operator separately.
 class GcashPaymentScreen extends ConsumerStatefulWidget {
   final double total;
 
@@ -78,7 +83,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
 
   String _customerNameLabel(PaymentSettings settings) {
     if (!settings.customerNameVisible) return 'Customer Name';
-    if (settings.customerNameRequired) return 'Customer Name (required)';
+    if (settings.customerNameRequired) return 'Customer Name *';
     return 'Customer Name (optional)';
   }
 
@@ -305,6 +310,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
     }
 
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       appBar: AppHeader(
         title: _isReviewing ? 'Review Payment' : 'GCash Payment',
         showBackButton: true,
@@ -312,11 +318,13 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
             ? (_isProcessing ? null : _goBackToDetails)
             : null,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(Spacing.lg),
-        child: _isReviewing
-            ? _buildReview(settings, cs)
-            : _buildDetails(settings, cs),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(Spacing.lg),
+          child: _isReviewing
+              ? _buildReview(settings, cs)
+              : _buildDetails(settings, cs),
+        ),
       ),
     );
   }
@@ -328,6 +336,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
 
         return Form(
           key: _formKey,
+          autovalidateMode: AutovalidateMode.disabled,
           child: isCompact
               ? _buildCompactDetailsBody(settings, cs)
               : _buildWideDetailsBody(settings, cs),
@@ -336,46 +345,23 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
     );
   }
 
+  /// Portrait phone layout: one vertical column following the payment
+  /// hierarchy exactly.
+  ///
+  /// Header → Amount → Scan to Pay / QR → Instructions → Customer / Reference
+  /// → Proof (if enabled) → Order Summary → Review Payment.
   Widget _buildCompactDetailsBody(PaymentSettings settings, ColorScheme cs) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _buildTotalCard(cs),
         const SizedBox(height: Spacing.lg),
         _buildMerchantQrSection(settings, cs),
-        _buildMerchantInfoCard(settings, cs),
+        const SizedBox(height: Spacing.xl),
+        _buildCustomerInfoSection(settings, cs),
         const SizedBox(height: Spacing.xl),
         _buildOrderSummary(cs, maxVisibleItems: 2, compact: true),
         const SizedBox(height: Spacing.xl),
-        if (settings.customerNameVisible) ...[
-          AppTextFormField(
-            controller: _customerController,
-            label: _customerNameLabel(settings),
-            prefixIcon: Icons.person_outline,
-            textCapitalization: TextCapitalization.words,
-            textInputAction: TextInputAction.next,
-            validator: (value) => _validateCustomer(settings, value),
-          ),
-          const SizedBox(height: Spacing.lg),
-        ],
-        AppTextFormField(
-          controller: _referenceController,
-          label: 'GCash Reference Number',
-          prefixIcon: Icons.numbers,
-          textCapitalization: TextCapitalization.characters,
-          textInputAction: TextInputAction.done,
-          validator: (value) => _validateReference(settings, value),
-        ),
-        const SizedBox(height: Spacing.lg),
-        if (settings.paymentProofVisible) ...[
-          Text(
-            'Payment Proof',
-            style: AppTypography.titleSmallBold(context),
-          ),
-          const SizedBox(height: Spacing.sm),
-          _buildProofPicker(settings, cs),
-          const SizedBox(height: Spacing.lg),
-        ],
         AppButton.filled(
           fullWidth: true,
           icon: Icons.receipt_long_outlined,
@@ -387,57 +373,32 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
     );
   }
 
+  /// Tablet / desktop layout: payment context on the left, required inputs and
+  /// confirmation on the right. The hierarchy is preserved; the columns only
+  /// make better use of available width.
   Widget _buildWideDetailsBody(PaymentSettings settings, ColorScheme cs) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildTotalCard(cs),
               const SizedBox(height: Spacing.lg),
-              _buildOrderSummary(cs, maxVisibleItems: 5, compact: true),
+              _buildMerchantQrSection(settings, cs),
             ],
           ),
         ),
         const SizedBox(width: Spacing.xl),
         Expanded(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildMerchantQrSection(settings, cs),
-              _buildMerchantInfoCard(settings, cs),
+              _buildCustomerInfoSection(settings, cs),
               const SizedBox(height: Spacing.xl),
-              if (settings.customerNameVisible) ...[
-                AppTextFormField(
-                  controller: _customerController,
-                  label: _customerNameLabel(settings),
-                  prefixIcon: Icons.person_outline,
-                  textCapitalization: TextCapitalization.words,
-                  textInputAction: TextInputAction.next,
-                  validator: (value) => _validateCustomer(settings, value),
-                ),
-                const SizedBox(height: Spacing.lg),
-              ],
-              AppTextFormField(
-                controller: _referenceController,
-                label: 'GCash Reference Number',
-                prefixIcon: Icons.numbers,
-                textCapitalization: TextCapitalization.characters,
-                textInputAction: TextInputAction.done,
-                validator: (value) => _validateReference(settings, value),
-              ),
-              const SizedBox(height: Spacing.lg),
-              if (settings.paymentProofVisible) ...[
-                Text(
-                  'Payment Proof',
-                  style: AppTypography.titleSmallBold(context),
-                ),
-                const SizedBox(height: Spacing.sm),
-                _buildProofPicker(settings, cs),
-                const SizedBox(height: Spacing.lg),
-              ],
+              _buildOrderSummary(cs, maxVisibleItems: 5, compact: false),
+              const SizedBox(height: Spacing.xl),
               AppButton.filled(
                 fullWidth: true,
                 icon: Icons.receipt_long_outlined,
@@ -452,9 +413,235 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
     );
   }
 
-  /// Compact recap of the cart so the cashier sees what the customer is
-  /// paying for. The number of visible lines is configurable so the review
-  /// screen can show a longer summary while the details screen stays compact.
+  /// The amount must be the strongest visual element on the screen.
+  ///
+  /// It is displayed full-width, centered, in a themed surface so it is
+  /// readable in both light and dark mode.
+  Widget _buildTotalCard(ColorScheme cs) {
+    return AppCard(
+      color: cs.primaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: Spacing.lg,
+          vertical: Spacing.md,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Total Due',
+              style: AppTypography.bodyLarge(
+                context,
+              ).copyWith(color: cs.onPrimaryContainer),
+            ),
+            const SizedBox(height: Spacing.xs),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.center,
+              child: Text(
+                CurrencyUtils.format(widget.total),
+                style: AppTypography.displayMedium(
+                  context,
+                ).copyWith(
+                  color: cs.onPrimaryContainer,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// QR code section: merchant QR, scan instructions, and merchant identity.
+  ///
+  /// The QR is displayed as a single, clearly bounded, tappable square. It is
+  /// the merchant's static QR from Payment Settings; it is *not* regenerated
+  /// with customer name or amount data.
+  Widget _buildMerchantQrSection(PaymentSettings settings, ColorScheme cs) {
+    final qrPath = settings.gcashQrImagePath;
+    final previewPath = settings.gcashQrPreviewPath;
+    final displayPath = previewPath?.isNotEmpty == true ? previewPath : qrPath;
+    final hasImage = displayPath != null && displayPath.isNotEmpty;
+    final canConfigure = SessionManager().canEditBusinessSettings();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.qr_code_scanner, color: cs.primary, size: 20),
+            const SizedBox(width: Spacing.sm),
+            Text(
+              'Scan to Pay',
+              style: AppTypography.titleSmallBold(context),
+            ),
+          ],
+        ),
+        const SizedBox(height: Spacing.md),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isCompact = layoutClassFor(constraints.maxWidth).isCompact;
+            final maxDimension = isCompact ? 220.0 : 280.0;
+            final qrSize =
+                (constraints.maxWidth * (isCompact ? 0.55 : 0.5))
+                    .clamp(180.0, maxDimension);
+
+            return Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: qrSize,
+                  maxHeight: qrSize,
+                ),
+                child: AppPaymentQrPreview(
+                  imagePath: displayPath,
+                  onTap: hasImage ? () => _openQrViewer(displayPath) : null,
+                  maxHeight: qrSize,
+                  emptyTitle: 'GCash QR not configured',
+                  emptySubtitle: canConfigure
+                      ? 'Upload the business GCash QR so customers can scan it.'
+                      : 'The Owner must upload the business GCash QR before customers can scan it.',
+                ),
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: Spacing.md),
+        Text(
+          'Open GCash and scan this QR code.',
+          style: AppTypography.bodySmall(
+            context,
+          ).copyWith(color: cs.onSurfaceVariant),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: Spacing.sm),
+        _buildMerchantInfoRow(settings, cs),
+        if (!hasImage && canConfigure) ...[
+          const SizedBox(height: Spacing.md),
+          AppButton.outlined(
+            fullWidth: true,
+            icon: Icons.settings_outlined,
+            label: 'Configure GCash QR',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const PaymentSettingsPage(),
+                ),
+              );
+            },
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// Compact merchant identity row shown under the QR.
+  ///
+  /// This keeps the merchant visible without consuming the vertical space of
+  /// a standalone card and without duplicating information elsewhere.
+  Widget _buildMerchantInfoRow(PaymentSettings settings, ColorScheme cs) {
+    final storeName = settings.storeName;
+    final storePhone = settings.storePhone;
+
+    if (storeName.isEmpty && storePhone.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          Icons.storefront_outlined,
+          color: cs.primary,
+          size: 18,
+        ),
+        const SizedBox(width: Spacing.xs),
+        Flexible(
+          child: Text(
+            storeName.isNotEmpty ? storeName : storePhone,
+            style: AppTypography.bodySmallSemibold(context),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        if (storeName.isNotEmpty && storePhone.isNotEmpty) ...[
+          const SizedBox(width: Spacing.sm),
+          Text(
+            storePhone,
+            style: AppTypography.bodySmall(
+              context,
+            ).copyWith(color: cs.onSurfaceVariant),
+          ),
+        ],
+      ],
+    );
+  }
+
+  void _openQrViewer(String qrPath) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AppPaymentQrViewer(
+          imagePath: qrPath,
+          title: 'Scan to Pay',
+          caption: 'Scan this GCash QR code to pay',
+        ),
+      ),
+    );
+  }
+
+  /// Customer / payment information: customer name, reference number, and
+  /// optional payment proof. Validation is driven by Payment Settings.
+  Widget _buildCustomerInfoSection(PaymentSettings settings, ColorScheme cs) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Customer / Payment Information',
+          style: AppTypography.titleSmallBold(context),
+        ),
+        const SizedBox(height: Spacing.md),
+        if (settings.customerNameVisible) ...[
+          AppTextFormField(
+            controller: _customerController,
+            label: _customerNameLabel(settings),
+            prefixIcon: Icons.person_outline,
+            helperText: settings.customerNameRequired
+                ? 'A customer name is required to complete this payment.'
+                : 'Optional customer name for this transaction.',
+            textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.next,
+            validator: (value) => _validateCustomer(settings, value),
+          ),
+          const SizedBox(height: Spacing.lg),
+        ],
+        AppTextFormField(
+          controller: _referenceController,
+          label: settings.gcashReferenceRequired
+              ? 'GCash Reference Number *'
+              : 'GCash Reference Number',
+          prefixIcon: Icons.numbers,
+          helperText:
+              'Enter the reference number shown after completing the GCash payment.',
+          textCapitalization: TextCapitalization.characters,
+          textInputAction: TextInputAction.done,
+          validator: (value) => _validateReference(settings, value),
+          onFieldSubmitted: (_) => _goToReview(settings),
+        ),
+        if (settings.paymentProofVisible) ...[
+          const SizedBox(height: Spacing.lg),
+          _buildProofPicker(settings, cs),
+        ],
+      ],
+    );
+  }
+
+  /// Compact, scannable order summary.
+  ///
+  /// It confirms what is being paid for without competing with the amount,
+  /// QR, or primary action.
   Widget _buildOrderSummary(
     ColorScheme cs, {
     int maxVisibleItems = 3,
@@ -467,6 +654,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
     final hiddenCount = cart.items.length - visibleItems.length;
 
     return AppCard(
+      variant: AppCardVariant.filled,
       child: Padding(
         padding: compact
             ? const EdgeInsets.all(Spacing.md)
@@ -478,7 +666,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Order',
+                  'Order Summary',
                   style: AppTypography.titleSmallBold(context),
                 ),
                 Text(
@@ -532,205 +720,47 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
     );
   }
 
-  Widget _buildTotalCard(ColorScheme cs) {
-    return AppCard(
-      color: cs.primaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(Spacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Total Due',
-              style: AppTypography.bodyLarge(
-                context,
-              ).copyWith(color: cs.onPrimaryContainer),
-            ),
-            const SizedBox(height: Spacing.xs),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(
-                CurrencyUtils.format(widget.total),
-                style: AppTypography.displayMedium(
-                  context,
-                ).copyWith(
-                  color: cs.onPrimaryContainer,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: -0.5,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _openQrViewer(String qrPath) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => AppPaymentQrViewer(
-          imagePath: qrPath,
-          title: 'Scan to Pay',
-          caption: 'Scan this GCash QR code to pay',
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMerchantQrSection(PaymentSettings settings, ColorScheme cs) {
-    final qrPath = settings.gcashQrImagePath;
-    final previewPath = settings.gcashQrPreviewPath;
-    final displayPath = previewPath?.isNotEmpty == true ? previewPath : qrPath;
-    final hasImage = displayPath != null && displayPath.isNotEmpty;
-    final canConfigure = SessionManager().canEditBusinessSettings();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(Icons.qr_code_scanner, color: cs.primary, size: 20),
-            const SizedBox(width: Spacing.sm),
-            Text(
-              'Scan to pay',
-              style: AppTypography.titleSmallBold(context),
-            ),
-          ],
-        ),
-        const SizedBox(height: Spacing.sm),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final qrSize = constraints.maxWidth < 320
-                ? constraints.maxWidth
-                : 320.0;
-            return AppPaymentQrPreview(
-              imagePath: displayPath,
-              onTap: hasImage ? () => _openQrViewer(displayPath) : null,
-              maxHeight: qrSize,
-              emptyTitle: 'GCash QR not configured',
-              emptySubtitle: canConfigure
-                  ? 'Upload the business GCash QR so customers can scan it.'
-                  : 'The Owner must upload the business GCash QR before customers can scan it.',
-            );
-          },
-        ),
-        if (!hasImage && canConfigure) ...[
-          const SizedBox(height: Spacing.md),
-          SizedBox(
-            width: double.infinity,
-            child: AppButton.outlined(
-              icon: Icons.settings_outlined,
-              label: 'Configure GCash QR',
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const PaymentSettingsPage(),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-        const SizedBox(height: Spacing.md),
-        Text(
-          'Open your GCash app and scan the QR code.',
-          style: AppTypography.bodySmall(
-            context,
-          ).copyWith(color: cs.onSurfaceVariant),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: Spacing.xl),
-      ],
-    );
-  }
-
-  Widget _buildMerchantInfoCard(PaymentSettings settings, ColorScheme cs) {
-    final storeName = settings.storeName;
-    final storePhone = settings.storePhone;
-
-    if (storeName.isEmpty && storePhone.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(top: Spacing.md),
-      child: AppCard(
-        child: Padding(
-          padding: const EdgeInsets.all(Spacing.md),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(Spacing.sm),
-                decoration: BoxDecoration(
-                  color: cs.primaryContainer,
-                  borderRadius: BorderRadius.circular(AppRadius.sm),
-                ),
-                child: Icon(
-                  Icons.storefront_outlined,
-                  color: cs.onPrimaryContainer,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: Spacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (storeName.isNotEmpty)
-                      Text(
-                        storeName,
-                        style: AppTypography.bodyLarge(context).copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    if (storePhone.isNotEmpty) ...[
-                      const SizedBox(height: Spacing.xs),
-                      Text(
-                        storePhone,
-                        style: AppTypography.bodySmall(
-                          context,
-                        ).copyWith(color: cs.onSurfaceVariant),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildProofPicker(PaymentSettings settings, ColorScheme cs) {
     final proofPath = _paymentProofPath;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Text(
+          'Payment Proof',
+          style: AppTypography.titleSmallBold(context),
+        ),
+        const SizedBox(height: Spacing.sm),
+        Text(
+          settings.paymentProofRequired
+              ? 'Attach a clear photo of the GCash payment screen.'
+              : 'Attach a photo of the GCash payment screen if needed.',
+          style: AppTypography.bodySmall(
+            context,
+          ).copyWith(color: cs.onSurfaceVariant),
+        ),
+        const SizedBox(height: Spacing.md),
         if (proofPath != null) ...[
           _buildProofThumbnail(proofPath),
           const SizedBox(height: Spacing.sm),
           Row(
             children: [
               Expanded(
-                child: OutlinedButton.icon(
+                child: AppButton.outlined(
+                  fullWidth: true,
+                  icon: Icons.camera_alt_outlined,
+                  label: 'Retake',
                   onPressed: () => _pickImage(ImageSource.camera),
-                  icon: const Icon(Icons.camera_alt_outlined),
-                  label: const Text('Retake'),
                 ),
               ),
               const SizedBox(width: Spacing.sm),
               Expanded(
-                child: OutlinedButton.icon(
+                child: AppButton.outlined(
+                  fullWidth: true,
+                  color: AppButtonColor.error,
+                  icon: Icons.delete_outline,
+                  label: 'Remove',
                   onPressed: _removeProof,
-                  icon: const Icon(Icons.delete_outline),
-                  label: const Text('Remove'),
                 ),
               ),
             ],
@@ -739,18 +769,20 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
           Row(
             children: [
               Expanded(
-                child: OutlinedButton.icon(
+                child: AppButton.outlined(
+                  fullWidth: true,
+                  icon: Icons.camera_alt_outlined,
+                  label: 'Camera',
                   onPressed: () => _pickImage(ImageSource.camera),
-                  icon: const Icon(Icons.camera_alt_outlined),
-                  label: const Text('Camera'),
                 ),
               ),
               const SizedBox(width: Spacing.sm),
               Expanded(
-                child: OutlinedButton.icon(
+                child: AppButton.outlined(
+                  fullWidth: true,
+                  icon: Icons.photo_library_outlined,
+                  label: 'Gallery',
                   onPressed: () => _pickImage(ImageSource.gallery),
-                  icon: const Icon(Icons.photo_library_outlined),
-                  label: const Text('Gallery'),
                 ),
               ),
             ],
@@ -763,7 +795,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
               'Payment proof is required',
               style: AppTypography.labelMedium(
                 context,
-              ).copyWith(color: cs.onSurfaceVariant),
+              ).copyWith(color: cs.error),
             ),
           ),
       ],
@@ -805,7 +837,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Please review the payment details before confirming.',
+              'Please review the payment details before completing.',
               style: AppTypography.bodyLarge(context).copyWith(
                 color: cs.onSurfaceVariant,
               ),
@@ -832,11 +864,11 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildOrderSummary(cs, maxVisibleItems: 5),
-        const SizedBox(height: Spacing.lg),
         _buildPaymentMethodCard(cs),
         const SizedBox(height: Spacing.lg),
         _buildPaymentDetailsCard(settings, cs),
+        const SizedBox(height: Spacing.lg),
+        _buildOrderSummary(cs, maxVisibleItems: 5),
         if (needsVerification) ...[
           const SizedBox(height: Spacing.lg),
           _buildVerificationCard(cs),
@@ -855,14 +887,21 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(child: _buildOrderSummary(cs, maxVisibleItems: 5)),
-        const SizedBox(width: Spacing.lg),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildPaymentMethodCard(cs),
               const SizedBox(height: Spacing.lg),
+              _buildOrderSummary(cs, maxVisibleItems: 5),
+            ],
+          ),
+        ),
+        const SizedBox(width: Spacing.xl),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
               _buildPaymentDetailsCard(settings, cs),
               if (needsVerification) ...[
                 const SizedBox(height: Spacing.lg),
@@ -966,22 +1005,22 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
                 label: 'Payment Proof',
                 value: _proofStatusLabel(settings, hasProof),
                 icon: hasProof
-                  ? Icons.check_circle
-                  : (settings.paymentProofRequired
-                      ? Icons.warning_amber_rounded
-                      : Icons.photo_camera_outlined),
+                    ? Icons.check_circle
+                    : (settings.paymentProofRequired
+                        ? Icons.warning_amber_rounded
+                        : Icons.photo_camera_outlined),
                 iconColor: hasProof
-                  ? cs.primary
-                  : (settings.paymentProofRequired
-                      ? cs.error
-                      : cs.onSurfaceVariant),
-                valueStyle: AppTypography.bodyLarge(context).copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: hasProof
                     ? cs.primary
                     : (settings.paymentProofRequired
                         ? cs.error
                         : cs.onSurfaceVariant),
+                valueStyle: AppTypography.bodyLarge(context).copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: hasProof
+                      ? cs.primary
+                      : (settings.paymentProofRequired
+                          ? cs.error
+                          : cs.onSurfaceVariant),
                 ),
               ),
             ],
@@ -1069,7 +1108,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
         AppButton.filled(
           fullWidth: true,
           icon: Icons.check_circle_outlined,
-          label: 'Confirm Payment',
+          label: 'Complete Payment',
           size: AppButtonSize.large,
           isLoading: _isProcessing,
           onPressed: () => _completeSale(settings),
