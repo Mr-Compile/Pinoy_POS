@@ -1,4 +1,4 @@
-﻿import 'package:pinoy_pos/core/date_utils.dart';
+import 'package:pinoy_pos/core/date_utils.dart';
 import 'package:pinoy_pos/data/dao/base_dao.dart';
 import 'package:pinoy_pos/data/models/calendar_day_sales.dart';
 import 'package:pinoy_pos/data/models/category_sales_result.dart';
@@ -29,7 +29,11 @@ class SaleDao extends BaseDao<Sale> {
     return maps.map((map) => fromMap(map)).toList();
   }
 
-  Future<List<Sale>> getByDateRange(DateTime start, DateTime end, {int limit = 500}) async {
+  Future<List<Sale>> getByDateRange(
+    DateTime start,
+    DateTime end, {
+    int limit = 500,
+  }) async {
     final database = await db;
     final maps = await database.query(
       tableName,
@@ -67,12 +71,15 @@ class SaleDao extends BaseDao<Sale> {
     final start = startOfDay(date);
     final end = start.add(const Duration(days: 1));
 
-    final result = await database.rawQuery('''
+    final result = await database.rawQuery(
+      '''
       SELECT COALESCE(SUM(total_amount), 0) as total
       FROM sales
       WHERE created_at >= ? AND created_at < ? AND deleted_at IS NULL
         AND payment_status = 'confirmed'
-    ''', [start.toIso8601String(), end.toIso8601String()]);
+    ''',
+      [start.toIso8601String(), end.toIso8601String()],
+    );
 
     return (result.first['total'] as num?)?.toDouble() ?? 0.0;
   }
@@ -82,24 +89,30 @@ class SaleDao extends BaseDao<Sale> {
     final start = DateTime(year, month, 1);
     final end = DateTime(year, month + 1, 1);
 
-    final result = await database.rawQuery('''
+    final result = await database.rawQuery(
+      '''
       SELECT COALESCE(SUM(total_amount), 0) as total
       FROM sales
       WHERE created_at >= ? AND created_at < ? AND deleted_at IS NULL
         AND payment_status = 'confirmed'
-    ''', [start.toIso8601String(), end.toIso8601String()]);
+    ''',
+      [start.toIso8601String(), end.toIso8601String()],
+    );
 
     return (result.first['total'] as num?)?.toDouble() ?? 0.0;
   }
 
   Future<double> getTotalSalesForUser(int userId) async {
     final database = await db;
-    final result = await database.rawQuery('''
+    final result = await database.rawQuery(
+      '''
       SELECT COALESCE(SUM(total_amount), 0) as total
       FROM sales
       WHERE user_id = ? AND deleted_at IS NULL
         AND payment_status = 'confirmed'
-    ''', [userId]);
+    ''',
+      [userId],
+    );
 
     return (result.first['total'] as num?)?.toDouble() ?? 0.0;
   }
@@ -109,29 +122,62 @@ class SaleDao extends BaseDao<Sale> {
     final start = startOfDay(date);
     final end = start.add(const Duration(days: 1));
 
-    final result = await database.rawQuery('''
+    final result = await database.rawQuery(
+      '''
       SELECT COALESCE(SUM(total_amount), 0) as total
       FROM sales
       WHERE created_at >= ? AND created_at < ? AND user_id = ? AND deleted_at IS NULL
         AND payment_status = 'confirmed'
-    ''', [start.toIso8601String(), end.toIso8601String(), userId]);
+    ''',
+      [start.toIso8601String(), end.toIso8601String(), userId],
+    );
 
     return (result.first['total'] as num?)?.toDouble() ?? 0.0;
   }
 
-  Future<double> getTotalSalesForMonthForUser(int year, int month, int userId) async {
+  Future<double> getTotalSalesForMonthForUser(
+    int year,
+    int month,
+    int userId,
+  ) async {
     final database = await db;
     final start = DateTime(year, month, 1);
     final end = DateTime(year, month + 1, 1);
 
-    final result = await database.rawQuery('''
+    final result = await database.rawQuery(
+      '''
       SELECT COALESCE(SUM(total_amount), 0) as total
       FROM sales
       WHERE created_at >= ? AND created_at < ? AND user_id = ? AND deleted_at IS NULL
         AND payment_status = 'confirmed'
-    ''', [start.toIso8601String(), end.toIso8601String(), userId]);
+    ''',
+      [start.toIso8601String(), end.toIso8601String(), userId],
+    );
 
     return (result.first['total'] as num?)?.toDouble() ?? 0.0;
+  }
+
+  /// Returns the highest sequential suffix (NNNN) already used by receipt
+  /// numbers of the form `YYYYMMDD-NNNN` for the given business-date
+  /// prefix (YYYYMMDD).
+  ///
+  /// All rows count — including voided, cancelled, and soft-deleted sales —
+  /// so a consumed number is never reused. Legacy `RCP…` receipt numbers
+  /// do not match the `prefix-%` pattern and are ignored.
+  ///
+  /// `substr(receipt_number, 10)` extracts the `NNNN` suffix: positions
+  /// 1–8 are the date, position 9 is the hyphen, 10+ is the sequence.
+  Future<int> getMaxReceiptSequence(
+    String datePrefix, {
+    DatabaseExecutor? txn,
+  }) async {
+    final executor = txn ?? await db;
+    final result = await executor.rawQuery(
+      'SELECT MAX(CAST(substr(receipt_number, 10) AS INTEGER)) AS max_seq '
+      'FROM sales WHERE receipt_number LIKE ?',
+      ['$datePrefix-%'],
+    );
+    return (result.first['max_seq'] as num?)?.toInt() ?? 0;
   }
 
   /// Returns a sale with the same reference number and payment method that is

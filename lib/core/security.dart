@@ -42,11 +42,4 @@ class SecurityHelper {
     final random = Random.secure();
     return (1000 + random.nextInt(9000)).toString();
   }
-
-  static String generateReceiptNumber() {
-    final now = DateTime.now();
-    final timestamp = now.millisecondsSinceEpoch;
-    final random = Random.secure().nextInt(9999);
-    return 'RCP$timestamp$random';
-  }
 }

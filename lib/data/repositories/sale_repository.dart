@@ -12,23 +12,77 @@ import 'package:sqflite/sqflite.dart';
 class SaleRepository {
   final SaleDao _saleDao = SaleDao();
 
-  Future<int> insert(Sale sale, {DatabaseExecutor? txn}) => _saleDao.insert(sale, txn: txn);
-  Future<int> update(Sale sale, {DatabaseExecutor? txn}) => _saleDao.update(sale, txn: txn);
-  Future<int> delete(int id, {DatabaseExecutor? txn}) => _saleDao.delete(id, txn: txn);
-  Future<int> softDelete(int id, {DatabaseExecutor? txn}) => _saleDao.softDelete(id, txn: txn);
-  Future<int> restore(int id, {DatabaseExecutor? txn}) => _saleDao.restore(id, txn: txn);
-  Future<Sale?> getById(int id, {DatabaseExecutor? txn}) => _saleDao.getById(id, txn: txn);
+  /// The single authoritative receipt-number generator.
+  ///
+  /// Produces `YYYYMMDD-NNNN` where the date is the local business date of
+  /// [businessDate] and NNNN is the next free sequence for that date. The
+  /// sequence is read from the `sales` table itself, so it survives app
+  /// restarts, works fully offline, and can never collide with legacy
+  /// `RCP…` numbers.
+  ///
+  /// Call this inside the sale transaction so the number and the sale are
+  /// committed atomically. Callers should retry on a UNIQUE violation in
+  /// case a concurrent sale consumed the number first.
+  Future<String> nextReceiptNumber(
+    DateTime businessDate, {
+    DatabaseExecutor? txn,
+  }) async {
+    final prefix = receiptDatePrefix(businessDate);
+    final next = await _saleDao.getMaxReceiptSequence(prefix, txn: txn) + 1;
+    return '$prefix-${next.toString().padLeft(4, '0')}';
+  }
+
+  /// Formats a date as the `YYYYMMDD` receipt-number prefix using the
+  /// device's local business date (not UTC).
+  static String receiptDatePrefix(DateTime date) {
+    final local = date.toLocal();
+    return '${local.year}'
+        '${local.month.toString().padLeft(2, '0')}'
+        '${local.day.toString().padLeft(2, '0')}';
+  }
+
+  Future<int> insert(Sale sale, {DatabaseExecutor? txn}) =>
+      _saleDao.insert(sale, txn: txn);
+  Future<int> update(Sale sale, {DatabaseExecutor? txn}) =>
+      _saleDao.update(sale, txn: txn);
+  Future<int> delete(int id, {DatabaseExecutor? txn}) =>
+      _saleDao.delete(id, txn: txn);
+  Future<int> softDelete(int id, {DatabaseExecutor? txn}) =>
+      _saleDao.softDelete(id, txn: txn);
+  Future<int> restore(int id, {DatabaseExecutor? txn}) =>
+      _saleDao.restore(id, txn: txn);
+  Future<Sale?> getById(int id, {DatabaseExecutor? txn}) =>
+      _saleDao.getById(id, txn: txn);
   Future<List<Sale>> getAll() => _saleDao.getAll();
-  Future<List<Sale>> getAllActive({int? limit}) => _saleDao.getAllActive(limit: limit);
+  Future<List<Sale>> getAllActive({int? limit}) =>
+      _saleDao.getAllActive(limit: limit);
   Future<List<Sale>> getDeleted() => _saleDao.getDeleted();
-  Future<List<Sale>> getByUserId(int userId, {int limit = 200}) => _saleDao.getByUserId(userId, limit: limit);
-  Future<List<Sale>> getByDateRange(DateTime start, DateTime end, {int limit = 500}) => _saleDao.getByDateRange(start, end, limit: limit);
-  Future<List<Sale>> getByDateRangeAndUser(DateTime start, DateTime end, int userId, {int limit = 200}) => _saleDao.getByDateRangeAndUser(start, end, userId, limit: limit);
-  Future<double> getTotalSalesForDate(DateTime date) => _saleDao.getTotalSalesForDate(date);
-  Future<double> getTotalSalesForMonth(int year, int month) => _saleDao.getTotalSalesForMonth(year, month);
-  Future<double> getTotalSalesForUser(int userId) => _saleDao.getTotalSalesForUser(userId);
-  Future<double> getTotalSalesForDateForUser(DateTime date, int userId) => _saleDao.getTotalSalesForDateForUser(date, userId);
-  Future<double> getTotalSalesForMonthForUser(int year, int month, int userId) => _saleDao.getTotalSalesForMonthForUser(year, month, userId);
+  Future<List<Sale>> getByUserId(int userId, {int limit = 200}) =>
+      _saleDao.getByUserId(userId, limit: limit);
+  Future<List<Sale>> getByDateRange(
+    DateTime start,
+    DateTime end, {
+    int limit = 500,
+  }) => _saleDao.getByDateRange(start, end, limit: limit);
+  Future<List<Sale>> getByDateRangeAndUser(
+    DateTime start,
+    DateTime end,
+    int userId, {
+    int limit = 200,
+  }) => _saleDao.getByDateRangeAndUser(start, end, userId, limit: limit);
+  Future<double> getTotalSalesForDate(DateTime date) =>
+      _saleDao.getTotalSalesForDate(date);
+  Future<double> getTotalSalesForMonth(int year, int month) =>
+      _saleDao.getTotalSalesForMonth(year, month);
+  Future<double> getTotalSalesForUser(int userId) =>
+      _saleDao.getTotalSalesForUser(userId);
+  Future<double> getTotalSalesForDateForUser(DateTime date, int userId) =>
+      _saleDao.getTotalSalesForDateForUser(date, userId);
+  Future<double> getTotalSalesForMonthForUser(
+    int year,
+    int month,
+    int userId,
+  ) => _saleDao.getTotalSalesForMonthForUser(year, month, userId);
 
   Future<Sale?> findByReferenceNumber(
     String referenceNumber,
@@ -41,10 +95,10 @@ class SaleRepository {
     String paymentStatus, {
     int limit = 200,
     DatabaseExecutor? txn,
-  }) =>
-      _saleDao.getByPaymentStatus(paymentStatus, limit: limit, txn: txn);
+  }) => _saleDao.getByPaymentStatus(paymentStatus, limit: limit, txn: txn);
 
-  Future<List<Sale>> getPendingPayments({int limit = 200}) => _saleDao.getPendingPayments(limit: limit);
+  Future<List<Sale>> getPendingPayments({int limit = 200}) =>
+      _saleDao.getPendingPayments(limit: limit);
 
   Future<List<Sale>> getFilteredSales({
     DateTime? start,
@@ -55,24 +109,22 @@ class SaleRepository {
     int? userId,
     int? limit = 500,
     DatabaseExecutor? txn,
-  }) =>
-      _saleDao.getFilteredSales(
-        start: start,
-        end: end,
-        paymentMethod: paymentMethod,
-        paymentStatus: paymentStatus,
-        search: search,
-        userId: userId,
-        limit: limit,
-        txn: txn,
-      );
+  }) => _saleDao.getFilteredSales(
+    start: start,
+    end: end,
+    paymentMethod: paymentMethod,
+    paymentStatus: paymentStatus,
+    search: search,
+    userId: userId,
+    limit: limit,
+    txn: txn,
+  );
 
   Future<List<StaffSalesSummary>> getStaffSalesSummary(
     DateTime start,
     DateTime end, {
     UserRole? role,
-  }) =>
-      _saleDao.getStaffSalesSummary(start, end, role: role);
+  }) => _saleDao.getStaffSalesSummary(start, end, role: role);
 
   // ── Centralised sales-analytics repository methods ───────────────────
 
@@ -81,45 +133,39 @@ class SaleRepository {
     DateTime end, {
     int? userId,
     DatabaseExecutor? txn,
-  }) =>
-      _saleDao.getSalesSummary(start, end, userId: userId, txn: txn);
+  }) => _saleDao.getSalesSummary(start, end, userId: userId, txn: txn);
 
   Future<int> getItemsSold(
     DateTime start,
     DateTime end, {
     int? userId,
     DatabaseExecutor? txn,
-  }) =>
-      _saleDao.getItemsSold(start, end, userId: userId, txn: txn);
+  }) => _saleDao.getItemsSold(start, end, userId: userId, txn: txn);
 
   Future<List<DailySalesPoint>> getSalesTrend(
     DateTime start,
     DateTime end, {
     required ReportGroupBy groupBy,
     int? userId,
-  }) =>
-      _saleDao.getSalesTrend(start, end, groupBy: groupBy, userId: userId);
+  }) => _saleDao.getSalesTrend(start, end, groupBy: groupBy, userId: userId);
 
   Future<List<PaymentBreakdown>> getPaymentBreakdown(
     DateTime start,
     DateTime end, {
     int? userId,
-  }) =>
-      _saleDao.getPaymentBreakdown(start, end, userId: userId);
+  }) => _saleDao.getPaymentBreakdown(start, end, userId: userId);
 
   Future<List<CategorySalesResult>> getCategorySales(
     DateTime start,
     DateTime end, {
     int? userId,
-  }) =>
-      _saleDao.getCategorySales(start, end, userId: userId);
+  }) => _saleDao.getCategorySales(start, end, userId: userId);
 
   Future<List<CalendarDaySales>> getCalendarDaySales(
     DateTime start,
     DateTime end, {
     int? userId,
-  }) =>
-      _saleDao.getCalendarDaySales(start, end, userId: userId);
+  }) => _saleDao.getCalendarDaySales(start, end, userId: userId);
 
   Future<List<Sale>> getConfirmedSalesForRange(
     DateTime start,
@@ -129,14 +175,13 @@ class SaleRepository {
     String? search,
     int? limit = 500,
     DatabaseExecutor? txn,
-  }) =>
-      _saleDao.getConfirmedSalesForRange(
-        start,
-        end,
-        userId: userId,
-        paymentMethod: paymentMethod,
-        search: search,
-        limit: limit,
-        txn: txn,
-      );
+  }) => _saleDao.getConfirmedSalesForRange(
+    start,
+    end,
+    userId: userId,
+    paymentMethod: paymentMethod,
+    search: search,
+    limit: limit,
+    txn: txn,
+  );
 }

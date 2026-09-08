@@ -2,7 +2,6 @@ import 'package:pinoy_pos/core/authorization_exception.dart';
 import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/database.dart';
 import 'package:pinoy_pos/core/payment_validation_exception.dart';
-import 'package:pinoy_pos/core/security.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/payment_settings.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
@@ -29,7 +28,8 @@ class SalesService {
   final SessionManager _sessionManager = SessionManager();
   final ActivityLogService _activityLogService = ActivityLogService();
   final ProductRepository _productRepository = ProductRepository();
-  final StockHistoryRepository _stockHistoryRepository = StockHistoryRepository();
+  final StockHistoryRepository _stockHistoryRepository =
+      StockHistoryRepository();
   final DatabaseHelper _dbHelper = DatabaseHelper();
   final SettingsService _settingsService = SettingsService();
   final ImageService _imageService = ImageService();
@@ -128,8 +128,7 @@ class SalesService {
     if (sale == null) return null;
 
     final currentUser = _sessionManager.currentUser;
-    if (currentUser?.role == UserRole.staff &&
-        sale.userId != currentUser?.id) {
+    if (currentUser?.role == UserRole.staff && sale.userId != currentUser?.id) {
       return null;
     }
 
@@ -213,8 +212,7 @@ class SalesService {
     if (sale == null) return null;
 
     final currentUser = _sessionManager.currentUser;
-    if (currentUser?.role == UserRole.staff &&
-        sale.userId != currentUser?.id) {
+    if (currentUser?.role == UserRole.staff && sale.userId != currentUser?.id) {
       return null;
     }
 
@@ -229,13 +227,15 @@ class SalesService {
         final product = await _productRepository.getById(item.productId);
         name = product?.name ?? 'Product #${item.productId}';
       }
-      receiptItems.add(ReceiptItem(
-        productId: item.productId,
-        productName: name,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        totalPrice: item.totalPrice,
-      ));
+      receiptItems.add(
+        ReceiptItem(
+          productId: item.productId,
+          productName: name,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalPrice: item.totalPrice,
+        ),
+      );
     }
 
     final subtotal = receiptItems.fold<double>(
@@ -333,7 +333,8 @@ class SalesService {
 
     // Determine the actual payment proof MIME type from magic bytes / filename.
     // Callers may pass an explicit type; otherwise detect from the file.
-    final resolvedProofType = paymentProofType ??
+    final resolvedProofType =
+        paymentProofType ??
         (paymentProofPath != null && paymentProofPath.isNotEmpty
             ? await _detectPaymentProofType(paymentProofPath)
             : null);
@@ -344,7 +345,8 @@ class SalesService {
       if (received < totalAmount) {
         throw PaymentValidationException(
           'Insufficient cash received',
-          details: 'Received ${CurrencyUtils.format(received)} but total is ${CurrencyUtils.format(totalAmount)}.',
+          details:
+              'Received ${CurrencyUtils.format(received)} but total is ${CurrencyUtils.format(totalAmount)}.',
         );
       }
     } else {
@@ -369,7 +371,9 @@ class SalesService {
 
     if (paymentMethod == 'GCash') {
       if (!paymentSettings.gcashEnabled) {
-        throw PaymentValidationException('GCash payments are currently disabled.');
+        throw PaymentValidationException(
+          'GCash payments are currently disabled.',
+        );
       }
 
       if (paymentSettings.gcashReferenceRequired) {
@@ -382,7 +386,8 @@ class SalesService {
         if (trimmedReference.length < paymentSettings.gcashReferenceMinLength) {
           throw PaymentValidationException(
             'GCash reference number is too short',
-            details: 'Reference number must be at least ${paymentSettings.gcashReferenceMinLength} characters.',
+            details:
+                'Reference number must be at least ${paymentSettings.gcashReferenceMinLength} characters.',
           );
         }
       }
@@ -398,8 +403,7 @@ class SalesService {
       // Enforce the verification policy before the sale is written.
       // The Owner's own sales are exempt; other operators (e.g. Staff)
       // must present an authorized verifier when the policy is enabled.
-      final needsVerification =
-          _verificationService.requiresVerificationFor(
+      final needsVerification = _verificationService.requiresVerificationFor(
         operatorRole: _sessionManager.currentUser?.role,
         paymentMethod: paymentMethod,
         settings: paymentSettings,
@@ -409,7 +413,8 @@ class SalesService {
         if (verifiedByUserId == null) {
           throw PaymentValidationException(
             'GCash verification required',
-            details: 'An authorized verifier must approve this payment before the sale can be completed.',
+            details:
+                'An authorized verifier must approve this payment before the sale can be completed.',
           );
         }
 
@@ -417,7 +422,9 @@ class SalesService {
         if (verifier == null ||
             verifier.id == _sessionManager.currentUser?.id ||
             !_verificationService.canRoleVerify(
-                verifier.role, paymentSettings)) {
+              verifier.role,
+              paymentSettings,
+            )) {
           throw PaymentValidationException(
             'Verifier is not authorized',
             details: 'The selected verifier cannot approve GCash payments.',
@@ -468,7 +475,13 @@ class SalesService {
         }
 
         final change = received - totalAmount;
-        final receiptNumber = SecurityHelper.generateReceiptNumber();
+
+        // Receipt numbers are date-sequential (YYYYMMDD-NNNN) and are
+        // generated inside this transaction so a completed sale and its
+        // number commit atomically. The sequence is derived from the sales
+        // table itself, which keeps it unique across restarts and offline
+        // use — no number is consumed unless the sale actually inserts.
+        final businessDate = DateTime.now();
 
         var sale = Sale(
           totalAmount: totalAmount,
@@ -476,19 +489,43 @@ class SalesService {
           change: change,
           paymentMethod: paymentMethod,
           paymentStatus: paymentStatus,
-          referenceNumber: trimmedReference?.isNotEmpty == true ? trimmedReference : null,
-          customerName: trimmedCustomer?.isNotEmpty == true ? trimmedCustomer : null,
+          referenceNumber: trimmedReference?.isNotEmpty == true
+              ? trimmedReference
+              : null,
+          customerName: trimmedCustomer?.isNotEmpty == true
+              ? trimmedCustomer
+              : null,
           paymentProofPath: paymentProofPath,
           paymentProofType: resolvedProofType,
           verifiedAt: verifiedAt,
           verifiedBy: verifiedBy,
           userId: _currentUserId('create_sales'),
-          createdAt: DateTime.now(),
-          receiptNumber: receiptNumber,
+          createdAt: businessDate,
           notes: trimmedNotes?.isNotEmpty == true ? trimmedNotes : null,
         );
 
-        final saleId = await _saleRepository.insert(sale, txn: txn);
+        // The UNIQUE constraint on sales.receipt_number is the final guard
+        // against duplicates. If a concurrent sale consumed the number
+        // first, re-read the table and take the next free sequence instead
+        // of failing the whole transaction.
+        var saleId = 0;
+        var receiptNumber = '';
+        for (var attempt = 0; attempt < 3; attempt++) {
+          receiptNumber = await _saleRepository.nextReceiptNumber(
+            businessDate,
+            txn: txn,
+          );
+          try {
+            saleId = await _saleRepository.insert(
+              sale.copyWith(receiptNumber: receiptNumber),
+              txn: txn,
+            );
+            sale = sale.copyWith(id: saleId, receiptNumber: receiptNumber);
+            break;
+          } on DatabaseException catch (e) {
+            if (!e.isUniqueConstraintError() || attempt == 2) rethrow;
+          }
+        }
 
         for (var item in itemsWithNames) {
           final saleItem = item.copyWith(saleId: saleId);
@@ -511,7 +548,10 @@ class SalesService {
         if (paymentProofPath != null && paymentProofPath.isNotEmpty) {
           final fileName = paymentProofPath.split('/').last;
           final newPath = 'payment_evidence/sale_$saleId/$fileName';
-          final moved = await _imageService.moveImage(paymentProofPath, newPath);
+          final moved = await _imageService.moveImage(
+            paymentProofPath,
+            newPath,
+          );
           if (moved != null) {
             committedProofPath = moved;
             sale = sale.copyWith(id: saleId, paymentProofPath: moved);
@@ -519,7 +559,8 @@ class SalesService {
           } else {
             throw PaymentValidationException(
               'Unable to save payment proof',
-              details: 'The payment evidence could not be moved to the sale directory.',
+              details:
+                  'The payment evidence could not be moved to the sale directory.',
             );
           }
         }
@@ -529,7 +570,8 @@ class SalesService {
           action: 'create_sale',
           entity: 'sale',
           entityId: saleId,
-          details: 'Sale $receiptNumber created for ${CurrencyUtils.format(totalAmount)}',
+          details:
+              'Sale $receiptNumber created for ${CurrencyUtils.format(totalAmount)}',
           txn: txn,
         );
 
@@ -614,7 +656,8 @@ class SalesService {
       if (item.unitPrice < 0) {
         throw PaymentValidationException(
           'Unit price cannot be negative',
-          details: 'Product #${item.productId} has unit price ${item.unitPrice}.',
+          details:
+              'Product #${item.productId} has unit price ${item.unitPrice}.',
         );
       }
       final expectedLineTotal = item.quantity * item.unitPrice;
@@ -712,12 +755,19 @@ class SalesService {
       final items = await _saleItemRepository.getBySaleId(saleId, txn: txn);
 
       for (var item in items) {
-        final product = await _productRepository.getById(item.productId, txn: txn);
+        final product = await _productRepository.getById(
+          item.productId,
+          txn: txn,
+        );
         if (product == null) continue;
 
         final previousStock = product.stock;
         final newStock = previousStock + item.quantity;
-        await _productRepository.updateStock(item.productId, newStock, txn: txn);
+        await _productRepository.updateStock(
+          item.productId,
+          newStock,
+          txn: txn,
+        );
 
         final history = StockHistory(
           productId: item.productId,
@@ -725,7 +775,8 @@ class SalesService {
           quantity: item.quantity,
           previousStock: previousStock,
           newStock: newStock,
-          reason: 'GCash payment rejected: ${sale.receiptNumber}${reason != null ? ' - $reason' : ''}',
+          reason:
+              'GCash payment rejected: ${sale.receiptNumber}${reason != null ? ' - $reason' : ''}',
           userId: _currentUserId('verify_payments'),
           createdAt: DateTime.now(),
         );
@@ -741,7 +792,8 @@ class SalesService {
         action: 'gcash_payment_rejected',
         entity: 'sale',
         entityId: saleId,
-        details: 'Reference: ${sale.referenceNumber}${reason != null ? ' - $reason' : ''}',
+        details:
+            'Reference: ${sale.referenceNumber}${reason != null ? ' - $reason' : ''}',
         txn: txn,
       );
 
@@ -767,7 +819,8 @@ class SalesService {
     final canVerify = _sessionManager.hasPermission('verify_payments');
     final isOwn = userId != null && userId == sale.userId;
 
-    if (!canVerify && !(isOwn && _sessionManager.hasPermission('create_sales'))) {
+    if (!canVerify &&
+        !(isOwn && _sessionManager.hasPermission('create_sales'))) {
       await _activityLogService.logActivity(
         action: 'unauthorized_replace_payment_proof',
         entity: 'sale',
@@ -786,11 +839,15 @@ class SalesService {
     final fileName = newRelativePath.split('/').last;
     final saleProofDir = 'payment_evidence/sale_$saleId';
     final targetPath = '$saleProofDir/$fileName';
-    final movedPath = await _imageService.moveImage(newRelativePath, targetPath);
+    final movedPath = await _imageService.moveImage(
+      newRelativePath,
+      targetPath,
+    );
     if (movedPath == null) {
       throw PaymentValidationException(
         'Unable to save payment proof',
-        details: 'The replacement evidence could not be moved to the sale directory.',
+        details:
+            'The replacement evidence could not be moved to the sale directory.',
       );
     }
 
@@ -836,12 +893,19 @@ class SalesService {
       for (var item in items) {
         // addStock opens its own transaction; for void we restore stock
         // directly via the repository within this transaction.
-        final product = await _productRepository.getById(item.productId, txn: txn);
+        final product = await _productRepository.getById(
+          item.productId,
+          txn: txn,
+        );
         if (product == null) continue;
 
         final previousStock = product.stock;
         final newStock = previousStock + item.quantity;
-        await _productRepository.updateStock(item.productId, newStock, txn: txn);
+        await _productRepository.updateStock(
+          item.productId,
+          newStock,
+          txn: txn,
+        );
 
         final history = StockHistory(
           productId: item.productId,
