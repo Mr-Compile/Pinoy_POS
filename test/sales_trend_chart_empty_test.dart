@@ -67,4 +67,32 @@ void main() {
 
     expect(find.text('No trend data'), findsNothing);
   });
+
+  testWidgets('SalesTrendChart scrollable bar chart does not crash with unbounded height',
+      (tester) async {
+    final trend = List.generate(
+      15,
+      (i) => DailySalesPoint(
+        date: DateTime(2026, 9, 1).add(Duration(days: i)),
+        total: (i + 1) * 10.0,
+        count: i + 1,
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: SalesTrendChart(
+              trend: trend,
+              groupBy: ReportGroupBy.day,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('No trend data'), findsNothing);
+    expect(find.text('150'), findsOneWidget);
+  });
 }

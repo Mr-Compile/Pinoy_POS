@@ -148,6 +148,7 @@ class _ScrollableBarChart extends StatelessWidget {
                 ),
                 child: SizedBox(
                   width: barWidth,
+                  height: 160,
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
@@ -213,10 +214,11 @@ class _Bar extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return LayoutBuilder(
       builder: (context, constraints) {
-        final max = constraints.maxHeight;
+        final max =
+            constraints.maxHeight.isFinite ? constraints.maxHeight : 160.0;
         // Reserve space for the label/value text (approx. 36 px).
         final barArea = max - 36;
-        if (barArea <= 0) return const SizedBox.shrink();
+        if (barArea <= 0 || !barArea.isFinite) return const SizedBox.shrink();
 
         final ratio = maxValue <= 0 ? 0.0 : (value / maxValue).clamp(0.0, 1.0);
 

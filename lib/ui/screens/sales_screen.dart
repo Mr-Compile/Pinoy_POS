@@ -58,10 +58,10 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
   }
 
   ReportingPeriodBounds _periodBounds() => periodBoundsFor(
-        _selectedPeriod,
-        customStart: _customStart,
-        customEnd: _customEnd,
-      );
+    _selectedPeriod,
+    customStart: _customStart,
+    customEnd: _customEnd,
+  );
 
   Future<void> _loadSales() async {
     setState(() {
@@ -197,55 +197,64 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
             AppDialogAction(
               label: 'Apply',
               isPrimary: true,
-              onPressed: (context) =>
-                  Navigator.of(context, rootNavigator: true).pop(
-                _SalesFilter(selectedMethod, selectedStatus),
-              ),
+              onPressed: (context) => Navigator.of(
+                context,
+                rootNavigator: true,
+              ).pop(_SalesFilter(selectedMethod, selectedStatus)),
             ),
           ],
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-                AppDropdownField<String?>(
-                  key: const ValueKey('filter_payment_method'),
-                  label: 'Payment Method',
-                  initialValue: selectedMethod,
-                  items: const [
-                    DropdownMenuItem<String?>(value: null, child: Text('All')),
-                  ] +
-                      methods
-                          .map((m) => DropdownMenuItem<String?>(
-                                value: m,
-                                child: Text(m),
-                              ))
-                          .toList(),
-                  onChanged: (value) =>
-                      setDialogState(() => selectedMethod = value),
-                ),
-                const SizedBox(height: 16),
-                AppDropdownField<String?>(
-                  key: const ValueKey('filter_payment_status'),
-                  label: 'Status',
-                  initialValue: selectedStatus,
-                  items: const [
-                    DropdownMenuItem<String?>(
-                        value: null, child: Text('All active')),
-                  ] +
-                      statuses
-                          .map((s) => DropdownMenuItem<String?>(
-                                value: s,
-                                child: Text(
-                                  s[0].toUpperCase() + s.substring(1),
-                                ),
-                              ))
-                          .toList(),
-                  onChanged: (value) =>
-                      setDialogState(() => selectedStatus = value),
-                ),
-              ],
-            ),
+              AppDropdownField<String?>(
+                key: const ValueKey('filter_payment_method'),
+                label: 'Payment Method',
+                initialValue: selectedMethod,
+                items:
+                    const [
+                      DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('All'),
+                      ),
+                    ] +
+                    methods
+                        .map(
+                          (m) => DropdownMenuItem<String?>(
+                            value: m,
+                            child: Text(m),
+                          ),
+                        )
+                        .toList(),
+                onChanged: (value) =>
+                    setDialogState(() => selectedMethod = value),
+              ),
+              const SizedBox(height: 16),
+              AppDropdownField<String?>(
+                key: const ValueKey('filter_payment_status'),
+                label: 'Status',
+                initialValue: selectedStatus,
+                items:
+                    const [
+                      DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('All active'),
+                      ),
+                    ] +
+                    statuses
+                        .map(
+                          (s) => DropdownMenuItem<String?>(
+                            value: s,
+                            child: Text(s[0].toUpperCase() + s.substring(1)),
+                          ),
+                        )
+                        .toList(),
+                onChanged: (value) =>
+                    setDialogState(() => selectedStatus = value),
+              ),
+            ],
           ),
         ),
+      ),
     );
 
     if (result != null && mounted) {
@@ -284,15 +293,12 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     if (_error != null) {
       return Scaffold(
         appBar: const AppHeader(title: 'My Sales'),
-        body: ErrorState(
-          title: 'Error',
-          message: _error,
-          onRetry: _loadSales,
-        ),
+        body: ErrorState(title: 'Error', message: _error, onRetry: _loadSales),
       );
     }
 
-    final filtersActive = _selectedPaymentMethod != null ||
+    final filtersActive =
+        _selectedPaymentMethod != null ||
         _selectedPaymentStatus != null ||
         _searchQuery.isNotEmpty ||
         _selectedPeriod != ReportingPeriod.thisMonth;
@@ -308,57 +314,65 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 800),
-          child: Column(
-            children: [
-              _buildPeriodHeader(context),
-              const Divider(height: 1),
-              _buildSummaryCard(context, totalAmount, _sales.length),
-              const SizedBox(height: Spacing.sm),
-              Expanded(
-                child: _sales.isEmpty
-                    ? EmptyState(
-                        icon: Icons.receipt_long,
-                        title: 'No Sales',
-                        message: filtersActive
-                            ? 'No sales match the selected filters.'
-                            : 'Start selling to see sales history',
-                        action: filtersActive
-                            ? AppButton.filled(
-                                onPressed: _clearFilters,
-                                icon: Icons.clear,
-                                label: 'Clear Filters',
-                                size: AppButtonSize.small,
-                              )
-                            : null,
-                      )
-                    : RefreshIndicator(
-                        onRefresh: _loadSales,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: grouped.length,
-                          itemBuilder: (context, index) {
-                            final group = grouped[index];
-                            final groupTotal = group.sales.fold<double>(
-                              0,
-                              (sum, sale) => sum + sale.totalAmount,
-                            );
-                            return AppSection(
-                              title: group.label,
-                              subtitle:
-                                  '${group.sales.length} sale${group.sales.length == 1 ? '' : 's'} · ${CurrencyUtils.format(groupTotal)}',
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: group.sales
-                                    .map((sale) =>
-                                        _buildSaleCard(sale, canVoid, context))
-                                    .toList(),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-              ),
-            ],
+          child: RefreshIndicator(
+            onRefresh: _loadSales,
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                SliverToBoxAdapter(child: _buildPeriodHeader(context)),
+                const SliverToBoxAdapter(child: Divider(height: 1)),
+                SliverToBoxAdapter(
+                  child: _buildSummaryCard(context, totalAmount, _sales.length),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: Spacing.sm)),
+                if (_sales.isEmpty)
+                  SliverToBoxAdapter(
+                    child: EmptyState(
+                      icon: Icons.receipt_long,
+                      title: 'No Sales',
+                      message: filtersActive
+                          ? 'No sales match the selected filters.'
+                          : 'Start selling to see sales history',
+                      action: filtersActive
+                          ? AppButton.filled(
+                              onPressed: _clearFilters,
+                              icon: Icons.clear,
+                              label: 'Clear Filters',
+                              size: AppButtonSize.small,
+                            )
+                          : null,
+                    ),
+                  )
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.all(16),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate((context, index) {
+                        final group = grouped[index];
+                        final groupTotal = group.sales.fold<double>(
+                          0,
+                          (sum, sale) => sum + sale.totalAmount,
+                        );
+                        return AppSection(
+                          title: group.label,
+                          subtitle:
+                              '${group.sales.length} sale${group.sales.length == 1 ? '' : 's'} · ${CurrencyUtils.format(groupTotal)}',
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: group.sales
+                                .map(
+                                  (sale) =>
+                                      _buildSaleCard(sale, canVoid, context),
+                                )
+                                .toList(),
+                          ),
+                        );
+                      }, childCount: grouped.length),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -447,16 +461,16 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                   children: [
                     Text(
                       'Total Sales',
-                      style: AppTypography.bodyMedium(context).copyWith(
-                        color: cs.onPrimaryContainer,
-                      ),
+                      style: AppTypography.bodyMedium(
+                        context,
+                      ).copyWith(color: cs.onPrimaryContainer),
                     ),
                     const SizedBox(height: Spacing.xs),
                     Text(
                       CurrencyUtils.format(total),
-                      style: AppTypography.titleLargeBold(context).copyWith(
-                        color: cs.onPrimaryContainer,
-                      ),
+                      style: AppTypography.titleLargeBold(
+                        context,
+                      ).copyWith(color: cs.onPrimaryContainer),
                     ),
                   ],
                 ),
@@ -467,16 +481,16 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                   children: [
                     Text(
                       'Transactions',
-                      style: AppTypography.bodyMedium(context).copyWith(
-                        color: cs.onPrimaryContainer,
-                      ),
+                      style: AppTypography.bodyMedium(
+                        context,
+                      ).copyWith(color: cs.onPrimaryContainer),
                     ),
                     const SizedBox(height: Spacing.xs),
                     Text(
                       '$count',
-                      style: AppTypography.titleLargeBold(context).copyWith(
-                        color: cs.onPrimaryContainer,
-                      ),
+                      style: AppTypography.titleLargeBold(
+                        context,
+                      ).copyWith(color: cs.onPrimaryContainer),
                     ),
                   ],
                 ),
@@ -553,8 +567,9 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
       subtitle: time,
       trailing: Text(
         CurrencyUtils.format(sale.totalAmount),
-        style: AppTypography.titleMediumBold(context)
-            .copyWith(color: cs.primary),
+        style: AppTypography.titleMediumBold(
+          context,
+        ).copyWith(color: cs.primary),
       ),
       chips: chips,
       statusLabel: _statusLabel(sale.paymentStatus),
@@ -564,9 +579,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (context) => SaleDetailScreen(sale: sale),
-          ),
+          MaterialPageRoute(builder: (context) => SaleDetailScreen(sale: sale)),
         );
       },
     );
@@ -581,9 +594,9 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
       ),
       child: Text(
         label,
-        style: AppTypography.labelMedium(context).copyWith(
-          color: cs.onSurfaceVariant,
-        ),
+        style: AppTypography.labelMedium(
+          context,
+        ).copyWith(color: cs.onSurfaceVariant),
       ),
     );
   }
