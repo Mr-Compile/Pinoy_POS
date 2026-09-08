@@ -6,6 +6,7 @@ import 'package:pinoy_pos/core/constants.dart';
 import 'package:pinoy_pos/core/modal_result.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/user.dart';
+import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/staff_provider.dart';
 import 'package:pinoy_pos/services/staff_service.dart';
 import 'package:pinoy_pos/services/user_service.dart';
@@ -19,6 +20,7 @@ import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/app_list_item.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
+import 'package:pinoy_pos/ui/widgets/responsive_create_action.dart';
 import 'package:pinoy_pos/ui/widgets/validators.dart';
 
 /// Owner staff management screen.
@@ -53,17 +55,27 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(staffControllerProvider);
+    final authNotifier = ref.read(authStateProvider.notifier);
+    final canManage = authNotifier.hasPermission('manage_staff');
+
+    final createAction = canManage
+        ? ResponsiveCreateAction(
+            label: 'Add Staff',
+            icon: Icons.person_add,
+            onPressed: _showAddStaffDialog,
+          )
+        : null;
+
+    final appBarAction = createAction?.appBarAction(context);
+    final createFab = createAction?.fab(context);
 
     return Scaffold(
       appBar: AppHeader(
         title: 'Staff Management',
         showBackButton: true,
+        actions: appBarAction != null ? [appBarAction] : null,
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAddStaffDialog,
-        icon: const Icon(Icons.person_add),
-        label: const Text('Add Staff'),
-      ),
+      floatingActionButton: createFab,
       body: RefreshIndicator(
         onRefresh: () => ref.read(staffControllerProvider.notifier).loadStaff(),
         child: Column(
@@ -517,10 +529,10 @@ class _StaffListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
     final statusColor = staff.isActive
-        ? AppSemanticColors.resolve(AppSemanticColors.success, cs.brightness)
-        : AppSemanticColors.resolve(AppSemanticColors.neutral, cs.brightness);
+        ? AppSemanticColors.resolve(AppSemanticColors.success, brightness)
+        : AppSemanticColors.resolve(AppSemanticColors.neutral, brightness);
 
     return AppListItem(
       leading: AppAvatar(
@@ -551,16 +563,16 @@ class _StaffListTile extends StatelessWidget {
           tooltip: staff.isActive ? 'Deactivate' : 'Activate',
           color: staff.isActive
               ? AppSemanticColors.resolve(
-                  AppSemanticColors.warning, cs.brightness)
+                  AppSemanticColors.warning, brightness)
               : AppSemanticColors.resolve(
-                  AppSemanticColors.success, cs.brightness),
+                  AppSemanticColors.success, brightness),
           onPressed: onToggleActive,
         ),
         AppListAction(
           icon: Icons.delete,
           tooltip: 'Delete',
           color: AppSemanticColors.resolve(
-              AppSemanticColors.error, cs.brightness),
+              AppSemanticColors.error, brightness),
           onPressed: onDelete,
         ),
       ],
