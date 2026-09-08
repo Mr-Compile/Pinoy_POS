@@ -523,7 +523,7 @@ class _SuperAdminVerificationDialogState
   @override
   Widget build(BuildContext context) {
     return AppDialog(
-      type: AppDialogType.warning,
+      type: AppDialogType.confirmation,
       title: 'SuperAdmin Verification',
       actions: [
         AppDialogAction(

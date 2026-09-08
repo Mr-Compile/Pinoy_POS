@@ -169,6 +169,11 @@ class _AIChatHeadState extends ConsumerState<AIChatHead> {
     if (!_positionLoaded) return const SizedBox.shrink();
 
     final cs = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
+    final aiColor = AppSemanticColors.resolve(
+      AppSemanticColors.purple,
+      brightness,
+    );
 
     return Positioned(
       left: _position.dx,
@@ -180,7 +185,7 @@ class _AIChatHeadState extends ConsumerState<AIChatHead> {
         child: Material(
           elevation: 6,
           shape: const CircleBorder(),
-          shadowColor: cs.primary.withValues(alpha: 0.3),
+          shadowColor: aiColor.withValues(alpha: 0.3),
           child: Container(
             width: _headSize,
             height: _headSize,
@@ -190,8 +195,8 @@ class _AIChatHeadState extends ConsumerState<AIChatHead> {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  cs.primary,
-                  cs.primary.withValues(alpha: 0.8),
+                  aiColor,
+                  aiColor.withValues(alpha: 0.8),
                 ],
               ),
             ),
@@ -241,7 +246,8 @@ class _AIChatHeadState extends ConsumerState<AIChatHead> {
         AppSemanticColors.resolve(AppSemanticColors.warning, brightness),
       AIConfigStatus.invalid || AIConfigStatus.unavailable =>
         AppSemanticColors.resolve(AppSemanticColors.error, brightness),
-      AIConfigStatus.checking => cs.secondary,
+      AIConfigStatus.checking =>
+        AppSemanticColors.resolve(AppSemanticColors.info, brightness),
     };
   }
 }

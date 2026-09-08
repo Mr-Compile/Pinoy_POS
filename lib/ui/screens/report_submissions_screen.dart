@@ -16,6 +16,7 @@ import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_status_chip.dart';
+import 'package:pinoy_pos/ui/widgets/responsive_create_action.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 
@@ -102,18 +103,24 @@ class _ReportSubmissionsScreenState
         ref.read(authStateProvider.notifier).hasPermission('view_report_submissions');
     final title = widget.submissionsOnly && isOwner ? 'Submitted Reports' : 'My Reports';
 
+    final createAction = isOwner
+        ? ResponsiveCreateAction(
+            label: 'Import',
+            icon: Icons.file_upload_outlined,
+            onPressed: _isLoading ? null : _importReport,
+          )
+        : null;
+
+    final appBarAction = createAction?.appBarAction(context);
+    final createFab = createAction?.fab(context);
+
     return Scaffold(
       appBar: AppHeader(
         title: title,
         showBackButton: true,
+        actions: appBarAction != null ? [appBarAction] : null,
       ),
-      floatingActionButton: isOwner
-          ? FloatingActionButton.extended(
-              icon: const Icon(Icons.file_upload_outlined),
-              label: const Text('Import'),
-              onPressed: _isLoading ? null : _importReport,
-            )
-          : null,
+      floatingActionButton: createFab,
       body: _buildBody(context, isOwner),
     );
   }

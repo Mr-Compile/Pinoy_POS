@@ -632,9 +632,12 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
   }
 
   Color _statusColor(String status, ColorScheme cs) {
+    final brightness = Theme.of(context).brightness;
     return switch (status) {
-      'confirmed' => cs.primary,
-      'pending' => cs.tertiary,
+      'confirmed' =>
+        AppSemanticColors.resolve(AppSemanticColors.success, brightness),
+      'pending' =>
+        AppSemanticColors.resolve(AppSemanticColors.warning, brightness),
       'cancelled' || 'refunded' => cs.error,
       _ => cs.outline,
     };

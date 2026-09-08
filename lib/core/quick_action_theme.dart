@@ -82,10 +82,6 @@ const _QuickActionColorFamily _primaryFamily = _QuickActionColorFamily(
   surface: AppSemanticColors.primarySurface,
 );
 
-const _QuickActionColorFamily _successFamily = _QuickActionColorFamily(
-  surface: AppSemanticColors.successSurface,
-);
-
 const _QuickActionColorFamily _infoFamily = _QuickActionColorFamily(
   surface: AppSemanticColors.infoSurface,
 );
@@ -94,25 +90,29 @@ const _QuickActionColorFamily _warningFamily = _QuickActionColorFamily(
   surface: AppSemanticColors.warningSurface,
 );
 
+const _QuickActionColorFamily _purpleFamily = _QuickActionColorFamily(
+  surface: AppSemanticColors.purpleSurface,
+);
+
 const _QuickActionColorFamily _neutralFamily = _QuickActionColorFamily(
   surface: AppSemanticColors.neutralSurface,
 );
 
 _QuickActionColorFamily _familyForType(QuickActionType type) {
   return switch (type) {
-    QuickActionType.newSale => _successFamily,
+    QuickActionType.newSale => _primaryFamily,
     QuickActionType.addProduct => _infoFamily,
-    QuickActionType.addStock => _infoFamily,
+    QuickActionType.addStock => _warningFamily,
     QuickActionType.viewSales => _primaryFamily,
-    QuickActionType.mySales => _successFamily,
-    QuickActionType.reports => _primaryFamily,
+    QuickActionType.mySales => _primaryFamily,
+    QuickActionType.reports => _purpleFamily,
     QuickActionType.manageStaff => _primaryFamily,
-    QuickActionType.aiAdvisor => _infoFamily,
+    QuickActionType.aiAdvisor => _purpleFamily,
     QuickActionType.manageUsers => _primaryFamily,
-    QuickActionType.backupRestore => _infoFamily,
+    QuickActionType.backupRestore => _primaryFamily,
     QuickActionType.trash => _warningFamily,
     QuickActionType.activityLogs => _neutralFamily,
-    QuickActionType.aiConfig => _infoFamily,
+    QuickActionType.aiConfig => _purpleFamily,
     QuickActionType.settings => _neutralFamily,
   };
 }

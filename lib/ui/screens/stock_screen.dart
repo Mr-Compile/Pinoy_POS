@@ -14,6 +14,7 @@ import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
+import 'package:pinoy_pos/ui/widgets/responsive_create_action.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/spacing.dart';
@@ -319,18 +320,24 @@ class _StockScreenState extends ConsumerState<StockScreen> {
       );
     }
 
+    final createAction = canAddStock && _products.isNotEmpty
+        ? ResponsiveCreateAction(
+            label: 'Add Stock',
+            icon: Icons.add,
+            onPressed: _isProcessing ? null : _showProductPickerDialog,
+          )
+        : null;
+
+    final appBarAction = createAction?.appBarAction(context);
+    final createFab = createAction?.fab(context);
+
     return Scaffold(
       appBar: AppHeader(
         title: 'Stock Management',
         showBackButton: true,
+        actions: appBarAction != null ? [appBarAction] : null,
       ),
-      floatingActionButton: canAddStock && _products.isNotEmpty
-          ? FloatingActionButton.extended(
-              icon: const Icon(Icons.add),
-              label: const Text('Add Stock'),
-              onPressed: _isProcessing ? null : () => _showProductPickerDialog(),
-            )
-          : null,
+      floatingActionButton: createFab,
       body: _products.isEmpty
           ? _buildNoProductsState()
           : Column(
@@ -374,87 +381,163 @@ class _StockScreenState extends ConsumerState<StockScreen> {
     );
   }
 
-  // ── Summary cards ──────────────────────────────────────────────────
+  // ── Summary / overview ─────────────────────────────────────────────
+
+  bool _isAvailable(Product p) => p.stock > 0 && !p.isLowStock;
 
   Widget _buildSummaryCards() {
     final totalProducts = _products.length;
+    final availableCount = _products.where(_isAvailable).length;
     final lowStockCount = _products.where(_isLowStock).length;
     final outOfStockCount = _products.where(_isOutOfStock).length;
     final cs = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
 
-    final summaryChildren = [
-      _buildSummaryCard(
-        'Total',
-        '$totalProducts',
-        Icons.inventory_2,
-        cs.primary,
+    final metrics = [
+      (
+        label: 'Total Stock',
+        value: '$totalProducts',
+        icon: Icons.inventory_2,
+        color: cs.primary,
       ),
-      _buildSummaryCard(
-        'Low Stock',
-        '$lowStockCount',
-        Icons.warning_amber,
-        cs.secondary,
+      (
+        label: 'Available',
+        value: '$availableCount',
+        icon: Icons.check_circle,
+        color: AppSemanticColors.resolve(AppSemanticColors.success, brightness),
       ),
-      _buildSummaryCard(
-        'Out of Stock',
-        '$outOfStockCount',
-        Icons.error_outline,
-        cs.error,
+      (
+        label: 'Low Stock',
+        value: '$lowStockCount',
+        icon: Icons.warning_amber,
+        color: AppSemanticColors.resolve(AppSemanticColors.warning, brightness),
+      ),
+      (
+        label: 'Out of Stock',
+        value: '$outOfStockCount',
+        icon: Icons.error_outline,
+        color: cs.error,
       ),
     ];
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(Spacing.lg, Spacing.md, Spacing.lg, Spacing.sm),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final isCompact = layoutClassFor(constraints.maxWidth) == LayoutClass.compact;
-          if (isCompact) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                summaryChildren[0],
-                const SizedBox(height: Spacing.sm),
-                summaryChildren[1],
-                const SizedBox(height: Spacing.sm),
-                summaryChildren[2],
-              ],
-            );
-          }
+      padding: const EdgeInsets.fromLTRB(
+        Spacing.lg,
+        Spacing.md,
+        Spacing.lg,
+        Spacing.sm,
+      ),
+      child: AppCard(
+        padding: const EdgeInsets.all(Spacing.md),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final layout = layoutClassFor(constraints.maxWidth);
 
-          return Row(
-            children: [
-              Expanded(child: summaryChildren[0]),
-              const SizedBox(width: Spacing.sm),
-              Expanded(child: summaryChildren[1]),
-              const SizedBox(width: Spacing.sm),
-              Expanded(child: summaryChildren[2]),
-            ],
-          );
-        },
+            if (layout == LayoutClass.compact) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < metrics.length; i++) ...[
+                    if (i > 0) const Divider(height: 16),
+                    _buildSummaryMetricRow(
+                      metrics[i].label,
+                      metrics[i].value,
+                      metrics[i].icon,
+                      metrics[i].color,
+                    ),
+                  ],
+                ],
+              );
+            }
+
+            if (layout == LayoutClass.medium) {
+              return GridView.count(
+                crossAxisCount: 2,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                mainAxisSpacing: Spacing.md,
+                crossAxisSpacing: Spacing.md,
+                childAspectRatio: 2.2,
+                children: metrics
+                    .map((m) => _buildSummaryMetricTile(
+                          m.label,
+                          m.value,
+                          m.icon,
+                          m.color,
+                        ))
+                    .toList(),
+              );
+            }
+
+            return Row(
+              children: metrics
+                  .map((m) => Expanded(
+                        child: _buildSummaryMetricTile(
+                          m.label,
+                          m.value,
+                          m.icon,
+                          m.color,
+                        ),
+                      ))
+                  .toList(),
+            );
+          },
+        ),
       ),
     );
   }
 
-  Widget _buildSummaryCard(String label, String value, IconData icon, Color color) {
-    return AppCard(
-      padding: const EdgeInsets.all(Spacing.md),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: Spacing.xs),
-          Text(
-            value,
-            style: AppTypography.titleLargeBold(context),
-          ),
-          Text(
+  /// Compact phone layout: a single row with label, value, and icon.
+  Widget _buildSummaryMetricRow(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
+    return Row(
+      children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(width: Spacing.sm),
+        Expanded(
+          child: Text(
             label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium,
           ),
-        ],
-      ),
+        ),
+        Text(
+          value,
+          style: AppTypography.titleMediumBold(context),
+        ),
+      ],
+    );
+  }
+
+  /// Tablet/desktop layout: a centered icon-value-label tile.
+  Widget _buildSummaryMetricTile(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
+    final cs = Theme.of(context).colorScheme;
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: color, size: 24),
+        const SizedBox(height: Spacing.xs),
+        Text(
+          value,
+          style: AppTypography.titleLargeBold(context),
+        ),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
+          textAlign: TextAlign.center,
+        ),
+      ],
     );
   }
 
@@ -604,44 +687,52 @@ class _StockScreenState extends ConsumerState<StockScreen> {
       );
     }
     if (_isLowStock(product)) {
+      final warningColor = AppSemanticColors.resolve(
+        AppSemanticColors.warning,
+        Theme.of(context).brightness,
+      );
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: cs.secondaryContainer,
+          color: warningColor.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(AppRadius.sm),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.warning_amber, size: 14, color: cs.onSecondaryContainer),
+            Icon(Icons.warning_amber, size: 14, color: warningColor),
             const SizedBox(width: 4),
             Text(
               'Low Stock',
               style: AppTypography.labelSmall(context).copyWith(
                 fontWeight: FontWeight.w600,
-                color: cs.onSecondaryContainer,
+                color: warningColor,
               ),
             ),
           ],
         ),
       );
     }
+    final successColor = AppSemanticColors.resolve(
+      AppSemanticColors.success,
+      Theme.of(context).brightness,
+    );
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: cs.tertiaryContainer,
+        color: successColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.check_circle, size: 14, color: cs.onTertiaryContainer),
+          Icon(Icons.check_circle, size: 14, color: successColor),
           const SizedBox(width: 4),
           Text(
             'Normal',
             style: AppTypography.labelSmall(context).copyWith(
               fontWeight: FontWeight.w600,
-              color: cs.onTertiaryContainer,
+              color: successColor,
             ),
           ),
         ],
@@ -664,6 +755,7 @@ class _StockScreenState extends ConsumerState<StockScreen> {
             children: [
               // Product header with image
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(AppRadius.sm),
@@ -698,11 +790,14 @@ class _StockScreenState extends ConsumerState<StockScreen> {
                       ],
                     ),
                   ),
+                  const SizedBox(width: Spacing.sm),
+                  _buildStockStatusBadge(product),
                 ],
               ),
               const SizedBox(height: Spacing.sm),
               // Stock info
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
                     child: _buildStockInfoColumn('Stock', '${product.stock}'),
@@ -710,7 +805,6 @@ class _StockScreenState extends ConsumerState<StockScreen> {
                   Expanded(
                     child: _buildStockInfoColumn('Minimum', '${product.minStock}'),
                   ),
-                  _buildStockStatusBadge(product),
                 ],
               ),
               const SizedBox(height: Spacing.sm),
@@ -1179,22 +1273,27 @@ class _StockHistoryDialog extends StatelessWidget {
     }
   }
 
-  Color _operationColor(StockOperationType type, ColorScheme cs) {
-    switch (type) {
-      case StockOperationType.add:
-        return cs.tertiary;
-      case StockOperationType.adjust:
-        return cs.secondary;
-      case StockOperationType.sale:
-        return cs.primary;
-      case StockOperationType.return_:
-        return cs.tertiary;
-    }
+  Color _operationColor(
+    StockOperationType type,
+    Brightness brightness,
+    ColorScheme cs,
+  ) {
+    return switch (type) {
+      StockOperationType.add =>
+        AppSemanticColors.resolve(AppSemanticColors.success, brightness),
+      StockOperationType.adjust =>
+        AppSemanticColors.resolve(AppSemanticColors.info, brightness),
+      StockOperationType.sale =>
+        cs.primary,
+      StockOperationType.return_ =>
+        AppSemanticColors.resolve(AppSemanticColors.warning, brightness),
+    };
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
 
     return AppDialog(
       type: AppDialogType.info,
@@ -1272,7 +1371,11 @@ class _StockHistoryDialog extends StatelessWidget {
                 separatorBuilder: (_, _) => const Divider(height: 1),
                 itemBuilder: (context, index) {
                   final entry = history[index];
-                  final opColor = _operationColor(entry.operation, cs);
+                  final opColor = _operationColor(
+                    entry.operation,
+                    brightness,
+                    cs,
+                  );
                   final diff = entry.newStock - entry.previousStock;
 
                   return ListTile(
@@ -1302,7 +1405,12 @@ class _StockHistoryDialog extends StatelessWidget {
                       diff >= 0 ? '+$diff' : '$diff',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: diff >= 0 ? cs.tertiary : cs.error,
+                        color: diff >= 0
+                            ? AppSemanticColors.resolve(
+                                AppSemanticColors.success,
+                                brightness,
+                              )
+                            : cs.error,
                       ),
                     ),
                   );

@@ -5,7 +5,7 @@ import 'package:pinoy_pos/core/spacing.dart';
 /// Common button color roles. Use `primary` for primary CTAs and use
 /// semantic colors only when the action meaning matches (e.g. green for
 /// save / new sale, red for delete, amber for warnings).
-enum AppButtonColor { primary, secondary, success, warning, info, error, neutral }
+enum AppButtonColor { primary, secondary, success, warning, info, error, neutral, purple }
 
 /// Common button variants used across the app.
 enum AppButtonVariant { filled, outlined, text, elevated, destructive, gradient }
@@ -170,6 +170,18 @@ class AppButton extends StatelessWidget {
     this.isLoading = false,
     this.fullWidth = false,
   })  : color = AppButtonColor.neutral,
+        variant = AppButtonVariant.filled;
+
+  const AppButton.purple({
+    super.key,
+    this.label,
+    this.child,
+    this.onPressed,
+    this.size = AppButtonSize.medium,
+    this.icon,
+    this.isLoading = false,
+    this.fullWidth = false,
+  })  : color = AppButtonColor.purple,
         variant = AppButtonVariant.filled;
 
   @override
@@ -344,6 +356,8 @@ class AppButton extends StatelessWidget {
         AppSemanticColors.resolveSurface(AppSemanticColors.errorSurface, brightness),
       AppButtonColor.neutral =>
         AppSemanticColors.resolveSurface(AppSemanticColors.neutralSurface, brightness),
+      AppButtonColor.purple =>
+        AppSemanticColors.resolveSurface(AppSemanticColors.purpleSurface, brightness),
     };
     return (surface, AppSemanticColors.contrastFor(surface, brightness));
   }
@@ -376,6 +390,10 @@ class AppButton extends StatelessWidget {
       AppButtonColor.neutral => (
           AppSemanticColors.resolve(AppSemanticColors.neutral, brightness),
           AppSemanticColors.resolveOn(AppSemanticColors.onNeutral, brightness)
+        ),
+      AppButtonColor.purple => (
+          AppSemanticColors.resolve(AppSemanticColors.purple, brightness),
+          AppSemanticColors.resolveOn(AppSemanticColors.onPurple, brightness)
         ),
     };
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
+import 'package:pinoy_pos/providers/payment_settings_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
@@ -66,6 +67,7 @@ class PaymentSettingsPage extends ConsumerWidget {
     try {
       await ref.read(settingsServiceProvider).updateSettings(updated);
       ref.invalidate(settingsProvider);
+      ref.invalidate(paymentSettingsProvider);
       await ref.read(settingsProvider.future);
       if (context.mounted) {
         await AppDialogService.success(
@@ -92,6 +94,7 @@ class PaymentSettingsPage extends ConsumerWidget {
 
       if (result.isSuccess) {
         ref.invalidate(settingsProvider);
+        ref.invalidate(paymentSettingsProvider);
         await ref.read(settingsProvider.future);
         if (context.mounted) {
           await AppDialogService.success(
@@ -128,6 +131,7 @@ class PaymentSettingsPage extends ConsumerWidget {
     try {
       await ref.read(settingsServiceProvider).clearGcashQrImage();
       ref.invalidate(settingsProvider);
+      ref.invalidate(paymentSettingsProvider);
       await ref.read(settingsProvider.future);
       if (context.mounted) {
         await AppDialogService.success(
@@ -168,6 +172,9 @@ class _PaymentSettingsForm extends StatefulWidget {
 }
 
 class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
+  final _storeNameController = TextEditingController();
+  final _storePhoneController = TextEditingController();
+
   late bool _gcashEnabled;
   late bool _gcashReferenceRequired;
   late String _customerNameRequirement;
@@ -192,7 +199,17 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
     }
   }
 
+  @override
+  void dispose() {
+    _storeNameController.dispose();
+    _storePhoneController.dispose();
+    super.dispose();
+  }
+
   void _syncFromSettings() {
+    _storeNameController.text = widget.settings.storeName;
+    _storePhoneController.text = widget.settings.storePhone;
+
     _gcashEnabled = widget.settings.gcashEnabled;
     _gcashReferenceRequired = widget.settings.gcashReferenceRequired;
     _customerNameRequirement = widget.settings.gcashCustomerNameRequirement;
@@ -231,6 +248,36 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
     );
   }
 
+  Widget _buildMerchantIdentitySection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Merchant Identity',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: 16),
+        AppTextFormField(
+          controller: _storeNameController,
+          label: 'Store Name',
+          prefixIcon: Icons.store_outlined,
+          helperText: 'Shown to customers on the GCash payment screen.',
+          textCapitalization: TextCapitalization.words,
+          enabled: !widget.isLoading,
+        ),
+        const SizedBox(height: 16),
+        AppTextFormField(
+          controller: _storePhoneController,
+          label: 'GCash Mobile Number',
+          prefixIcon: Icons.phone_outlined,
+          helperText: 'The mobile number linked to the GCash account.',
+          keyboardType: TextInputType.phone,
+          enabled: !widget.isLoading,
+        ),
+      ],
+    );
+  }
+
   Widget _buildGcashQrSection(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final qrPath = widget.settings.gcashQrImagePath;
@@ -250,14 +297,27 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
             style: Theme.of(context).textTheme.titleSmall,
           ),
           const SizedBox(height: 8),
-          AppPaymentQrPreview(
-            imagePath: displayQrPath,
-            onTap: safeQrPath != null ? () => _openQrViewer(context, safeQrPath) : null,
-            emptyTitle: 'No GCash QR image uploaded',
-            emptySubtitle: 'Upload a QR image so customers can scan it.',
-            maxHeight: 240,
-            emptyColor: cs.surfaceContainerHighest,
-            emptyForegroundColor: cs.onSurfaceVariant,
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final maxQrWidth =
+                  constraints.maxWidth < 312 ? constraints.maxWidth - 32 : 280.0;
+              return Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: maxQrWidth),
+                  child: AppPaymentQrPreview(
+                    imagePath: displayQrPath,
+                    onTap: safeQrPath != null
+                        ? () => _openQrViewer(context, safeQrPath)
+                        : null,
+                    emptyTitle: 'No GCash QR image uploaded',
+                    emptySubtitle: 'Upload a QR image so customers can scan it.',
+                    maxHeight: maxQrWidth,
+                    emptyColor: cs.surfaceContainerHighest,
+                    emptyForegroundColor: cs.onSurfaceVariant,
+                  ),
+                ),
+              );
+            },
           ),
           if (hasImage && !hasPreview) ...[
             const SizedBox(height: 8),
@@ -297,6 +357,8 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
 
   void _submit() {
     final updated = widget.settings.copyWith(
+      storeName: _storeNameController.text.trim(),
+      storePhone: _storePhoneController.text.trim(),
       gcashEnabled: _gcashEnabled,
       gcashReferenceRequired: _gcashReferenceRequired,
       gcashCustomerNameRequirement: _customerNameRequirement,
@@ -316,6 +378,10 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          AppCard(
+            child: _buildMerchantIdentitySection(),
+          ),
+          const SizedBox(height: 24),
           AppCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

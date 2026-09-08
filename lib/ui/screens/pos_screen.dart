@@ -1144,8 +1144,9 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
 
     return paymentSettingsAsync.when(
       loading: () => AppDialog(
-        type: AppDialogType.info,
+        type: AppDialogType.loading,
         title: 'Payment',
+        showIcon: false,
         actions: [
           AppDialogAction(
             label: 'Cancel',
@@ -1229,7 +1230,7 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
     }
 
     return AppDialog(
-      type: AppDialogType.info,
+      type: AppDialogType.confirmation,
       title: 'Payment',
       showIcon: false,
       actions: [

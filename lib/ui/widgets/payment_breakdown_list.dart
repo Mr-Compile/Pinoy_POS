@@ -45,7 +45,7 @@ class PaymentBreakdownList extends StatelessWidget {
       AppSemanticColors.resolve(AppSemanticColors.info, brightness),
       AppSemanticColors.resolve(AppSemanticColors.warning, brightness),
       AppSemanticColors.resolve(AppSemanticColors.error, brightness),
-      cs.secondary,
+      AppSemanticColors.resolve(AppSemanticColors.purple, brightness),
     ];
 
     return Column(

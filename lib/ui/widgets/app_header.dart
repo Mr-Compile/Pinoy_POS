@@ -30,6 +30,10 @@ import 'package:pinoy_pos/ui/widgets/theme_toggle.dart';
 /// ```
 class AppHeader extends StatelessWidget implements PreferredSizeWidget {
   final String title;
+
+  /// Optional secondary line shown directly under the title.
+  final String? subtitle;
+
   final bool showBackButton;
   final List<Widget>? actions;
   final bool showThemeToggle;
@@ -43,6 +47,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
   const AppHeader({
     super.key,
     required this.title,
+    this.subtitle,
     this.showBackButton = false,
     this.actions,
     this.showThemeToggle = true,
@@ -72,7 +77,21 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
     return AppBar(
       // Let AppBarTheme.titleTextStyle carry the size, weight, and color
       // so the title uses the same foreground as the header icons.
-      title: Text(title),
+      title: subtitle == null
+          ? Text(title)
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(title),
+                Text(
+                  subtitle!,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: headerForeground.withValues(alpha: 0.85),
+                      ),
+                ),
+              ],
+            ),
       leading: showBackButton
           ? IconButton(
               icon: Icon(Icons.arrow_back_rounded, color: headerForeground),

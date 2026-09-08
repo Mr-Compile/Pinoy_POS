@@ -34,6 +34,11 @@ class AppPaymentQrPreview extends StatelessWidget {
   /// Foreground color for the empty state. Defaults to [ColorScheme.onErrorContainer].
   final Color? emptyForegroundColor;
 
+  /// When true, the QR image is rendered without its own card so it can be
+  /// placed inside a surrounding section card without nested surfaces.
+  /// The empty state still uses a card so it stays visible on its own.
+  final bool embedded;
+
   const AppPaymentQrPreview({
     super.key,
     required this.imagePath,
@@ -43,6 +48,7 @@ class AppPaymentQrPreview extends StatelessWidget {
     this.maxHeight = 240,
     this.emptyColor,
     this.emptyForegroundColor,
+    this.embedded = false,
   });
 
   bool get _hasImage => imagePath != null && imagePath!.isNotEmpty;
@@ -69,47 +75,60 @@ class AppPaymentQrPreview extends StatelessWidget {
       ),
     );
 
+    final content = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Stack(
+          alignment: Alignment.bottomRight,
+          children: [
+            preview,
+            if (onTap != null)
+              Padding(
+                padding: const EdgeInsets.all(8),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: cs.surfaceContainerHighest.withValues(alpha: 0.9),
+                    borderRadius: BorderRadius.circular(AppRadius.xl),
+                  ),
+                  padding: const EdgeInsets.all(6),
+                  child: Icon(
+                    Icons.fullscreen,
+                    size: 18,
+                    color: cs.onSurface,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        if (onTap != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8, top: 4),
+            child: Text(
+              'Tap to enlarge',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+            ),
+          ),
+      ],
+    );
+
+    if (embedded) {
+      // Keep the QR itself tappable even without the card chrome.
+      return onTap != null
+          ? InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(AppRadius.control),
+              child: content,
+            )
+          : content;
+    }
+
     return AppCard(
       onTap: onTap,
       padding: EdgeInsets.zero,
       color: cs.surface,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Stack(
-            alignment: Alignment.bottomRight,
-            children: [
-              preview,
-              if (onTap != null)
-                Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: cs.surfaceContainerHighest.withValues(alpha: 0.9),
-                      borderRadius: BorderRadius.circular(AppRadius.xl),
-                    ),
-                    padding: const EdgeInsets.all(6),
-                    child: Icon(
-                      Icons.fullscreen,
-                      size: 18,
-                      color: cs.onSurface,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          if (onTap != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8, top: 4),
-              child: Text(
-                'Tap to enlarge',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: cs.onSurfaceVariant,
-                    ),
-              ),
-            ),
-        ],
-      ),
+      child: content,
     );
   }
 

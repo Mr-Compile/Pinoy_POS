@@ -19,6 +19,7 @@ import 'package:pinoy_pos/ui/widgets/app_image.dart';
 import 'package:pinoy_pos/ui/widgets/app_list_item.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
+import 'package:pinoy_pos/ui/widgets/responsive_create_action.dart';
 
 class ProductsScreen extends ConsumerStatefulWidget {
   const ProductsScreen({super.key});
@@ -142,8 +143,14 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     final authNotifier = ref.read(authStateProvider.notifier);
     final canEdit = authNotifier.hasPermission('edit_products');
     final canDelete = authNotifier.hasPermission('delete_products');
-    final isTablet =
-        layoutClassFor(MediaQuery.of(context).size.width).isAtLeastMedium;
+
+    final createAction = canEdit
+        ? ResponsiveCreateAction(
+            label: 'Add Product',
+            icon: Icons.add,
+            onPressed: _showProductDialog,
+          )
+        : null;
 
     if (_isLoading) {
       return const Scaffold(
@@ -152,15 +159,15 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
       );
     }
 
+    final appBarAction = createAction?.appBarAction(context);
+    final createFab = createAction?.fab(context);
+
     return Scaffold(
-      appBar: const AppHeader(title: 'Products'),
-      floatingActionButton: canEdit && !isTablet
-          ? FloatingActionButton.extended(
-              icon: const Icon(Icons.add),
-              label: const Text('Add Product'),
-              onPressed: () => _showProductDialog(),
-            )
-          : null,
+      appBar: AppHeader(
+        title: 'Products',
+        actions: appBarAction != null ? [appBarAction] : null,
+      ),
+      floatingActionButton: createFab,
       body: Column(
         children: [
           Padding(
@@ -169,15 +176,6 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
               builder: (context, constraints) {
                 final isCompact =
                     layoutClassFor(constraints.maxWidth) == LayoutClass.compact;
-                final addButton = canEdit
-                    ? AppButton.filled(
-                        size: AppButtonSize.small,
-                        icon: Icons.add,
-                        label: 'Add Product',
-                        fullWidth: isCompact,
-                        onPressed: _showProductDialog,
-                      )
-                    : null;
 
                 if (isCompact) {
                   return Column(
@@ -209,10 +207,6 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                           });
                         },
                       ),
-                      if (addButton != null) ...[
-                        const SizedBox(height: 12),
-                        addButton,
-                      ],
                     ],
                   );
                 }
@@ -249,10 +243,6 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                         },
                       ),
                     ),
-                    if (addButton != null) ...[
-                      const SizedBox(width: 12),
-                      addButton,
-                    ],
                   ],
                 );
               },

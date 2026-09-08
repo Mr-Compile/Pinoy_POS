@@ -124,7 +124,9 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
       AIConfigStatus.invalid ||
       AIConfigStatus.unavailable =>
         cs.error,
-      AIConfigStatus.checking => cs.secondary,
+      AIConfigStatus.checking =>
+        AppSemanticColors.resolve(
+            AppSemanticColors.info, Theme.of(context).brightness),
     };
 
     final label = switch (status) {
@@ -192,6 +194,11 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
       BuildContext context, AIAdvisorChatState chatState) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final brightness = theme.brightness;
+    final aiColor = AppSemanticColors.resolve(
+      AppSemanticColors.purple,
+      brightness,
+    );
     final used = chatState.dailyQuota - chatState.remainingQueries;
     final isLimitReached = chatState.remainingQueries <= 0;
 
@@ -205,7 +212,7 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
       ),
       child: Row(
         children: [
-          Icon(Icons.auto_awesome, size: 18, color: cs.primary),
+          Icon(Icons.auto_awesome, size: 18, color: aiColor),
           const SizedBox(width: 8),
           Text(
             'AI Queries Today',
@@ -220,7 +227,7 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
                     ? used / chatState.dailyQuota
                     : 0,
                 backgroundColor: cs.surfaceContainerHighest,
-                color: isLimitReached ? cs.error : cs.primary,
+                color: isLimitReached ? cs.error : aiColor,
                 minHeight: 6,
               ),
             ),
@@ -244,6 +251,10 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
       BuildContext context, AIAdvisorChatState chatState) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final aiColor = AppSemanticColors.resolve(
+      AppSemanticColors.purple,
+      theme.brightness,
+    );
     final role = SessionManager().currentUser?.role;
     final roleConfig = role != null ? AIRoleConfig(role) : null;
 
@@ -258,8 +269,8 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
           Center(
             child: Column(
               children: [
-                Icon(Icons.auto_awesome, size: 48,
-                    color: cs.primary.withValues(alpha: 0.5)),
+                Icon(Icons.auto_awesome,
+                    size: 48, color: aiColor.withValues(alpha: 0.5)),
                 const SizedBox(height: Spacing.sm),
                 Text(
                   roleConfig?.title ?? 'AI Advisor',
@@ -293,7 +304,7 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
               spacing: Spacing.sm,
               runSpacing: Spacing.sm,
               children: chatState.suggestions
-                  .map((q) => _buildSuggestionChip(cs, q))
+                  .map((q) => _buildSuggestionChip(cs, q, aiColor))
                   .toList(),
             ),
           ] else if (canChat) ...[
@@ -312,7 +323,7 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
                   [
                     'How are my sales today?',
                     'Give me a summary.',
-                  ]).map((q) => _buildSuggestionChip(cs, q)).toList(),
+                  ]).map((q) => _buildSuggestionChip(cs, q, aiColor)).toList(),
             ),
           ],
         ],
@@ -320,10 +331,10 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
     );
   }
 
-  Widget _buildSuggestionChip(ColorScheme cs, String label) {
+  Widget _buildSuggestionChip(ColorScheme cs, String label, Color aiColor) {
     return ActionChip(
       label: Text(label, maxLines: 2, overflow: TextOverflow.ellipsis),
-      avatar: Icon(Icons.lightbulb_outline, size: 16, color: cs.primary),
+      avatar: Icon(Icons.lightbulb_outline, size: 16, color: aiColor),
       onPressed: () => _sendSuggestion(label),
     );
   }
@@ -349,6 +360,14 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
   Widget _buildMessageBubble(BuildContext context, AIChatMessage msg) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final aiColor = AppSemanticColors.resolve(
+      AppSemanticColors.purple,
+      theme.brightness,
+    );
+    final onAiColor = AppSemanticColors.resolveOn(
+      AppSemanticColors.onPurple,
+      theme.brightness,
+    );
     final isUser = msg.isUser;
     final isError = msg.isError;
 
@@ -362,9 +381,8 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
           if (!isUser) ...[
             CircleAvatar(
               radius: 14,
-              backgroundColor: cs.primary,
-              child:
-                  Icon(Icons.auto_awesome, color: cs.onPrimary, size: 16),
+              backgroundColor: aiColor,
+              child: Icon(Icons.auto_awesome, color: onAiColor, size: 16),
             ),
             const SizedBox(width: Spacing.xs),
           ],
@@ -395,14 +413,22 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
 
   Widget _buildTypingIndicator(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final aiColor = AppSemanticColors.resolve(
+      AppSemanticColors.purple,
+      Theme.of(context).brightness,
+    );
+    final onAiColor = AppSemanticColors.resolveOn(
+      AppSemanticColors.onPurple,
+      Theme.of(context).brightness,
+    );
     return Padding(
       padding: const EdgeInsets.only(bottom: Spacing.sm),
       child: Row(
         children: [
           CircleAvatar(
             radius: 14,
-            backgroundColor: cs.primary,
-            child: Icon(Icons.auto_awesome, color: cs.onPrimary, size: 16),
+            backgroundColor: aiColor,
+            child: Icon(Icons.auto_awesome, color: onAiColor, size: 16),
           ),
           const SizedBox(width: Spacing.xs),
           Container(
@@ -446,7 +472,10 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
             height: 8,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: cs.primary,
+              color: AppSemanticColors.resolve(
+                AppSemanticColors.purple,
+                Theme.of(context).brightness,
+              ),
             ),
           ),
         );

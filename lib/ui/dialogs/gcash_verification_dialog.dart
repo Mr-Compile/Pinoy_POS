@@ -55,7 +55,7 @@ class _GcashVerificationDialog extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return AppDialogForm<ModalResult<User>>(
-      type: AppDialogType.warning,
+      type: AppDialogType.confirmation,
       title: 'GCash Payment Verification',
       message:
           'An authorized verifier must approve this payment before the sale is completed.',

@@ -7,7 +7,6 @@ import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/user_provider.dart';
-import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_form.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
@@ -16,6 +15,7 @@ import 'package:pinoy_pos/ui/widgets/app_image.dart';
 import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/app_list_item.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
+import 'package:pinoy_pos/ui/widgets/responsive_create_action.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/core/modal_result.dart';
@@ -65,10 +65,14 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
   }
 
   Color _roleColor(UserRole role, ColorScheme colorScheme) {
+    final brightness = Theme.of(context).brightness;
     return switch (role) {
-      UserRole.owner => colorScheme.tertiary,
-      UserRole.admin => colorScheme.primary,
-      UserRole.staff => colorScheme.secondary,
+      UserRole.owner =>
+        AppSemanticColors.resolve(AppSemanticColors.primary, brightness),
+      UserRole.admin =>
+        AppSemanticColors.resolve(AppSemanticColors.info, brightness),
+      UserRole.staff =>
+        AppSemanticColors.resolve(AppSemanticColors.neutral, brightness),
     };
   }
 
@@ -174,6 +178,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
           AppDialogAction(
             label: 'Reset',
             isPrimary: true,
+            isDestructive: true,
             onPressed: (context) => Navigator.pop(context, true),
           ),
         ],
@@ -640,20 +645,26 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     final canResetPassword = authNotifier.hasPermission('reset_password');
     final canToggleActive = authNotifier.hasPermission('toggle_user_active');
     final currentUser = ref.read(authStateProvider).user;
-    final isTablet =
-        layoutClassFor(MediaQuery.of(context).size.width).isAtLeastMedium;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
+    final createAction = canManage
+        ? ResponsiveCreateAction(
+            label: 'Add User',
+            icon: Icons.person_add,
+            onPressed: _showAddUserDialog,
+          )
+        : null;
+
+    final appBarAction = createAction?.appBarAction(context);
+    final createFab = createAction?.fab(context);
+
     return Scaffold(
-      appBar: const AppHeader(title: 'Users'),
-      floatingActionButton: canManage && !isTablet
-          ? FloatingActionButton.extended(
-              icon: const Icon(Icons.person_add),
-              label: const Text('Add User'),
-              onPressed: () => _showAddUserDialog(),
-            )
-          : null,
+      appBar: AppHeader(
+        title: 'Users',
+        actions: appBarAction != null ? [appBarAction] : null,
+      ),
+      floatingActionButton: createFab,
       body: Column(
         children: [
           // ── Search bar ──
@@ -688,18 +699,6 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                               tooltip: 'Refresh',
                               onPressed: _refresh,
                             ),
-                            if (canManage) ...[
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: AppButton.filled(
-                                  size: AppButtonSize.small,
-                                  icon: Icons.person_add,
-                                  label: 'Add User',
-                                  fullWidth: true,
-                                  onPressed: () => _showAddUserDialog(),
-                                ),
-                              ),
-                            ],
                           ],
                         ),
                       ],
@@ -726,15 +725,6 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                         tooltip: 'Refresh',
                         onPressed: _refresh,
                       ),
-                      if (canManage) ...[
-                        const SizedBox(width: 12),
-                        AppButton.filled(
-                          size: AppButtonSize.small,
-                          icon: Icons.person_add,
-                          label: 'Add User',
-                          onPressed: () => _showAddUserDialog(),
-                        ),
-                      ],
                     ],
                   );
                 },
@@ -879,13 +869,19 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
           if (user.mustChangePassword)
             _StatusBadge(
               label: 'Temp Password',
-              color: colorScheme.tertiary,
+              color: AppSemanticColors.resolve(
+                AppSemanticColors.warning,
+                Theme.of(context).brightness,
+              ),
               icon: Icons.key,
             ),
           if (user.hasPin)
             _StatusBadge(
               label: 'PIN',
-              color: colorScheme.secondary,
+              color: AppSemanticColors.resolve(
+                AppSemanticColors.info,
+                Theme.of(context).brightness,
+              ),
               icon: Icons.lock,
             ),
         ];

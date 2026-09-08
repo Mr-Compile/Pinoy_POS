@@ -83,6 +83,13 @@ void main() {
           Brightness.dark,
         ),
       ),
+      AppButtonColor.purple: (
+        AppSemanticColors.purpleSurface,
+        AppSemanticColors.resolveSurface(
+          AppSemanticColors.purpleSurface,
+          Brightness.dark,
+        ),
+      ),
     };
 
     for (final (name, theme, brightness) in [
@@ -186,7 +193,7 @@ void main() {
       expect(style.foreground, AppColorTokens.textPrimary);
     });
 
-    test('dark mode ai config uses info surface with light foreground', () {
+    test('dark mode ai config uses purple surface with light foreground', () {
       final style = resolveQuickActionStyleForBrightness(
         Brightness.dark,
         QuickActionType.aiConfig,
@@ -194,7 +201,7 @@ void main() {
       expect(
         style.background,
         AppSemanticColors.resolveSurface(
-          AppSemanticColors.infoSurface,
+          AppSemanticColors.purpleSurface,
           Brightness.dark,
         ),
       );

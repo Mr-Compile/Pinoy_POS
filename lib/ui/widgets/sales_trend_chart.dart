@@ -157,7 +157,10 @@ class _ScrollableBarChart extends StatelessWidget {
                         value: points[i].value,
                         maxValue: maxValue,
                         color: i == highlightIndex
-                            ? cs.tertiary
+                            ? AppSemanticColors.resolve(
+                                AppSemanticColors.info,
+                                Theme.of(context).brightness,
+                              )
                             : cs.primary,
                       ),
                       const SizedBox(height: Spacing.xs),

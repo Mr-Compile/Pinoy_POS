@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_countdown_ring.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 
@@ -104,7 +105,7 @@ class _SessionExpiringDialogState extends State<SessionExpiringDialog> {
       actions: [
         AppDialogAction(
           label: 'Log Out',
-          isDestructive: true,
+          color: AppButtonColor.error,
           onPressed: (dialogContext) {
             Navigator.of(dialogContext, rootNavigator: true).pop();
             widget.onLogout();
@@ -113,6 +114,7 @@ class _SessionExpiringDialogState extends State<SessionExpiringDialog> {
         AppDialogAction(
           label: 'Continue Session',
           isPrimary: true,
+          color: AppButtonColor.success,
           onPressed: (dialogContext) {
             Navigator.of(dialogContext, rootNavigator: true).pop();
             widget.onContinue();

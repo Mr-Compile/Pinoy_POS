@@ -64,7 +64,10 @@ class MiniBarChart extends StatelessWidget {
                             value: points[i].value,
                             max: maxValue,
                             color: i == highlightIndex
-                                ? cs.tertiary
+                                ? AppSemanticColors.resolve(
+                                    AppSemanticColors.info,
+                                    Theme.of(context).brightness,
+                                  )
                                 : cs.primary,
                           ),
                         ),

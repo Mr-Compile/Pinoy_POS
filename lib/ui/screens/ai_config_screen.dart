@@ -465,10 +465,14 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
 
   Widget _buildIntroCard(BuildContext context) {
     final theme = Theme.of(context);
+    final aiColor = AppSemanticColors.resolve(
+      AppSemanticColors.purple,
+      theme.brightness,
+    );
     return AppCard(
       child: Row(
         children: [
-          Icon(Icons.smart_toy, size: 32, color: theme.colorScheme.primary),
+          Icon(Icons.smart_toy, size: 32, color: aiColor),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -573,6 +577,10 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
 
   Widget _buildApiKeyCard(BuildContext context) {
     final theme = Theme.of(context);
+    final aiColor = AppSemanticColors.resolve(
+      AppSemanticColors.purple,
+      theme.brightness,
+    );
     return AppCard(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -608,7 +616,7 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
                             height: 18,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: theme.colorScheme.primary,
+                              color: aiColor,
                             ),
                           )
                         : const Icon(Icons.wifi_protected_setup),
@@ -628,6 +636,10 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
   Widget _buildModelSelectionCard(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final aiColor = AppSemanticColors.resolve(
+      AppSemanticColors.purple,
+      theme.brightness,
+    );
 
     return AppCard(
       child: Padding(
@@ -647,7 +659,7 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
                           height: 16,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: cs.primary,
+                            color: aiColor,
                           ),
                         )
                       : const Icon(Icons.refresh, size: 18),
@@ -673,12 +685,12 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: cs.primaryContainer.withValues(alpha: 0.3),
+                    color: aiColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(AppRadius.sm),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.check_circle, size: 20, color: cs.primary),
+                      Icon(Icons.check_circle, size: 20, color: aiColor),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Column(
@@ -797,16 +809,20 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
       BuildContext context, GroqModel model, bool isSelected) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final aiColor = AppSemanticColors.resolve(
+      AppSemanticColors.purple,
+      theme.brightness,
+    );
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       clipBehavior: Clip.antiAlias,
       child: ListTile(
         selected: isSelected,
-        selectedTileColor: cs.primaryContainer.withValues(alpha: 0.3),
+        selectedTileColor: aiColor.withValues(alpha: 0.1),
         leading: Icon(
           isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
-          color: isSelected ? cs.primary : cs.onSurfaceVariant,
+          color: isSelected ? aiColor : cs.onSurfaceVariant,
           size: 22,
         ),
         title: Text(
@@ -853,7 +869,7 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
           ],
         ),
         trailing: isSelected
-            ? Icon(Icons.check, color: cs.primary)
+            ? Icon(Icons.check, color: aiColor)
             : TextButton(
                 onPressed: () {
                   setState(() => _selectedModel = model.id);

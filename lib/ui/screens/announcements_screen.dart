@@ -12,9 +12,9 @@ import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/validators.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
-import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/modal_result.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
+import 'package:pinoy_pos/ui/widgets/responsive_create_action.dart';
 import 'package:pinoy_pos/providers/notification_provider.dart';
 
 class AnnouncementsScreen extends ConsumerStatefulWidget {
@@ -113,8 +113,6 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
   Widget build(BuildContext context) {
     final authNotifier = ref.read(authStateProvider.notifier);
     final canManage = authNotifier.hasPermission('manage_announcements');
-    final isTablet =
-        layoutClassFor(MediaQuery.of(context).size.width).isAtLeastMedium;
 
     if (_isLoading) {
       return Scaffold(
@@ -126,21 +124,16 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
       );
     }
 
-    // Primary create action. On tablet/desktop a visible labeled
-    // FilledButton.icon is placed in the AppBar; on mobile a FAB.extended
-    // is used so the action is always reachable and clearly labeled.
-    final Widget? createAction = canManage
-        ? (isTablet
-            ? Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: FilledButton.icon(
-                  icon: const Icon(Icons.campaign),
-                  label: const Text('Add Announcement'),
-                  onPressed: () => _showAnnouncementDialog(),
-                ),
-              )
-            : null)
+    final createAction = canManage
+        ? ResponsiveCreateAction(
+            label: 'Add Announcement',
+            icon: Icons.campaign,
+            onPressed: _showAnnouncementDialog,
+          )
         : null;
+
+    final appBarAction = createAction?.appBarAction(context);
+    final createFab = createAction?.fab(context);
 
     return Scaffold(
       appBar: AppHeader(
@@ -151,16 +144,11 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
             icon: const Icon(Icons.refresh),
             onPressed: _loadAnnouncements,
           ),
-          ?createAction,
+          // ignore: use_null_aware_elements
+          if (appBarAction != null) appBarAction,
         ],
       ),
-      floatingActionButton: canManage && !isTablet
-          ? FloatingActionButton.extended(
-              icon: const Icon(Icons.campaign),
-              label: const Text('Add Announcement'),
-              onPressed: () => _showAnnouncementDialog(),
-            )
-          : null,
+      floatingActionButton: createFab,
       body: _announcements.isEmpty
           ? EmptyState(
               icon: Icons.campaign,

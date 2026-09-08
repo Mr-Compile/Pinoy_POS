@@ -73,7 +73,15 @@ class _InstructionsList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
+    final aiContainer = AppSemanticColors.resolve(
+      AppSemanticColors.purpleContainer,
+      brightness,
+    );
+    final onAiContainer = AppSemanticColors.resolveOn(
+      AppSemanticColors.onPurpleContainer,
+      brightness,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -92,14 +100,14 @@ class _InstructionsList extends StatelessWidget {
                 height: 24,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: cs.primaryContainer,
+                  color: aiContainer,
                   shape: BoxShape.circle,
                 ),
                 child: Text(
                   '$index',
                   style: AppTypography.labelMedium(context).copyWith(
                     fontWeight: FontWeight.bold,
-                    color: cs.onPrimaryContainer,
+                    color: onAiContainer,
                   ),
                 ),
               ),
@@ -130,6 +138,16 @@ class _ActionList extends ConsumerWidget {
     final role = SessionManager().currentUser?.role;
     final currentDestinationId = ref.read(currentRouteProvider);
 
+    final brightness = Theme.of(context).brightness;
+    final aiContainer = AppSemanticColors.resolve(
+      AppSemanticColors.purpleContainer,
+      brightness,
+    );
+    final onAiContainer = AppSemanticColors.resolveOn(
+      AppSemanticColors.onPurpleContainer,
+      brightness,
+    );
+
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -145,9 +163,10 @@ class _ActionList extends ConsumerWidget {
         final icon = isExternal ? Icons.open_in_new : Icons.arrow_forward;
 
         return ActionChip.elevated(
-          avatar: Icon(icon, size: 18, color: cs.onPrimaryContainer),
+          avatar: Icon(icon, size: 18, color: onAiContainer),
           label: Text(action.label),
-          backgroundColor: isExternal ? cs.surfaceContainerHighest : cs.primaryContainer,
+          backgroundColor:
+              isExternal ? cs.surfaceContainerHighest : aiContainer,
           side: isExternal ? BorderSide(color: cs.outline) : BorderSide.none,
           onPressed: allowed
               ? () => _onActionTap(context, ref, action)
@@ -179,14 +198,17 @@ class _SuggestionChips extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cs = Theme.of(context).colorScheme;
+    final aiColor = AppSemanticColors.resolve(
+      AppSemanticColors.purple,
+      Theme.of(context).brightness,
+    );
 
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: suggestions.map((suggestion) {
         return ActionChip(
-          avatar: Icon(Icons.lightbulb_outline, size: 16, color: cs.primary),
+          avatar: Icon(Icons.lightbulb_outline, size: 16, color: aiColor),
           label: Text(suggestion),
           onPressed: () {
             ref.read(aiAdvisorChatProvider.notifier).sendQuery(suggestion);

@@ -856,7 +856,10 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
         icon: Icons.download_outlined,
         title: 'Import Backup',
         subtitle: 'Restore from a Pinoy POS .db backup',
-        iconColor: cs.tertiary,
+        iconColor: AppSemanticColors.resolve(
+          AppSemanticColors.success,
+          theme.brightness,
+        ),
         isLoading: _isImporting,
         onTap: _isImporting ? null : _importBackup,
       ),
@@ -954,13 +957,20 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                   }
                 },
                 itemBuilder: (context) => [
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'restore',
                     child: Row(
                       children: [
-                        Icon(Icons.restore_outlined, size: 20),
-                        SizedBox(width: Spacing.sm),
-                        Text('Restore'),
+                        Icon(
+                          Icons.restore_outlined,
+                          size: 20,
+                          color: AppSemanticColors.resolve(
+                            AppSemanticColors.success,
+                            Theme.of(context).brightness,
+                          ),
+                        ),
+                        const SizedBox(width: Spacing.sm),
+                        const Text('Restore'),
                       ],
                     ),
                   ),

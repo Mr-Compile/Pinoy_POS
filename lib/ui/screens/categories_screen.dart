@@ -1,20 +1,19 @@
 ﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/catalog_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/dialogs/category_dialog.dart';
-import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/app_list_item.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
+import 'package:pinoy_pos/ui/widgets/responsive_create_action.dart';
 
 class CategoriesScreen extends ConsumerStatefulWidget {
   const CategoriesScreen({super.key});
@@ -194,8 +193,14 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
     final canEdit = authNotifier.hasPermission('edit_categories');
     final canDelete = authNotifier.hasPermission('delete_categories');
     final canToggleStatus = authNotifier.hasPermission('change_category_status');
-    final isTablet =
-        layoutClassFor(MediaQuery.of(context).size.width).isAtLeastMedium;
+
+    final createAction = canEdit
+        ? ResponsiveCreateAction(
+            label: 'Add Category',
+            icon: Icons.add,
+            onPressed: _showCategoryDialog,
+          )
+        : null;
 
     if (_isLoading) {
       return Scaffold(
@@ -207,42 +212,22 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
       );
     }
 
-    // Primary create action. On tablet/desktop a visible labeled
-    // button is placed in the AppBar; on mobile a FAB.extended
-    // is used so the action is always reachable and clearly labeled.
-    final Widget? createAction = canEdit
-        ? (isTablet
-            ? Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: AppButton.filled(
-                  size: AppButtonSize.small,
-                  icon: Icons.add,
-                  label: 'Add Category',
-                  onPressed: () => _showCategoryDialog(),
-                ),
-              )
-            : null)
-        : null;
+    final appBarAction = createAction?.appBarAction(context);
+    final createFab = createAction?.fab(context);
 
     return Scaffold(
       appBar: AppHeader(
         title: 'Categories',
         showBackButton: true,
         actions: [
-          ?createAction,
+          ?appBarAction,
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadCategories,
           ),
         ],
       ),
-      floatingActionButton: canEdit && !isTablet
-          ? FloatingActionButton.extended(
-              icon: const Icon(Icons.add),
-              label: const Text('Add Category'),
-              onPressed: () => _showCategoryDialog(),
-            )
-          : null,
+      floatingActionButton: createFab,
       body: _categories.isEmpty
           ? EmptyState(
               icon: Icons.category,

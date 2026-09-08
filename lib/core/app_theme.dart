@@ -16,34 +16,36 @@ class AppColorTokens {
   static const Color primaryBlueDark = Color(0xFF0C3392);
   static const Color primaryBlueLight = Color(0xFF2F80ED);
 
-  // ── Dark mode surfaces ───────────────────────────────────────────────
+  // ── Dark mode foundation ─────────────────────────────────────────────
 
-  static const Color darkBackground = Color(0xFF070C17);
-  static const Color darkSurface = Color(0xFF121C32);
-  static const Color darkSurfaceElevated = Color(0xFF152348);
-  static const Color darkBlueSurface = Color(0xFF0C3392);
-  static const Color darkBorder = Color(0xFF263A63);
+  static const Color darkBackground = Color(0xFF070B14);
+  static const Color darkSurface = Color(0xFF0F1728);
+  static const Color darkSurfaceElevated = Color(0xFF121D35);
+  static const Color darkSurfaceStrong = Color(0xFF17264A);
+  static const Color darkBorder = Color(0xFF243455);
+  static const Color darkDivider = Color(0xFF1B2942);
 
   // ── Dark mode text ───────────────────────────────────────────────────
 
-  static const Color textPrimary = Color(0xFFFEFEFE);
-  static const Color textSecondary = Color(0xFFDEE5ED);
-  static const Color textMuted = Color(0xFFAAB9D4);
-  static const Color textDisabled = Color(0xFF71809A);
+  static const Color textPrimary = Color(0xFFF5F7FA);
+  static const Color textSecondary = Color(0xFFC2CAD8);
+  static const Color textMuted = Color(0xFF8994A8);
+  static const Color textDisabled = Color(0xFF5D687A);
 
-  // ── Light mode surfaces ──────────────────────────────────────────────
+  // ── Light mode foundation ────────────────────────────────────────────
 
-  static const Color lightBackground = Color(0xFFF7F9FC);
+  static const Color lightBackground = Color(0xFFF5F7FB);
   static const Color lightSurface = Color(0xFFFFFFFF);
-  static const Color lightSurfaceElevated = Color(0xFFEFF4FF);
-  static const Color lightBlueSurface = Color(0xFFE8F0FF);
-  static const Color lightBorder = Color(0xFFD8E1EF);
+  static const Color lightSurfaceSoft = Color(0xFFEEF4FF);
+  static const Color lightBorder = Color(0xFFD9E1EF);
+  static const Color lightDivider = Color(0xFFE7ECF4);
 
   // ── Light mode text ──────────────────────────────────────────────────
 
   static const Color lightTextPrimary = Color(0xFF172033);
-  static const Color lightTextSecondary = Color(0xFF536176);
+  static const Color lightTextSecondary = Color(0xFF4F5B70);
   static const Color lightTextMuted = Color(0xFF7B879A);
+  static const Color lightTextDisabled = Color(0xFFA8B1C0);
 
   // ── On-color helper ──────────────────────────────────────────────────
 
@@ -72,7 +74,7 @@ class AppRadius {
 }
 
 /// Semantic colors that communicate meaning (primary, success, warning, error,
-/// info, neutral, disabled).
+/// info, purple, neutral, disabled).
 ///
 /// The values in this class are the canonical light-mode roles. Each role has
 /// an explicit dark-mode counterpart returned by [resolve] so the UI stays
@@ -95,7 +97,7 @@ class AppSemanticColors {
   static const Color onSuccessContainer = Color(0xFF14532D);
 
   static const Color warning = Color(0xFFD97706);
-  static const Color onWarning = AppColorTokens.lightTextPrimary;
+  static const Color onWarning = AppColorTokens.onPrimaryBlue;
   static const Color warningContainer = Color(0xFFFEF3C7);
   static const Color onWarningContainer = Color(0xFF78350F);
 
@@ -104,55 +106,65 @@ class AppSemanticColors {
   static const Color errorContainer = Color(0xFFFEE2E2);
   static const Color onErrorContainer = Color(0xFF7F1D1D);
 
-  static const Color info = primaryLight;
-  static const Color onInfo = onWarning;
-  static const Color infoContainer = AppColorTokens.lightBlueSurface;
-  static const Color onInfoContainer = onWarning;
+  static const Color info = Color(0xFF0891B2);
+  static const Color onInfo = AppColorTokens.onPrimaryBlue;
+  static const Color infoContainer = Color(0xFFCFFAFE);
+  static const Color onInfoContainer = Color(0xFF0E5C6D);
+
+  // ── Purple accent for AI / advanced features ─────────────────────────
+
+  static const Color purple = Color(0xFF7C3AED);
+  static const Color onPurple = AppColorTokens.onPrimaryBlue;
+  static const Color purpleContainer = Color(0xFFEDE9FE);
+  static const Color onPurpleContainer = Color(0xFF4C1D95);
 
   /// Neutral grey for non-emphasised actions and secondary icons.
-  static const Color neutral = AppColorTokens.lightTextMuted;
+  static const Color neutral = Color(0xFF64748B);
   static const Color onNeutral = AppColorTokens.onPrimaryBlue;
   static const Color neutralContainer = Color(0xFFF1F5F9);
   static const Color onNeutralContainer = Color(0xFF334155);
 
-  static const Color disabled = Color(0xFF9CA3AF);
-
-  /// Alias for error used by destructive actions.
-  static const Color danger = error;
+  static const Color disabled = Color(0xFFA8B1C0);
 
   // ── Theme-aware resolution: light constant → dark variant ─────────────
 
   static final Map<Color, Color> _darkForLight = {
-    // Primary family (info aliases primaryLight, so it resolves automatically)
+    // Primary family
     primary: AppColorTokens.primaryBlue,
     primaryLight: const Color(0xFF60A5FA),
     primaryDark: AppColorTokens.primaryBlue,
 
     // Success family
     success: const Color(0xFF4ADE80),
-    successContainer: const Color(0xFF14532D),
+    successContainer: const Color(0xFF12351F),
     onSuccessContainer: const Color(0xFF86EFAC),
 
-    // Warning family (onWarning also resolves onInfo/onInfoContainer)
+    // Warning family
     warning: const Color(0xFFFBBF24),
-    warningContainer: const Color(0xFF78350F),
+    warningContainer: const Color(0xFF3A2A0A),
     onWarningContainer: const Color(0xFFFDE68A),
-    onWarning: AppColorTokens.textPrimary,
 
     // Error / danger family
     error: const Color(0xFFF87171),
-    errorContainer: const Color(0xFF991B1B),
+    errorContainer: const Color(0xFF3A1518),
     onErrorContainer: const Color(0xFFFECACA),
 
-    // Info family (info == primaryLight; onInfo/onInfoContainer alias onWarning)
-    infoContainer: AppColorTokens.darkBlueSurface,
+    // Info family
+    info: const Color(0xFF06B6D4),
+    infoContainer: const Color(0xFF0A3038),
+    onInfoContainer: const Color(0xFF9AF1F7),
+
+    // Purple family
+    purple: const Color(0xFF8B5CF6),
+    purpleContainer: const Color(0xFF291A4A),
+    onPurpleContainer: const Color(0xFFD8B4FE),
 
     // Neutral family
-    neutral: AppColorTokens.textMuted,
-    neutralContainer: const Color(0xFF334155),
+    neutral: const Color(0xFF94A3B8),
+    neutralContainer: const Color(0xFF1E293B),
     onNeutralContainer: const Color(0xFFF1F5F9),
 
-    // On-colors (onSuccess/onError/onNeutral alias onPrimary)
+    // On-colors (onSuccess/onError/onNeutral/onPurple/onInfo alias onPrimary)
     onPrimary: AppColorTokens.onPrimaryBlue,
 
     // Disabled
@@ -176,19 +188,20 @@ class AppSemanticColors {
   static const Color secondarySurface = AppColorTokens.primaryBlueLight;
   static const Color successSurface = Color(0xFF16A34A);
   static const Color warningSurface = Color(0xFFD97706);
-  static const Color infoSurface = AppColorTokens.primaryBlue;
+  static const Color infoSurface = Color(0xFF0891B2);
   static const Color errorSurface = Color(0xFFDC2626);
-  static const Color neutralSurface = Color(0xFF475569);
+  static const Color neutralSurface = Color(0xFF64748B);
+  static const Color purpleSurface = Color(0xFF7C3AED);
 
   static final Map<Color, Color> _darkSurfaceForLight = {
-    // primarySurface and infoSurface both use the primary blue in light,
-    // so the primarySurface mapping covers infoSurface as well.
     primarySurface: AppColorTokens.primaryBlue,
-    secondarySurface: AppColorTokens.darkBlueSurface,
-    successSurface: const Color(0xFF166534),
-    warningSurface: const Color(0xFF92400E),
-    errorSurface: const Color(0xFF991B1B),
-    neutralSurface: const Color(0xFF334155),
+    secondarySurface: AppColorTokens.primaryBlueDark,
+    successSurface: const Color(0xFF12351F),
+    warningSurface: const Color(0xFF3A2A0A),
+    errorSurface: const Color(0xFF3A1518),
+    neutralSurface: const Color(0xFF1E293B),
+    infoSurface: const Color(0xFF0A3038),
+    purpleSurface: const Color(0xFF291A4A),
   };
 
   /// Returns the dark-mode surface color for a light-mode semantic [surface].
@@ -244,8 +257,8 @@ class AppColors {
     final primary = AppColorTokens.primaryBlue;
     final onPrimary = AppColorTokens.onPrimaryBlue;
     final primaryContainer = isDark
-        ? AppColorTokens.darkBlueSurface
-        : AppColorTokens.lightBlueSurface;
+        ? AppColorTokens.primaryBlueDark
+        : AppColorTokens.lightSurfaceSoft;
     final onPrimaryContainer = isDark
         ? AppColorTokens.textPrimary
         : AppColorTokens.lightTextPrimary;
@@ -254,7 +267,7 @@ class AppColors {
     final onSecondary = isDark ? AppColorTokens.textPrimary : AppColorTokens.onPrimaryBlue;
     final secondaryContainer = isDark
         ? AppColorTokens.darkSurfaceElevated
-        : AppColorTokens.lightSurfaceElevated;
+        : AppColorTokens.lightSurface;
     final onSecondaryContainer = isDark
         ? AppColorTokens.textPrimary
         : AppColorTokens.lightTextPrimary;
@@ -262,20 +275,22 @@ class AppColors {
     final tertiary = AppColorTokens.primaryBlueDark;
     final onTertiary = AppColorTokens.onPrimaryBlue;
     final tertiaryContainer = isDark
-        ? AppColorTokens.darkBlueSurface
-        : AppColorTokens.lightBlueSurface;
+        ? AppColorTokens.primaryBlueDark
+        : AppColorTokens.lightSurfaceSoft;
     final onTertiaryContainer = isDark
         ? AppColorTokens.textPrimary
         : AppColorTokens.lightTextPrimary;
 
-    final error = isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626);
-    final onError = isDark ? AppColorTokens.textPrimary : AppColorTokens.onPrimaryBlue;
-    final errorContainer = isDark
-        ? const Color(0xFF991B1B)
-        : const Color(0xFFFEE2E2);
-    final onErrorContainer = isDark
-        ? const Color(0xFFFECACA)
-        : const Color(0xFF7F1D1D);
+    final error = AppSemanticColors.resolve(AppSemanticColors.error, brightness);
+    final onError = AppSemanticColors.resolveOn(AppSemanticColors.onError, brightness);
+    final errorContainer = AppSemanticColors.resolve(
+      AppSemanticColors.errorContainer,
+      brightness,
+    );
+    final onErrorContainer = AppSemanticColors.resolveOn(
+      AppSemanticColors.onErrorContainer,
+      brightness,
+    );
 
     final surface = isDark ? AppColorTokens.darkSurface : AppColorTokens.lightSurface;
     final onSurface = isDark ? AppColorTokens.textPrimary : AppColorTokens.lightTextPrimary;
@@ -284,19 +299,19 @@ class AppColors {
     final surfaceDim = isDark ? AppColorTokens.darkBackground : AppColorTokens.lightBackground;
     final surfaceBright = isDark
         ? AppColorTokens.darkSurfaceElevated
-        : AppColorTokens.lightSurfaceElevated;
+        : AppColorTokens.lightSurface;
     final surfaceContainerLowest = surfaceDim;
     final surfaceContainerLow = surface;
     final surfaceContainer = isDark
         ? AppColorTokens.darkSurfaceElevated
-        : AppColorTokens.lightSurfaceElevated;
+        : AppColorTokens.lightSurface;
     final surfaceContainerHigh = isDark
-        ? AppColorTokens.darkBlueSurface
-        : AppColorTokens.lightBlueSurface;
+        ? AppColorTokens.darkSurfaceStrong
+        : AppColorTokens.lightSurfaceSoft;
     final surfaceContainerHighest = surfaceContainerHigh;
 
     final outline = isDark ? AppColorTokens.darkBorder : AppColorTokens.lightBorder;
-    final outlineVariant = isDark ? const Color(0xFF1E2D4D) : const Color(0xFFE2E8F0);
+    final outlineVariant = isDark ? AppColorTokens.darkDivider : AppColorTokens.lightDivider;
 
     final inverseSurface = isDark
         ? AppColorTokens.lightSurface
@@ -365,7 +380,7 @@ class AppColors {
     final isDark = brightness == Brightness.dark;
 
     final appBarBackground = isDark
-        ? AppColorTokens.darkBlueSurface
+        ? AppColorTokens.primaryBlueDark
         : AppColorTokens.primaryBlue;
     final appBarForeground = AppColorTokens.onPrimaryBlue;
 
@@ -617,6 +632,9 @@ class AppColors {
         surfaceTintColor: isDark ? Colors.transparent : null,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.dialog),
+          side: BorderSide(
+            color: isDark ? AppColorTokens.darkBorder : AppColorTokens.lightBorder,
+          ),
         ),
       ),
 

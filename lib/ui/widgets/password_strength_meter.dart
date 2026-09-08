@@ -19,17 +19,21 @@ class PasswordStrengthMeter extends StatelessWidget {
     final colorScheme = theme.colorScheme;
 
     // Map strength level to a semantic color token.
+    final brightness = theme.brightness;
     final Color strengthColor;
     switch (result.level) {
       case PasswordStrengthLevel.veryWeak:
       case PasswordStrengthLevel.weak:
         strengthColor = colorScheme.error;
       case PasswordStrengthLevel.fair:
-        strengthColor = colorScheme.tertiary;
+        strengthColor =
+            AppSemanticColors.resolve(AppSemanticColors.warning, brightness);
       case PasswordStrengthLevel.good:
-        strengthColor = colorScheme.primary;
+        strengthColor =
+            AppSemanticColors.resolve(AppSemanticColors.info, brightness);
       case PasswordStrengthLevel.strong:
-        strengthColor = colorScheme.primary;
+        strengthColor =
+            AppSemanticColors.resolve(AppSemanticColors.success, brightness);
     }
 
     // 5 segments: 0–4.

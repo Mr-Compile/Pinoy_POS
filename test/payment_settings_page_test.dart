@@ -120,6 +120,7 @@ void main() {
     await pumpWithOwner(tester, fakeService);
 
     // Toggle verification on.
+    await tester.ensureVisible(find.text('Verify staff GCash sales'));
     await tester.tap(find.text('Verify staff GCash sales'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));

@@ -1,5 +1,6 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/payment_breakdown.dart';
 
@@ -42,15 +43,15 @@ class PaymentMethodChart extends StatelessWidget {
       );
     }
 
+    final brightness = Theme.of(context).brightness;
     final colors = [
       cs.primary,
-      cs.tertiary,
-      cs.secondary,
-      cs.error,
-      cs.primaryContainer,
-      cs.tertiaryContainer,
-      cs.secondaryContainer,
-      cs.errorContainer,
+      AppSemanticColors.resolve(AppSemanticColors.success, brightness),
+      AppSemanticColors.resolve(AppSemanticColors.info, brightness),
+      AppSemanticColors.resolve(AppSemanticColors.warning, brightness),
+      AppSemanticColors.resolve(AppSemanticColors.purple, brightness),
+      AppSemanticColors.resolve(AppSemanticColors.error, brightness),
+      AppSemanticColors.resolve(AppSemanticColors.neutral, brightness),
     ];
 
     final sections = active.asMap().entries.map((entry) {
@@ -65,7 +66,7 @@ class PaymentMethodChart extends StatelessWidget {
         radius: size / 2 - 16,
         title: '${(pct * 100).toStringAsFixed(0)}%',
         titleStyle: TextStyle(
-          color: _contrastColor(cs, color),
+          color: _contrastColor(context, cs, color),
           fontSize: 10,
           fontWeight: FontWeight.bold,
         ),
@@ -107,9 +108,12 @@ class PaymentMethodChart extends StatelessWidget {
     );
   }
 
-  Color _contrastColor(ColorScheme colorScheme, Color color) {
-    final brightness = color.computeLuminance();
-    return brightness > 0.5 ? colorScheme.surface : colorScheme.onSurface;
+  Color _contrastColor(BuildContext context, ColorScheme colorScheme, Color color) {
+    return AppSemanticColors.contrastFor(
+      color,
+      Theme.of(context).brightness,
+      threshold: 0.4,
+    );
   }
 
   String _formatMoney(double v) {

@@ -235,9 +235,10 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
 
   Widget _buildProfileCard(BuildContext context, User staff) {
     final cs = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
     final statusColor = staff.isActive
-        ? AppSemanticColors.resolve(AppSemanticColors.success, cs.brightness)
-        : AppSemanticColors.resolve(AppSemanticColors.neutral, cs.brightness);
+        ? AppSemanticColors.resolve(AppSemanticColors.success, brightness)
+        : AppSemanticColors.resolve(AppSemanticColors.neutral, brightness);
 
     return AppCard(
       child: Row(

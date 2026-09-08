@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/app_messages.dart';
@@ -80,7 +81,8 @@ class AppDialogService {
     required String title,
     String? message,
     String? details,
-    String primaryLabel = 'Try Again',
+    String primaryLabel = 'OK',
+    AppButtonColor? primaryColor,
     void Function(BuildContext)? onPrimary,
     String secondaryLabel = 'Close',
     void Function(BuildContext)? onSecondary,
@@ -96,6 +98,7 @@ class AppDialogService {
         AppDialogAction(
           label: primaryLabel,
           isPrimary: true,
+          color: primaryColor,
           onPressed: onPrimary ?? (context) => Navigator.of(context, rootNavigator: true).pop(),
         ),
       ],
@@ -221,7 +224,7 @@ class AppDialogService {
   }) {
     return _show<bool>(
       context: context,
-      type: AppDialogType.confirmation,
+      type: destructive ? AppDialogType.warning : AppDialogType.confirmation,
       title: title,
       message: message,
       details: details,
@@ -253,7 +256,7 @@ class AppDialogService {
 
     return _show<bool>(
       context: context,
-      type: AppDialogType.warning,
+      type: permanent ? AppDialogType.permanentDelete : AppDialogType.delete,
       title: title,
       message: '$itemName will be affected.\n$message',
       actions: [
@@ -277,7 +280,7 @@ class AppDialogService {
   }) {
     return _show<bool>(
       context: context,
-      type: AppDialogType.warning,
+      type: AppDialogType.permanentDelete,
       title: 'Permanently Delete?',
       message: '$itemName will be permanently deleted.\nThis action cannot be undone.',
       actions: [
@@ -301,7 +304,7 @@ class AppDialogService {
   }) {
     return _show<bool>(
       context: context,
-      type: AppDialogType.confirmation,
+      type: AppDialogType.restore,
       title: 'Restore from Trash?',
       message: 'Restore "$itemName" from trash? It will become active again.',
       actions: [
@@ -321,7 +324,7 @@ class AppDialogService {
   static Future<bool?> logoutConfirm(BuildContext context) {
     return _show<bool>(
       context: context,
-      type: AppDialogType.error,
+      type: AppDialogType.logout,
       title: 'Log out?',
       message: AppMessages.logoutConfirm,
       actions: [
@@ -395,7 +398,7 @@ class AppDialogService {
   }) {
     return _show(
       context: context,
-      type: AppDialogType.warning,
+      type: AppDialogType.info,
       title: 'Session Ended',
       message: AppMessages.sessionExpired,
       dismissible: false,
@@ -485,6 +488,7 @@ class AppDialogService {
       title: title,
       message: message,
       primaryLabel: 'Try Again',
+      primaryColor: AppButtonColor.primary,
       onPrimary: onRetry == null
           ? null
           : (context) {
@@ -571,6 +575,7 @@ class AppDialogService {
         AppDialogAction(
           label: 'Try Again',
           isPrimary: true,
+          color: AppButtonColor.primary,
           onPressed: (context) => Navigator.of(context, rootNavigator: true)
               .pop(BackupExportFailedResult.tryAgain),
         ),
@@ -628,6 +633,7 @@ class AppDialogService {
         AppDialogAction(
           label: 'Choose New Location',
           isPrimary: true,
+          color: AppButtonColor.primary,
           onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(true),
         ),
       ],
@@ -655,6 +661,7 @@ class AppDialogService {
         AppDialogAction(
           label: 'Try Again',
           isPrimary: true,
+          color: AppButtonColor.primary,
           onPressed: (context) =>
               Navigator.of(context, rootNavigator: true).pop(true),
         ),
@@ -695,7 +702,7 @@ class AppDialogService {
     }
     return _show<bool>(
       context: context,
-      type: AppDialogType.warning,
+      type: AppDialogType.restore,
       title: 'Restore Backup?',
       message: info.toString(),
       actions: [
@@ -706,7 +713,6 @@ class AppDialogService {
         AppDialogAction(
           label: 'Restore',
           isPrimary: true,
-          isDestructive: true,
           onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(true),
         ),
       ],
@@ -747,6 +753,7 @@ class AppDialogService {
       title: 'Invalid Backup File',
       message: 'The selected .db file is invalid or corrupted. Please choose a valid Pinoy POS SQLite database.',
       primaryLabel: 'Choose Another File',
+      primaryColor: AppButtonColor.primary,
     );
   }
 
@@ -758,6 +765,7 @@ class AppDialogService {
       title: 'Incompatible Backup',
       message: 'This .db file does not contain the required Pinoy POS data tables and cannot be restored.',
       primaryLabel: 'Choose Another File',
+      primaryColor: AppButtonColor.primary,
     );
   }
 
@@ -986,6 +994,7 @@ class AppDialogService {
         AppDialogAction(
           label: 'Try Again',
           isPrimary: true,
+          color: AppButtonColor.primary,
           onPressed: (context) =>
               Navigator.of(context, rootNavigator: true).pop(true),
         ),

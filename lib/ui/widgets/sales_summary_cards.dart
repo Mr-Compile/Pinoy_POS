@@ -29,7 +29,7 @@ class SalesSummaryCards extends StatelessWidget {
           label: 'Total Sales',
           icon: Icons.payments_outlined,
           iconColor: AppSemanticColors.resolve(
-            AppSemanticColors.success,
+            AppSemanticColors.primary,
             Theme.of(context).brightness,
           ),
           value: _formatMoney(analytics.totalSales),
@@ -43,7 +43,10 @@ class SalesSummaryCards extends StatelessWidget {
           context,
           label: 'Transactions',
           icon: Icons.receipt_outlined,
-          iconColor: Theme.of(context).colorScheme.primary,
+          iconColor: AppSemanticColors.resolve(
+            AppSemanticColors.purple,
+            Theme.of(context).brightness,
+          ),
           value: analytics.transactionCount.toString(),
           subtitle: _changeText(
             comparison.transactionCountChangePercent(analytics.transactionCount),
@@ -55,7 +58,10 @@ class SalesSummaryCards extends StatelessWidget {
           context,
           label: 'Average Sale',
           icon: Icons.trending_up,
-          iconColor: Theme.of(context).colorScheme.tertiary,
+          iconColor: AppSemanticColors.resolve(
+            AppSemanticColors.success,
+            Theme.of(context).brightness,
+          ),
           value: _formatMoney(analytics.averageTransaction),
           subtitle: _changeText(
             comparison.averageTransactionChangePercent(analytics.averageTransaction),

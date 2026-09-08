@@ -579,6 +579,10 @@ class _OwnerDashboard extends ConsumerWidget {
 
   Widget _buildAIAdvisorCard(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
+    final aiColor = AppSemanticColors.resolve(
+      AppSemanticColors.purple,
+      Theme.of(context).brightness,
+    );
     return AppSection(
       title: 'Business Advisor',
       padding: const EdgeInsets.only(bottom: Spacing.md),
@@ -591,7 +595,7 @@ class _OwnerDashboard extends ConsumerWidget {
         ),
         child: Row(
           children: [
-            Icon(Icons.auto_awesome, color: cs.tertiary),
+            Icon(Icons.auto_awesome, color: aiColor),
             const SizedBox(width: Spacing.md),
             Expanded(
               child: Text(
@@ -733,7 +737,10 @@ class _AdminDashboard extends ConsumerWidget {
                 label: 'Recent Activity',
                 value: '${data.recentActivityCount}',
                 icon: Icons.history,
-                iconColor: Theme.of(context).colorScheme.tertiary,
+                iconColor: AppSemanticColors.resolve(
+                  AppSemanticColors.info,
+                  Theme.of(context).brightness,
+                ),
                 subtitle: 'last 7 days',
                 tier: KpiCardTier.secondary,
               ),
@@ -887,13 +894,16 @@ class _AdminDashboard extends ConsumerWidget {
                   DonutSegment(
                     label: 'Admin',
                     value: data.usersByRole.admin,
-                    color: Theme.of(context).colorScheme.tertiary,
+                    color: AppSemanticColors.resolve(
+                      AppSemanticColors.info,
+                      Theme.of(context).brightness,
+                    ),
                   ),
                   DonutSegment(
                     label: 'Staff',
                     value: data.usersByRole.staff,
                     color: AppSemanticColors.resolve(
-                      AppSemanticColors.info,
+                      AppSemanticColors.neutral,
                       Theme.of(context).brightness,
                     ),
                   ),

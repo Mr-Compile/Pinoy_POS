@@ -108,7 +108,12 @@ class CategorySalesList extends StatelessWidget {
                         : (sorted[i].totalSales / maxTotal).clamp(0.0, 1.0),
                     minHeight: 8,
                     backgroundColor: cs.surfaceContainerHighest,
-                    valueColor: AlwaysStoppedAnimation<Color>(cs.tertiary),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      AppSemanticColors.resolve(
+                        AppSemanticColors.info,
+                        Theme.of(context).brightness,
+                      ),
+                    ),
                   ),
                 ),
               ],

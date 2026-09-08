@@ -55,11 +55,6 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
   bool _committed = false;
 
   @override
-  void initState() {
-    super.initState();
-  }
-
-  @override
   void dispose() {
     if (!_committed && _paymentProofPath != null) {
       _imageService.deleteImage(_paymentProofPath);
@@ -149,6 +144,11 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
   }
 
   Future<void> _completeSale(PaymentSettings settings) async {
+    // Re-entrancy guard: without this, a fast double-tap could open two
+    // verification dialogs or start two concurrent createSale calls before
+    // the loading state disables the button.
+    if (_isProcessing) return;
+
     final cart = ref.read(cartProvider);
     if (cart.isEmpty) {
       AppDialogService.error(
@@ -158,6 +158,8 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
       );
       return;
     }
+
+    setState(() => _isProcessing = true);
 
     // Enforce the verification policy before any sale is written. When the
     // operator (e.g. Staff) requires verification, an authorized verifier
@@ -185,12 +187,11 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
       if (result == null || !result.isSaved || result.value == null) {
         // Verification was cancelled — abort the sale. The cart, form and
         // attached proof remain untouched so the operator can retry.
+        setState(() => _isProcessing = false);
         return;
       }
       verifiedByUserId = result.value!.id;
     }
-
-    setState(() => _isProcessing = true);
 
     try {
       final items = ref.read(cartProvider.notifier).toSaleItems();
@@ -248,8 +249,10 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
       }
     } on PaymentValidationException catch (e) {
       if (mounted) {
-        setState(() => _isProcessing = false);
-        _isReviewing = false;
+        setState(() {
+          _isProcessing = false;
+          _isReviewing = false;
+        });
         AppDialogService.error(
           context,
           title: 'Invalid GCash Payment',
@@ -259,8 +262,10 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isProcessing = false);
-        _isReviewing = false;
+        setState(() {
+          _isProcessing = false;
+          _isReviewing = false;
+        });
         AppDialogService.error(
           context,
           title: 'Transaction Failed',
@@ -313,6 +318,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
       resizeToAvoidBottomInset: true,
       appBar: AppHeader(
         title: _isReviewing ? 'Review Payment' : 'GCash Payment',
+        subtitle: _isReviewing ? null : 'Scan QR to pay',
         showBackButton: true,
         onBackPressed: _isReviewing
             ? (_isProcessing ? null : _goBackToDetails)
@@ -321,6 +327,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(Spacing.lg),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           child: _isReviewing
               ? _buildReview(settings, cs)
               : _buildDetails(settings, cs),
@@ -369,6 +376,8 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
           size: AppButtonSize.large,
           onPressed: () => _goToReview(settings),
         ),
+        const SizedBox(height: Spacing.lg),
+        _buildSecureNote(cs),
       ],
     );
   }
@@ -406,8 +415,29 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
                 size: AppButtonSize.large,
                 onPressed: () => _goToReview(settings),
               ),
+              const SizedBox(height: Spacing.lg),
+              _buildSecureNote(cs),
             ],
           ),
+        ),
+      ],
+    );
+  }
+
+  /// Subtle reassurance caption under the primary action, matching the
+  /// "secure payment" footer of modern mobile payment screens without
+  /// competing with the action above it.
+  Widget _buildSecureNote(ColorScheme cs) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.lock_outline, size: 14, color: cs.onSurfaceVariant),
+        const SizedBox(width: Spacing.xs),
+        Text(
+          'Secure payment via GCash',
+          style: AppTypography.bodySmall(
+            context,
+          ).copyWith(color: cs.onSurfaceVariant),
         ),
       ],
     );
@@ -419,7 +449,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
   /// readable in both light and dark mode.
   Widget _buildTotalCard(ColorScheme cs) {
     return AppCard(
-      color: cs.primaryContainer,
+      color: cs.primary,
       child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: Spacing.lg,
@@ -433,7 +463,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
               'Total Due',
               style: AppTypography.bodyLarge(
                 context,
-              ).copyWith(color: cs.onPrimaryContainer),
+              ).copyWith(color: cs.onPrimary.withValues(alpha: 0.9)),
             ),
             const SizedBox(height: Spacing.xs),
             FittedBox(
@@ -444,7 +474,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
                 style: AppTypography.displayMedium(
                   context,
                 ).copyWith(
-                  color: cs.onPrimaryContainer,
+                  color: cs.onPrimary,
                   fontWeight: FontWeight.bold,
                   letterSpacing: -0.5,
                 ),
@@ -456,7 +486,9 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
     );
   }
 
-  /// QR code section: merchant QR, scan instructions, and merchant identity.
+  /// QR code section: merchant QR, scan instructions, and merchant identity
+  /// grouped into a single card so the amount → QR → instructions flow reads
+  /// as one payment context.
   ///
   /// The QR is displayed as a single, clearly bounded, tappable square. It is
   /// the merchant's static QR from Payment Settings; it is *not* regenerated
@@ -469,56 +501,67 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
     final canConfigure = SessionManager().canEditBusinessSettings();
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            Icon(Icons.qr_code_scanner, color: cs.primary, size: 20),
-            const SizedBox(width: Spacing.sm),
-            Text(
-              'Scan to Pay',
-              style: AppTypography.titleSmallBold(context),
-            ),
-          ],
-        ),
-        const SizedBox(height: Spacing.md),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final isCompact = layoutClassFor(constraints.maxWidth).isCompact;
-            final maxDimension = isCompact ? 220.0 : 280.0;
-            final qrSize =
-                (constraints.maxWidth * (isCompact ? 0.55 : 0.5))
-                    .clamp(180.0, maxDimension);
+        AppCard(
+          child: Padding(
+            padding: const EdgeInsets.all(Spacing.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.qr_code_scanner, color: cs.primary, size: 20),
+                    const SizedBox(width: Spacing.sm),
+                    Expanded(
+                      child: Text(
+                        'Scan to Pay',
+                        style: AppTypography.titleSmallBold(context),
+                      ),
+                    ),
+                    _buildQrBadge(cs),
+                  ],
+                ),
+                const SizedBox(height: Spacing.md),
+                if (hasImage) ...[
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isCompact =
+                          layoutClassFor(constraints.maxWidth).isCompact;
+                      final maxDimension = isCompact ? 220.0 : 280.0;
+                      final qrSize =
+                          (constraints.maxWidth * (isCompact ? 0.55 : 0.5))
+                              .clamp(180.0, maxDimension);
 
-            return Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: qrSize,
-                  maxHeight: qrSize,
-                ),
-                child: AppPaymentQrPreview(
-                  imagePath: displayPath,
-                  onTap: hasImage ? () => _openQrViewer(displayPath) : null,
-                  maxHeight: qrSize,
-                  emptyTitle: 'GCash QR not configured',
-                  emptySubtitle: canConfigure
-                      ? 'Upload the business GCash QR so customers can scan it.'
-                      : 'The Owner must upload the business GCash QR before customers can scan it.',
-                ),
-              ),
-            );
-          },
+                      return Center(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(maxWidth: qrSize),
+                          child: AppPaymentQrPreview(
+                            imagePath: displayPath,
+                            onTap: () => _openQrViewer(displayPath),
+                            maxHeight: qrSize,
+                            embedded: true,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: Spacing.sm),
+                  Text(
+                    'Open GCash and scan this QR code.',
+                    style: AppTypography.bodySmall(
+                      context,
+                    ).copyWith(color: cs.onSurfaceVariant),
+                    textAlign: TextAlign.center,
+                  ),
+                  _buildMerchantInfoRow(settings, cs),
+                ] else ...[
+                  _buildMissingQrState(cs, canConfigure),
+                ],
+              ],
+            ),
+          ),
         ),
-        const SizedBox(height: Spacing.md),
-        Text(
-          'Open GCash and scan this QR code.',
-          style: AppTypography.bodySmall(
-            context,
-          ).copyWith(color: cs.onSurfaceVariant),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: Spacing.sm),
-        _buildMerchantInfoRow(settings, cs),
         if (!hasImage && canConfigure) ...[
           const SizedBox(height: Spacing.md),
           AppButton.outlined(
@@ -538,7 +581,79 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
     );
   }
 
-  /// Compact merchant identity row shown under the QR.
+  /// Small "QR Payment" badge shown on the right of the Scan to Pay header,
+  /// matching the payment-method badge used by modern payment sheets.
+  Widget _buildQrBadge(ColorScheme cs) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: Spacing.sm,
+        vertical: Spacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: cs.secondaryContainer,
+        borderRadius: BorderRadius.circular(AppRadius.chip),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.verified_outlined,
+            size: 14,
+            color: cs.onSecondaryContainer,
+          ),
+          const SizedBox(width: Spacing.xs),
+          Text(
+            'QR Payment',
+            style: AppTypography.labelSmall(context).copyWith(
+              color: cs.onSecondaryContainer,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Inline missing-QR state rendered inside the section card.
+  ///
+  /// Keeps the "no QR configured" message in the same visual section as the
+  /// scan-to-pay header instead of a detached standalone card.
+  Widget _buildMissingQrState(ColorScheme cs, bool canConfigure) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(Spacing.lg),
+      decoration: BoxDecoration(
+        color: cs.errorContainer,
+        borderRadius: BorderRadius.circular(AppRadius.control),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.qr_code, color: cs.onErrorContainer, size: 40),
+          const SizedBox(height: Spacing.sm),
+          Text(
+            'GCash QR not configured',
+            style: AppTypography.bodyMediumSemibold(
+              context,
+            ).copyWith(color: cs.onErrorContainer),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: Spacing.xs),
+          Text(
+            canConfigure
+                ? 'Upload the business GCash QR so customers can scan it.'
+                : 'The Owner must upload the business GCash QR before customers can scan it.',
+            style: AppTypography.bodySmall(
+              context,
+            ).copyWith(color: cs.onErrorContainer),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Compact merchant identity shown under the QR, separated by a divider.
   ///
   /// This keeps the merchant visible without consuming the vertical space of
   /// a standalone card and without duplicating information elsewhere.
@@ -550,32 +665,36 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
       return const SizedBox.shrink();
     }
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    final label = [
+      if (storeName.isNotEmpty) storeName,
+      if (storePhone.isNotEmpty) storePhone,
+    ].join(' · ');
+
+    return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(
-          Icons.storefront_outlined,
-          color: cs.primary,
-          size: 18,
+        const SizedBox(height: Spacing.md),
+        Divider(height: 1, color: cs.outlineVariant),
+        const SizedBox(height: Spacing.md),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.storefront_outlined,
+              color: cs.primary,
+              size: 18,
+            ),
+            const SizedBox(width: Spacing.xs),
+            Flexible(
+              child: Text(
+                label,
+                style: AppTypography.bodySmallSemibold(context),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: Spacing.xs),
-        Flexible(
-          child: Text(
-            storeName.isNotEmpty ? storeName : storePhone,
-            style: AppTypography.bodySmallSemibold(context),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-        if (storeName.isNotEmpty && storePhone.isNotEmpty) ...[
-          const SizedBox(width: Spacing.sm),
-          Text(
-            storePhone,
-            style: AppTypography.bodySmall(
-              context,
-            ).copyWith(color: cs.onSurfaceVariant),
-          ),
-        ],
       ],
     );
   }

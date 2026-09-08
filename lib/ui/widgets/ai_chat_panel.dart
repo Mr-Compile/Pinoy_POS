@@ -175,18 +175,32 @@ class _AIChatPanelState extends ConsumerState<AIChatPanel> {
   }
 
   Widget _buildHeader(BuildContext context, ColorScheme cs, AIAdvisorChatState chatState) {
+    final brightness = Theme.of(context).brightness;
+    final aiColor = AppSemanticColors.resolve(
+      AppSemanticColors.purple,
+      brightness,
+    );
+    final aiContainer = AppSemanticColors.resolve(
+      AppSemanticColors.purpleContainer,
+      brightness,
+    );
+    final onAiContainer = AppSemanticColors.resolveOn(
+      AppSemanticColors.onPurpleContainer,
+      brightness,
+    );
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.sm),
       decoration: BoxDecoration(
-        color: cs.primaryContainer,
+        color: aiContainer,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
       ),
       child: Row(
         children: [
           CircleAvatar(
             radius: 18,
-            backgroundColor: cs.primary,
-            child: Icon(Icons.auto_awesome, color: cs.onPrimary, size: 20),
+            backgroundColor: aiColor,
+            child: Icon(Icons.auto_awesome, color: onAiContainer, size: 20),
           ),
           const SizedBox(width: Spacing.sm),
           Expanded(
@@ -198,13 +212,13 @@ class _AIChatPanelState extends ConsumerState<AIChatPanel> {
                   'AI Business Advisor',
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: cs.onPrimaryContainer,
+                        color: onAiContainer,
                       ),
                 ),
                 Text(
                   '${chatState.remainingQueries} of ${chatState.dailyQuota} queries left today',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: cs.onPrimaryContainer.withValues(alpha: 0.8),
+                        color: onAiContainer.withValues(alpha: 0.8),
                       ),
                 ),
               ],
@@ -297,6 +311,10 @@ class _AIChatPanelState extends ConsumerState<AIChatPanel> {
     final role = user?.role ?? UserRole.staff;
     final roleConfig = AIRoleConfig(role);
     final userName = user?.fullName ?? 'there';
+    final aiColor = AppSemanticColors.resolve(
+      AppSemanticColors.purple,
+      Theme.of(context).brightness,
+    );
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(Spacing.lg),
@@ -306,8 +324,8 @@ class _AIChatPanelState extends ConsumerState<AIChatPanel> {
           Center(
             child: Column(
               children: [
-                Icon(Icons.auto_awesome, size: 40,
-                    color: cs.primary.withValues(alpha: 0.5)),
+                Icon(Icons.auto_awesome,
+                    size: 40, color: aiColor.withValues(alpha: 0.5)),
                 const SizedBox(height: Spacing.sm),
                 Text(
                   'Hello, $userName',
@@ -347,7 +365,7 @@ class _AIChatPanelState extends ConsumerState<AIChatPanel> {
             spacing: Spacing.sm,
             runSpacing: Spacing.sm,
             children: roleConfig.faqQuestions
-                .map((q) => _buildSuggestionChip(cs, q, q))
+                .map((q) => _buildSuggestionChip(cs, q, q, aiColor))
                 .toList(),
           ),
           const SizedBox(height: Spacing.lg),
@@ -364,7 +382,7 @@ class _AIChatPanelState extends ConsumerState<AIChatPanel> {
             spacing: Spacing.sm,
             runSpacing: Spacing.sm,
             children: roleConfig.suggestedQuestions
-                .map((q) => _buildSuggestionChip(cs, q, q))
+                .map((q) => _buildSuggestionChip(cs, q, q, aiColor))
                 .toList(),
           ),
         ],
@@ -372,10 +390,15 @@ class _AIChatPanelState extends ConsumerState<AIChatPanel> {
     );
   }
 
-  Widget _buildSuggestionChip(ColorScheme cs, String label, String query) {
+  Widget _buildSuggestionChip(
+    ColorScheme cs,
+    String label,
+    String query,
+    Color aiColor,
+  ) {
     return ActionChip(
       label: Text(label, maxLines: 2, overflow: TextOverflow.ellipsis),
-      avatar: Icon(Icons.lightbulb_outline, size: 16, color: cs.primary),
+      avatar: Icon(Icons.lightbulb_outline, size: 16, color: aiColor),
       onPressed: () {
         ref.read(aiAdvisorChatProvider.notifier).sendQuery(query);
         _scrollToBottom();
@@ -389,6 +412,15 @@ class _AIChatPanelState extends ConsumerState<AIChatPanel> {
     ColorScheme cs,
     AIChatMessage msg,
   ) {
+    final brightness = theme.brightness;
+    final aiColor = AppSemanticColors.resolve(
+      AppSemanticColors.purple,
+      brightness,
+    );
+    final onAiColor = AppSemanticColors.resolveOn(
+      AppSemanticColors.onPurple,
+      brightness,
+    );
     final isUser = msg.isUser;
     final isError = msg.isError;
 
@@ -401,8 +433,8 @@ class _AIChatPanelState extends ConsumerState<AIChatPanel> {
           if (!isUser) ...[
             CircleAvatar(
               radius: 14,
-              backgroundColor: cs.primary,
-              child: Icon(Icons.auto_awesome, color: cs.onPrimary, size: 16),
+              backgroundColor: aiColor,
+              child: Icon(Icons.auto_awesome, color: onAiColor, size: 16),
             ),
             const SizedBox(width: Spacing.xs),
           ],
@@ -431,14 +463,23 @@ class _AIChatPanelState extends ConsumerState<AIChatPanel> {
   }
 
   Widget _buildTypingIndicator(ColorScheme cs) {
+    final brightness = Theme.of(context).brightness;
+    final aiColor = AppSemanticColors.resolve(
+      AppSemanticColors.purple,
+      brightness,
+    );
+    final onAiColor = AppSemanticColors.resolveOn(
+      AppSemanticColors.onPurple,
+      brightness,
+    );
     return Padding(
       padding: const EdgeInsets.only(bottom: Spacing.sm),
       child: Row(
         children: [
           CircleAvatar(
             radius: 14,
-            backgroundColor: cs.primary,
-            child: Icon(Icons.auto_awesome, color: cs.onPrimary, size: 16),
+            backgroundColor: aiColor,
+            child: Icon(Icons.auto_awesome, color: onAiColor, size: 16),
           ),
           const SizedBox(width: Spacing.xs),
           Container(
@@ -455,11 +496,11 @@ class _AIChatPanelState extends ConsumerState<AIChatPanel> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _buildDot(cs, 0),
+                _buildDot(cs, 0, aiColor),
                 const SizedBox(width: 4),
-                _buildDot(cs, 150),
+                _buildDot(cs, 150, aiColor),
                 const SizedBox(width: 4),
-                _buildDot(cs, 300),
+                _buildDot(cs, 300, aiColor),
               ],
             ),
           ),
@@ -468,7 +509,7 @@ class _AIChatPanelState extends ConsumerState<AIChatPanel> {
     );
   }
 
-  Widget _buildDot(ColorScheme cs, int delay) {
+  Widget _buildDot(ColorScheme cs, int delay, Color aiColor) {
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.3, end: 1.0),
       duration: const Duration(milliseconds: 600),
@@ -481,7 +522,7 @@ class _AIChatPanelState extends ConsumerState<AIChatPanel> {
             height: 8,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: cs.primary,
+              color: aiColor,
             ),
           ),
         );

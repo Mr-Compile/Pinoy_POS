@@ -501,7 +501,13 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
                 children: [
                   if (canRestore)
                     IconButton(
-                      icon: const Icon(Icons.restore),
+                      icon: Icon(
+                        Icons.restore,
+                        color: AppSemanticColors.resolve(
+                          AppSemanticColors.success,
+                          Theme.of(context).brightness,
+                        ),
+                      ),
                       tooltip: 'Restore',
                       onPressed: () => _restoreItem(item),
                     ),
@@ -755,7 +761,13 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
             ),
             if (canRestoreAll)
               IconButton(
-                icon: const Icon(Icons.restore),
+                icon: Icon(
+                  Icons.restore,
+                  color: AppSemanticColors.resolve(
+                    AppSemanticColors.success,
+                    Theme.of(context).brightness,
+                  ),
+                ),
                 tooltip: 'Restore selected',
                 onPressed: _restoreSelected,
               ),
@@ -815,7 +827,13 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
             value: _restoreSelected,
             child: Row(
               children: [
-                Icon(Icons.restore, color: cs.onSurface),
+                Icon(
+                  Icons.restore,
+                  color: AppSemanticColors.resolve(
+                    AppSemanticColors.success,
+                    Theme.of(context).brightness,
+                  ),
+                ),
                 const SizedBox(width: 12),
                 const Text('Restore selected'),
               ],
