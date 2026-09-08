@@ -39,10 +39,10 @@ class AppQuickActionCard extends StatelessWidget {
 
     return Material(
       color: background,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppRadius.control),
       child: InkWell(
         onTap: enabled ? onTap : null,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.control),
         child: ConstrainedBox(
           constraints: const BoxConstraints(minWidth: 64, minHeight: 64),
           child: Padding(

@@ -102,22 +102,30 @@ class AppListItem extends StatelessWidget {
         if (statusLabel != null || (actions != null && actions!.isNotEmpty)) ...[
           const SizedBox(height: Spacing.md),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (statusLabel != null && statusColor != null)
+              if (statusLabel != null && statusColor != null) ...[
                 AppStatusChip(
                   label: statusLabel!,
                   color: statusColor!,
                   icon: statusIcon,
                 ),
-              if (actions != null && actions!.isNotEmpty) ...[
-                const Spacer(),
-                ...actions!.map((action) => AppIconButton(
-                      icon: action.icon,
-                      onPressed: action.onPressed,
-                      tooltip: action.tooltip,
-                      color: action.color ?? cs.onSurfaceVariant,
-                    )),
+                const SizedBox(width: Spacing.sm),
               ],
+              if (actions != null && actions!.isNotEmpty)
+                Expanded(
+                  child: Wrap(
+                    alignment: WrapAlignment.end,
+                    spacing: Spacing.xs,
+                    runSpacing: Spacing.xs,
+                    children: actions!.map((action) => AppIconButton(
+                          icon: action.icon,
+                          onPressed: action.onPressed,
+                          tooltip: action.tooltip,
+                          color: action.color ?? cs.onSurfaceVariant,
+                        )).toList(),
+                  ),
+                ),
             ],
           ),
         ],

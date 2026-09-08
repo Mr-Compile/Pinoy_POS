@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/daily_sales_point.dart';
 import 'package:pinoy_pos/data/models/reporting_period.dart';
@@ -233,7 +234,7 @@ class _Bar extends StatelessWidget {
               decoration: BoxDecoration(
                 color: value <= 0 ? cs.surfaceContainerHighest : color,
                 borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(4),
+                  top: Radius.circular(AppRadius.xs),
                 ),
               ),
             ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/product.dart';
@@ -141,8 +142,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     final authNotifier = ref.read(authStateProvider.notifier);
     final canEdit = authNotifier.hasPermission('edit_products');
     final canDelete = authNotifier.hasPermission('delete_products');
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isTablet = screenWidth >= 600;
+    final isTablet =
+        layoutClassFor(MediaQuery.of(context).size.width).isAtLeastMedium;
 
     if (_isLoading) {
       return const Scaffold(
@@ -164,48 +165,97 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-            child: Row(
-              children: [
-                Expanded(
-                  child: AppSearchField(
-                    controller: _searchController,
-                    hint: 'Search products',
-                    onChanged: _onSearchChanged,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: AppDropdownField<int?>(
-                    initialValue: _selectedCategoryId,
-                    label: 'Category',
-                    isDense: true,
-                    items: [
-                      const DropdownMenuItem<int?>(
-                        value: null,
-                        child: Text('All'),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isCompact =
+                    layoutClassFor(constraints.maxWidth) == LayoutClass.compact;
+                final addButton = canEdit
+                    ? AppButton.filled(
+                        size: AppButtonSize.small,
+                        icon: Icons.add,
+                        label: 'Add Product',
+                        fullWidth: isCompact,
+                        onPressed: _showProductDialog,
+                      )
+                    : null;
+
+                if (isCompact) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      AppSearchField(
+                        controller: _searchController,
+                        hint: 'Search products',
+                        onChanged: _onSearchChanged,
                       ),
-                      ..._categories.map((category) => DropdownMenuItem<int?>(
-                            value: category.id,
-                            child: Text(category.name),
-                          )),
+                      const SizedBox(height: 12),
+                      AppDropdownField<int?>(
+                        initialValue: _selectedCategoryId,
+                        label: 'Category',
+                        isDense: true,
+                        items: [
+                          const DropdownMenuItem<int?>(
+                            value: null,
+                            child: Text('All'),
+                          ),
+                          ..._categories.map((category) => DropdownMenuItem<int?>(
+                                value: category.id,
+                                child: Text(category.name),
+                              )),
+                        ],
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedCategoryId = value;
+                          });
+                        },
+                      ),
+                      if (addButton != null) ...[
+                        const SizedBox(height: 12),
+                        addButton,
+                      ],
                     ],
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedCategoryId = value;
-                      });
-                    },
-                  ),
-                ),
-                if (canEdit && isTablet) ...[
-                  const SizedBox(width: 12),
-                  AppButton.filled(
-                    size: AppButtonSize.small,
-                    icon: Icons.add,
-                    label: 'Add Product',
-                    onPressed: _showProductDialog,
-                  ),
-                ],
-              ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Expanded(
+                      child: AppSearchField(
+                        controller: _searchController,
+                        hint: 'Search products',
+                        onChanged: _onSearchChanged,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: AppDropdownField<int?>(
+                        initialValue: _selectedCategoryId,
+                        label: 'Category',
+                        isDense: true,
+                        items: [
+                          const DropdownMenuItem<int?>(
+                            value: null,
+                            child: Text('All'),
+                          ),
+                          ..._categories.map((category) => DropdownMenuItem<int?>(
+                                value: category.id,
+                                child: Text(category.name),
+                              )),
+                        ],
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedCategoryId = value;
+                          });
+                        },
+                      ),
+                    ),
+                    if (addButton != null) ...[
+                      const SizedBox(width: 12),
+                      addButton,
+                    ],
+                  ],
+                );
+              },
             ),
           ),
           Expanded(

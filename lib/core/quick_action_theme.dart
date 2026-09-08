@@ -26,11 +26,6 @@ enum QuickActionType {
 }
 
 /// Theme-aware style for one quick action.
-///
-/// [background] and [foreground] are resolved for the current brightness.
-/// The foreground is chosen from actual contrast, not a hardcoded "white on
-/// everything" assumption, so light amber and cyan backgrounds get black
-/// text while deep blue/purple backgrounds get white text.
 class QuickActionStyle {
   final Color background;
   final Color foreground;
@@ -46,9 +41,6 @@ class QuickActionStyle {
 }
 
 /// Resolves the theme-aware [QuickActionStyle] for a given [type].
-///
-/// This is the single source of truth for quick action colors, typography
-/// contrast and default labels across the entire app.
 QuickActionStyle resolveQuickActionStyle(
   BuildContext context,
   QuickActionType type,
@@ -66,8 +58,8 @@ QuickActionStyle resolveQuickActionStyleForBrightness(
   QuickActionType type,
 ) {
   final family = _familyForType(type);
-  final background = family.surface(brightness);
-  final foreground = AppSemanticColors.contrastFor(background);
+  final background = AppSemanticColors.resolveSurface(family.surface, brightness);
+  final foreground = AppSemanticColors.contrastFor(background, brightness);
   final (icon, label) = _defaultsFor(type);
 
   return QuickActionStyle(
@@ -79,80 +71,49 @@ QuickActionStyle resolveQuickActionStyleForBrightness(
 }
 
 class _QuickActionColorFamily {
-  final Color lightSurface;
-  final Color darkSurface;
+  final Color surface;
 
   const _QuickActionColorFamily({
-    required this.lightSurface,
-    required this.darkSurface,
+    required this.surface,
   });
-
-  Color surface(Brightness brightness) {
-    return brightness == Brightness.light ? lightSurface : darkSurface;
-  }
 }
 
-const _QuickActionColorFamily _blueFamily = _QuickActionColorFamily(
-  lightSurface: AppSemanticColors.primarySurface, // Blue 500
-  darkSurface: Color(0xFF1E3A8A), // Blue 900
+const _QuickActionColorFamily _primaryFamily = _QuickActionColorFamily(
+  surface: AppSemanticColors.primarySurface,
 );
 
-const _QuickActionColorFamily _tealFamily = _QuickActionColorFamily(
-  lightSurface: Color(0xFF14B8A6), // Teal 500
-  darkSurface: Color(0xFF115E59), // Teal 900
+const _QuickActionColorFamily _successFamily = _QuickActionColorFamily(
+  surface: AppSemanticColors.successSurface,
 );
 
-const _QuickActionColorFamily _greenFamily = _QuickActionColorFamily(
-  lightSurface: AppSemanticColors.successSurface, // Emerald 700
-  darkSurface: Color(0xFF065F46), // Emerald 900
+const _QuickActionColorFamily _infoFamily = _QuickActionColorFamily(
+  surface: AppSemanticColors.infoSurface,
 );
 
-const _QuickActionColorFamily _cyanFamily = _QuickActionColorFamily(
-  lightSurface: AppSemanticColors.infoSurface, // Cyan 500
-  darkSurface: Color(0xFF155E75), // Cyan 900
+const _QuickActionColorFamily _warningFamily = _QuickActionColorFamily(
+  surface: AppSemanticColors.warningSurface,
 );
 
-const _QuickActionColorFamily _amberFamily = _QuickActionColorFamily(
-  lightSurface: AppSemanticColors.warningSurface, // Amber 500
-  darkSurface: Color(0xFF92400E), // Amber 900
-);
-
-const _QuickActionColorFamily _indigoFamily = _QuickActionColorFamily(
-  lightSurface: AppSemanticColors.secondarySurface, // Indigo 500
-  darkSurface: Color(0xFF312E81), // Indigo 900
-);
-
-const _QuickActionColorFamily _purpleFamily = _QuickActionColorFamily(
-  lightSurface: Color(0xFF8B5CF6), // Violet 500
-  darkSurface: Color(0xFF5B21B6), // Violet 800
-);
-
-const _QuickActionColorFamily _violetFamily = _QuickActionColorFamily(
-  lightSurface: Color(0xFF7C3AED), // Violet 600
-  darkSurface: Color(0xFF4C1D95), // Violet 900
-);
-
-const _QuickActionColorFamily _slateFamily = _QuickActionColorFamily(
-  lightSurface: AppSemanticColors.neutralSurface, // Slate 600
-  darkSurface: Color(0xFF334155), // Slate 700
+const _QuickActionColorFamily _neutralFamily = _QuickActionColorFamily(
+  surface: AppSemanticColors.neutralSurface,
 );
 
 _QuickActionColorFamily _familyForType(QuickActionType type) {
   return switch (type) {
-    QuickActionType.newSale => _greenFamily,
-    QuickActionType.addProduct => _cyanFamily,
-    QuickActionType.addStock => _cyanFamily,
-    QuickActionType.viewSales => _greenFamily,
-    QuickActionType.mySales => _greenFamily,
-    QuickActionType.reports => _indigoFamily,
-    QuickActionType.manageStaff => _blueFamily,
-    QuickActionType.aiAdvisor => _violetFamily,
-    QuickActionType.manageUsers => _blueFamily,
-    QuickActionType.backupRestore => _tealFamily,
-    QuickActionType.trash => _amberFamily,
-    QuickActionType.activityLogs => _purpleFamily,
-    QuickActionType.aiConfig => _violetFamily,
-    QuickActionType.settings => _slateFamily,
+    QuickActionType.newSale => _successFamily,
+    QuickActionType.addProduct => _infoFamily,
+    QuickActionType.addStock => _infoFamily,
+    QuickActionType.viewSales => _primaryFamily,
+    QuickActionType.mySales => _successFamily,
+    QuickActionType.reports => _primaryFamily,
+    QuickActionType.manageStaff => _primaryFamily,
+    QuickActionType.aiAdvisor => _infoFamily,
+    QuickActionType.manageUsers => _primaryFamily,
+    QuickActionType.backupRestore => _infoFamily,
+    QuickActionType.trash => _warningFamily,
+    QuickActionType.activityLogs => _neutralFamily,
+    QuickActionType.aiConfig => _infoFamily,
+    QuickActionType.settings => _neutralFamily,
   };
 }
 

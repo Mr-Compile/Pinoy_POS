@@ -528,6 +528,40 @@ flutter analyze
 flutter test --concurrency=1
 ```
 
+## Global Color and Radius System
+
+### Source of truth
+
+`lib/core/app_theme.dart` now contains:
+
+- `AppColorTokens` â€” the exact requested foundation palette (`primaryBlue`, `darkBackground`, `darkSurface`, `lightBackground`, `textPrimary`, etc.).
+- `AppSemanticColors` â€” primary, success, warning, error, info, neutral, disabled roles plus theme-aware `resolve`/`resolveSurface`/`contrastFor` helpers.
+- `AppColors` â€” `ColorScheme` built directly from those tokens for both light and dark, with component themes for cards, buttons, inputs, dialog, navigation, FAB, chips, list tiles.
+- `AppRadius` â€” `xs`, `sm`, `md`, `lg`, `xl`, `xxl` plus semantic aliases (`chip`, `control`, `input`, `card`, `dialog`, `fab`, `menu`).
+
+### Theme rules enforced
+
+- No `Color(0x...)` values outside `app_theme.dart`.
+- No `Colors.white`/`Colors.black`/`Colors.blue`/`Colors.red`/`Colors.green`/`Colors.orange` in UI code; `Colors.transparent` is still allowed for see-through surfaces.
+- No hardcoded `BorderRadius.circular(N)` or `Radius.circular(N)` values in `lib/ui` or `lib/core`; all rounding uses `AppRadius`.
+- `main.dart` already consumes `AppColors.getLightTheme()` / `AppColors.getDarkTheme()`.
+- `quick_action_theme.dart` now only uses the semantic `primary/success/info/warning/neutral` families.
+- `app_button.dart`, `app_card.dart`, `app_input_fields.dart`, `app_dialog.dart`, `notification_bell.dart`, `profile_menu.dart`, `app_status_chip.dart`, and all audited screens now consume the tokens.
+
+### Verification
+
+```powershell
+flutter analyze
+flutter test test/app_button_theme_test.dart
+flutter test test/owner_screens_test.dart test/app_input_fields_test.dart
+flutter test test/payment_qr_service_test.dart test/payment_settings_page_test.dart test/trash_qr_test.dart
+flutter test
+```
+
+Result (most recent run): `flutter analyze` reports no issues; `flutter test` passes 383/383 tests.
+
+Recommended: run the full suite with `--concurrency=1` on Windows if `sqflite_common_ffi` file-lock races appear.
+
 Result: `flutter analyze` reports no issues. The full test suite passes 305/305 tests when run with `--concurrency=1` on Windows. The default parallel runner can hit `database is locked` errors in the integration tests because multiple test suites share the same `sqflite_common_ffi` database file on disk. Use `--concurrency=1` for a clean full run; targeted widget and unit tests run cleanly without it.
 
 ## POS Payment Riverpod Crash + At-Till GCash Verification
@@ -711,23 +745,27 @@ Result: lutter analyze clean on changed files (one pre-existing info-level lint
 ### What Changed
 
 - lib/core/security.dart
-  - Removed SecurityHelper.generateReceiptNumber() (timestamp + random RCP… values). SaleRepository.nextReceiptNumber is now the single authoritative generator.
+  - Removed SecurityHelper.generateReceiptNumber() (timestamp + random RCPï¿½ values). SaleRepository.nextReceiptNumber is now the single authoritative generator.
 - lib/data/dao/sale_dao.dart
-  - getMaxReceiptSequence(datePrefix, {txn}) returns MAX(CAST(substr(receipt_number, 10) AS INTEGER)) for rows matching 'YYYYMMDD-%'. All rows count (confirmed, voided, cancelled, soft-deleted) so consumed numbers are never reused; legacy RCP… rows never match the prefix.
+  - getMaxReceiptSequence(datePrefix, {txn}) returns MAX(CAST(substr(receipt_number, 10) AS INTEGER)) for rows matching 'YYYYMMDD-%'. All rows count (confirmed, voided, cancelled, soft-deleted) so consumed numbers are never reused; legacy RCPï¿½ rows never match the prefix.
 - lib/data/repositories/sale_repository.dart
   - 
-extReceiptNumber(businessDate, {txn}) formats YYYYMMDD-NNNN using the **local** business date (eceiptDatePrefix uses 	oLocal()), zero-padded to 4 digits.
+extReceiptNumber(businessDate, {txn}) formats YYYYMMDD-NNNN using the **local** business date (
+eceiptDatePrefix uses 	oLocal()), zero-padded to 4 digits.
 - lib/services/sales_service.dart
   - createSale generates the receipt number inside the existing SQLite transaction, sharing one DateTime.now() for createdAt and the receipt prefix.
-  - The insert retries up to 3 times on DatabaseException.isUniqueConstraintError() (the eceipt_number TEXT UNIQUE column is the final duplicate guard); on conflict it re-reads the table and takes the next free sequence rather than failing.
+  - The insert retries up to 3 times on DatabaseException.isUniqueConstraintError() (the 
+eceipt_number TEXT UNIQUE column is the final duplicate guard); on conflict it re-reads the table and takes the next free sequence rather than failing.
 - 	est/receipt_number_test.dart (new, 12 tests)
-  - Format YYYYMMDD-0001 first sale, same-day increment, regex format, continuation from persisted rows, next-day reset to 0001, legacy RCP… rows ignored, createSale skipping a taken number, voided-sale numbers not reused, search by full/date/sequence, created_at ordering, and failed-sale lifecycle (no number consumed).
+  - Format YYYYMMDD-0001 first sale, same-day increment, regex format, continuation from persisted rows, next-day reset to 0001, legacy RCPï¿½ rows ignored, createSale skipping a taken number, voided-sale numbers not reused, search by full/date/sequence, created_at ordering, and failed-sale lifecycle (no number consumed).
 
 ### Unchanged
 
-- No schema migration needed: eceipt_number TEXT UNIQUE already exists; historical RCP… numbers are preserved and cannot collide with the new format.
+- No schema migration needed: 
+eceipt_number TEXT UNIQUE already exists; historical RCPï¿½ numbers are preserved and cannot collide with the new format.
 - All UI surfaces already render sale.receiptNumber (sales list 'Sale #', transaction list, sale detail, receipt screen/PDF, dashboard, reports export, AI navigation), so the new format flows through without display changes.
-- Search already covers eceipt_number LIKE in getFilteredSales/getConfirmedSalesForRange, so 20260908, 20260908-0007, and  007 all match.
+- Search already covers 
+eceipt_number LIKE in getFilteredSales/getConfirmedSalesForRange, so 20260908, 20260908-0007, and  007 all match.
 - Ordering stays created_at DESC, which aligns with the per-day sequence.
 
 ### Verification

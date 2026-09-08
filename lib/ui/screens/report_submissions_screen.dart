@@ -267,7 +267,7 @@ class _ReportCard extends StatelessWidget {
     return AppCard(
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.control),
         child: Padding(
           padding: const EdgeInsets.all(Spacing.md),
           child: Row(
@@ -375,7 +375,7 @@ class _Thumbnail extends StatelessWidget {
       final file = File(thumb);
       if (file.existsSync()) {
         return ClipRRect(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           child: Image.file(
             file,
             width: 56,
@@ -391,7 +391,7 @@ class _Thumbnail extends StatelessWidget {
       height: 72,
       decoration: BoxDecoration(
         color: cs.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Icon(
         _fileIcon(report.fileFormat),

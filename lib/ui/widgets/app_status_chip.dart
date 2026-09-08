@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:pinoy_pos/core/app_typography.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 
 /// A compact status chip with a colored icon and label.
 ///
@@ -53,7 +53,7 @@ class AppStatusChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(AppRadius.chip),
       ),
       child: content,
     );

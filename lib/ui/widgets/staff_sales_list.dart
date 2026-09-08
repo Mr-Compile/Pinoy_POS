@@ -121,7 +121,7 @@ class _StaffSalesRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(AppRadius.xs),
                   child: LinearProgressIndicator(
                     value: ratio,
                     minHeight: 6,

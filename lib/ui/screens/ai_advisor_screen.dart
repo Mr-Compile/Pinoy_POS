@@ -214,7 +214,7 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
           const SizedBox(width: 8),
           Expanded(
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(AppRadius.xs),
               child: LinearProgressIndicator(
                 value: chatState.dailyQuota > 0
                     ? used / chatState.dailyQuota
@@ -379,8 +379,8 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
                         ? cs.primary
                         : cs.surfaceContainerHighest,
                 borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(16),
-                  topRight: const Radius.circular(16),
+                  topLeft: const Radius.circular(AppRadius.lg),
+                  topRight: const Radius.circular(AppRadius.lg),
                   bottomLeft: Radius.circular(isUser ? 16 : 4),
                   bottomRight: Radius.circular(isUser ? 4 : 16),
                 ),
@@ -411,10 +411,10 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
             decoration: BoxDecoration(
               color: cs.surfaceContainerHighest,
               borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
-                bottomLeft: Radius.circular(4),
-                bottomRight: Radius.circular(16),
+                topLeft: Radius.circular(AppRadius.lg),
+                topRight: Radius.circular(AppRadius.lg),
+                bottomLeft: Radius.circular(AppRadius.xs),
+                bottomRight: Radius.circular(AppRadius.lg),
               ),
             ),
             child: Row(

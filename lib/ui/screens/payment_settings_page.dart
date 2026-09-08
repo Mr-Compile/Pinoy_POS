@@ -234,8 +234,11 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
   Widget _buildGcashQrSection(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final qrPath = widget.settings.gcashQrImagePath;
+    final previewPath = widget.settings.gcashQrPreviewPath;
+    final displayQrPath = previewPath?.isNotEmpty == true ? previewPath : qrPath;
     final hasImage = qrPath != null && qrPath.isNotEmpty;
-    final safeQrPath = hasImage ? qrPath : null;
+    final hasPreview = previewPath != null && previewPath.isNotEmpty;
+    final safeQrPath = displayQrPath;
 
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -248,7 +251,7 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
           ),
           const SizedBox(height: 8),
           AppPaymentQrPreview(
-            imagePath: qrPath,
+            imagePath: displayQrPath,
             onTap: safeQrPath != null ? () => _openQrViewer(context, safeQrPath) : null,
             emptyTitle: 'No GCash QR image uploaded',
             emptySubtitle: 'Upload a QR image so customers can scan it.',
@@ -256,6 +259,15 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
             emptyColor: cs.surfaceContainerHighest,
             emptyForegroundColor: cs.onSurfaceVariant,
           ),
+          if (hasImage && !hasPreview) ...[
+            const SizedBox(height: 8),
+            Text(
+              'QR code could not be detected automatically. The original image will be used.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+            ),
+          ],
           const SizedBox(height: 12),
           Row(
             children: [

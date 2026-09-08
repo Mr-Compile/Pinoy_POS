@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/services/password_strength_service.dart';
 
 /// A live password strength meter that displays a colored progress bar
@@ -72,7 +73,7 @@ class PasswordStrengthMeter extends StatelessWidget {
                     color: isFilled
                         ? strengthColor
                         : colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(3),
+                    borderRadius: BorderRadius.circular(AppRadius.xs),
                   ),
                 ),
               );

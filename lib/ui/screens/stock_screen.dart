@@ -15,6 +15,7 @@ import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 
@@ -307,8 +308,6 @@ class _StockScreenState extends ConsumerState<StockScreen> {
     final canAddStock = authNotifier.hasPermission('add_stock');
     final canAdjustStock = authNotifier.hasPermission('adjust_stock');
     final canViewStock = authNotifier.hasPermission('view_stock');
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isTablet = screenWidth >= 600;
 
     if (_isLoading) {
       return Scaffold(
@@ -344,9 +343,17 @@ class _StockScreenState extends ConsumerState<StockScreen> {
                 Expanded(
                   child: _filteredProducts.isEmpty
                       ? _buildEmptyFilterState()
-                      : isTablet
-                          ? _buildTabletStockList(canAddStock, canAdjustStock, canViewStock)
-                          : _buildMobileStockList(canAddStock, canAdjustStock, canViewStock),
+                      : LayoutBuilder(
+                          builder: (context, constraints) {
+                            final layout = layoutClassFor(constraints.maxWidth);
+                            if (layout == LayoutClass.expanded) {
+                              return _buildTabletStockList(
+                                  canAddStock, canAdjustStock, canViewStock);
+                            }
+                            return _buildMobileStockList(
+                                canAddStock, canAdjustStock, canViewStock);
+                          },
+                        ),
                 ),
               ],
             ),
@@ -375,37 +382,55 @@ class _StockScreenState extends ConsumerState<StockScreen> {
     final outOfStockCount = _products.where(_isOutOfStock).length;
     final cs = Theme.of(context).colorScheme;
 
+    final summaryChildren = [
+      _buildSummaryCard(
+        'Total',
+        '$totalProducts',
+        Icons.inventory_2,
+        cs.primary,
+      ),
+      _buildSummaryCard(
+        'Low Stock',
+        '$lowStockCount',
+        Icons.warning_amber,
+        cs.secondary,
+      ),
+      _buildSummaryCard(
+        'Out of Stock',
+        '$outOfStockCount',
+        Icons.error_outline,
+        cs.error,
+      ),
+    ];
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(Spacing.lg, Spacing.md, Spacing.lg, Spacing.sm),
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildSummaryCard(
-              'Total',
-              '$totalProducts',
-              Icons.inventory_2,
-              cs.primary,
-            ),
-          ),
-          const SizedBox(width: Spacing.sm),
-          Expanded(
-            child: _buildSummaryCard(
-              'Low Stock',
-              '$lowStockCount',
-              Icons.warning_amber,
-              cs.secondary,
-            ),
-          ),
-          const SizedBox(width: Spacing.sm),
-          Expanded(
-            child: _buildSummaryCard(
-              'Out of Stock',
-              '$outOfStockCount',
-              Icons.error_outline,
-              cs.error,
-            ),
-          ),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isCompact = layoutClassFor(constraints.maxWidth) == LayoutClass.compact;
+          if (isCompact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                summaryChildren[0],
+                const SizedBox(height: Spacing.sm),
+                summaryChildren[1],
+                const SizedBox(height: Spacing.sm),
+                summaryChildren[2],
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              Expanded(child: summaryChildren[0]),
+              const SizedBox(width: Spacing.sm),
+              Expanded(child: summaryChildren[1]),
+              const SizedBox(width: Spacing.sm),
+              Expanded(child: summaryChildren[2]),
+            ],
+          );
+        },
       ),
     );
   }
@@ -560,7 +585,7 @@ class _StockScreenState extends ConsumerState<StockScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
           color: cs.errorContainer,
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -583,7 +608,7 @@ class _StockScreenState extends ConsumerState<StockScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
           color: cs.secondaryContainer,
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -605,7 +630,7 @@ class _StockScreenState extends ConsumerState<StockScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: cs.tertiaryContainer,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -641,7 +666,7 @@ class _StockScreenState extends ConsumerState<StockScreen> {
               Row(
                 children: [
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
                     child: SizedBox(
                       width: 56,
                       height: 56,
@@ -752,7 +777,7 @@ class _StockScreenState extends ConsumerState<StockScreen> {
             children: [
               // Image
               ClipRRect(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
                 child: SizedBox(
                   width: 48,
                   height: 48,
@@ -851,7 +876,7 @@ class _StockScreenState extends ConsumerState<StockScreen> {
       isScrollControlled: true,
       useSafeArea: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
       ),
       builder: (context) => DraggableScrollableSheet(
         initialChildSize: 0.7,
@@ -882,7 +907,7 @@ class _StockScreenState extends ConsumerState<StockScreen> {
                   final product = _products[index];
                   return ListTile(
                     leading: ClipRRect(
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
                       child: SizedBox(
                         width: 40,
                         height: 40,
@@ -1011,12 +1036,12 @@ class _StockOperationDialogState extends State<_StockOperationDialog> {
                 padding: const EdgeInsets.all(Spacing.md),
                 decoration: BoxDecoration(
                   color: cs.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadius.control),
                 ),
                 child: Row(
                   children: [
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
                       child: SizedBox(
                         width: 40,
                         height: 40,
@@ -1094,7 +1119,7 @@ class _StockOperationDialogState extends State<_StockOperationDialog> {
                   padding: const EdgeInsets.all(Spacing.md),
                   decoration: BoxDecoration(
                     color: cs.primaryContainer,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.control),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1192,12 +1217,12 @@ class _StockHistoryDialog extends StatelessWidget {
               padding: const EdgeInsets.all(Spacing.md),
               decoration: BoxDecoration(
                 color: cs.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.control),
               ),
               child: Row(
                 children: [
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
                     child: SizedBox(
                       width: 40,
                       height: 40,

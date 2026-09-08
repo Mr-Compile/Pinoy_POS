@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/constants.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/user.dart';
@@ -180,7 +181,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
           ),
           child: Row(
             children: [
@@ -465,7 +466,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                       color: Theme.of(context)
                           .colorScheme
                           .surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
                     ),
                     child: Row(
                       children: [
@@ -639,8 +640,8 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     final canResetPassword = authNotifier.hasPermission('reset_password');
     final canToggleActive = authNotifier.hasPermission('toggle_user_active');
     final currentUser = ref.read(authStateProvider).user;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isTablet = screenWidth >= 600;
+    final isTablet =
+        layoutClassFor(MediaQuery.of(context).size.width).isAtLeastMedium;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -659,36 +660,84 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
           if (userState.users.isNotEmpty || _searchQuery.isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: AppSearchField(
-                      controller: _searchController,
-                      hint: 'Search by name or username...',
-                      onChanged: (value) =>
-                          setState(() => _searchQuery = value),
-                      onClear: () {
-                        _searchController.clear();
-                        setState(() => _searchQuery = '');
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  AppIconButton(
-                    icon: Icons.refresh,
-                    tooltip: 'Refresh',
-                    onPressed: _refresh,
-                  ),
-                  if (canManage && isTablet) ...[
-                    const SizedBox(width: 12),
-                    AppButton.filled(
-                      size: AppButtonSize.small,
-                      icon: Icons.person_add,
-                      label: 'Add User',
-                      onPressed: () => _showAddUserDialog(),
-                    ),
-                  ],
-                ],
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final isCompact =
+                      layoutClassFor(constraints.maxWidth) ==
+                          LayoutClass.compact;
+
+                  if (isCompact) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        AppSearchField(
+                          controller: _searchController,
+                          hint: 'Search by name or username...',
+                          onChanged: (value) =>
+                              setState(() => _searchQuery = value),
+                          onClear: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            AppIconButton(
+                              icon: Icons.refresh,
+                              tooltip: 'Refresh',
+                              onPressed: _refresh,
+                            ),
+                            if (canManage) ...[
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: AppButton.filled(
+                                  size: AppButtonSize.small,
+                                  icon: Icons.person_add,
+                                  label: 'Add User',
+                                  fullWidth: true,
+                                  onPressed: () => _showAddUserDialog(),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: AppSearchField(
+                          controller: _searchController,
+                          hint: 'Search by name or username...',
+                          onChanged: (value) =>
+                              setState(() => _searchQuery = value),
+                          onClear: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      AppIconButton(
+                        icon: Icons.refresh,
+                        tooltip: 'Refresh',
+                        onPressed: _refresh,
+                      ),
+                      if (canManage) ...[
+                        const SizedBox(width: 12),
+                        AppButton.filled(
+                          size: AppButtonSize.small,
+                          icon: Icons.person_add,
+                          label: 'Add User',
+                          onPressed: () => _showAddUserDialog(),
+                        ),
+                      ],
+                    ],
+                  );
+                },
               ),
             ),
           // ── Role filter chips ──
@@ -1077,7 +1126,7 @@ class _RoleBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(
@@ -1108,7 +1157,7 @@ class _StatusBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

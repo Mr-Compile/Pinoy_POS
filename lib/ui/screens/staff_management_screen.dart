@@ -53,20 +53,17 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(staffControllerProvider);
-    final isTablet = MediaQuery.of(context).size.width >= 600;
 
     return Scaffold(
       appBar: AppHeader(
         title: 'Staff Management',
         showBackButton: true,
       ),
-      floatingActionButton: isTablet
-          ? null
-          : FloatingActionButton.extended(
-              onPressed: _showAddStaffDialog,
-              icon: const Icon(Icons.person_add),
-              label: const Text('Add Staff'),
-            ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showAddStaffDialog,
+        icon: const Icon(Icons.person_add),
+        label: const Text('Add Staff'),
+      ),
       body: RefreshIndicator(
         onRefresh: () => ref.read(staffControllerProvider.notifier).loadStaff(),
         child: Column(
@@ -149,7 +146,7 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
               padding: const EdgeInsets.all(Spacing.sm),
               decoration: BoxDecoration(
                 color: cs.errorContainer,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
               child: Text(
                 state.error!,
@@ -322,7 +319,7 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
                     decoration: BoxDecoration(
                       color:
                           Theme.of(context).colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
                     ),
                     child: Row(
                       children: [

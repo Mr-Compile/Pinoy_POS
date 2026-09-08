@@ -442,6 +442,19 @@ class DatabaseHelper {
       }
     }
 
+    // Migration from v23 → v24: add the generated GCash QR preview path.
+    // Nullable because older uploads have no preview and the app falls back
+    // to the original uploaded image.
+    if (oldVersion < 24) {
+      try {
+        await db.execute(
+          'ALTER TABLE settings ADD COLUMN gcash_qr_preview_path TEXT',
+        );
+      } catch (_) {
+        // Column may already exist.
+      }
+    }
+
     // Create any tables that were introduced after the backup's original
     // version but do not have an explicit migration block above (e.g.
     // `announcements`, `ai_usage`).  All CREATE statements in _createTables
@@ -786,6 +799,7 @@ class DatabaseHelper {
         gcash_reference_min_length INTEGER NOT NULL DEFAULT 6,
         gcash_qr_image_path TEXT,
         gcash_qr_image_type TEXT,
+        gcash_qr_preview_path TEXT,
         ai_daily_quota INTEGER NOT NULL DEFAULT 20,
         inactivity_timeout_minutes INTEGER NOT NULL DEFAULT 15,
         session_warning_seconds INTEGER NOT NULL DEFAULT 30,

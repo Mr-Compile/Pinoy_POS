@@ -2,6 +2,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/ai_config_status.dart';
+import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/ai_role_config.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/user.dart';
@@ -73,7 +74,7 @@ class _AIChatPanelState extends ConsumerState<AIChatPanel> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final mq = MediaQuery.of(context);
-    final isTablet = mq.size.width >= 600;
+    final isTablet = layoutClassFor(mq.size.width).isAtLeastMedium;
 
     _scrollToBottom();
 
@@ -95,19 +96,20 @@ class _AIChatPanelState extends ConsumerState<AIChatPanel> {
     final panelWidth = (mq.size.width * 0.35).clamp(320.0, 440.0);
     final panelHeight = (mq.size.height * 0.6).clamp(400.0, 600.0);
     final safePadding = mq.padding;
+    final viewInsets = mq.viewInsets;
 
     return Positioned(
       right: safePadding.right + Spacing.md,
-      bottom: safePadding.bottom + Spacing.md,
+      bottom: safePadding.bottom + Spacing.md + viewInsets.bottom,
       child: Material(
         elevation: 8,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
         color: cs.surface,
         child: Container(
           width: panelWidth,
           height: panelHeight,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(AppRadius.xl),
             color: cs.surface,
           ),
           clipBehavior: Clip.antiAlias,
@@ -127,21 +129,22 @@ class _AIChatPanelState extends ConsumerState<AIChatPanel> {
   ) {
     final mq = MediaQuery.of(context);
     final safePadding = mq.padding;
+    final viewInsets = mq.viewInsets;
     final panelHeight = mq.size.height * 0.7;
 
     return Positioned(
       left: 0,
       right: 0,
-      bottom: 0,
+      bottom: viewInsets.bottom,
       child: Material(
         elevation: 8,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
         color: cs.surface,
         child: Container(
           height: panelHeight,
           padding: EdgeInsets.only(bottom: safePadding.bottom),
           decoration: BoxDecoration(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
             color: cs.surface,
           ),
           clipBehavior: Clip.antiAlias,
@@ -176,7 +179,7 @@ class _AIChatPanelState extends ConsumerState<AIChatPanel> {
       padding: const EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.sm),
       decoration: BoxDecoration(
         color: cs.primaryContainer,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
       ),
       child: Row(
         children: [
@@ -413,8 +416,8 @@ class _AIChatPanelState extends ConsumerState<AIChatPanel> {
                         ? cs.primary
                         : cs.surfaceContainerHighest,
                 borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(16),
-                  topRight: const Radius.circular(16),
+                  topLeft: const Radius.circular(AppRadius.lg),
+                  topRight: const Radius.circular(AppRadius.lg),
                   bottomLeft: Radius.circular(isUser ? 16 : 4),
                   bottomRight: Radius.circular(isUser ? 4 : 16),
                 ),
@@ -443,10 +446,10 @@ class _AIChatPanelState extends ConsumerState<AIChatPanel> {
             decoration: BoxDecoration(
               color: cs.surfaceContainerHighest,
               borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
-                bottomLeft: Radius.circular(4),
-                bottomRight: Radius.circular(16),
+                topLeft: Radius.circular(AppRadius.lg),
+                topRight: Radius.circular(AppRadius.lg),
+                bottomLeft: Radius.circular(AppRadius.xs),
+                bottomRight: Radius.circular(AppRadius.lg),
               ),
             ),
             child: Row(

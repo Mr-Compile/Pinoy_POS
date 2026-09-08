@@ -25,17 +25,15 @@ class PaymentSuccessScreen extends StatelessWidget {
         showBackButton: false,
       ),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // The summary scrolls so the action buttons stay visible and
-              // reachable on short screens instead of being pushed off the
-              // bottom by a tall card.
-              Expanded(
-                child: SingleChildScrollView(
-                  child: AppCard(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  AppCard(
                     color: cs.primaryContainer,
                     child: Padding(
                       padding: const EdgeInsets.all(24),
@@ -79,45 +77,45 @@ class PaymentSuccessScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => SaleDetailScreen(sale: sale),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => SaleDetailScreen(sale: sale),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.receipt_long_outlined),
+                    label: const Text('View Sale Details'),
+                  ),
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: cs.secondaryContainer,
+                      foregroundColor: cs.onSecondaryContainer,
                     ),
-                  );
-                },
-                icon: const Icon(Icons.receipt_long_outlined),
-                label: const Text('View Sale Details'),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => ReceiptScreen(sale: sale),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.print_outlined),
+                    label: const Text('View / Download Receipt'),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton(
+                    onPressed: () {
+                      // Pop back to the POS tab (root of the navigation stack).
+                      Navigator.of(context).popUntil((route) => route.isFirst);
+                    },
+                    child: const Text('New Sale'),
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: cs.secondaryContainer,
-                  foregroundColor: cs.onSecondaryContainer,
-                ),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => ReceiptScreen(sale: sale),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.print_outlined),
-                label: const Text('View / Download Receipt'),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton(
-                onPressed: () {
-                  // Pop back to the POS tab (root of the navigation stack).
-                  Navigator.of(context).popUntil((route) => route.isFirst);
-                },
-                child: const Text('New Sale'),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -128,10 +126,18 @@ class PaymentSuccessScreen extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+              textAlign: TextAlign.end,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );

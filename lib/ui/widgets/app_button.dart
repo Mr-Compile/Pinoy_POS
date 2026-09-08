@@ -227,7 +227,7 @@ class AppButton extends StatelessWidget {
         : _buildIconLabel(effectiveLabel, icon, iconSize, labelColor);
 
     final shape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppRadius.control),
     );
 
     final button = switch (variant) {
@@ -345,7 +345,7 @@ class AppButton extends StatelessWidget {
       AppButtonColor.neutral =>
         AppSemanticColors.resolveSurface(AppSemanticColors.neutralSurface, brightness),
     };
-    return (surface, AppSemanticColors.contrastFor(surface));
+    return (surface, AppSemanticColors.contrastFor(surface, brightness));
   }
 
   /// Accent color and its canonical on-color for transparent/tinted buttons.
@@ -570,7 +570,7 @@ class AppButton extends StatelessWidget {
             idleColor,
           );
 
-    const borderRadius = BorderRadius.all(Radius.circular(12));
+    const borderRadius = BorderRadius.all(Radius.circular(AppRadius.control));
 
     return Container(
       width: fullWidth ? double.infinity : null,

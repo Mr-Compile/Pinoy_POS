@@ -6,6 +6,7 @@ import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/data/repositories/settings_repository.dart';
 import 'package:pinoy_pos/services/groq_service.dart';
 import 'package:pinoy_pos/services/image_service.dart';
+import 'package:pinoy_pos/services/payment_qr_service.dart';
 import 'package:pinoy_pos/services/secure_storage_service.dart';
 import 'package:pinoy_pos/services/trash_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -32,10 +33,12 @@ class SettingsService {
         if (path == null || path.isEmpty) return;
 
         final current = await getSettings();
+        final previewResult = await PaymentQrService().generatePreview(path);
         await updateSettings(
           current.copyWith(
             gcashQrImagePath: path,
             gcashQrImageType: type,
+            gcashQrPreviewPath: previewResult.previewPath,
           ),
         );
         await refreshStoreInfo();
@@ -145,7 +148,8 @@ class SettingsService {
         a.gcashVerificationMode != b.gcashVerificationMode ||
         a.gcashReferenceMinLength != b.gcashReferenceMinLength ||
         a.gcashQrImagePath != b.gcashQrImagePath ||
-        a.gcashQrImageType != b.gcashQrImageType;
+        a.gcashQrImageType != b.gcashQrImageType ||
+        a.gcashQrPreviewPath != b.gcashQrPreviewPath;
   }
 
   /// Picks and stores a GCash merchant QR image, then writes the relative
@@ -172,13 +176,22 @@ class SettingsService {
     final current = await getSettings();
     final oldPath = current.gcashQrImagePath;
     final oldType = current.gcashQrImageType;
+    final oldPreview = current.gcashQrPreviewPath;
+
     if (oldPath != null && oldPath.isNotEmpty) {
       await TrashService().moveQrToTrash(oldPath, oldType);
     }
+    if (oldPreview != null && oldPreview.isNotEmpty) {
+      await PaymentQrService().deletePreview(oldPreview);
+    }
+
+    final previewResult = await PaymentQrService().generatePreview(result.filePath);
+
     await updateSettings(
       current.copyWith(
         gcashQrImagePath: result.filePath,
         gcashQrImageType: result.mediaType,
+        gcashQrPreviewPath: previewResult.previewPath,
       ),
     );
     return result;
@@ -197,13 +210,20 @@ class SettingsService {
     final current = await getSettings();
     final oldPath = current.gcashQrImagePath;
     final oldType = current.gcashQrImageType;
+    final oldPreview = current.gcashQrPreviewPath;
+
     if (oldPath != null && oldPath.isNotEmpty) {
       await TrashService().moveQrToTrash(oldPath, oldType);
     }
+    if (oldPreview != null && oldPreview.isNotEmpty) {
+      await PaymentQrService().deletePreview(oldPreview);
+    }
+
     await updateSettings(
       current.copyWith(
         gcashQrImagePath: null,
         gcashQrImageType: null,
+        gcashQrPreviewPath: null,
       ),
     );
   }

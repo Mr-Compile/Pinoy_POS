@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/safe_navigation.dart';
 import 'package:pinoy_pos/data/models/notification.dart' as models;
 import 'package:pinoy_pos/providers/notification_provider.dart';
@@ -48,7 +49,7 @@ class _NotificationBellState extends ConsumerState<NotificationBell> {
         isLabelVisible: unreadCount > 0,
         backgroundColor: AppSemanticColors.resolveSurface(
             AppSemanticColors.errorSurface, brightness),
-        textColor: Colors.white,
+        textColor: AppColorTokens.onPrimaryBlue,
         label: Text(
           _formatBadge(unreadCount),
           // The Badge textColor is ignored when the Text style supplies a
@@ -56,7 +57,7 @@ class _NotificationBellState extends ConsumerState<NotificationBell> {
           // red, so white is the only readable foreground.
           style: AppTypography.labelSmall(context).copyWith(
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            color: AppColorTokens.onPrimaryBlue,
           ),
           textScaler: TextScaler.noScaling,
         ),
@@ -76,8 +77,9 @@ class _NotificationBellState extends ConsumerState<NotificationBell> {
   }
 
   void _onTap(int unreadCount) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    if (screenWidth >= 600) {
+    final isMediumOrLarger =
+        layoutClassFor(MediaQuery.of(context).size.width).isAtLeastMedium;
+    if (isMediumOrLarger) {
       _showDropdown();
     } else {
       _safePush(const NotificationsScreen());
@@ -109,7 +111,7 @@ class _NotificationBellState extends ConsumerState<NotificationBell> {
         0,
       ),
       constraints: const BoxConstraints(maxWidth: 340, maxHeight: 480),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.menu)),
       items: [
         PopupMenuItem<void>(
           enabled: false,

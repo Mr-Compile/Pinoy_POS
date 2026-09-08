@@ -11,6 +11,13 @@ class PaymentSettings {
   final int gcashReferenceMinLength;
   final String? gcashQrImagePath;
   final String? gcashQrImageType;
+  final String? gcashQrPreviewPath;
+
+  /// Merchant name shown on the GCash payment screen.
+  final String storeName;
+
+  /// Merchant contact number shown on the GCash payment screen.
+  final String storePhone;
 
   const PaymentSettings({
     required this.gcashEnabled,
@@ -21,6 +28,9 @@ class PaymentSettings {
     required this.gcashReferenceMinLength,
     this.gcashQrImagePath,
     this.gcashQrImageType,
+    this.gcashQrPreviewPath,
+    this.storeName = 'Pinoy POS',
+    this.storePhone = '',
   });
 
   factory PaymentSettings.fromSettings(Settings settings) {
@@ -33,6 +43,9 @@ class PaymentSettings {
       gcashReferenceMinLength: settings.gcashReferenceMinLength,
       gcashQrImagePath: settings.gcashQrImagePath,
       gcashQrImageType: settings.gcashQrImageType,
+      gcashQrPreviewPath: settings.gcashQrPreviewPath,
+      storeName: settings.storeName.isNotEmpty ? settings.storeName : 'Pinoy POS',
+      storePhone: settings.storePhone,
     );
   }
 

@@ -1,6 +1,7 @@
 ﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
@@ -193,8 +194,8 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
     final canEdit = authNotifier.hasPermission('edit_categories');
     final canDelete = authNotifier.hasPermission('delete_categories');
     final canToggleStatus = authNotifier.hasPermission('change_category_status');
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isTablet = screenWidth >= 600;
+    final isTablet =
+        layoutClassFor(MediaQuery.of(context).size.width).isAtLeastMedium;
 
     if (_isLoading) {
       return Scaffold(

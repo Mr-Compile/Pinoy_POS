@@ -674,7 +674,7 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: cs.primaryContainer.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
                   ),
                   child: Row(
                     children: [
@@ -728,7 +728,7 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.control),
       ),
       child: Column(
         children: [
@@ -785,18 +785,10 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
                 )),
         const SizedBox(height: 8),
         // Model list
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 400),
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: filtered.length,
-            itemBuilder: (context, index) {
-              final model = filtered[index];
-              final isSelected = model.id == _selectedModel;
-              return _buildModelTile(context, model, isSelected);
-            },
-          ),
-        ),
+        ...filtered.map((model) {
+          final isSelected = model.id == _selectedModel;
+          return _buildModelTile(context, model, isSelected);
+        }),
       ],
     );
   }
@@ -844,7 +836,7 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
                                 AppSemanticColors.success, theme.brightness)
                             .withValues(alpha: 0.1)
                         : cs.error.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(AppRadius.xs),
                   ),
                   child: Text(
                     model.active ? 'Active' : 'Inactive',

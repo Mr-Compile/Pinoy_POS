@@ -150,7 +150,7 @@ class KpiCardSkeleton extends StatelessWidget {
     final block = Container(
       decoration: BoxDecoration(
         color: cs.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
     );
 
@@ -191,7 +191,7 @@ class KpiGrid extends StatelessWidget {
   const KpiGrid({
     super.key,
     required this.children,
-    this.tabletColumns = 4,
+    this.tabletColumns = 2,
     this.desktopColumns = 4,
   });
 

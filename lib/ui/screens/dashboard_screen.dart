@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/quick_action_theme.dart';
 import 'package:pinoy_pos/core/route_guard.dart';
@@ -231,7 +232,7 @@ class _DashboardLoadingView extends StatelessWidget {
                   width: 160,
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(AppRadius.xs),
                   ),
                 ),
                 const SizedBox(height: Spacing.md),
@@ -239,7 +240,7 @@ class _DashboardLoadingView extends StatelessWidget {
                   height: 160,
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
                   ),
                 ),
               ],
@@ -1546,26 +1547,29 @@ class _ResponsiveTwoColumn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isTablet = MediaQuery.of(context).size.width >= 600;
-    if (!isTablet) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          left,
-          const SizedBox(height: Spacing.lg),
-          right,
-        ],
-      );
-    }
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(child: left),
-          const SizedBox(width: Spacing.lg),
-          Expanded(child: right),
-        ],
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (layoutClassFor(constraints.maxWidth) == LayoutClass.compact) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              left,
+              const SizedBox(height: Spacing.lg),
+              right,
+            ],
+          );
+        }
+        return IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: left),
+              const SizedBox(width: Spacing.lg),
+              Expanded(child: right),
+            ],
+          ),
+        );
+      },
     );
   }
 }

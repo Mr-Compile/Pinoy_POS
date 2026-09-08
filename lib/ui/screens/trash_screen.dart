@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:intl/intl.dart';
 
 import 'package:pinoy_pos/core/currency_utils.dart';
@@ -428,7 +429,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
     final appBarTitle =
         _selectionMode ? '${_selectedIds.length} selected' : 'Trash';
     final appBarActions = _selectionMode
-        ? _buildSelectionActions(authNotifier)
+        ? [_buildSelectionActions(authNotifier)]
         : _buildNormalActions(authNotifier);
 
     return Scaffold(
@@ -535,7 +536,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
           width: size,
           height: size,
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
             child: AppImage(
               imagePath: product?.imageUrl,
               placeholderIcon: Icons.inventory_2,
@@ -572,7 +573,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
           width: size,
           height: size,
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
             child: AppImage(
               imagePath: path,
               placeholderIcon: Icons.qr_code,
@@ -721,43 +722,128 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
     ];
   }
 
-  List<Widget> _buildSelectionActions(AuthStateNotifier authNotifier) {
+  Widget _buildSelectionActions(AuthStateNotifier authNotifier) {
     final selected = _selectedItems();
     final canRestoreAll = selected.isNotEmpty &&
         selected.every((i) => _canRestoreItem(i, authNotifier));
     final canDeleteAll = selected.isNotEmpty &&
         selected.every((i) => _canDeleteItem(i, authNotifier));
 
-    return [
-      IconButton(
-        icon: const Icon(Icons.select_all),
-        tooltip: 'Select all',
-        onPressed: _selectAll,
-      ),
-      IconButton(
-        icon: const Icon(Icons.clear),
-        tooltip: 'Clear selection',
-        onPressed: _clearSelection,
-      ),
-      if (canRestoreAll)
-        IconButton(
-          icon: const Icon(Icons.restore),
-          tooltip: 'Restore selected',
-          onPressed: _restoreSelected,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 220) {
+          return _buildSelectionPopupMenu(
+            context,
+            authNotifier,
+            canRestoreAll: canRestoreAll,
+            canDeleteAll: canDeleteAll,
+          );
+        }
+
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.select_all),
+              tooltip: 'Select all',
+              onPressed: _selectAll,
+            ),
+            IconButton(
+              icon: const Icon(Icons.clear),
+              tooltip: 'Clear selection',
+              onPressed: _clearSelection,
+            ),
+            if (canRestoreAll)
+              IconButton(
+                icon: const Icon(Icons.restore),
+                tooltip: 'Restore selected',
+                onPressed: _restoreSelected,
+              ),
+            if (canDeleteAll)
+              IconButton(
+                icon: Icon(Icons.delete_forever,
+                  color: Theme.of(context).colorScheme.error),
+                tooltip: 'Delete selected',
+                onPressed: _deleteSelected,
+              ),
+            IconButton(
+              icon: const Icon(Icons.close),
+              tooltip: 'Cancel selection',
+              onPressed: _exitSelectionMode,
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildSelectionPopupMenu(
+    BuildContext context,
+    AuthStateNotifier authNotifier, {
+    required bool canRestoreAll,
+    required bool canDeleteAll,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+
+    return PopupMenuButton<VoidCallback>(
+      icon: const Icon(Icons.more_vert),
+      tooltip: 'Selection actions',
+      onSelected: (callback) => callback(),
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: _selectAll,
+          child: Row(
+            children: [
+              Icon(Icons.select_all, color: cs.onSurface),
+              const SizedBox(width: 12),
+              const Text('Select all'),
+            ],
+          ),
         ),
-      if (canDeleteAll)
-        IconButton(
-          icon: Icon(Icons.delete_forever,
-              color: Theme.of(context).colorScheme.error),
-          tooltip: 'Delete selected',
-          onPressed: _deleteSelected,
+        PopupMenuItem(
+          value: _clearSelection,
+          child: Row(
+            children: [
+              Icon(Icons.clear, color: cs.onSurface),
+              const SizedBox(width: 12),
+              const Text('Clear selection'),
+            ],
+          ),
         ),
-      IconButton(
-        icon: const Icon(Icons.close),
-        tooltip: 'Cancel selection',
-        onPressed: _exitSelectionMode,
-      ),
-    ];
+        if (canRestoreAll)
+          PopupMenuItem(
+            value: _restoreSelected,
+            child: Row(
+              children: [
+                Icon(Icons.restore, color: cs.onSurface),
+                const SizedBox(width: 12),
+                const Text('Restore selected'),
+              ],
+            ),
+          ),
+        if (canDeleteAll)
+          PopupMenuItem(
+            value: _deleteSelected,
+            child: Row(
+              children: [
+                Icon(Icons.delete_forever, color: cs.error),
+                const SizedBox(width: 12),
+                Text('Delete selected', style: TextStyle(color: cs.error)),
+              ],
+            ),
+          ),
+        PopupMenuItem(
+          value: _exitSelectionMode,
+          child: Row(
+            children: [
+              Icon(Icons.close, color: cs.onSurface),
+              const SizedBox(width: 12),
+              const Text('Cancel'),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   bool _canRestoreItem(TrashItem item, AuthStateNotifier authNotifier) {

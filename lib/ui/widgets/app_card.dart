@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 
 /// Visual style of an [AppCard].
 enum AppCardVariant { elevated, filled, outlined }
@@ -26,7 +27,7 @@ class AppCard extends StatelessWidget {
     this.color,
     this.elevation,
     this.variant = AppCardVariant.elevated,
-    this.borderRadius = 16,
+    this.borderRadius = AppRadius.card,
   });
 
   @override

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/date_utils.dart';
 import 'package:pinoy_pos/core/spacing.dart';
@@ -403,6 +404,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                 tooltip: 'Filters',
                 onPressed: _isProcessing ? null : _showFilterDialog,
               ),
+              const SizedBox(width: Spacing.xs),
               AppIconButton(
                 icon: Icons.refresh,
                 tooltip: 'Refresh',
@@ -446,6 +448,48 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
 
   Widget _buildSummaryCard(BuildContext context, double total, int count) {
     final cs = Theme.of(context).colorScheme;
+    final totalColumn = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Total Sales',
+          style: AppTypography.bodyMedium(
+            context,
+          ).copyWith(color: cs.onPrimaryContainer),
+        ),
+        const SizedBox(height: Spacing.xs),
+        Text(
+          CurrencyUtils.format(total),
+          style: AppTypography.titleLargeBold(
+            context,
+          ).copyWith(color: cs.onPrimaryContainer),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+
+    final countColumn = Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(
+          'Transactions',
+          style: AppTypography.bodyMedium(
+            context,
+          ).copyWith(color: cs.onPrimaryContainer),
+        ),
+        const SizedBox(height: Spacing.xs),
+        Text(
+          '$count',
+          style: AppTypography.titleLargeBold(
+            context,
+          ).copyWith(color: cs.onPrimaryContainer),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
       child: Card(
@@ -453,49 +497,27 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
         margin: EdgeInsets.zero,
         child: Padding(
           padding: const EdgeInsets.all(Spacing.md),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              if (layoutClassFor(constraints.maxWidth) == LayoutClass.compact) {
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Total Sales',
-                      style: AppTypography.bodyMedium(
-                        context,
-                      ).copyWith(color: cs.onPrimaryContainer),
-                    ),
-                    const SizedBox(height: Spacing.xs),
-                    Text(
-                      CurrencyUtils.format(total),
-                      style: AppTypography.titleLargeBold(
-                        context,
-                      ).copyWith(color: cs.onPrimaryContainer),
-                    ),
+                    totalColumn,
+                    const SizedBox(width: Spacing.md),
+                    countColumn,
                   ],
-                ),
-              ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      'Transactions',
-                      style: AppTypography.bodyMedium(
-                        context,
-                      ).copyWith(color: cs.onPrimaryContainer),
-                    ),
-                    const SizedBox(height: Spacing.xs),
-                    Text(
-                      '$count',
-                      style: AppTypography.titleLargeBold(
-                        context,
-                      ).copyWith(color: cs.onPrimaryContainer),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(child: totalColumn),
+                  const SizedBox(width: Spacing.md),
+                  Expanded(child: countColumn),
+                ],
+              );
+            },
           ),
         ),
       ),
@@ -590,7 +612,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: cs.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Text(
         label,

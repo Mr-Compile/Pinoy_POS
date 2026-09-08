@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/backup_history.dart';
 import 'package:pinoy_pos/data/models/backup_location.dart';
@@ -536,8 +537,6 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isTablet = screenWidth >= 600;
 
     return Scaffold(
       appBar: const AppHeader(
@@ -556,13 +555,18 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                   onRefresh: _loadBackups,
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.all(Spacing.lg),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: isTablet ? 800 : double.infinity,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isTablet =
+                            layoutClassFor(constraints.maxWidth).isAtLeastMedium;
+                        return Center(
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: isTablet ? 800 : double.infinity,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
                           Text(
                             'Backup & Restore',
                             style: AppTypography.headlineSmallSemibold(context),
@@ -606,9 +610,12 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                         ],
                       ),
                     ),
-                  ),
-                ),
-    );
+                  );
+                },
+              ),
+            ),
+          ),
+        );
   }
 
   // ── Location / Destination Status Card ───────────────────────────────
@@ -732,7 +739,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
               padding: const EdgeInsets.all(Spacing.md),
               decoration: BoxDecoration(
                 color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.control),
               ),
               child: Row(
                 children: [

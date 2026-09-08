@@ -17,6 +17,7 @@ import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/breakpoints.dart';
 
 class SaleDetailScreen extends ConsumerStatefulWidget {
   final Sale? sale;
@@ -465,9 +466,14 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        Text(
-                          item.formattedTotal(receipt.currency),
-                          style: AppTypography.titleSmallBold(context),
+                        Flexible(
+                          child: Text(
+                            item.formattedTotal(receipt.currency),
+                            style: AppTypography.titleSmallBold(context),
+                            textAlign: TextAlign.end,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ],
                     ),
@@ -559,7 +565,7 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
                   return GestureDetector(
                     onTap: _viewPaymentProof,
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.control),
                       child: Image.file(
                         info.file,
                         height: 120,
@@ -623,21 +629,39 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
   }
 
   Widget _buildActionPairs(List<Widget> actions) {
-    final rows = <Widget>[];
-    for (var i = 0; i < actions.length; i += 2) {
-      final children = <Widget>[Expanded(child: actions[i])];
-      if (i + 1 < actions.length) {
-        children.add(const SizedBox(width: 12));
-        children.add(Expanded(child: actions[i + 1]));
-      }
-      rows.add(Row(children: children));
-      if (i + 2 < actions.length) {
-        rows.add(const SizedBox(height: 12));
-      }
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: rows,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = layoutClassFor(constraints.maxWidth) == LayoutClass.compact;
+
+        if (isCompact) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var i = 0; i < actions.length; i++) ...[
+                actions[i],
+                if (i < actions.length - 1) const SizedBox(height: 12),
+              ],
+            ],
+          );
+        }
+
+        final rows = <Widget>[];
+        for (var i = 0; i < actions.length; i += 2) {
+          final children = <Widget>[Expanded(child: actions[i])];
+          if (i + 1 < actions.length) {
+            children.add(const SizedBox(width: 12));
+            children.add(Expanded(child: actions[i + 1]));
+          }
+          rows.add(Row(children: children));
+          if (i + 2 < actions.length) {
+            rows.add(const SizedBox(height: 12));
+          }
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: rows,
+        );
+      },
     );
   }
 
@@ -645,14 +669,21 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
             child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
           ),
           const SizedBox(width: 12),
-          Text(value, style: Theme.of(context).textTheme.bodyMedium),
+          Expanded(
+            child: Text(
+              value,
+              style: Theme.of(context).textTheme.bodyMedium,
+              textAlign: TextAlign.end,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );

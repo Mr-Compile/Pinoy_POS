@@ -36,7 +36,7 @@ class _ProfileMenuState extends ConsumerState<ProfileMenu> {
     return InkWell(
       key: _avatarKey,
       onTap: () => _showDropdown(user),
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(AppRadius.xl),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         child: AppAvatar(
@@ -85,7 +85,7 @@ class _ProfileMenuState extends ConsumerState<ProfileMenu> {
         0,
       ),
       constraints: const BoxConstraints(maxWidth: 280),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.menu)),
       items: [
         PopupMenuItem<void>(
           enabled: false,

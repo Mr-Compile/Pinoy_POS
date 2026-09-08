@@ -15,6 +15,7 @@ import 'package:pinoy_pos/ui/screens/gcash_payment_screen.dart';
 import 'package:pinoy_pos/ui/screens/payment_success_screen.dart';
 import 'package:pinoy_pos/ui/screens/products_screen.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/ui/widgets/app_button.dart';
@@ -23,8 +24,6 @@ import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_icon_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
-import 'package:pinoy_pos/ui/widgets/app_payment_qr_preview.dart';
-import 'package:pinoy_pos/ui/widgets/app_payment_qr_viewer.dart';
 import 'package:pinoy_pos/ui/widgets/app_status_chip.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
@@ -305,16 +304,14 @@ class _POSScreenState extends ConsumerState<POSScreen> {
 
   /// Minimum body width before the cart docks beside the product grid.
   /// Below this the POS uses the stacked phone layout with a sticky cart
-  /// bar; at or above it the two-pane layout keeps ~500 px for products
-  /// so the grid never collapses into unreadably small cards.
-  static const double _twoPaneMinWidth = 840;
+  /// bar; at or above it the two-pane layout gives the product catalog
+  /// at least ~430 px while keeping the cart within a usable 280–380 px.
+  static const double _twoPaneMinWidth = 720;
 
   @override
   Widget build(BuildContext context) {
     final authNotifier = ref.read(authStateProvider.notifier);
     final canSell = authNotifier.hasPermission('create_sales');
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isWide = screenWidth >= _twoPaneMinWidth;
 
     if (_isLoading) {
       return Scaffold(
@@ -343,9 +340,15 @@ class _POSScreenState extends ConsumerState<POSScreen> {
       appBar: AppHeader(title: 'POS'),
       body: _products.isEmpty
           ? _buildNoProductsState(canSell)
-          : isWide
-          ? _buildWideLayout(canSell, screenWidth)
-          : _buildMobileLayout(canSell),
+          : LayoutBuilder(
+              builder: (context, constraints) {
+                final isWide = constraints.maxWidth >= _twoPaneMinWidth;
+                if (isWide) {
+                  return _buildWideLayout(canSell, constraints.maxWidth);
+                }
+                return _buildMobileLayout(canSell);
+              },
+            ),
     );
   }
 
@@ -469,7 +472,7 @@ class _POSScreenState extends ConsumerState<POSScreen> {
               children: [
                 ClipRRect(
                   borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(16),
+                    top: Radius.circular(AppRadius.lg),
                   ),
                   child: AppImage(
                     imagePath: product.imageUrl,
@@ -483,7 +486,7 @@ class _POSScreenState extends ConsumerState<POSScreen> {
                     decoration: BoxDecoration(
                       color: cs.surface.withValues(alpha: 0.7),
                       borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(16),
+                        top: Radius.circular(AppRadius.lg),
                       ),
                     ),
                     child: Center(
@@ -550,7 +553,7 @@ class _POSScreenState extends ConsumerState<POSScreen> {
         final maxColumns = isWide ? 6 : 4;
         final crossAxisCount = (constraints.maxWidth / minTileWidth)
             .floor()
-            .clamp(2, maxColumns);
+            .clamp(1, maxColumns);
 
         return GridView.builder(
           padding: const EdgeInsets.all(Spacing.lg),
@@ -633,7 +636,7 @@ class _POSScreenState extends ConsumerState<POSScreen> {
       isScrollControlled: true,
       useSafeArea: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
       ),
       builder: (context) => DraggableScrollableSheet(
         initialChildSize: 0.85,
@@ -656,10 +659,11 @@ class _POSScreenState extends ConsumerState<POSScreen> {
 
   // ── Wide layout (tablet landscape / desktop) ───────────────────────
 
-  Widget _buildWideLayout(bool canSell, double screenWidth) {
+  Widget _buildWideLayout(bool canSell, double layoutWidth) {
     // The cart column scales with the window but stays within a usable
     // range so cart rows never become too cramped or too stretched.
-    final cartWidth = (screenWidth * 0.34).clamp(320.0, 420.0);
+    // At 720 px this leaves ~430 px for the product catalog.
+    final cartWidth = (layoutWidth * 0.38).clamp(280.0, 380.0);
 
     return Row(
       children: [
@@ -766,7 +770,7 @@ class _MobileCartBar extends ConsumerWidget {
               Expanded(
                 child: InkWell(
                   onTap: onOpenCart,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadius.control),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: Spacing.sm,
@@ -1134,18 +1138,6 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
     return null;
   }
 
-  void _openQrViewer(String qrPath) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => AppPaymentQrViewer(
-          imagePath: qrPath,
-          title: 'Scan to Pay',
-          caption: 'Scan this GCash QR code to pay',
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final paymentSettingsAsync = ref.watch(paymentSettingsProvider);
@@ -1263,7 +1255,7 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
               padding: const EdgeInsets.all(Spacing.md),
               decoration: BoxDecoration(
                 color: cs.primaryContainer,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.control),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1296,9 +1288,10 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
             LayoutBuilder(
               key: const ValueKey('pos_payment_method'),
               builder: (context, constraints) {
-                final columns = constraints.maxWidth >= 400
-                    ? methods.length
-                    : 2;
+                final columns =
+                    layoutClassFor(constraints.maxWidth).isAtLeastMedium
+                        ? methods.length
+                        : 2;
                 final tileWidth =
                     (constraints.maxWidth - Spacing.sm * (columns - 1)) /
                     columns;
@@ -1320,21 +1313,6 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
                 );
               },
             ),
-            // QR preview for GCash
-            if (currentMethod == 'GCash') ...[
-              const SizedBox(height: Spacing.md),
-              AppPaymentQrPreview(
-                imagePath: settings.gcashQrImagePath,
-                onTap:
-                    settings.gcashQrImagePath != null &&
-                        settings.gcashQrImagePath!.isNotEmpty
-                    ? () => _openQrViewer(settings.gcashQrImagePath!)
-                    : null,
-                maxHeight: 180,
-                emptyTitle: 'GCash QR not configured',
-                emptySubtitle: 'The Owner must upload the business GCash QR.',
-              ),
-            ],
             const SizedBox(height: Spacing.lg),
             // Cash received (Cash only)
             if (currentMethod == 'Cash') ...[
@@ -1363,7 +1341,7 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
                   padding: const EdgeInsets.all(Spacing.md),
                   decoration: BoxDecoration(
                     color: cs.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.control),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1467,10 +1445,10 @@ class _PaymentMethodTile extends StatelessWidget {
 
     return Material(
       color: selected ? cs.primaryContainer : cs.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppRadius.control),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.control),
         child: Container(
           constraints: const BoxConstraints(minHeight: 56),
           padding: const EdgeInsets.symmetric(
@@ -1478,7 +1456,7 @@ class _PaymentMethodTile extends StatelessWidget {
             vertical: Spacing.sm,
           ),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.control),
             border: Border.all(
               color: selected ? cs.primary : cs.outlineVariant,
               width: selected ? 1.5 : 1,

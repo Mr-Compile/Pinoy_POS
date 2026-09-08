@@ -35,19 +35,17 @@ class SalesTransactionsList extends StatelessWidget {
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (int i = 0; i < sales.length; i++) ...[
-          _SaleRow(
-            sale: sales[i],
-            currency: _currency,
-            staffNames: staffNames,
-            onTap: onTap,
-          ),
-          if (i < sales.length - 1) const SizedBox(height: Spacing.sm),
-        ],
-      ],
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: sales.length,
+      separatorBuilder: (_, _) => const SizedBox(height: Spacing.sm),
+      itemBuilder: (_, i) => _SaleRow(
+        sale: sales[i],
+        currency: _currency,
+        staffNames: staffNames,
+        onTap: onTap,
+      ),
     );
   }
 }

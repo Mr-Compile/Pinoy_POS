@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/auth_navigation.dart';
+import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
@@ -72,8 +73,8 @@ class _PinLockScreenState extends ConsumerState<PinLockScreen> {
     final user = authState.user;
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isTablet = screenWidth >= 600;
+    final isTablet =
+        layoutClassFor(MediaQuery.of(context).size.width).isAtLeastMedium;
 
     if (user == null) {
       return Scaffold(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/auth_navigation.dart';
+import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/constants.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
@@ -139,7 +140,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         body: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final isWide = constraints.maxWidth >= 600;
+              final isWide =
+                  layoutClassFor(constraints.maxWidth).isAtLeastMedium;
               final horizontalPadding = isWide ? 48.0 : 16.0;
               final cardPadding = isWide ? 48.0 : 28.0;
               final iconContainerSize = isWide ? 112.0 : 92.0;
@@ -158,7 +160,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         child: Container(
                           decoration: BoxDecoration(
                             color: colorScheme.surface,
-                            borderRadius: BorderRadius.circular(28),
+                            borderRadius: BorderRadius.circular(AppRadius.xxl),
                             boxShadow: [
                               BoxShadow(
                                 color: isDark
@@ -288,7 +290,7 @@ class _IconContainer extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadius.xxl),
         boxShadow: [
           BoxShadow(
             color: colorScheme.primary.withValues(alpha: isDark ? 0.35 : 0.22),

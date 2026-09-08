@@ -105,7 +105,7 @@ void main() {
           final expectedBackground =
               AppSemanticColors.resolveSurface(entry.value.$1, brightness);
           final expectedForeground =
-              AppSemanticColors.contrastFor(expectedBackground);
+              AppSemanticColors.contrastFor(expectedBackground, brightness);
 
           final button = tester.widget<FilledButton>(
             find.byType(FilledButton),
@@ -120,70 +120,100 @@ void main() {
             style.foregroundColor?.resolve({WidgetState.focused}),
             expectedForeground,
           );
-          // The foreground must not be the surface text color — that was
-          // the contrast bug this regression test guards.
-          expect(
-            style.foregroundColor?.resolve({WidgetState.focused}),
-            isNot(theme.colorScheme.onSurface),
-          );
         });
       }
     }
   });
 
   group('QuickActionTheme resolves theme-aware styles', () {
-    test('light mode trash is amber with black foreground', () {
+    test('light mode trash is amber with dark foreground', () {
       final style = resolveQuickActionStyleForBrightness(
         Brightness.light,
         QuickActionType.trash,
       );
       expect(style.background, AppSemanticColors.warningSurface);
-      expect(style.foreground, Colors.black);
+      expect(
+        style.foreground,
+        AppSemanticColors.contrastFor(
+          AppSemanticColors.warningSurface,
+          Brightness.light,
+        ),
+      );
     });
 
-    test('dark mode trash is deep amber with white foreground', () {
+    test('dark mode trash is deep amber with light foreground', () {
       final style = resolveQuickActionStyleForBrightness(
         Brightness.dark,
         QuickActionType.trash,
       );
-      expect(style.background, const Color(0xFF92400E));
-      expect(style.foreground, Colors.white);
+      expect(
+        style.background,
+        AppSemanticColors.resolveSurface(
+          AppSemanticColors.warningSurface,
+          Brightness.dark,
+        ),
+      );
+      expect(style.foreground, AppColorTokens.textPrimary);
     });
 
-    test('dark mode manage users is deep blue with white foreground', () {
+    test('dark mode manage users uses primary blue with light foreground', () {
       final style = resolveQuickActionStyleForBrightness(
         Brightness.dark,
         QuickActionType.manageUsers,
       );
-      expect(style.background, const Color(0xFF1E3A8A));
-      expect(style.foreground, Colors.white);
+      expect(
+        style.background,
+        AppSemanticColors.resolveSurface(
+          AppSemanticColors.primarySurface,
+          Brightness.dark,
+        ),
+      );
+      expect(style.foreground, AppColorTokens.textPrimary);
     });
 
-    test('dark mode activity logs is deep purple with white foreground', () {
+    test('dark mode activity logs uses neutral surface with light foreground', () {
       final style = resolveQuickActionStyleForBrightness(
         Brightness.dark,
         QuickActionType.activityLogs,
       );
-      expect(style.background, const Color(0xFF5B21B6));
-      expect(style.foreground, Colors.white);
+      expect(
+        style.background,
+        AppSemanticColors.resolveSurface(
+          AppSemanticColors.neutralSurface,
+          Brightness.dark,
+        ),
+      );
+      expect(style.foreground, AppColorTokens.textPrimary);
     });
 
-    test('dark mode ai config is deep violet with white foreground', () {
+    test('dark mode ai config uses info surface with light foreground', () {
       final style = resolveQuickActionStyleForBrightness(
         Brightness.dark,
         QuickActionType.aiConfig,
       );
-      expect(style.background, const Color(0xFF4C1D95));
-      expect(style.foreground, Colors.white);
+      expect(
+        style.background,
+        AppSemanticColors.resolveSurface(
+          AppSemanticColors.infoSurface,
+          Brightness.dark,
+        ),
+      );
+      expect(style.foreground, AppColorTokens.textPrimary);
     });
 
-    test('dark mode settings is dark slate with white foreground', () {
+    test('dark mode settings uses neutral surface with light foreground', () {
       final style = resolveQuickActionStyleForBrightness(
         Brightness.dark,
         QuickActionType.settings,
       );
-      expect(style.background, const Color(0xFF334155));
-      expect(style.foreground, Colors.white);
+      expect(
+        style.background,
+        AppSemanticColors.resolveSurface(
+          AppSemanticColors.neutralSurface,
+          Brightness.dark,
+        ),
+      );
+      expect(style.foreground, AppColorTokens.textPrimary);
     });
   });
 

@@ -12,6 +12,7 @@ import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/validators.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/modal_result.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/providers/notification_provider.dart';
@@ -112,8 +113,8 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
   Widget build(BuildContext context) {
     final authNotifier = ref.read(authStateProvider.notifier);
     final canManage = authNotifier.hasPermission('manage_announcements');
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isTablet = screenWidth >= 600;
+    final isTablet =
+        layoutClassFor(MediaQuery.of(context).size.width).isAtLeastMedium;
 
     if (_isLoading) {
       return Scaffold(

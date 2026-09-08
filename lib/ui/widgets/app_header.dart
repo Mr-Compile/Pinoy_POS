@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/ui/widgets/notification_bell.dart';
 import 'package:pinoy_pos/ui/widgets/profile_menu.dart';
 import 'package:pinoy_pos/ui/widgets/theme_toggle.dart';
@@ -36,6 +37,9 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
   final bool showProfileMenu;
   final PreferredSizeWidget? bottom;
 
+  /// Custom back action. When null, the back button calls [Navigator.maybePop].
+  final VoidCallback? onBackPressed;
+
   const AppHeader({
     super.key,
     required this.title,
@@ -45,6 +49,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
     this.showNotificationBell = true,
     this.showProfileMenu = true,
     this.bottom,
+    this.onBackPressed,
   });
 
   @override
@@ -62,7 +67,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
     ];
 
     final headerForeground =
-        Theme.of(context).appBarTheme.foregroundColor ?? Colors.white;
+        Theme.of(context).appBarTheme.foregroundColor ?? AppColorTokens.onPrimaryBlue;
 
     return AppBar(
       // Let AppBarTheme.titleTextStyle carry the size, weight, and color
@@ -72,7 +77,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
           ? IconButton(
               icon: Icon(Icons.arrow_back_rounded, color: headerForeground),
               tooltip: 'Back',
-              onPressed: () => Navigator.of(context).maybePop(),
+              onPressed: onBackPressed ?? () => Navigator.of(context).maybePop(),
             )
           : null,
       actions: headerActions,

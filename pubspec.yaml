@@ -58,6 +58,11 @@ dependencies:
   # Image Handling
   image_picker: ^1.1.2
 
+  # QR/barcode detection and image cropping
+  qr_code_dart_decoder: ^0.3.0
+  zxing_lib: ^1.1.4
+  image: ^4.1.6
+
   # File / directory picker for backup & restore (cross-platform)
   file_picker: ^8.1.2
 
@@ -79,6 +84,7 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  qr: ^3.0.2
   build_runner: ^2.4.13
   riverpod_generator: ^2.4.0
   mockito: ^5.4.4

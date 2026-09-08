@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
 
@@ -85,7 +86,7 @@ class AppPaymentQrPreview extends StatelessWidget {
                   child: Container(
                     decoration: BoxDecoration(
                       color: cs.surfaceContainerHighest.withValues(alpha: 0.9),
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(AppRadius.xl),
                     ),
                     padding: const EdgeInsets.all(6),
                     child: Icon(

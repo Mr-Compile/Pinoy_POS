@@ -18,6 +18,7 @@
   final int gcashReferenceMinLength;
   final String? gcashQrImagePath;
   final String? gcashQrImageType;
+  final String? gcashQrPreviewPath;
   final int aiDailyQuota;
   final int inactivityTimeoutMinutes;
   final int sessionWarningSeconds;
@@ -42,6 +43,7 @@
     this.gcashReferenceMinLength = 6,
     this.gcashQrImagePath,
     this.gcashQrImageType,
+    this.gcashQrPreviewPath,
     this.aiDailyQuota = 20,
     this.inactivityTimeoutMinutes = 15,
     this.sessionWarningSeconds = 30,
@@ -68,6 +70,7 @@
       'gcash_reference_min_length': gcashReferenceMinLength,
       'gcash_qr_image_path': gcashQrImagePath,
       'gcash_qr_image_type': gcashQrImageType,
+      'gcash_qr_preview_path': gcashQrPreviewPath,
       'ai_daily_quota': aiDailyQuota,
       'inactivity_timeout_minutes': inactivityTimeoutMinutes,
       'session_warning_seconds': sessionWarningSeconds,
@@ -135,6 +138,7 @@
       gcashReferenceMinLength: intOrNull('gcash_reference_min_length') ?? 6,
       gcashQrImagePath: stringOrNull('gcash_qr_image_path'),
       gcashQrImageType: stringOrNull('gcash_qr_image_type'),
+      gcashQrPreviewPath: stringOrNull('gcash_qr_preview_path'),
       aiDailyQuota: intOrNull('ai_daily_quota') ?? 20,
       inactivityTimeoutMinutes: intOrNull('inactivity_timeout_minutes') ?? 15,
       sessionWarningSeconds: intOrNull('session_warning_seconds') ?? 30,
@@ -161,6 +165,7 @@
     int? gcashReferenceMinLength,
     Object? gcashQrImagePath = _sentinel,
     Object? gcashQrImageType = _sentinel,
+    Object? gcashQrPreviewPath = _sentinel,
     int? aiDailyQuota,
     Object? inactivityTimeoutMinutes = _sentinel,
     int? sessionWarningSeconds,
@@ -193,6 +198,9 @@
       gcashQrImageType: gcashQrImageType == _sentinel
           ? this.gcashQrImageType
           : gcashQrImageType as String?,
+      gcashQrPreviewPath: gcashQrPreviewPath == _sentinel
+          ? this.gcashQrPreviewPath
+          : gcashQrPreviewPath as String?,
       aiDailyQuota: aiDailyQuota ?? this.aiDailyQuota,
       inactivityTimeoutMinutes: inactivityTimeoutMinutes == _sentinel
           ? this.inactivityTimeoutMinutes

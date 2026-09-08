@@ -16,6 +16,11 @@ class AppGrid extends StatelessWidget {
   final ScrollPhysics? physics;
   final EdgeInsetsGeometry? padding;
 
+  /// When set, the grid uses [GridView.extent] with this as the
+  /// [maxCrossAxisExtent] instead of a fixed column count. This prevents
+  /// tiny cells when the grid is placed inside a narrow pane.
+  final double? minTileWidth;
+
   const AppGrid({
     super.key,
     required this.children,
@@ -28,12 +33,26 @@ class AppGrid extends StatelessWidget {
     this.shrinkWrap = true,
     this.physics = const NeverScrollableScrollPhysics(),
     this.padding,
+    this.minTileWidth,
   });
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        if (minTileWidth != null && minTileWidth! > 0) {
+          return GridView.extent(
+            maxCrossAxisExtent: minTileWidth!,
+            shrinkWrap: shrinkWrap,
+            physics: physics,
+            mainAxisSpacing: mainAxisSpacing,
+            crossAxisSpacing: crossAxisSpacing,
+            childAspectRatio: childAspectRatio,
+            padding: padding,
+            children: children,
+          );
+        }
+
         final layout = layoutClassFor(constraints.maxWidth);
         final crossAxisCount = switch (layout) {
           LayoutClass.compact => compactColumns,

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'package:pinoy_pos/core/breakpoints.dart';
+
 import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/payment_proof_provider.dart';
@@ -242,14 +244,37 @@ class _PaymentProofViewerScreenState
       return const Center(child: Text('Payment proof not found.'));
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(
-          child: _buildPreview(info),
-        ),
-        _buildMetadata(info),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide =
+            layoutClassFor(constraints.maxWidth) != LayoutClass.compact;
+
+        if (isWide) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 2,
+                child: _buildPreview(info),
+              ),
+              Expanded(
+                flex: 1,
+                child: _buildMetadata(info),
+              ),
+            ],
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: _buildPreview(info),
+            ),
+            _buildMetadata(info),
+          ],
+        );
+      },
     );
   }
 
@@ -332,6 +357,8 @@ class _PaymentProofViewerScreenState
               style: theme.textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w500,
               ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 4),
             Text(
@@ -341,16 +368,19 @@ class _PaymentProofViewerScreenState
               ),
             ),
             const SizedBox(height: 12),
-            FilledButton.icon(
-              onPressed: _isExporting ? null : _downloadImage,
-              icon: _isExporting
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.download),
-              label: const Text('Download Image'),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _isExporting ? null : _downloadImage,
+                icon: _isExporting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.download),
+                label: const Text('Download Image'),
+              ),
             ),
           ],
         ),

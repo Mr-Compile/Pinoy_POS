@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/breakpoints.dart';
 
 /// One item in a [HorizontalBarChart].
 class HorizontalBarItem {
@@ -54,68 +56,80 @@ class HorizontalBarChart extends StatelessWidget {
 
     return SizedBox(
       height: height,
-      child: ListView.separated(
-        padding: EdgeInsets.zero,
-        itemCount: sorted.length,
-        separatorBuilder: (context, index) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          final item = sorted[index];
-          final ratio = maxValue <= 0 ? 0.0 : (item.value / maxValue).clamp(0.0, 1.0);
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isCompact =
+              layoutClassFor(constraints.maxWidth) == LayoutClass.compact;
+          final labelWidth = isCompact ? 80.0 : 120.0;
+          final valueWidth = isCompact ? 56.0 : 80.0;
 
-          return Row(
-            children: [
-              SizedBox(
-                width: 120,
-                child: Text(
-                  item.label,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: cs.onSurface,
-                      ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Stack(
-                  alignment: Alignment.centerLeft,
-                  children: [
-                    Container(
-                      height: 24,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: cs.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
+          return ListView.separated(
+            padding: EdgeInsets.zero,
+            itemCount: sorted.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final item = sorted[index];
+              final ratio =
+                  maxValue <= 0 ? 0.0 : (item.value / maxValue).clamp(0.0, 1.0);
+
+              return Row(
+                children: [
+                  SizedBox(
+                    width: labelWidth,
+                    child: Text(
+                      item.label,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: cs.onSurface,
+                          ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    FractionallySizedBox(
-                      widthFactor: ratio,
-                      child: Container(
-                        height: 24,
-                        decoration: BoxDecoration(
-                          color: index == 0 ? cs.primary : cs.primaryContainer,
-                          borderRadius: BorderRadius.circular(4),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Stack(
+                      alignment: Alignment.centerLeft,
+                      children: [
+                        Container(
+                          height: 24,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: cs.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(AppRadius.xs),
+                          ),
                         ),
-                      ),
+                        FractionallySizedBox(
+                          widthFactor: ratio,
+                          child: Container(
+                            height: 24,
+                            decoration: BoxDecoration(
+                              color: index == 0
+                                  ? cs.primary
+                                  : cs.primaryContainer,
+                              borderRadius: BorderRadius.circular(AppRadius.xs),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 80,
-                child: Text(
-                  item.trailing ?? _formatValue(item.value),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: cs.onSurfaceVariant,
-                        fontWeight: FontWeight.w600,
-                      ),
-                  textAlign: TextAlign.right,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: valueWidth,
+                    child: Text(
+                      item.trailing ?? _formatValue(item.value),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                          ),
+                      textAlign: TextAlign.right,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              );
+            },
           );
         },
       ),

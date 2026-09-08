@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 
 /// One bar in a [MiniBarChart].
@@ -157,7 +158,7 @@ class _Bar extends StatelessWidget {
             height: h < 2 && value > 0 ? 2 : h,
             decoration: BoxDecoration(
               color: value <= 0 ? cs.surfaceContainerHighest : color,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.xs)),
             ),
           ),
         );

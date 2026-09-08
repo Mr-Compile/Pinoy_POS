@@ -10,10 +10,12 @@ import 'package:path_provider/path_provider.dart';
 import 'package:printing/printing.dart';
 
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/export_history.dart';
 import 'package:pinoy_pos/services/file_export_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_button.dart';
+import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_section.dart';
@@ -160,23 +162,58 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
       final excel = Excel.decodeBytes(bytes);
       final first = excel.tables.keys.first;
       final sheet = excel.tables[first]!;
+      final headers = sheet.row(0).map((cell) => cell?.value?.toString() ?? '').toList();
+      final rows = sheet.rows.skip(1).take(50).toList();
 
-      return SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: DataTable(
-          columns: sheet.row(0)
-              .map((cell) => DataColumn(label: Text(cell?.value?.toString() ?? '')))
-              .toList(),
-          rows: sheet.rows
-              .skip(1)
-              .take(50)
-              .map((row) => DataRow(
-                    cells: row
-                        .map((cell) => DataCell(Text(cell?.value?.toString() ?? '')))
-                        .toList(),
-                  ))
-              .toList(),
-        ),
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          if (layoutClassFor(constraints.maxWidth) == LayoutClass.compact) {
+            return ListView.builder(
+              padding: const EdgeInsets.all(Spacing.md),
+              itemCount: rows.length,
+              itemBuilder: (context, index) {
+                final row = rows[index];
+                return AppCard(
+                  margin: const EdgeInsets.only(bottom: Spacing.sm),
+                  child: Padding(
+                    padding: const EdgeInsets.all(Spacing.md),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        for (int i = 0; i < headers.length && i < row.length; i++)
+                          _SpreadsheetCellRow(
+                            header: headers[i],
+                            value: row[i]?.value?.toString() ?? '',
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            );
+          }
+
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minWidth: constraints.maxWidth),
+              child: DataTable(
+                columns: headers
+                    .map((header) => DataColumn(label: Text(header)))
+                    .toList(),
+                rows: rows
+                    .map((row) => DataRow(
+                          cells: row
+                              .map((cell) => DataCell(
+                                  Text(cell?.value?.toString() ?? '')))
+                              .toList(),
+                        ))
+                    .toList(),
+              ),
+            ),
+          );
+        },
       );
     } catch (e, st) {
       debugPrint('[ReportPreviewScreen] spreadsheet decode failed: $e\n$st');
@@ -233,36 +270,65 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
   }
 
   Widget _buildActions(BuildContext context, ColorScheme cs) {
+    final exportButton = AppButton.filled(
+      label: 'Export',
+      icon: Icons.download,
+      onPressed: _export,
+    );
+    final shareButton = _bytes != null
+        ? AppButton.outlined(
+            label: 'Share',
+            icon: Icons.share,
+            color: AppButtonColor.neutral,
+            onPressed: _share,
+          )
+        : null;
+
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(Spacing.md),
-        child: Row(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              tooltip: 'Reload',
-              onPressed: _loadFile,
-            ),
-            const SizedBox(width: Spacing.sm),
-            Expanded(
-              child: AppButton.filled(
-                label: 'Export',
-                icon: Icons.download,
-                onPressed: _export,
-              ),
-            ),
-            if (_bytes != null) ...[
-              const SizedBox(width: Spacing.md),
-              Expanded(
-                child: AppButton.outlined(
-                  label: 'Share',
-                  icon: Icons.share,
-                  color: AppButtonColor.neutral,
-                  onPressed: _share,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            if (layoutClassFor(constraints.maxWidth) == LayoutClass.compact) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.refresh),
+                        tooltip: 'Reload',
+                        onPressed: _loadFile,
+                      ),
+                    ],
+                  ),
+                  exportButton,
+                  if (shareButton != null) ...[
+                    const SizedBox(height: Spacing.sm),
+                    shareButton,
+                  ],
+                ],
+              );
+            }
+
+            return Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  tooltip: 'Reload',
+                  onPressed: _loadFile,
                 ),
-              ),
-            ],
-          ],
+                const SizedBox(width: Spacing.sm),
+                Expanded(child: exportButton),
+                if (shareButton != null) ...[
+                  const SizedBox(width: Spacing.md),
+                  Expanded(child: shareButton),
+                ],
+              ],
+            );
+          },
         ),
       ),
     );
@@ -341,6 +407,48 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
     return 'report'
         .replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_')
         .toLowerCase();
+  }
+}
+
+class _SpreadsheetCellRow extends StatelessWidget {
+  final String header;
+  final String value;
+
+  const _SpreadsheetCellRow({required this.header, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              header,
+              style: AppTypography.bodySmall(context).copyWith(
+                color: cs.onSurfaceVariant,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: Spacing.sm),
+          Expanded(
+            child: Text(
+              value,
+              style: AppTypography.bodySmall(context).copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

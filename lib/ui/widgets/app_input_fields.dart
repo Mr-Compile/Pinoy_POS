@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 
 /// Shared input-field components for the whole application.
 ///
@@ -262,7 +263,7 @@ class AppDropdownField<T> extends StatelessWidget {
             (prefixIcon != null ? Icon(prefixIcon) : null),
       ),
       isExpanded: true,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(AppRadius.input),
     );
   }
 }
@@ -318,7 +319,7 @@ class AppDropdown<T> extends StatelessWidget {
           icon: const Icon(Icons.arrow_drop_down),
           items: items,
           onChanged: enabled ? onChanged : null,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppRadius.input),
         ),
       ),
     );
