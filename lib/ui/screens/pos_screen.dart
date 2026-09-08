@@ -15,7 +15,6 @@ import 'package:pinoy_pos/ui/screens/gcash_payment_screen.dart';
 import 'package:pinoy_pos/ui/screens/payment_success_screen.dart';
 import 'package:pinoy_pos/ui/screens/products_screen.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
-import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/ui/widgets/app_button.dart';
@@ -133,13 +132,17 @@ class _POSScreenState extends ConsumerState<POSScreen> {
 
     // Category filter
     if (_selectedCategoryId != null) {
-      result = result.where((p) => p.categoryId == _selectedCategoryId).toList();
+      result = result
+          .where((p) => p.categoryId == _selectedCategoryId)
+          .toList();
     }
 
     // Search filter (case-insensitive name match)
     if (_searchQuery.isNotEmpty) {
       final query = _searchQuery.toLowerCase();
-      result = result.where((p) => p.name.toLowerCase().contains(query)).toList();
+      result = result
+          .where((p) => p.name.toLowerCase().contains(query))
+          .toList();
     }
 
     return result;
@@ -176,8 +179,7 @@ class _POSScreenState extends ConsumerState<POSScreen> {
   void _addToCart(Product product) {
     ref.read(cartProvider.notifier).addProduct(product).then((error) {
       if (error != null && mounted) {
-        AppDialogService.error(context,
-            title: 'Unable to add', message: error);
+        AppDialogService.error(context, title: 'Unable to add', message: error);
       }
     });
   }
@@ -187,8 +189,11 @@ class _POSScreenState extends ConsumerState<POSScreen> {
   Future<void> _checkout() async {
     final cart = ref.read(cartProvider);
     if (cart.isEmpty) {
-      AppDialogService.error(context,
-          title: 'Empty Cart', message: 'Add products to the cart before checkout.');
+      AppDialogService.error(
+        context,
+        title: 'Empty Cart',
+        message: 'Add products to the cart before checkout.',
+      );
       return;
     }
 
@@ -215,9 +220,7 @@ class _POSScreenState extends ConsumerState<POSScreen> {
     if (result.paymentMethod == 'GCash') {
       await Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => GcashPaymentScreen(total: total),
-        ),
+        MaterialPageRoute(builder: (_) => GcashPaymentScreen(total: total)),
       );
       return;
     }
@@ -226,7 +229,9 @@ class _POSScreenState extends ConsumerState<POSScreen> {
 
     try {
       final saleItems = ref.read(cartProvider.notifier).toSaleItems();
-      final success = await ref.read(salesServiceProvider).createSale(
+      final success = await ref
+          .read(salesServiceProvider)
+          .createSale(
             items: saleItems,
             totalAmount: total,
             cashReceived: result.cashReceived,
@@ -267,37 +272,49 @@ class _POSScreenState extends ConsumerState<POSScreen> {
           bumpCatalogRevision(ref);
         } else {
           ref.read(cartProvider.notifier).setProcessing(false);
-          AppDialogService.error(context,
-              title: 'Transaction Failed',
-              message: 'Failed to complete the sale. Please try again.');
+          AppDialogService.error(
+            context,
+            title: 'Transaction Failed',
+            message: 'Failed to complete the sale. Please try again.',
+          );
         }
       }
     } on PaymentValidationException catch (e) {
       if (mounted) {
         ref.read(cartProvider.notifier).setProcessing(false);
-        AppDialogService.error(context,
-            title: 'Invalid Payment',
-            message: e.message,
-            details: e.details);
+        AppDialogService.error(
+          context,
+          title: 'Invalid Payment',
+          message: e.message,
+          details: e.details,
+        );
       }
     } catch (e) {
       if (mounted) {
         ref.read(cartProvider.notifier).setProcessing(false);
-        AppDialogService.error(context,
-            title: 'Transaction Failed',
-            message: 'An error occurred while processing the sale.');
+        AppDialogService.error(
+          context,
+          title: 'Transaction Failed',
+          message: 'An error occurred while processing the sale.',
+        );
       }
     }
   }
 
   // ── Build ──────────────────────────────────────────────────────────
 
+  /// Minimum body width before the cart docks beside the product grid.
+  /// Below this the POS uses the stacked phone layout with a sticky cart
+  /// bar; at or above it the two-pane layout keeps ~500 px for products
+  /// so the grid never collapses into unreadably small cards.
+  static const double _twoPaneMinWidth = 840;
+
   @override
   Widget build(BuildContext context) {
     final authNotifier = ref.read(authStateProvider.notifier);
     final canSell = authNotifier.hasPermission('create_sales');
-    final layout = layoutClassFor(MediaQuery.of(context).size.width);
-    final isTablet = layout.isAtLeastMedium;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isWide = screenWidth >= _twoPaneMinWidth;
 
     if (_isLoading) {
       return Scaffold(
@@ -326,9 +343,9 @@ class _POSScreenState extends ConsumerState<POSScreen> {
       appBar: AppHeader(title: 'POS'),
       body: _products.isEmpty
           ? _buildNoProductsState(canSell)
-          : isTablet
-              ? _buildTabletLayout(canSell)
-              : _buildMobileLayout(canSell),
+          : isWide
+          ? _buildWideLayout(canSell, screenWidth)
+          : _buildMobileLayout(canSell),
     );
   }
 
@@ -363,7 +380,12 @@ class _POSScreenState extends ConsumerState<POSScreen> {
 
   Widget _buildSearchAndFilters(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(Spacing.lg, Spacing.md, Spacing.lg, Spacing.sm),
+      padding: const EdgeInsets.fromLTRB(
+        Spacing.lg,
+        Spacing.md,
+        Spacing.lg,
+        Spacing.sm,
+      ),
       child: Column(
         children: [
           // Search field
@@ -446,7 +468,9 @@ class _POSScreenState extends ConsumerState<POSScreen> {
               fit: StackFit.expand,
               children: [
                 ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(16),
+                  ),
                   child: AppImage(
                     imagePath: product.imageUrl,
                     placeholderIcon: Icons.inventory_2,
@@ -458,13 +482,16 @@ class _POSScreenState extends ConsumerState<POSScreen> {
                   Container(
                     decoration: BoxDecoration(
                       color: cs.surface.withValues(alpha: 0.7),
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(16),
+                      ),
                     ),
                     child: Center(
                       child: Text(
                         'Out of Stock',
-                        style: AppTypography.titleSmallBold(context)
-                            .copyWith(color: cs.error),
+                        style: AppTypography.titleSmallBold(
+                          context,
+                        ).copyWith(color: cs.error),
                       ),
                     ),
                   ),
@@ -487,8 +514,9 @@ class _POSScreenState extends ConsumerState<POSScreen> {
                 const SizedBox(height: Spacing.xs),
                 Text(
                   CurrencyUtils.format(product.price),
-                  style: AppTypography.titleMediumBold(context)
-                      .copyWith(color: cs.primary),
+                  style: AppTypography.titleMediumBold(
+                    context,
+                  ).copyWith(color: cs.primary),
                 ),
                 const SizedBox(height: Spacing.xs),
                 AppStatusChip(
@@ -507,41 +535,36 @@ class _POSScreenState extends ConsumerState<POSScreen> {
 
   // ── Product grid ───────────────────────────────────────────────────
 
-  Widget _buildProductGrid(List<Product> products, {required bool isTablet}) {
+  Widget _buildProductGrid(List<Product> products, {required bool isWide}) {
     if (products.isEmpty) {
       return _buildEmptySearchState();
     }
 
-    final screenWidth = MediaQuery.of(context).size.width;
-    // Determine cross-axis count based on available width.
-    // Mobile: 2 columns. Tablet: 3-5 depending on width.
-    int crossAxisCount;
-    double childAspectRatio;
-    if (isTablet) {
-      if (screenWidth >= 1200) {
-        crossAxisCount = 5;
-      } else if (screenWidth >= 900) {
-        crossAxisCount = 4;
-      } else {
-        crossAxisCount = 3;
-      }
-      childAspectRatio = 0.85;
-    } else {
-      // Mobile
-      crossAxisCount = 2;
-      childAspectRatio = 0.78;
-    }
+    // Column count follows the grid's own width rather than the device
+    // class, so phones, split panes, and desktop windows all adapt. Cards
+    // keep a sensible minimum width so names, prices, and stock chips stay
+    // readable instead of shrinking into clipped slivers.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final minTileWidth = isWide ? 170.0 : 150.0;
+        final maxColumns = isWide ? 6 : 4;
+        final crossAxisCount = (constraints.maxWidth / minTileWidth)
+            .floor()
+            .clamp(2, maxColumns);
 
-    return GridView.builder(
-      padding: const EdgeInsets.all(Spacing.lg),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: crossAxisCount,
-        childAspectRatio: childAspectRatio,
-        crossAxisSpacing: Spacing.md,
-        mainAxisSpacing: Spacing.md,
-      ),
-      itemCount: products.length,
-      itemBuilder: (context, index) => _buildProductCard(products[index], isTablet: isTablet),
+        return GridView.builder(
+          padding: const EdgeInsets.all(Spacing.lg),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            childAspectRatio: isWide ? 0.85 : 0.78,
+            crossAxisSpacing: Spacing.md,
+            mainAxisSpacing: Spacing.md,
+          ),
+          itemCount: products.length,
+          itemBuilder: (context, index) =>
+              _buildProductCard(products[index], isTablet: isWide),
+        );
+      },
     );
   }
 
@@ -550,11 +573,13 @@ class _POSScreenState extends ConsumerState<POSScreen> {
     return Center(
       child: EmptyState(
         icon: Icons.search_off,
-        title: hasFilters ? 'No Products Found' : 'No Products in This Category',
+        title: hasFilters
+            ? 'No Products Found'
+            : 'No Products in This Category',
         message: hasFilters
             ? _searchQuery.isNotEmpty
-                ? "No products match '$_searchQuery'."
-                : 'No products in this category.'
+                  ? "No products match '$_searchQuery'."
+                  : 'No products in this category.'
             : 'No products available in this category.',
         action: hasFilters
             ? AppButton.text(
@@ -570,30 +595,34 @@ class _POSScreenState extends ConsumerState<POSScreen> {
 
   // ── Cart summary + checkout ────────────────────────────────────────
 
-  Widget _buildCheckoutPanel(bool canSell, {bool isTablet = false}) {
+  Widget _buildCheckoutPanel(
+    bool canSell, {
+    ScrollController? scrollController,
+  }) {
     // The checkout panel watches the cart provider so it rebuilds
     // immediately, even when displayed inside a modal bottom sheet.
     return _CheckoutPanel(
       canSell: canSell,
       onCheckout: _checkout,
+      scrollController: scrollController,
     );
   }
 
   // ── Mobile layout ──────────────────────────────────────────────────
 
+  /// Stacked portrait layout: search and categories on top, the product
+  /// grid fills the middle, and a sticky cart bar stays pinned to the
+  /// bottom so the path to checkout is always visible.
   Widget _buildMobileLayout(bool canSell) {
-    return Stack(
+    return Column(
       children: [
-        Column(
-          children: [
-            _buildSearchAndFilters(context),
-            Expanded(
-              child: _buildProductGrid(_filteredProducts, isTablet: false),
-            ),
-          ],
+        _buildSearchAndFilters(context),
+        Expanded(child: _buildProductGrid(_filteredProducts, isWide: false)),
+        _MobileCartBar(
+          canSell: canSell,
+          onOpenCart: _showMobileCartSheet,
+          onCheckout: _checkout,
         ),
-        // Floating cart button
-        _FloatingCartButton(onOpenCart: _showMobileCartSheet),
       ],
     );
   }
@@ -612,7 +641,10 @@ class _POSScreenState extends ConsumerState<POSScreen> {
         maxChildSize: 0.95,
         expand: false,
         builder: (context, scrollController) => _CheckoutPanel(
-          canSell: ref.read(authStateProvider.notifier).hasPermission('create_sales'),
+          canSell: ref
+              .read(authStateProvider.notifier)
+              .hasPermission('create_sales'),
+          scrollController: scrollController,
           onCheckout: () {
             Navigator.of(context).pop();
             _checkout();
@@ -622,26 +654,29 @@ class _POSScreenState extends ConsumerState<POSScreen> {
     );
   }
 
-  // ── Tablet layout ──────────────────────────────────────────────────
+  // ── Wide layout (tablet landscape / desktop) ───────────────────────
 
-  Widget _buildTabletLayout(bool canSell) {
+  Widget _buildWideLayout(bool canSell, double screenWidth) {
+    // The cart column scales with the window but stays within a usable
+    // range so cart rows never become too cramped or too stretched.
+    final cartWidth = (screenWidth * 0.34).clamp(320.0, 420.0);
+
     return Row(
       children: [
         // Left: product catalog
         Expanded(
-          flex: 3,
           child: Column(
             children: [
               _buildSearchAndFilters(context),
               Expanded(
-                child: _buildProductGrid(_filteredProducts, isTablet: true),
+                child: _buildProductGrid(_filteredProducts, isWide: true),
               ),
             ],
           ),
         ),
         // Right: cart + checkout
         Container(
-          width: 360,
+          width: cartWidth,
           decoration: BoxDecoration(
             border: Border(
               left: BorderSide(
@@ -650,7 +685,7 @@ class _POSScreenState extends ConsumerState<POSScreen> {
               ),
             ),
           ),
-          child: _buildCheckoutPanel(canSell, isTablet: true),
+          child: _buildCheckoutPanel(canSell),
         ),
       ],
     );
@@ -677,41 +712,99 @@ class _ProductQuantityBadge extends ConsumerWidget {
       right: 6,
       child: Container(
         padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          color: cs.primary,
-          shape: BoxShape.circle,
-        ),
+        decoration: BoxDecoration(color: cs.primary, shape: BoxShape.circle),
         child: Text(
           '$quantity',
-          style: AppTypography.labelMedium(context).copyWith(
-            color: cs.onPrimary,
-            fontWeight: FontWeight.bold,
-          ),
+          style: AppTypography.labelMedium(
+            context,
+          ).copyWith(color: cs.onPrimary, fontWeight: FontWeight.bold),
         ),
       ),
     );
   }
 }
 
-// ── Floating cart button (mobile) ───────────────────────────────────
+// ── Sticky cart bar (compact layout) ─────────────────────────────────
 
-class _FloatingCartButton extends ConsumerWidget {
+/// Pinned to the bottom of the stacked POS layout while the cart has
+/// items. Tapping the summary opens the editable cart sheet; the Checkout
+/// button goes straight to payment. It sits inside the layout (not an
+/// overlay) so it never covers products, and SafeArea keeps it clear of
+/// device navigation bars.
+class _MobileCartBar extends ConsumerWidget {
+  final bool canSell;
   final VoidCallback onOpenCart;
+  final VoidCallback onCheckout;
 
-  const _FloatingCartButton({required this.onOpenCart});
+  const _MobileCartBar({
+    required this.canSell,
+    required this.onOpenCart,
+    required this.onCheckout,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cart = ref.watch(cartProvider);
     if (cart.isEmpty) return const SizedBox.shrink();
 
-    return Positioned(
-      bottom: Spacing.lg,
-      right: Spacing.lg,
-      child: FloatingActionButton.extended(
-        icon: const Icon(Icons.shopping_cart),
-        label: Text('${cart.itemCount} items · ${CurrencyUtils.format(cart.total)}'),
-        onPressed: onOpenCart,
+    final cs = Theme.of(context).colorScheme;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surface,
+        border: Border(top: BorderSide(color: cs.outlineVariant, width: 1)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: Spacing.lg,
+            vertical: Spacing.sm,
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: InkWell(
+                  onTap: onOpenCart,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: Spacing.sm,
+                      vertical: Spacing.sm,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '${cart.itemCount} item${cart.itemCount == 1 ? '' : 's'} · tap to review',
+                          style: AppTypography.bodySmall(
+                            context,
+                          ).copyWith(color: cs.onSurfaceVariant),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          CurrencyUtils.format(cart.total),
+                          style: AppTypography.titleLargeBold(
+                            context,
+                          ).copyWith(color: cs.primary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: Spacing.md),
+              AppButton.filled(
+                icon: Icons.point_of_sale,
+                label: 'Checkout',
+                isLoading: cart.isProcessing,
+                onPressed: canSell ? onCheckout : null,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -723,9 +816,14 @@ class _CheckoutPanel extends ConsumerWidget {
   final bool canSell;
   final VoidCallback onCheckout;
 
+  /// When the panel lives inside a [DraggableScrollableSheet], this is the
+  /// sheet's scroll controller so the cart list drives the drag gesture.
+  final ScrollController? scrollController;
+
   const _CheckoutPanel({
     required this.canSell,
     required this.onCheckout,
+    this.scrollController,
   });
 
   @override
@@ -744,7 +842,7 @@ class _CheckoutPanel extends ConsumerWidget {
               Text('Cart', style: AppTypography.titleLargeBold(context)),
               if (cart.isNotEmpty)
                 AppButton.text(
-                  icon: Icons.delete_sweep,
+                  icon: Icons.clear_all,
                   label: 'Clear',
                   size: AppButtonSize.small,
                   onPressed: () => _confirmClear(context, ref),
@@ -761,6 +859,7 @@ class _CheckoutPanel extends ConsumerWidget {
                   message: 'Select a product to start a transaction.',
                 )
               : ListView.builder(
+                  controller: scrollController,
                   padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
                   itemCount: cart.items.length,
                   itemBuilder: (context, index) =>
@@ -787,8 +886,9 @@ class _CheckoutPanel extends ConsumerWidget {
                       Text('Subtotal', style: AppTypography.bodyLarge(context)),
                       Text(
                         CurrencyUtils.format(cart.subtotal),
-                        style: AppTypography.bodyLarge(context)
-                            .copyWith(fontWeight: FontWeight.w600),
+                        style: AppTypography.bodyLarge(
+                          context,
+                        ).copyWith(fontWeight: FontWeight.w600),
                       ),
                     ],
                   ),
@@ -796,12 +896,15 @@ class _CheckoutPanel extends ConsumerWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Total', style: AppTypography.titleLargeBold(context)),
+                      Text(
+                        'Total',
+                        style: AppTypography.titleLargeBold(context),
+                      ),
                       Text(
                         CurrencyUtils.format(cart.total),
-                        style: AppTypography.headlineSmallBold(context).copyWith(
-                              color: cs.primary,
-                            ),
+                        style: AppTypography.headlineSmallBold(
+                          context,
+                        ).copyWith(color: cs.primary),
                       ),
                     ],
                   ),
@@ -821,9 +924,13 @@ class _CheckoutPanel extends ConsumerWidget {
   }
 
   Future<void> _confirmClear(BuildContext context, WidgetRef ref) async {
-    final confirmed = await AppDialogService.deleteConfirm(
+    final confirmed = await AppDialogService.confirmation(
       context,
-      itemName: 'all cart items',
+      title: 'Clear Cart?',
+      message: 'Clear all items from the cart?',
+      confirmLabel: 'Clear Cart',
+      cancelLabel: 'Cancel',
+      destructive: true,
     );
     if (confirmed == true) {
       ref.read(cartProvider.notifier).clear();
@@ -842,79 +949,105 @@ class _CartItemRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final product = item.product;
     final cs = Theme.of(context).colorScheme;
+    final notifier = ref.read(cartProvider.notifier);
 
+    // Two-section layout: the thumbnail, name, and remove action sit in
+    // the top row; quantity controls and the line subtotal sit in the
+    // bottom row. Splitting the controls onto their own row keeps every
+    // element reachable on narrow phones — long product names ellipsize
+    // instead of pushing the buttons off screen.
     return AppCard(
       variant: AppCardVariant.filled,
-      padding: const EdgeInsets.symmetric(
-        horizontal: Spacing.md,
-        vertical: Spacing.sm,
-      ),
+      margin: const EdgeInsets.only(bottom: Spacing.sm),
+      padding: const EdgeInsets.all(Spacing.md),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Name + price/qty
+          // Product thumbnail. The fixed 56px box keeps every cart row
+          // identically sized whether the product has an image or falls
+          // back to the icon — AppImage handles missing/corrupted files.
+          SizedBox(
+            width: 56,
+            height: 56,
+            child: AppImage(
+              imagePath: product.imageUrl,
+              placeholderIcon: Icons.inventory_2_outlined,
+              placeholderIconSize: 24,
+              borderRadius: 10,
+              fit: BoxFit.cover,
+              cacheWidth: 128,
+              semanticLabel: product.name,
+            ),
+          ),
+          const SizedBox(width: Spacing.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        product.name,
+                        style: AppTypography.bodyLarge(
+                          context,
+                        ).copyWith(fontWeight: FontWeight.w600),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    AppIconButton(
+                      icon: Icons.highlight_remove,
+                      onPressed: () => notifier.remove(product.id!),
+                      tooltip: 'Remove item',
+                      color: cs.error,
+                    ),
+                  ],
+                ),
                 Text(
-                  product.name,
-                  style: AppTypography.bodyLarge(context)
-                      .copyWith(fontWeight: FontWeight.w600),
+                  '${CurrencyUtils.format(product.price)} each',
+                  style: AppTypography.bodySmall(
+                    context,
+                  ).copyWith(color: cs.onSurfaceVariant),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                Text(
-                  '${CurrencyUtils.format(product.price)} × ${item.quantity}',
-                  style: AppTypography.bodySmall(context)
-                      .copyWith(color: cs.onSurfaceVariant),
+                const SizedBox(height: Spacing.xs),
+                Row(
+                  children: [
+                    AppIconButton(
+                      icon: Icons.remove,
+                      onPressed: () => notifier.decrement(product.id!),
+                      tooltip: 'Decrease quantity',
+                    ),
+                    SizedBox(
+                      width: 36,
+                      child: Text(
+                        '${item.quantity}',
+                        style: AppTypography.titleMedium(context),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    AppIconButton(
+                      icon: Icons.add,
+                      onPressed: () => notifier.increment(product.id!),
+                      tooltip: 'Increase quantity',
+                    ),
+                    const Spacer(),
+                    Flexible(
+                      child: Text(
+                        CurrencyUtils.format(item.lineTotal),
+                        style: AppTypography.titleSmallBold(context),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ),
-          // Quantity controls
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AppIconButton(
-                icon: Icons.remove,
-                onPressed: () =>
-                  ref.read(cartProvider.notifier).decrement(product.id!),
-                tooltip: 'Decrease quantity',
-              ),
-              SizedBox(
-                width: 40,
-                child: Text(
-                  '${item.quantity}',
-                  style: AppTypography.titleMedium(context),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              AppIconButton(
-                icon: Icons.add,
-                onPressed: () =>
-                  ref.read(cartProvider.notifier).increment(product.id!),
-                tooltip: 'Increase quantity',
-              ),
-            ],
-          ),
-          const SizedBox(width: Spacing.sm),
-          // Subtotal
-          SizedBox(
-            width: 72,
-            child: Text(
-              CurrencyUtils.format(item.lineTotal),
-              style: AppTypography.titleSmallBold(context),
-              textAlign: TextAlign.right,
-            ),
-          ),
-          // Remove
-          AppIconButton(
-            icon: Icons.delete_outline,
-            onPressed: () =>
-              ref.read(cartProvider.notifier).remove(product.id!),
-            tooltip: 'Remove item',
-            color: cs.error,
           ),
         ],
       ),
@@ -976,6 +1109,15 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
       return const ['Cash', 'GCash', 'Card', 'Other'];
     }
     return const ['Cash', 'Card', 'Other'];
+  }
+
+  IconData _paymentMethodIcon(String method) {
+    return switch (method) {
+      'Cash' => Icons.payments_outlined,
+      'GCash' => Icons.qr_code_2,
+      'Card' => Icons.credit_card_outlined,
+      _ => Icons.more_horiz,
+    };
   }
 
   String _customerNameLabel(PaymentSettings settings) {
@@ -1047,8 +1189,9 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
   Widget _buildContent(BuildContext context, PaymentSettings settings) {
     final cs = Theme.of(context).colorScheme;
     final methods = _availableMethods(settings.gcashEnabled);
-    final currentMethod =
-        methods.contains(_paymentMethod) ? _paymentMethod : 'Cash';
+    final currentMethod = methods.contains(_paymentMethod)
+        ? _paymentMethod
+        : 'Cash';
     final cash = currentMethod == 'Cash' ? _parseCash() : widget.total;
     final change = cash - widget.total;
 
@@ -1058,36 +1201,34 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
       });
     }
 
-    final primaryLabel =
-        currentMethod == 'GCash' ? 'Continue with GCash' : 'Complete Sale';
+    final primaryLabel = currentMethod == 'GCash'
+        ? 'Continue with GCash'
+        : 'Complete Sale';
 
     void completePayment(BuildContext context) {
       if (currentMethod == 'GCash') {
-        Navigator.of(context, rootNavigator: true).pop(
-          _PaymentResult(
-            cashReceived: 0.0,
-            paymentMethod: 'GCash',
-          ),
-        );
+        Navigator.of(
+          context,
+          rootNavigator: true,
+        ).pop(_PaymentResult(cashReceived: 0.0, paymentMethod: 'GCash'));
         return;
       }
 
       if (!_formKey.currentState!.validate()) return;
       Navigator.of(context, rootNavigator: true).pop(
         _PaymentResult(
-          cashReceived: currentMethod == 'Cash'
-              ? _parseCash()
-              : widget.total,
+          cashReceived: currentMethod == 'Cash' ? _parseCash() : widget.total,
           paymentMethod: currentMethod,
           notes: _notesController.text.trim().isEmpty
               ? null
               : _notesController.text.trim(),
           referenceNumber:
               (currentMethod == 'Card' || currentMethod == 'Other') &&
-                      _referenceController.text.trim().isNotEmpty
-                  ? _referenceController.text.trim()
-                  : null,
-          customerName: settings.customerNameVisible &&
+                  _referenceController.text.trim().isNotEmpty
+              ? _referenceController.text.trim()
+              : null,
+          customerName:
+              settings.customerNameVisible &&
                   _customerNameController.text.trim().isNotEmpty
               ? _customerNameController.text.trim()
               : null,
@@ -1114,148 +1255,176 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
       child: Form(
         key: _formKey,
         child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Total display
-              Container(
-                padding: const EdgeInsets.all(Spacing.md),
-                decoration: BoxDecoration(
-                  color: cs.primaryContainer,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Total Due',
-                        style: TextStyle(color: cs.onPrimaryContainer)),
-                    Text(
-                      CurrencyUtils.format(widget.total),
-                      style: AppTypography.titleLargeBold(context)
-                          .copyWith(color: cs.onPrimaryContainer),
-                    ),
-                  ],
-                ),
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Total display
+            Container(
+              padding: const EdgeInsets.all(Spacing.md),
+              decoration: BoxDecoration(
+                color: cs.primaryContainer,
+                borderRadius: BorderRadius.circular(12),
               ),
-              const SizedBox(height: Spacing.lg),
-              // Payment method
-              AppDropdownField<String>(
-                key: const ValueKey('pos_payment_method'),
-                label: 'Payment Method',
-                prefixIcon: Icons.payment,
-                initialValue: currentMethod,
-                items: methods
-                    .map((m) => DropdownMenuItem(
-                          value: m,
-                          child: Text(m),
-                        ))
-                    .toList(),
-                onChanged: (value) {
-                  if (value == null) return;
-                  setState(() => _paymentMethod = value);
-                },
-              ),
-              // QR preview for GCash
-              if (currentMethod == 'GCash') ...[
-                const SizedBox(height: Spacing.md),
-                AppPaymentQrPreview(
-                  imagePath: settings.gcashQrImagePath,
-                  onTap: settings.gcashQrImagePath != null &&
-                          settings.gcashQrImagePath!.isNotEmpty
-                      ? () => _openQrViewer(settings.gcashQrImagePath!)
-                      : null,
-                  maxHeight: 180,
-                  emptyTitle: 'GCash QR not configured',
-                  emptySubtitle: 'The Owner must upload the business GCash QR.',
-                ),
-              ],
-              const SizedBox(height: Spacing.lg),
-              // Cash received (Cash only)
-              if (currentMethod == 'Cash') ...[
-                AppTextFormField(
-                  controller: _cashController,
-                  label: 'Cash Received',
-                  prefixText: CurrencyUtils.symbol(),
-                  prefixIcon: Icons.payments,
-                  keyboardType: TextInputType.number,
-                  validator: (value) {
-                    final cash = double.tryParse(value?.trim() ?? '');
-                    if (cash == null) {
-                      return 'Enter a valid amount';
-                    }
-                    if (cash < widget.total) {
-                      return 'Insufficient cash received';
-                    }
-                    return null;
-                  },
-                  onChanged: (_) => setState(() {}),
-                ),
-                const SizedBox(height: Spacing.md),
-                // Change display
-                if (cash >= widget.total)
-                  Container(
-                    padding: const EdgeInsets.all(Spacing.md),
-                    decoration: BoxDecoration(
-                      color: cs.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Change',
-                            style: TextStyle(color: cs.onSurfaceVariant)),
-                        Text(
-                          CurrencyUtils.format(change),
-                          style: AppTypography.titleLargeBold(context)
-                              .copyWith(color: cs.primary),
-                        ),
-                      ],
-                    ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Total Due',
+                    style: TextStyle(color: cs.onPrimaryContainer),
                   ),
-                const SizedBox(height: Spacing.md),
-                // Quick cash buttons
-                Wrap(
+                  Text(
+                    CurrencyUtils.format(widget.total),
+                    style: AppTypography.titleLargeBold(
+                      context,
+                    ).copyWith(color: cs.onPrimaryContainer),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: Spacing.lg),
+            // Payment method — large tappable tiles instead of a
+            // dropdown so the choices are visible at a glance and easy
+            // to hit on a phone. Two columns on compact widths, one row
+            // when there is room for every method side by side.
+            Text(
+              'Payment Method',
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            const SizedBox(height: Spacing.sm),
+            LayoutBuilder(
+              key: const ValueKey('pos_payment_method'),
+              builder: (context, constraints) {
+                final columns = constraints.maxWidth >= 400
+                    ? methods.length
+                    : 2;
+                final tileWidth =
+                    (constraints.maxWidth - Spacing.sm * (columns - 1)) /
+                    columns;
+                return Wrap(
                   spacing: Spacing.sm,
+                  runSpacing: Spacing.sm,
                   children: [
-                    _buildQuickCashButton(widget.total),
-                    _buildQuickCashButton(_roundUp(widget.total, 50)),
-                    _buildQuickCashButton(_roundUp(widget.total, 100)),
-                    _buildQuickCashButton(_roundUp(widget.total, 500)),
+                    for (final method in methods)
+                      SizedBox(
+                        width: tileWidth,
+                        child: _PaymentMethodTile(
+                          label: method,
+                          icon: _paymentMethodIcon(method),
+                          selected: method == currentMethod,
+                          onTap: () => setState(() => _paymentMethod = method),
+                        ),
+                      ),
                   ],
-                ),
-                const SizedBox(height: Spacing.md),
-              ],
-              // Reference (Card/Other only)
-              if (currentMethod == 'Card' || currentMethod == 'Other') ...[
-                AppTextFormField(
-                  controller: _referenceController,
-                  label: 'Reference Number (optional)',
-                  prefixIcon: Icons.confirmation_number,
-                ),
-                const SizedBox(height: Spacing.md),
-              ],
-              // Customer name for non-GCash methods, driven by Payment Settings.
-              if (currentMethod != 'GCash' && settings.customerNameVisible) ...[
-                AppTextFormField(
-                  controller: _customerNameController,
-                  label: _customerNameLabel(settings),
-                  prefixIcon: Icons.person,
-                  textCapitalization: TextCapitalization.words,
-                  validator: (value) => _validateCustomerName(settings, value),
-                ),
-                const SizedBox(height: Spacing.md),
-              ],
-              // Notes
-              AppTextFormField(
-                controller: _notesController,
-                label: 'Notes (optional)',
-                prefixIcon: Icons.note,
-                maxLines: 2,
+                );
+              },
+            ),
+            // QR preview for GCash
+            if (currentMethod == 'GCash') ...[
+              const SizedBox(height: Spacing.md),
+              AppPaymentQrPreview(
+                imagePath: settings.gcashQrImagePath,
+                onTap:
+                    settings.gcashQrImagePath != null &&
+                        settings.gcashQrImagePath!.isNotEmpty
+                    ? () => _openQrViewer(settings.gcashQrImagePath!)
+                    : null,
+                maxHeight: 180,
+                emptyTitle: 'GCash QR not configured',
+                emptySubtitle: 'The Owner must upload the business GCash QR.',
               ),
             ],
-          ),
+            const SizedBox(height: Spacing.lg),
+            // Cash received (Cash only)
+            if (currentMethod == 'Cash') ...[
+              AppTextFormField(
+                controller: _cashController,
+                label: 'Cash Received',
+                prefixText: CurrencyUtils.symbol(),
+                prefixIcon: Icons.payments,
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  final cash = double.tryParse(value?.trim() ?? '');
+                  if (cash == null) {
+                    return 'Enter a valid amount';
+                  }
+                  if (cash < widget.total) {
+                    return 'Insufficient cash received';
+                  }
+                  return null;
+                },
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: Spacing.md),
+              // Change display
+              if (cash >= widget.total)
+                Container(
+                  padding: const EdgeInsets.all(Spacing.md),
+                  decoration: BoxDecoration(
+                    color: cs.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Change',
+                        style: TextStyle(color: cs.onSurfaceVariant),
+                      ),
+                      Text(
+                        CurrencyUtils.format(change),
+                        style: AppTypography.titleLargeBold(
+                          context,
+                        ).copyWith(color: cs.primary),
+                      ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: Spacing.md),
+              // Quick cash buttons
+              Wrap(
+                spacing: Spacing.sm,
+                children: [
+                  _buildQuickCashButton(widget.total),
+                  _buildQuickCashButton(_roundUp(widget.total, 50)),
+                  _buildQuickCashButton(_roundUp(widget.total, 100)),
+                  _buildQuickCashButton(_roundUp(widget.total, 500)),
+                ],
+              ),
+              const SizedBox(height: Spacing.md),
+            ],
+            // Reference (Card/Other only)
+            if (currentMethod == 'Card' || currentMethod == 'Other') ...[
+              AppTextFormField(
+                controller: _referenceController,
+                label: 'Reference Number (optional)',
+                prefixIcon: Icons.confirmation_number,
+              ),
+              const SizedBox(height: Spacing.md),
+            ],
+            // Customer name for non-GCash methods, driven by Payment Settings.
+            if (currentMethod != 'GCash' && settings.customerNameVisible) ...[
+              AppTextFormField(
+                controller: _customerNameController,
+                label: _customerNameLabel(settings),
+                prefixIcon: Icons.person,
+                textCapitalization: TextCapitalization.words,
+                validator: (value) => _validateCustomerName(settings, value),
+              ),
+              const SizedBox(height: Spacing.md),
+            ],
+            // Notes
+            AppTextFormField(
+              controller: _notesController,
+              label: 'Notes (optional)',
+              prefixIcon: Icons.note,
+              maxLines: 2,
+            ),
+          ],
         ),
-      );
+      ),
+    );
   }
 
   double _roundUp(double value, double to) {
@@ -1269,6 +1438,72 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
         _cashController.text = amount.toStringAsFixed(2);
         setState(() {});
       },
+    );
+  }
+}
+
+// ── Payment method tile ──────────────────────────────────────────────
+
+/// A single tappable payment-method option used by the payment dialog.
+/// 56px minimum height keeps it a comfortable touch target; colors come
+/// entirely from the color scheme so light and dark modes both work.
+class _PaymentMethodTile extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _PaymentMethodTile({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final foreground = selected ? cs.onPrimaryContainer : cs.onSurfaceVariant;
+
+    return Material(
+      color: selected ? cs.primaryContainer : cs.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 56),
+          padding: const EdgeInsets.symmetric(
+            horizontal: Spacing.sm,
+            vertical: Spacing.sm,
+          ),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: selected ? cs.primary : cs.outlineVariant,
+              width: selected ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 20, color: selected ? cs.primary : foreground),
+              const SizedBox(width: Spacing.sm),
+              Flexible(
+                child: Text(
+                  label,
+                  style: AppTypography.titleSmall(context).copyWith(
+                    color: foreground,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
