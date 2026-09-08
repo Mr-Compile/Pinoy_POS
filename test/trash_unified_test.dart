@@ -15,6 +15,8 @@ import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
 import 'package:pinoy_pos/services/trash_service.dart';
 import 'package:pinoy_pos/ui/screens/trash_screen.dart';
+import 'package:pinoy_pos/ui/widgets/app_button.dart';
+import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class _FakeAuthService extends AuthService {
@@ -35,13 +37,31 @@ class _FakeAuthService extends AuthService {
   bool hasPermission(String permission) => true;
 }
 
-class _FakeTrashService extends TrashService {
-  final List<TrashItem> _items;
+class _LimitedFakeAuthService extends _FakeAuthService {
+  final Set<String> _permissions;
 
-  _FakeTrashService(this._items);
+  _LimitedFakeAuthService(super._owner, this._permissions);
 
   @override
-  Future<List<TrashItem>> getAllTrash() async => _items;
+  bool hasPermission(String permission) => _permissions.contains(permission);
+}
+
+class _FakeTrashService extends TrashService {
+  final List<TrashItem> _sourceItems;
+  final Set<int> _removedIds = {};
+
+  int? _lastRestoredId;
+  int? _lastPermanentlyDeletedId;
+
+  _FakeTrashService(this._sourceItems);
+
+  Set<int> get removedIds => _removedIds;
+  int? get lastRestoredId => _lastRestoredId;
+  int? get lastPermanentlyDeletedId => _lastPermanentlyDeletedId;
+
+  @override
+  Future<List<TrashItem>> getAllTrash() async =>
+      _sourceItems.where((i) => i.id != null && !_removedIds.contains(i.id!)).toList();
 
   @override
   Future<int> backfillSoftDeletedToTrash() async => 0;
@@ -50,12 +70,18 @@ class _FakeTrashService extends TrashService {
   Future<int> processExpiredTrash() async => 0;
 
   @override
-  Future<TrashOperationResult> restoreFromTrash(int id) async =>
-      const TrashOperationResult(success: true);
+  Future<TrashOperationResult> restoreFromTrash(int id) async {
+    _lastRestoredId = id;
+    _removedIds.add(id);
+    return const TrashOperationResult(success: true);
+  }
 
   @override
-  Future<TrashOperationResult> permanentDelete(int id) async =>
-      const TrashOperationResult(success: true);
+  Future<TrashOperationResult> permanentDelete(int id) async {
+    _lastPermanentlyDeletedId = id;
+    _removedIds.add(id);
+    return const TrashOperationResult(success: true);
+  }
 
   @override
   Future<TrashOperationResult> bulkRestore(List<int> ids) async =>
@@ -84,8 +110,8 @@ TrashItem _trashItemForCategory(Category category) => TrashItem(
       entityId: category.id!,
       entityName: category.name,
       snapshotJson: TrashService.snapshotForCategory(category),
-      deletedBy: 1,
-      deletedByName: 'Owner',
+      deletedBy: 2,
+      deletedByName: 'Admin',
       deletedAt: DateTime.now(),
       expiresAt: DateTime.now().add(const Duration(days: 30)),
     );
@@ -120,8 +146,8 @@ TrashItem _trashItemForAnnouncement(Announcement announcement) => TrashItem(
       entityId: announcement.id!,
       entityName: announcement.title,
       snapshotJson: TrashService.snapshotForAnnouncement(announcement),
-      deletedBy: 1,
-      deletedByName: 'Owner',
+      deletedBy: 2,
+      deletedByName: 'Admin',
       deletedAt: DateTime.now(),
       expiresAt: DateTime.now().add(const Duration(days: 30)),
     );
@@ -189,13 +215,16 @@ void main() {
     SessionManager().setCurrentUser(owner);
   });
 
-  testWidgets('unified trash screen shows all entity types in one list',
-      (WidgetTester tester) async {
+  Future<void> pumpTrashScreen(
+    WidgetTester tester, {
+    AuthService? authService,
+    TrashService? trashService,
+  }) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          authServiceProvider.overrideWithValue(_FakeAuthService(owner)),
-          trashServiceProvider.overrideWithValue(_FakeTrashService(trashItems)),
+          authServiceProvider.overrideWithValue(authService ?? _FakeAuthService(owner)),
+          trashServiceProvider.overrideWithValue(trashService ?? _FakeTrashService(trashItems)),
           notificationCountProvider.overrideWith((ref) => 0),
         ],
         child: MaterialApp(
@@ -205,20 +234,27 @@ void main() {
       ),
     );
 
-    // Give the screen a tall viewport so the full unified list is built.
     await tester.binding.setSurfaceSize(const Size(600, 1200));
     addTearDown(() async => await tester.binding.setSurfaceSize(null));
 
-    // Wait for the screen to load the fake trash list.
     for (int i = 0; i < 5; i++) {
       await tester.pump(const Duration(milliseconds: 300));
     }
+  }
 
-    // There should be no TabBar or TabBarView.
+  testWidgets('unified trash screen shows all records in one list with no filters',
+      (WidgetTester tester) async {
+    await pumpTrashScreen(tester);
+
+    // No tab or dropdown filtering UI should exist.
     expect(find.byType(TabBar), findsNothing);
     expect(find.byType(TabBarView), findsNothing);
+    expect(find.byType(DropdownButton<String>), findsNothing);
 
-    // All five entity types should be visible in the same list.
+    // A single search field should be present.
+    expect(find.byType(AppSearchField), findsOneWidget);
+
+    // All five entity types should appear in the same list.
     expect(find.text('Canned Tuna'), findsOneWidget);
     expect(find.text('Groceries'), findsOneWidget);
     expect(find.text('Staff One'), findsOneWidget);
@@ -230,91 +266,150 @@ void main() {
     expect(find.widgetWithIcon(IconButton, Icons.delete_forever), findsWidgets);
   });
 
-  testWidgets('filter dropdown filters the unified list without tabs',
+  testWidgets('search filters the unified list and clear restores all records',
       (WidgetTester tester) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          authServiceProvider.overrideWithValue(_FakeAuthService(owner)),
-          trashServiceProvider.overrideWithValue(_FakeTrashService(trashItems)),
-          notificationCountProvider.overrideWith((ref) => 0),
-        ],
-        child: MaterialApp(
-          theme: ThemeData(splashFactory: NoSplash.splashFactory),
-          home: const TrashScreen(),
-        ),
-      ),
-    );
+    await pumpTrashScreen(tester);
 
-    await tester.binding.setSurfaceSize(const Size(600, 1200));
-    addTearDown(() async => await tester.binding.setSurfaceSize(null));
-
-    for (int i = 0; i < 5; i++) {
-      await tester.pump(const Duration(milliseconds: 300));
-    }
-
-    expect(find.text('Canned Tuna'), findsOneWidget);
-    expect(find.text('Groceries'), findsOneWidget);
-
-    // Open the filter dropdown.
-    await tester.tap(find.byType(DropdownButton<String>));
-    await tester.pump(const Duration(milliseconds: 300));
-
-    // Select "Products".
-    await tester.tap(find.text('Products').last);
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.pump(const Duration(milliseconds: 300));
-
-    // Only the product remains visible; the others are filtered out.
-    expect(find.text('Canned Tuna'), findsOneWidget);
-    expect(find.text('Groceries'), findsNothing);
-    expect(find.text('Staff One'), findsNothing);
-    expect(find.text('Merchant QR'), findsNothing);
-    expect(find.text('Sale Day'), findsNothing);
-
-    // Still no tab UI.
-    expect(find.byType(TabBar), findsNothing);
-    expect(find.byType(TabBarView), findsNothing);
-  });
-
-  testWidgets('search filters the unified list across names and snapshot text',
-      (WidgetTester tester) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          authServiceProvider.overrideWithValue(_FakeAuthService(owner)),
-          trashServiceProvider.overrideWithValue(_FakeTrashService(trashItems)),
-          notificationCountProvider.overrideWith((ref) => 0),
-        ],
-        child: MaterialApp(
-          theme: ThemeData(splashFactory: NoSplash.splashFactory),
-          home: const TrashScreen(),
-        ),
-      ),
-    );
-
-    await tester.binding.setSurfaceSize(const Size(600, 1200));
-    addTearDown(() async => await tester.binding.setSurfaceSize(null));
-
-    for (int i = 0; i < 5; i++) {
-      await tester.pump(const Duration(milliseconds: 300));
-    }
-
-    // Type a product name into the search field.
+    // Search by product name.
     await tester.enterText(find.byType(TextField).first, 'Canned');
     await tester.pump(const Duration(milliseconds: 300));
-
     expect(find.text('Canned Tuna'), findsOneWidget);
     expect(find.text('Groceries'), findsNothing);
 
-    // Clear and search for a snapshot value (announcement content).
+    // Clear search.
+    await tester.tap(find.byIcon(Icons.close));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Canned Tuna'), findsOneWidget);
+    expect(find.text('Groceries'), findsOneWidget);
+    expect(find.text('Staff One'), findsOneWidget);
+
+    // Search by username in a user snapshot.
+    await tester.enterText(find.byType(TextField).first, 'staff1');
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Staff One'), findsOneWidget);
+    expect(find.text('Canned Tuna'), findsNothing);
+
+    // Clear.
     await tester.tap(find.byIcon(Icons.close));
     await tester.pump(const Duration(milliseconds: 300));
 
-    await tester.enterText(find.byType(TextField).first, '50% off');
+    // Search by record type label.
+    await tester.enterText(find.byType(TextField).first, 'qr');
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Merchant QR'), findsOneWidget);
+    expect(find.text('Canned Tuna'), findsNothing);
+
+    // Clear.
+    await tester.tap(find.byIcon(Icons.close));
     await tester.pump(const Duration(milliseconds: 300));
 
+    // Search by snapshot content (announcement body).
+    await tester.enterText(find.byType(TextField).first, '50% off');
+    await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Sale Day'), findsOneWidget);
     expect(find.text('Canned Tuna'), findsNothing);
+  });
+
+  testWidgets('empty trash shows "Trash is empty."', (WidgetTester tester) async {
+    await pumpTrashScreen(
+      tester,
+      trashService: _FakeTrashService([]),
+    );
+
+    expect(find.text('Trash is empty.'), findsOneWidget);
+  });
+
+  testWidgets('search with no matches shows "No matching records found."',
+      (WidgetTester tester) async {
+    await pumpTrashScreen(tester);
+
+    await tester.enterText(find.byType(TextField).first, 'nonexistent');
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('No matching records found.'), findsOneWidget);
+  });
+
+  testWidgets('restore from search results restores the correct record',
+      (WidgetTester tester) async {
+    final fakeService = _FakeTrashService(trashItems);
+    await pumpTrashScreen(tester, trashService: fakeService);
+
+    await tester.enterText(find.byType(TextField).first, 'Canned');
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Canned Tuna'), findsOneWidget);
+
+    await tester.tap(find.widgetWithIcon(IconButton, Icons.restore));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // Confirm the restore dialog.
+    expect(find.text('Restore from Trash?'), findsOneWidget);
+    await tester.tap(find.widgetWithText(AppButton, 'Restore'));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // Dismiss the success dialog.
+    expect(find.text('Restored'), findsOneWidget);
+    await tester.tap(find.widgetWithText(AppButton, 'Done'));
+    for (int i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 300));
+    }
+
+    expect(fakeService.lastRestoredId, 1);
+    expect(find.text('Canned Tuna'), findsNothing);
+    expect(find.text('No matching records found.'), findsOneWidget);
+  });
+
+  testWidgets('permanent delete from search results deletes the correct record',
+      (WidgetTester tester) async {
+    final fakeService = _FakeTrashService(trashItems);
+    await pumpTrashScreen(tester, trashService: fakeService);
+
+    await tester.enterText(find.byType(TextField).first, 'Canned');
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Canned Tuna'), findsOneWidget);
+
+    await tester.tap(find.widgetWithIcon(IconButton, Icons.delete_forever));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // Confirm the permanent delete dialog.
+    expect(find.text('Permanently Delete?'), findsOneWidget);
+    await tester.tap(find.widgetWithText(AppButton, 'Delete Permanently'));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // Dismiss the success dialog.
+    expect(find.text('Deleted'), findsOneWidget);
+    await tester.tap(find.widgetWithText(AppButton, 'Done'));
+    for (int i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 300));
+    }
+
+    expect(fakeService.lastPermanentlyDeletedId, 1);
+    expect(find.text('Canned Tuna'), findsNothing);
+    expect(find.text('No matching records found.'), findsOneWidget);
+  });
+
+  testWidgets('permissions still filter the unified list to authorized types',
+      (WidgetTester tester) async {
+    final limitedAuth = _LimitedFakeAuthService(
+      owner,
+      {
+        'view_trash',
+        'view_products',
+        'view_categories',
+      },
+    );
+
+    await pumpTrashScreen(
+      tester,
+      authService: limitedAuth,
+    );
+
+    // Allowed records are visible.
+    expect(find.text('Canned Tuna'), findsOneWidget);
+    expect(find.text('Groceries'), findsOneWidget);
+
+    // Unauthorized entity types are not shown.
+    expect(find.text('Staff One'), findsNothing);
+    expect(find.text('Merchant QR'), findsNothing);
+    expect(find.text('Sale Day'), findsNothing);
   });
 }

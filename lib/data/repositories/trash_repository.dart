@@ -30,12 +30,6 @@ class TrashRepository {
         txn: txn,
       );
 
-  Future<List<TrashItem>> getByEntityType(
-    String entityType, {
-    DatabaseExecutor? txn,
-  }) =>
-      _trashDao.getByEntityType(entityType, txn: txn);
-
   Future<TrashItem?> getByEntity(
     String entityType,
     int entityId, {

@@ -282,7 +282,7 @@ void main() {
   testWidgets('TrashScreen builds for owner', (tester) async {
     final owner = await authenticateAsOwner();
     await pumpOwnerScreen(tester, const TrashScreen(), owner: owner);
-    expect(find.text('Trash Bin'), findsWidgets);
+    expect(find.text('Trash'), findsWidgets);
   });
 
   testWidgets('ActivityLogsScreen builds for owner', (tester) async {

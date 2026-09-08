@@ -36,7 +36,6 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
   final _searchController = TextEditingController();
   final Set<int> _selectedIds = {};
   bool _selectionMode = false;
-  String _filterType = 'all';
   List<String> _allowedTypes = [];
   final _dateFormat = DateFormat('MMM d, y h:mm a');
 
@@ -62,9 +61,6 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
       if (authNotifier.hasPermission('view_settings')) 'merchant_qr',
       if (authNotifier.hasPermission('view_announcements')) 'announcement',
     ];
-    if (!_allowedTypes.contains(_filterType) && _filterType != 'all') {
-      _filterType = 'all';
-    }
   }
 
   Future<void> _loadTrash() async {
@@ -103,25 +99,26 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
         if (!_allowedTypes.contains(item.entityType)) {
           return false;
         }
-        if (_filterType != 'all' && item.entityType != _filterType) {
-          return false;
-        }
         if (query.isEmpty) return true;
 
-        final name = (item.entityName ?? '').toLowerCase();
-        final typeLabel = _labelForType(item.entityType).toLowerCase();
-        final snapshot = item.snapshotMap;
-        final snapshotText = snapshot != null
-            ? snapshot.values
-                .whereType<String>()
-                .map((v) => v.toLowerCase())
-                .join(' ')
-            : '';
-        return name.contains(query) ||
-            typeLabel.contains(query) ||
-            snapshotText.contains(query);
+        return _matchesSearch(item, query);
       }).toList();
     });
+  }
+
+  bool _matchesSearch(TrashItem item, String query) {
+    final name = (item.entityName ?? '').toLowerCase();
+    final typeLabel = _labelForType(item.entityType).toLowerCase();
+    final rawType = item.entityType.toLowerCase();
+    final deletedBy = (item.deletedByName ?? '').toLowerCase();
+    final snapshot = item.snapshotMap;
+    final snapshotText = snapshot != null
+        ? snapshot.values
+            .map((v) => v?.toString().toLowerCase() ?? '')
+            .join(' ')
+        : '';
+    final haystack = '$name $typeLabel $rawType $deletedBy $snapshotText';
+    return haystack.contains(query);
   }
 
   List<TrashItem> _selectedItems() {
@@ -337,7 +334,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
       return;
     }
 
-    final itemName = _filterType == 'all' && _searchController.text.isEmpty
+    final itemName = _searchController.text.isEmpty
         ? 'all items in trash'
         : 'all visible items in trash';
 
@@ -399,14 +396,14 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
-        appBar: AppHeader(title: 'Trash Bin', showBackButton: true),
+        appBar: AppHeader(title: 'Trash', showBackButton: true),
         body: const LoadingState(),
       );
     }
 
     if (_loadError != null) {
       return Scaffold(
-        appBar: AppHeader(title: 'Trash Bin', showBackButton: true),
+        appBar: AppHeader(title: 'Trash', showBackButton: true),
         body: ErrorState(
           title: 'Failed to Load Trash',
           message: _loadError,
@@ -417,7 +414,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
 
     if (_allowedTypes.isEmpty) {
       return Scaffold(
-        appBar: AppHeader(title: 'Trash Bin', showBackButton: true),
+        appBar: AppHeader(title: 'Trash', showBackButton: true),
         body: const EmptyState(
           icon: Icons.delete_outline,
           title: 'No Trash Items',
@@ -429,7 +426,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
     final authNotifier = ref.read(authStateProvider.notifier);
 
     final appBarTitle =
-        _selectionMode ? '${_selectedIds.length} selected' : 'Trash Bin';
+        _selectionMode ? '${_selectedIds.length} selected' : 'Trash';
     final appBarActions = _selectionMode
         ? _buildSelectionActions(authNotifier)
         : _buildNormalActions(authNotifier);
@@ -447,38 +444,14 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: AppSearchField(
-                    controller: _searchController,
-                    hint: 'Search trash...',
-                    onChanged: (_) => _filterItems(),
-                    onClear: () {
-                      _searchController.clear();
-                      _filterItems();
-                    },
-                  ),
-                ),
-                const SizedBox(width: 12),
-                SizedBox(
-                  width: 150,
-                  child: AppDropdown<String>(
-                    label: 'Filter',
-                    value: _filterType,
-                    items: _buildFilterItems(),
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() {
-                          _filterType = value;
-                        });
-                        _filterItems();
-                      }
-                    },
-                    isDense: true,
-                  ),
-                ),
-              ],
+            child: AppSearchField(
+              controller: _searchController,
+              hint: 'Search trash...',
+              onChanged: (_) => _filterItems(),
+              onClear: () {
+                _searchController.clear();
+                _filterItems();
+              },
             ),
           ),
           Expanded(
@@ -489,23 +462,14 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
     );
   }
 
-  List<DropdownMenuItem<String>> _buildFilterItems() {
-    return [
-      const DropdownMenuItem(value: 'all', child: Text('All')),
-      for (final type in _allowedTypes)
-        DropdownMenuItem(value: type, child: Text(_labelForType(type))),
-    ];
-  }
-
   Widget _buildBody() {
     if (_filteredItems.isEmpty) {
-      final hasFilters =
-          _filterType != 'all' || _searchController.text.isNotEmpty;
+      final hasSearch = _searchController.text.trim().isNotEmpty;
       return EmptyState(
         icon: Icons.delete_outline,
-        title: hasFilters ? 'No Matching Items' : 'Trash is Empty',
-        message: hasFilters
-            ? 'Try adjusting your search or filter.'
+        title: hasSearch ? 'No matching records found.' : 'Trash is empty.',
+        message: hasSearch
+            ? 'Try a different search term.'
             : 'Deleted products, categories, users, QR images, and '
                 'announcements will appear here.',
       );

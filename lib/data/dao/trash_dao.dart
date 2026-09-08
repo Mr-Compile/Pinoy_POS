@@ -42,20 +42,6 @@ class TrashDao extends BaseDao<TrashItem> {
     );
   }
 
-  Future<List<TrashItem>> getByEntityType(
-    String entityType, {
-    DatabaseExecutor? txn,
-  }) async {
-    final executor = txn ?? await db;
-    final maps = await executor.query(
-      tableName,
-      where: 'entity_type = ?',
-      whereArgs: [entityType],
-      orderBy: 'deleted_at DESC',
-    );
-    return maps.map((map) => fromMap(map)).toList();
-  }
-
   Future<TrashItem?> getByEntity(
     String entityType,
     int entityId, {

@@ -80,45 +80,6 @@ class TrashService {
     return _withDeletedByNames(items);
   }
 
-  /// Returns trash items for a single entity type.
-  Future<List<TrashItem>> getByEntityType(String entityType) async {
-    if (!_sessionManager.hasPermission('view_trash')) {
-      return [];
-    }
-    final items = await _trashRepository.getByEntityType(entityType);
-    return _withDeletedByNames(items);
-  }
-
-  /// Searches trash by name within an optional entity-type filter.
-  Future<List<TrashItem>> searchTrash({
-    String? query,
-    String? entityType,
-  }) async {
-    if (!_sessionManager.hasPermission('view_trash')) {
-      return [];
-    }
-
-    final where = <String>[];
-    final whereArgs = <Object?>[];
-
-    if (entityType != null && entityType != 'all') {
-      where.add('entity_type = ?');
-      whereArgs.add(entityType);
-    }
-
-    if (query != null && query.trim().isNotEmpty) {
-      where.add('entity_name LIKE ?');
-      whereArgs.add('%${query.trim()}%');
-    }
-
-    final whereClause = where.isEmpty ? null : where.join(' AND ');
-    final items = await _trashRepository.getAll(
-      where: whereClause,
-      whereArgs: whereArgs,
-    );
-    return _withDeletedByNames(items);
-  }
-
   /// Moves an entity to trash.
   ///
   /// The caller is responsible for ensuring the entity is not already in the
