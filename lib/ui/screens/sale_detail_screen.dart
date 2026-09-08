@@ -22,11 +22,8 @@ class SaleDetailScreen extends ConsumerStatefulWidget {
   final Sale? sale;
   final int? saleId;
 
-  const SaleDetailScreen({
-    super.key,
-    this.sale,
-    this.saleId,
-  }) : assert(sale != null || saleId != null);
+  const SaleDetailScreen({super.key, this.sale, this.saleId})
+    : assert(sale != null || saleId != null);
 
   @override
   ConsumerState<SaleDetailScreen> createState() => _SaleDetailScreenState();
@@ -153,11 +150,9 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
   }
 
   Future<void> _viewReceipt() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ReceiptScreen(sale: _sale),
-      ),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => ReceiptScreen(sale: _sale)));
   }
 
   Future<void> _downloadPdf(ReceiptViewData receipt) async {
@@ -238,9 +233,7 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
   Future<void> _viewPaymentProof() async {
     if (_sale.paymentProofPath == null) return;
     await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => PaymentProofViewerScreen(sale: _sale),
-      ),
+      MaterialPageRoute(builder: (_) => PaymentProofViewerScreen(sale: _sale)),
     );
   }
 
@@ -248,20 +241,14 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Scaffold(
-        appBar: AppHeader(
-          title: 'Sale Details',
-          showBackButton: true,
-        ),
+        appBar: AppHeader(title: 'Sale Details', showBackButton: true),
         body: LoadingState(),
       );
     }
 
     if (_notFound || _saleId <= 0) {
       return Scaffold(
-        appBar: const AppHeader(
-          title: 'Sale Not Found',
-          showBackButton: true,
-        ),
+        appBar: const AppHeader(title: 'Sale Not Found', showBackButton: true),
         body: ErrorState(
           title: 'Sale Not Found',
           message: 'The requested sale could not be found.',
@@ -274,8 +261,7 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
     final receiptAsync = ref.watch(receiptViewDataProvider(_saleId));
     final authNotifier = ref.read(authStateProvider.notifier);
     final canVerify = authNotifier.hasPermission('verify_payments');
-    final canViewEvidence =
-        authNotifier.hasPermission('view_payment_evidence');
+    final canViewEvidence = authNotifier.hasPermission('view_payment_evidence');
 
     return Scaffold(
       appBar: AppHeader(
@@ -287,14 +273,14 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
         error: (e, _) => ErrorState(
           title: 'Error',
           message: 'Failed to load sale details: $e',
-          onRetry: () =>
-              ref.invalidate(receiptViewDataProvider(_saleId)),
+          onRetry: () => ref.invalidate(receiptViewDataProvider(_saleId)),
         ),
         data: (receipt) {
           if (receipt == null) {
             return const ErrorState(
               title: 'Not Found',
-              message: 'The sale could not be found or you do not have permission to view it.',
+              message:
+                  'The sale could not be found or you do not have permission to view it.',
             );
           }
           return _buildBody(receipt, canVerify, canViewEvidence);
@@ -304,7 +290,10 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
   }
 
   Widget _buildBody(
-      ReceiptViewData receipt, bool canVerify, bool canViewEvidence) {
+    ReceiptViewData receipt,
+    bool canVerify,
+    bool canViewEvidence,
+  ) {
     final cs = Theme.of(context).colorScheme;
 
     return Center(
@@ -342,7 +331,10 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
   }
 
   Widget _buildHeaderCard(
-      ReceiptViewData receipt, ColorScheme cs, bool canVerify) {
+    ReceiptViewData receipt,
+    ColorScheme cs,
+    bool canVerify,
+  ) {
     final statusColor = _statusColor(receipt.paymentStatus, cs);
     final statusIcon = _statusIcon(receipt.paymentStatus);
 
@@ -363,8 +355,9 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
                     children: [
                       Text(
                         'Sale #${receipt.receiptNumber}',
-                        style: AppTypography.titleMediumBold(context)
-                            .copyWith(color: cs.onPrimaryContainer),
+                        style: AppTypography.titleMediumBold(
+                          context,
+                        ).copyWith(color: cs.onPrimaryContainer),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -382,8 +375,9 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
                   avatar: Icon(statusIcon, size: 16, color: statusColor),
                   label: Text(
                     receipt.statusLabel,
-                    style: AppTypography.bodySmall(context)
-                        .copyWith(color: statusColor),
+                    style: AppTypography.bodySmall(
+                      context,
+                    ).copyWith(color: statusColor),
                   ),
                   side: BorderSide(color: statusColor),
                   backgroundColor: statusColor.withValues(alpha: 0.1),
@@ -427,15 +421,13 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Total',
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
+            Text('Total', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 4),
             Text(
               receipt.formattedTotal(),
-              style: AppTypography.headlineSmallSemibold(context)
-                  .copyWith(color: cs.primary),
+              style: AppTypography.headlineSmallSemibold(
+                context,
+              ).copyWith(color: cs.primary),
             ),
             if (receipt.cashReceived > 0 || receipt.change > 0) ...[
               const SizedBox(height: 8),
@@ -455,42 +447,41 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Items',
-              style: AppTypography.titleSmallBold(context),
-            ),
+            Text('Items', style: AppTypography.titleSmallBold(context)),
             const SizedBox(height: 8),
-            ...receipt.items.map((item) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              item.productName,
-                              style: AppTypography.titleSmall(context),
-                            ),
+            ...receipt.items.map(
+              (item) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.productName,
+                            style: AppTypography.titleSmall(context),
                           ),
-                          const SizedBox(width: 12),
-                          Text(
-                            item.formattedTotal(receipt.currency),
-                            style: AppTypography.titleSmallBold(context),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${item.quantity} x ${item.formattedUnitPrice(receipt.currency)}',
-                        style: AppTypography.bodySmall(context).copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
+                        const SizedBox(width: 12),
+                        Text(
+                          item.formattedTotal(receipt.currency),
+                          style: AppTypography.titleSmallBold(context),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${item.quantity} x ${item.formattedUnitPrice(receipt.currency)}',
+                      style: AppTypography.bodySmall(context).copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
-                    ],
-                  ),
-                )),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -504,10 +495,7 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Payment',
-              style: AppTypography.titleSmallBold(context),
-            ),
+            Text('Payment', style: AppTypography.titleSmallBold(context)),
             const SizedBox(height: 8),
             _buildValueRow('Method', receipt.paymentMethod),
             if (receipt.referenceNumber != null &&
@@ -530,10 +518,7 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Notes',
-              style: AppTypography.titleSmallBold(context),
-            ),
+            Text('Notes', style: AppTypography.titleSmallBold(context)),
             const SizedBox(height: 8),
             Text(receipt.notes!),
           ],
@@ -549,10 +534,7 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Payment Proof',
-              style: AppTypography.titleSmallBold(context),
-            ),
+            Text('Payment Proof', style: AppTypography.titleSmallBold(context)),
             const SizedBox(height: 8),
             FutureBuilder<PaymentProofInfo?>(
               future: _proofFutures.putIfAbsent(
@@ -606,7 +588,10 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
   }
 
   Widget _buildActions(
-      ReceiptViewData receipt, bool canVerify, bool canViewEvidence) {
+    ReceiptViewData receipt,
+    bool canVerify,
+    bool canViewEvidence,
+  ) {
     final actions = <Widget>[
       FilledButton.icon(
         onPressed: _viewReceipt,
@@ -664,16 +649,10 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
+            child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
           ),
           const SizedBox(width: 12),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
+          Text(value, style: Theme.of(context).textTheme.bodyMedium),
         ],
       ),
     );

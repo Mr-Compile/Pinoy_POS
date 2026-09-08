@@ -64,6 +64,15 @@ void main() {
       createdAt: DateTime.now(),
     );
 
+    final product3 = Product(
+      id: 3,
+      name: 'Third Product',
+      price: 75.0,
+      stock: 10,
+      minStock: 1,
+      createdAt: DateTime.now(),
+    );
+
     test('adds product and reflects quantity', () async {
       final error = await cart.addProduct(product);
       expect(error, isNull);
@@ -104,6 +113,51 @@ void main() {
       cart.remove(1);
       expect(cart.state.quantityFor(1), isNull);
       expect(cart.state.isEmpty, isTrue);
+    });
+
+    test('remove leaves other products in cart', () async {
+      await cart.addProduct(product);
+      await cart.addProduct(product2);
+      await cart.addProduct(product3);
+      cart.remove(2);
+
+      expect(cart.state.quantityFor(1), 1);
+      expect(cart.state.quantityFor(2), isNull);
+      expect(cart.state.quantityFor(3), 1);
+      expect(cart.state.isEmpty, isFalse);
+    });
+
+    test('decrement only decreases quantity when above one', () async {
+      await cart.addProduct(product);
+      await cart.increment(1);
+      await cart.increment(1);
+      await cart.increment(1);
+      await cart.increment(1); // qty 5
+
+      cart.decrement(1);
+      expect(cart.state.quantityFor(1), 4);
+    });
+
+    test('clearing cart does not modify product stock', () async {
+      await cart.addProduct(product);
+      await cart.increment(1);
+      await cart.addProduct(product2);
+
+      cart.clear();
+
+      expect(cart.state.isEmpty, isTrue);
+      expect(product.stock, 5);
+      expect(product2.stock, 2);
+    });
+
+    test('cleared cart can add the same product again', () async {
+      await cart.addProduct(product);
+      await cart.increment(1); // qty 2
+      cart.clear();
+
+      final error = await cart.addProduct(product);
+      expect(error, isNull);
+      expect(cart.state.quantityFor(1), 1);
     });
 
     test('clears cart', () async {

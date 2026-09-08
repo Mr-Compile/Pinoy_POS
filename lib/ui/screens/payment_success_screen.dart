@@ -20,84 +20,105 @@ class PaymentSuccessScreen extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: const AppHeader(title: 'Payment Successful', showBackButton: false),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            AppCard(
-              color: cs.primaryContainer,
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  children: [
-                    Icon(Icons.check_circle, size: 64, color: cs.primary),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Payment Successful',
-                      style: AppTypography.headlineSmallSemibold(context)
-                          .copyWith(color: cs.onPrimaryContainer),
+      appBar: const AppHeader(
+        title: 'Payment Successful',
+        showBackButton: false,
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // The summary scrolls so the action buttons stay visible and
+              // reachable on short screens instead of being pushed off the
+              // bottom by a tall card.
+              Expanded(
+                child: SingleChildScrollView(
+                  child: AppCard(
+                    color: cs.primaryContainer,
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        children: [
+                          Icon(Icons.check_circle, size: 64, color: cs.primary),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Payment Successful',
+                            style: AppTypography.headlineSmallSemibold(
+                              context,
+                            ).copyWith(color: cs.onPrimaryContainer),
+                          ),
+                          const SizedBox(height: 24),
+                          _buildRow(
+                            'Amount',
+                            CurrencyUtils.format(sale.totalAmount),
+                          ),
+                          if (sale.change > 0)
+                            _buildRow(
+                              'Change',
+                              CurrencyUtils.format(sale.change),
+                            ),
+                          _buildRow('Method', sale.paymentMethod),
+                          if (sale.referenceNumber != null &&
+                              sale.referenceNumber!.isNotEmpty)
+                            _buildRow('Reference', sale.referenceNumber!),
+                          if (sale.customerName != null &&
+                              sale.customerName!.isNotEmpty)
+                            _buildRow('Customer', sale.customerName!),
+                          _buildRow(
+                            'Status',
+                            sale.paymentStatus[0].toUpperCase() +
+                                sale.paymentStatus.substring(1),
+                          ),
+                          _buildRow(
+                            'Receipt #',
+                            sale.receiptNumber ?? sale.id?.toString() ?? '—',
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 24),
-                    _buildRow('Amount', CurrencyUtils.format(sale.totalAmount)),
-                    if (sale.change > 0)
-                      _buildRow('Change', CurrencyUtils.format(sale.change)),
-                    _buildRow('Method', sale.paymentMethod),
-                    if (sale.referenceNumber != null && sale.referenceNumber!.isNotEmpty)
-                      _buildRow('Reference', sale.referenceNumber!),
-                    if (sale.customerName != null && sale.customerName!.isNotEmpty)
-                      _buildRow('Customer', sale.customerName!),
-                    _buildRow(
-                      'Status',
-                      sale.paymentStatus[0].toUpperCase() +
-                          sale.paymentStatus.substring(1),
-                    ),
-                    _buildRow(
-                      'Receipt #',
-                      sale.receiptNumber ?? sale.id?.toString() ?? '—',
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-            const Spacer(),
-            FilledButton.icon(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => SaleDetailScreen(sale: sale),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.receipt_long_outlined),
-              label: const Text('View Sale Details'),
-            ),
-            const SizedBox(height: 12),
-            FilledButton.icon(
-              style: FilledButton.styleFrom(
-                backgroundColor: cs.secondaryContainer,
-                foregroundColor: cs.onSecondaryContainer,
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => SaleDetailScreen(sale: sale),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.receipt_long_outlined),
+                label: const Text('View Sale Details'),
               ),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => ReceiptScreen(sale: sale),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.print_outlined),
-              label: const Text('View / Download Receipt'),
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton(
-              onPressed: () {
-                // Pop back to the POS tab (root of the navigation stack).
-                Navigator.of(context).popUntil((route) => route.isFirst);
-              },
-              child: const Text('New Sale'),
-            ),
-          ],
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: cs.secondaryContainer,
+                  foregroundColor: cs.onSecondaryContainer,
+                ),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => ReceiptScreen(sale: sale),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.print_outlined),
+                label: const Text('View / Download Receipt'),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton(
+                onPressed: () {
+                  // Pop back to the POS tab (root of the navigation stack).
+                  Navigator.of(context).popUntil((route) => route.isFirst);
+                },
+                child: const Text('New Sale'),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -17,6 +16,7 @@ import 'package:pinoy_pos/ui/screens/payment_settings_page.dart';
 import 'package:pinoy_pos/ui/screens/payment_success_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
+import 'package:pinoy_pos/ui/widgets/app_image.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_payment_qr_preview.dart';
 import 'package:pinoy_pos/ui/widgets/app_payment_qr_viewer.dart';
@@ -158,11 +158,9 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
     // exempt. Cancelling the dialog leaves the cart intact and creates no
     // sale.
     int? verifiedByUserId;
-    final verificationService =
-        ref.read(paymentVerificationServiceProvider);
+    final verificationService = ref.read(paymentVerificationServiceProvider);
     final operator = SessionManager().currentUser;
-    final needsVerification =
-        verificationService.requiresVerificationFor(
+    final needsVerification = verificationService.requiresVerificationFor(
       operatorRole: operator?.role,
       paymentMethod: 'GCash',
       settings: settings,
@@ -189,7 +187,9 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
 
     try {
       final items = ref.read(cartProvider.notifier).toSaleItems();
-      final success = await ref.read(salesServiceProvider).createSale(
+      final success = await ref
+          .read(salesServiceProvider)
+          .createSale(
             items: items,
             totalAmount: widget.total,
             cashReceived: widget.total,
@@ -220,9 +220,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
 
         if (sale != null) {
           await Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(
-              builder: (_) => PaymentSuccessScreen(sale: sale),
-            ),
+            MaterialPageRoute(builder: (_) => PaymentSuccessScreen(sale: sale)),
             (route) => route.isFirst,
           );
         } else {
@@ -324,6 +322,8 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          _buildOrderSummary(cs),
+          const SizedBox(height: 16),
           _buildTotalCard(cs),
           const SizedBox(height: 24),
           _buildMerchantQrSection(settings, cs),
@@ -346,10 +346,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
           ),
           const SizedBox(height: 16),
           if (settings.paymentProofVisible) ...[
-            Text(
-              'Payment Proof',
-              style: AppTypography.titleSmallBold(context),
-            ),
+            Text('Payment Proof', style: AppTypography.titleSmallBold(context)),
             const SizedBox(height: 8),
             _buildProofPicker(settings, cs),
             const SizedBox(height: 16),
@@ -368,21 +365,92 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
     );
   }
 
+  /// Compact recap of the cart so the cashier sees what the customer is
+  /// paying for before entering GCash details. Capped at three lines so
+  /// long orders cannot push the payment fields off screen.
+  Widget _buildOrderSummary(ColorScheme cs) {
+    final cart = ref.watch(cartProvider);
+    if (cart.isEmpty) return const SizedBox.shrink();
+
+    final visibleItems = cart.items.take(3).toList();
+    final hiddenCount = cart.items.length - visibleItems.length;
+
+    return AppCard(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Order Summary',
+                  style: AppTypography.titleSmallBold(context),
+                ),
+                Text(
+                  '${cart.itemCount} item${cart.itemCount == 1 ? '' : 's'}',
+                  style: AppTypography.bodySmall(
+                    context,
+                  ).copyWith(color: cs.onSurfaceVariant),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ...visibleItems.map(
+              (item) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${item.product.name} × ${item.quantity}',
+                        style: AppTypography.bodyMedium(context),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      CurrencyUtils.format(item.lineTotal),
+                      style: AppTypography.bodyMedium(
+                        context,
+                      ).copyWith(fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (hiddenCount > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  '+$hiddenCount more item${hiddenCount == 1 ? '' : 's'}',
+                  style: AppTypography.bodySmall(
+                    context,
+                  ).copyWith(color: cs.onSurfaceVariant),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildTotalCard(ColorScheme cs) {
     return AppCard(
+      color: cs.primaryContainer,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'Total Due',
-              style: TextStyle(color: cs.onPrimaryContainer),
-            ),
+            Text('Total Due', style: TextStyle(color: cs.onPrimaryContainer)),
             Text(
               CurrencyUtils.format(widget.total),
-              style: AppTypography.titleLargeBold(context)
-                  .copyWith(color: cs.onPrimaryContainer),
+              style: AppTypography.titleLargeBold(
+                context,
+              ).copyWith(color: cs.onPrimaryContainer),
             ),
           ],
         ),
@@ -429,7 +497,9 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
                 const SizedBox(height: 12),
                 AppPaymentQrPreview(
                   imagePath: qrPath,
-                  onTap: safeQrPath != null ? () => _openQrViewer(safeQrPath) : null,
+                  onTap: safeQrPath != null
+                      ? () => _openQrViewer(safeQrPath)
+                      : null,
                   emptyTitle: 'GCash QR not configured',
                   emptySubtitle: canConfigure
                       ? 'Upload the business GCash QR so customers can scan it.'
@@ -518,9 +588,9 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
             padding: const EdgeInsets.only(top: 4),
             child: Text(
               'Payment proof is required',
-              style: AppTypography.labelMedium(context).copyWith(
-                color: cs.onSurfaceVariant,
-              ),
+              style: AppTypography.labelMedium(
+                context,
+              ).copyWith(color: cs.onSurfaceVariant),
             ),
           ),
       ],
@@ -528,32 +598,20 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
   }
 
   Widget _buildProofThumbnail(String relativePath) {
-    return FutureBuilder<File?>(
-      future: ImageService().resolveImageFile(relativePath),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const SizedBox(
-            height: 160,
-            child: Center(child: CircularProgressIndicator()),
-          );
-        }
-        final file = snapshot.data;
-        if (file == null) {
-          return const SizedBox(
-            height: 160,
-            child: Center(child: Icon(Icons.broken_image)),
-          );
-        }
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Image.file(
-            file,
-            height: 160,
-            width: double.infinity,
-            fit: BoxFit.cover,
-          ),
-        );
-      },
+    // AppImage resolves the stored path and shows a themed placeholder if
+    // the file was deleted or corrupted instead of a bare broken-image icon.
+    return SizedBox(
+      height: 160,
+      width: double.infinity,
+      child: AppImage(
+        imagePath: relativePath,
+        placeholderIcon: Icons.receipt_long_outlined,
+        placeholderIconSize: 40,
+        borderRadius: 12,
+        fit: BoxFit.cover,
+        cacheWidth: 1024,
+        semanticLabel: 'Payment proof',
+      ),
     );
   }
 
@@ -565,6 +623,8 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        _buildOrderSummary(cs),
+        const SizedBox(height: 16),
         _buildTotalCard(cs),
         const SizedBox(height: 24),
         AppCard(
@@ -578,10 +638,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  'GCash',
-                  style: AppTypography.titleMediumBold(context),
-                ),
+                Text('GCash', style: AppTypography.titleMediumBold(context)),
                 if (customer.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Text(
@@ -599,8 +656,9 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
                 const SizedBox(height: 4),
                 Text(
                   reference,
-                  style: AppTypography.titleMediumBold(context)
-                      .copyWith(color: cs.primary),
+                  style: AppTypography.titleMediumBold(
+                    context,
+                  ).copyWith(color: cs.primary),
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -658,8 +716,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
             Expanded(
               child: LoadingButton(
                 isLoading: _isProcessing,
-                onPressed:
-                    _isProcessing ? null : () => _completeSale(settings),
+                onPressed: _isProcessing ? null : () => _completeSale(settings),
                 label: 'Confirm Payment',
               ),
             ),
