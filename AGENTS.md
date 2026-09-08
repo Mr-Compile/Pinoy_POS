@@ -670,3 +670,71 @@ flutter test
 ```
 
 Result: `flutter analyze` reports no issues; `flutter test` passes 321/321 tests (11/11 in `session_timeout_service_test.dart`, 5/5 in `session_expiring_dialog_test.dart`).
+
+
+## POS Mobile/Portrait UX Pass
+
+### What Changed
+
+- lib/ui/screens/pos_screen.dart
+  - Two-pane POS layout now engages at >= 840 px (_twoPaneMinWidth) instead of the generic 600 px medium breakpoint, so portrait tablets keep the stacked phone layout and the product pane never shrinks below ~500 px beside the cart.
+  - _CartItemRow shows a fixed 56 px AppImage thumbnail (Icons.inventory_2_outlined fallback, cacheWidth: 128) and splits content into a name/remove row and a quantity/subtotal row, so long names ellipsize instead of pushing controls off screen.
+  - Compact layout replaces the floating cart FAB with _MobileCartBar, a sticky bottom bar (item count + total + Checkout) inside the layout's SafeArea; tapping the summary opens the editable cart sheet, Checkout jumps straight to the payment dialog.
+  - _buildProductGrid derives column count from the grid's own LayoutBuilder width (min tile 150 px compact / 170 px wide, clamped 2-4 / 2-6 columns).
+  - The wide-layout cart panel width scales with the window via (width * 0.34).clamp(320, 420).
+  - _CheckoutPanel accepts the DraggableScrollableSheet scroll controller so the cart list drives the drag gesture in the bottom sheet.
+  - The payment dialog's method dropdown is replaced by _PaymentMethodTile tiles (icon + label, 56 px min height, theme colors) in a 2-column wrap on compact widths and a single row when there is room; the pos_payment_method key is kept on the selector.
+- lib/ui/screens/gcash_payment_screen.dart
+  - _buildOrderSummary card (cart items, capped at 3 rows + "+N more") now sits at the top of both the details and review steps.
+  - _buildTotalCard uses cs.primaryContainer, fixing onPrimaryContainer text on a default surface (contrast bug in dark mode).
+  - _buildProofThumbnail uses AppImage so missing/corrupted proof files show a themed placeholder instead of a bare Icons.broken_image.
+- lib/ui/screens/payment_success_screen.dart
+  - The summary card scrolls inside Expanded so the action buttons stay reachable on short screens.
+
+### Unchanged Behaviour
+
+- Cart add/increment/decrement/remove, stock validation, checkout permissions, payment Required/Optional settings, GCash verification flow, inventory deduction, sale persistence, and receipt/success navigation are untouched.
+- Sales screen was already card-based (AppListItem) with responsive PeriodSelector (stacks under 360 px); sale detail and receipt screens already use Expanded/Flexible rows with 600-800 px max-width constraints.
+
+### Verification
+
+`powershell
+flutter analyze
+flutter test test/owner_screens_test.dart test/cart_provider_test.dart test/payment_pos_validation_test.dart test/gcash_payment_service_test.dart test/payment_settings_page_test.dart test/app_dialog_form_test.dart test/app_input_fields_test.dart test/app_button_theme_test.dart test/period_selector_test.dart test/sales_period_selector_test.dart test/sales_trend_chart_empty_test.dart test/dialog_dismiss_test.dart test/modal_result_test.dart
+`
+
+Result: lutter analyze clean on changed files (one pre-existing info-level lint in 	est/trash_unified_test.dart, unrelated). Focused suites pass 112/112. The full lutter test run could not complete in this environment because concurrent lutter invocations lock uild/native_assets/windows/sqlite3.dll and kill the run; all POS/payment/widget suites were verified individually.
+
+
+## Date-Sequential Receipt Numbers (YYYYMMDD-NNNN)
+
+### What Changed
+
+- lib/core/security.dart
+  - Removed SecurityHelper.generateReceiptNumber() (timestamp + random RCP… values). SaleRepository.nextReceiptNumber is now the single authoritative generator.
+- lib/data/dao/sale_dao.dart
+  - getMaxReceiptSequence(datePrefix, {txn}) returns MAX(CAST(substr(receipt_number, 10) AS INTEGER)) for rows matching 'YYYYMMDD-%'. All rows count (confirmed, voided, cancelled, soft-deleted) so consumed numbers are never reused; legacy RCP… rows never match the prefix.
+- lib/data/repositories/sale_repository.dart
+  - 
+extReceiptNumber(businessDate, {txn}) formats YYYYMMDD-NNNN using the **local** business date (eceiptDatePrefix uses 	oLocal()), zero-padded to 4 digits.
+- lib/services/sales_service.dart
+  - createSale generates the receipt number inside the existing SQLite transaction, sharing one DateTime.now() for createdAt and the receipt prefix.
+  - The insert retries up to 3 times on DatabaseException.isUniqueConstraintError() (the eceipt_number TEXT UNIQUE column is the final duplicate guard); on conflict it re-reads the table and takes the next free sequence rather than failing.
+- 	est/receipt_number_test.dart (new, 12 tests)
+  - Format YYYYMMDD-0001 first sale, same-day increment, regex format, continuation from persisted rows, next-day reset to 0001, legacy RCP… rows ignored, createSale skipping a taken number, voided-sale numbers not reused, search by full/date/sequence, created_at ordering, and failed-sale lifecycle (no number consumed).
+
+### Unchanged
+
+- No schema migration needed: eceipt_number TEXT UNIQUE already exists; historical RCP… numbers are preserved and cannot collide with the new format.
+- All UI surfaces already render sale.receiptNumber (sales list 'Sale #', transaction list, sale detail, receipt screen/PDF, dashboard, reports export, AI navigation), so the new format flows through without display changes.
+- Search already covers eceipt_number LIKE in getFilteredSales/getConfirmedSalesForRange, so 20260908, 20260908-0007, and  007 all match.
+- Ordering stays created_at DESC, which aligns with the per-day sequence.
+
+### Verification
+
+`powershell
+flutter analyze
+flutter test test/receipt_number_test.dart test/gcash_payment_service_test.dart test/payment_pos_validation_test.dart test/sales_screen_responsive_test.dart test/owner_integration_test.dart test/owner_screens_test.dart
+`
+
+Result: lutter analyze clean on changed files; 12/12 new tests pass and all sales/payment regression suites pass.
