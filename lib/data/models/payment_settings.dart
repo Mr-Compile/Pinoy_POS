@@ -36,7 +36,14 @@ class PaymentSettings {
     );
   }
 
+  /// Whether the customer name is required at checkout.
+  ///
+  /// Although the backing column is named `gcash_customer_name_requirement`
+  /// for historical reasons, this rule is enforced for every payment method
+  /// so the setting controls the POS consistently.
   bool get customerNameRequired => gcashCustomerNameRequirement == 'required';
+
+  /// Whether the customer name field should be shown at checkout.
   bool get customerNameVisible => gcashCustomerNameRequirement != 'off';
 
   bool get paymentProofRequired => gcashPaymentProofRequirement == 'required';

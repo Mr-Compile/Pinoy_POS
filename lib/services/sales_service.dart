@@ -352,6 +352,17 @@ class SalesService {
       received = totalAmount;
     }
 
+    // Customer name is configured in Payment Settings and applies to every
+    // payment method. It is checked here at the service level so the rule
+    // cannot be bypassed by another UI path.
+    if (paymentSettings.customerNameRequired &&
+        (trimmedCustomer == null || trimmedCustomer.isEmpty)) {
+      throw PaymentValidationException(
+        'Customer name is required',
+        details: 'Enter the customer name before completing the sale.',
+      );
+    }
+
     const paymentStatus = 'confirmed';
     DateTime? verifiedAt;
     int? verifiedBy;
@@ -374,14 +385,6 @@ class SalesService {
             details: 'Reference number must be at least ${paymentSettings.gcashReferenceMinLength} characters.',
           );
         }
-      }
-
-      if (paymentSettings.customerNameRequired &&
-          (trimmedCustomer == null || trimmedCustomer.isEmpty)) {
-        throw PaymentValidationException(
-          'Customer name is required',
-          details: 'Enter the customer name for this GCash payment.',
-        );
       }
 
       if (paymentSettings.paymentProofRequired &&

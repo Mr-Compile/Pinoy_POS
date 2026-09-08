@@ -74,6 +74,12 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
     return null;
   }
 
+  String _customerNameLabel(PaymentSettings settings) {
+    if (!settings.customerNameVisible) return 'Customer Name';
+    if (settings.customerNameRequired) return 'Customer Name (required)';
+    return 'Customer Name (optional)';
+  }
+
   String? _validateCustomer(PaymentSettings settings, String? value) {
     if (!settings.customerNameRequired) return null;
     final trimmed = value?.trim() ?? '';
@@ -324,7 +330,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
           if (settings.customerNameVisible) ...[
             AppTextFormField(
               controller: _customerController,
-              label: 'Customer Name',
+              label: _customerNameLabel(settings),
               prefixIcon: Icons.person_outline,
               textCapitalization: TextCapitalization.words,
               validator: (value) => _validateCustomer(settings, value),

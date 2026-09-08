@@ -66,11 +66,6 @@ class DashboardScreen extends ConsumerWidget {
     final user = authState.user;
     final dashboardState = ref.watch(dashboardProvider);
 
-    // Reload dashboard data whenever the shared sales period filter changes.
-    ref.listen(salesPeriodFilterProvider, (_, _) {
-      ref.read(dashboardProvider.notifier).load();
-    });
-
     return Scaffold(
       appBar: const AppHeader(title: 'Dashboard'),
       body: RefreshIndicator(

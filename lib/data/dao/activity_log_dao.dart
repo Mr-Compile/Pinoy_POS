@@ -46,7 +46,7 @@ class ActivityLogDao extends BaseDao<ActivityLog> {
     final database = await db;
     final maps = await database.query(
       tableName,
-      where: 'created_at BETWEEN ? AND ?',
+      where: 'created_at >= ? AND created_at < ?',
       whereArgs: [start.toIso8601String(), end.toIso8601String()],
       orderBy: 'created_at DESC',
       limit: limit,
@@ -63,7 +63,7 @@ class ActivityLogDao extends BaseDao<ActivityLog> {
     final database = await db;
     final maps = await database.query(
       tableName,
-      where: 'user_id = ? AND created_at BETWEEN ? AND ?',
+      where: 'user_id = ? AND created_at >= ? AND created_at < ?',
       whereArgs: [userId, start.toIso8601String(), end.toIso8601String()],
       orderBy: 'created_at DESC',
       limit: limit,

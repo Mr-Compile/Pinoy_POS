@@ -41,10 +41,6 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    ref.listen(salesPeriodFilterProvider, (_, _) {
-      ref.read(salesAnalyticsProvider.notifier).load();
-    });
-
     final state = ref.watch(salesAnalyticsProvider);
     final canExport =
         ref.read(authStateProvider.notifier).hasPermission('export_reports');

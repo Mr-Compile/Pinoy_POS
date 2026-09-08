@@ -131,5 +131,14 @@ class SalesAnalyticsNotifier extends StateNotifier<SalesAnalyticsState> {
 
 final salesAnalyticsProvider =
     StateNotifierProvider<SalesAnalyticsNotifier, SalesAnalyticsState>((ref) {
-  return SalesAnalyticsNotifier(ref);
+  final notifier = SalesAnalyticsNotifier(ref);
+
+  // Reload analytics whenever the shared sales period filter changes.
+  // Keeping the listener at the provider level keeps the analytics in sync
+  // with the Dashboard even when this screen is not currently visible.
+  ref.listen(salesPeriodFilterProvider, (previous, next) {
+    notifier.load();
+  });
+
+  return notifier;
 });

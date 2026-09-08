@@ -87,9 +87,21 @@ final dashboardProvider =
   // serving the previous role's cached state.
   final isAuthenticated =
       ref.watch(authStateProvider.select((s) => s.user != null));
-  return DashboardNotifier(
+
+  final notifier = DashboardNotifier(
     ref.watch(dashboardServiceProvider),
     ref,
     isAuthenticated: isAuthenticated,
   );
+
+  // Reload the dashboard whenever the shared sales period filter changes.
+  // Keeping the listener at the provider level ensures the dashboard state is
+  // refreshed even when the Dashboard screen is not currently in the widget
+  // tree (e.g. the filter was changed from the Sales Analytics screen and the
+  // user then returns to the Dashboard).
+  ref.listen(salesPeriodFilterProvider, (previous, next) {
+    notifier.load();
+  });
+
+  return notifier;
 });

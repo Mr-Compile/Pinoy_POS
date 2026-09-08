@@ -218,10 +218,12 @@ class DashboardService {
       ..sort((a, b) => a.stock.compareTo(b.stock));
 
     // Recent activity (Owner sees own actions only; dashboard is a personal view).
-    final activities = await _activityLogRepository.getByUserId(
+    final recentActivities = await _activityLogRepository.getByUserIdAndDateRange(
       _sessionManager.currentUser!.id!,
+      filter.startOfPeriod,
+      filter.endOfPeriod,
+      limit: 5,
     );
-    final recentActivities = activities.take(5).toList();
 
     // Active announcements, pinned first.
     final announcements = await _loadAnnouncements();
@@ -272,9 +274,12 @@ class DashboardService {
           );
     final recentActivities = currentUser?.id == null
         ? <ActivityLog>[]
-        : (await _activityLogRepository.getByUserId(currentUser!.id!))
-            .take(5)
-            .toList();
+        : await _activityLogRepository.getByUserIdAndDateRange(
+            currentUser!.id!,
+            weekAgo,
+            now,
+            limit: 5,
+          );
 
     // Backup status from backup_history (real DB rows, not filesystem scan).
     final backups = await _backupHistoryRepository.getAll();
@@ -355,9 +360,13 @@ class DashboardService {
         .toList()
       ..sort((a, b) => a.stock.compareTo(b.stock));
 
-    // Staff recent activity (own only — DAO filters by user_id).
-    final activities = await _activityLogRepository.getByUserId(user.id!);
-    final recentActivities = activities.take(5).toList();
+    // Staff recent activity (own only — DAO filters by user_id and date range).
+    final recentActivities = await _activityLogRepository.getByUserIdAndDateRange(
+      user.id!,
+      filter.startOfPeriod,
+      filter.endOfPeriod,
+      limit: 5,
+    );
 
     return StaffDashboardData(
       analytics: analytics,

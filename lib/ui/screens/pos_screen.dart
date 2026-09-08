@@ -978,6 +978,20 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
     return const ['Cash', 'Card', 'Other'];
   }
 
+  String _customerNameLabel(PaymentSettings settings) {
+    if (!settings.customerNameVisible) return 'Customer Name';
+    if (settings.customerNameRequired) return 'Customer Name (required)';
+    return 'Customer Name (optional)';
+  }
+
+  String? _validateCustomerName(PaymentSettings settings, String? value) {
+    if (!settings.customerNameRequired) return null;
+    if ((value?.trim() ?? '').isEmpty) {
+      return 'Customer name is required';
+    }
+    return null;
+  }
+
   void _openQrViewer(String qrPath) {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -1073,11 +1087,10 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
                       _referenceController.text.trim().isNotEmpty
                   ? _referenceController.text.trim()
                   : null,
-          customerName:
-              (currentMethod == 'Card' || currentMethod == 'Other') &&
-                      _customerNameController.text.trim().isNotEmpty
-                  ? _customerNameController.text.trim()
-                  : null,
+          customerName: settings.customerNameVisible &&
+                  _customerNameController.text.trim().isNotEmpty
+              ? _customerNameController.text.trim()
+              : null,
         ),
       );
     }
@@ -1212,7 +1225,7 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
                 ),
                 const SizedBox(height: Spacing.md),
               ],
-              // Reference and customer (Card/Other only)
+              // Reference (Card/Other only)
               if (currentMethod == 'Card' || currentMethod == 'Other') ...[
                 AppTextFormField(
                   controller: _referenceController,
@@ -1220,10 +1233,15 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
                   prefixIcon: Icons.confirmation_number,
                 ),
                 const SizedBox(height: Spacing.md),
+              ],
+              // Customer name for non-GCash methods, driven by Payment Settings.
+              if (currentMethod != 'GCash' && settings.customerNameVisible) ...[
                 AppTextFormField(
                   controller: _customerNameController,
-                  label: 'Customer Name (optional)',
+                  label: _customerNameLabel(settings),
                   prefixIcon: Icons.person,
+                  textCapitalization: TextCapitalization.words,
+                  validator: (value) => _validateCustomerName(settings, value),
                 ),
                 const SizedBox(height: Spacing.md),
               ],

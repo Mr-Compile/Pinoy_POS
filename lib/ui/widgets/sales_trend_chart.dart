@@ -24,7 +24,7 @@ class SalesTrendChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (trend.isEmpty) {
+    if (trend.isEmpty || _trendIsAllZero(trend)) {
       return const EmptyState(
         icon: Icons.bar_chart,
         title: 'No trend data',
@@ -61,6 +61,15 @@ class SalesTrendChart extends StatelessWidget {
       }
     }
     return maxIndex;
+  }
+
+  bool _trendIsAllZero(List<DailySalesPoint> trend) {
+    for (final point in trend) {
+      if (point.total != 0.0 || point.count != 0) {
+        return false;
+      }
+    }
+    return true;
   }
 
   BarChartPoint _toBarPoint(DailySalesPoint point) {
