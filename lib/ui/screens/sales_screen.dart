@@ -19,14 +19,13 @@ import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_form.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
+import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_icon_button.dart';
-import 'package:pinoy_pos/ui/widgets/app_list_item.dart';
-import 'package:pinoy_pos/ui/widgets/app_section.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/summary_stat_card.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
-import 'package:pinoy_pos/ui/widgets/period_selector.dart';
+
 import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 
 class SalesScreen extends ConsumerStatefulWidget {
@@ -52,7 +51,15 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
   final _searchController = TextEditingController();
 
   /// Quick-filter payment methods shown as chips below the search bar.
-  static const _paymentMethods = ['Cash', 'GCash', 'Card', 'Other'];
+  static const _paymentMethods = ['GCash', 'Cash', 'Card'];
+
+  /// Quick period chips shown at the top of the sales screen.
+  static const _quickPeriods = [
+    ReportingPeriod.thisMonth,
+    ReportingPeriod.thisWeek,
+    ReportingPeriod.today,
+    ReportingPeriod.custom,
+  ];
 
   @override
   void initState() {
@@ -104,19 +111,6 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
         });
       }
     }
-  }
-
-  void _onPeriodSelected(ReportingPeriod period) {
-    if (period == _selectedPeriod) return;
-
-    setState(() {
-      _selectedPeriod = period;
-      if (period != ReportingPeriod.custom) {
-        _customStart = null;
-        _customEnd = null;
-      }
-    });
-    _loadSales();
   }
 
   void _onCustomRange(DateTimeRange range) {
@@ -594,29 +588,11 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                   )
                 else
                   SliverPadding(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate((context, index) {
                         final group = grouped[index];
-                        final groupTotal = group.sales.fold<double>(
-                          0,
-                          (sum, sale) => sum + sale.totalAmount,
-                        );
-                        return AppSection(
-                          title: group.label,
-                          subtitle:
-                              '${group.sales.length} sale${group.sales.length == 1 ? '' : 's'} · ${CurrencyUtils.format(groupTotal)}',
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: group.sales
-                                .map(
-                                  (sale) =>
-                                      _buildSaleCard(sale, canVoid, context),
-                                )
-                                .toList(),
-                          ),
-                        );
+                        return _buildGroup(context, group, canVoid);
                       }, childCount: grouped.length),
                     ),
                   ),
@@ -638,20 +614,14 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          PeriodSelector(
-            selected: _selectedPeriod,
-            onSelected: _onPeriodSelected,
-            customStart: _customStart,
-            customEnd: _customEnd,
-            onCustomRange: _onCustomRange,
-          ),
+          _buildPeriodChips(context),
           const SizedBox(height: Spacing.sm),
           _buildStatsStrip(context, totalAmount, pendingCount),
           const SizedBox(height: Spacing.sm),
           _buildSearchBar(context),
           const SizedBox(height: Spacing.sm),
           _buildMethodChips(context),
-          const SizedBox(height: Spacing.sm),
+          const SizedBox(height: Spacing.md),
         ],
       ),
     );
@@ -671,7 +641,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
           child: SummaryStatCard(
             icon: Icons.receipt_long_outlined,
             color: cs.primary,
-            value: CurrencyUtils.format(total),
+            value: CurrencyUtils.formatWhole(total),
             label: 'Total Sales',
           ),
         ),
@@ -710,10 +680,12 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
           ),
         ),
         const SizedBox(width: Spacing.sm),
-        AppIconButton(
-          icon: Icons.filter_list,
-          tooltip: 'Filters',
+        AppButton.outlined(
           onPressed: _isProcessing ? null : _showFilterDialog,
+          icon: Icons.filter_list,
+          label: 'Filter',
+          size: AppButtonSize.small,
+          color: AppButtonColor.neutral,
         ),
         if (ref
             .read(authStateProvider.notifier)
@@ -742,6 +714,29 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
           onPressed: _isProcessing ? null : _loadSales,
         ),
       ],
+    );
+  }
+
+  Widget _buildPeriodChips(BuildContext context) {
+    final chips = _quickPeriods.map((period) {
+      final label = switch (period) {
+        ReportingPeriod.thisMonth => 'This month',
+        ReportingPeriod.thisWeek => 'This week',
+        ReportingPeriod.today => 'Today',
+        ReportingPeriod.custom => 'Custom',
+        _ => period.displayName,
+      };
+      return _MethodChip(
+        label: label,
+        selected: _selectedPeriod == period,
+        onSelected: (_) => _onQuickPeriodSelected(period),
+      );
+    }).toList();
+
+    return Wrap(
+      spacing: Spacing.sm,
+      runSpacing: Spacing.xs,
+      children: chips,
     );
   }
 
@@ -786,6 +781,44 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     _loadSales();
   }
 
+  void _onQuickPeriodSelected(ReportingPeriod period) {
+    if (period == _selectedPeriod && period != ReportingPeriod.custom) return;
+
+    if (period == ReportingPeriod.custom) {
+      _pickCustomRange();
+      return;
+    }
+
+    setState(() {
+      _selectedPeriod = period;
+      _customStart = null;
+      _customEnd = null;
+    });
+    _loadSales();
+  }
+
+  Future<void> _pickCustomRange() async {
+    final now = DateTime.now();
+    final first = now.subtract(const Duration(days: 365 * 2));
+    final initial = _customStart != null && _customEnd != null
+        ? DateTimeRange(start: _customStart!, end: _customEnd!)
+        : DateTimeRange(
+            start: now.subtract(const Duration(days: 30)),
+            end: now,
+          );
+
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: first,
+      lastDate: now.add(const Duration(days: 1)),
+      initialDateRange: initial,
+    );
+
+    if (picked != null && mounted) {
+      _onCustomRange(picked);
+    }
+  }
+
   List<_SalesGroup> _groupByDate(List<Sale> sales) {
     final groups = <String, List<Sale>>{};
     for (final sale in sales) {
@@ -822,9 +855,55 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     return '${local.month}/${local.day}/${local.year}';
   }
 
+  Widget _buildGroup(
+    BuildContext context,
+    _SalesGroup group,
+    bool canVoid,
+  ) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Spacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, Spacing.sm),
+            child: Text(
+              group.label.toUpperCase(),
+              style: AppTypography.labelMedium(context).copyWith(
+                fontWeight: FontWeight.w700,
+                color: cs.onSurfaceVariant,
+                letterSpacing: 0.4,
+              ),
+            ),
+          ),
+          AppCard(
+            variant: AppCardVariant.filled,
+            padding: const EdgeInsets.all(Spacing.md + 2),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (var i = 0; i < group.sales.length; i++) ...[
+                  _buildSaleCard(group.sales[i], canVoid, context),
+                  if (i < group.sales.length - 1)
+                    Divider(
+                      height: 1,
+                      color: cs.outlineVariant,
+                    ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSaleCard(Sale sale, bool canVoid, BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final statusColor = _statusColor(sale.paymentStatus, cs);
+    final brightness = Theme.of(context).brightness;
+    final statusColor = _statusColor(sale.paymentStatus);
     final statusIcon = _statusIcon(sale.paymentStatus);
     final time = _formatTime(sale.createdAt);
 
@@ -833,45 +912,116 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
         ? ' · ${sale.customerName}'
         : '';
 
-    final actions = <AppListAction>[
-      if (canVoid && sale.paymentStatus == 'confirmed')
-        AppListAction(
-          icon: Icons.delete,
-          tooltip: 'Void sale',
-          color: cs.error,
-          onPressed: () => _voidSale(sale),
-        ),
-    ];
-
-    return AppListItem(
-      margin: const EdgeInsets.only(bottom: Spacing.md),
-      leading: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: statusColor.withValues(alpha: 0.16),
-          borderRadius: BorderRadius.circular(AppRadius.md),
-        ),
-        child: Icon(statusIcon, color: statusColor, size: 20),
-      ),
-      title: 'Sale #${sale.receiptNumber ?? sale.id}',
-      subtitle: '$time · ${sale.paymentMethod}$customerText',
-      trailing: Text(
-        CurrencyUtils.format(sale.totalAmount),
-        style: AppTypography.titleMediumBold(
-          context,
-        ).copyWith(color: cs.primary),
-      ),
-      statusLabel: _statusLabel(sale.paymentStatus),
-      statusColor: statusColor,
-      statusIcon: statusIcon,
-      actions: actions.isNotEmpty ? actions : null,
+    return InkWell(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => SaleDetailScreen(sale: sale)),
         );
       },
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: statusColor.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+              child: Icon(statusIcon, color: statusColor, size: 19),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Sale #${sale.receiptNumber ?? sale.id}',
+                    style: AppTypography.titleSmall(context).copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    '$time · ${sale.paymentMethod}$customerText',
+                    style: AppTypography.bodySmall(context).copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  CurrencyUtils.format(sale.totalAmount),
+                  style: AppTypography.titleMediumBold(context).copyWith(
+                    color: cs.primary,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                _buildStatusPill(
+                  sale.paymentStatus,
+                  statusColor,
+                  brightness,
+                  context,
+                ),
+              ],
+            ),
+            if (canVoid && sale.paymentStatus == 'confirmed') ...[
+              const SizedBox(width: 4),
+              AppIconButton(
+                icon: Icons.delete,
+                tooltip: 'Void sale',
+                onPressed: () => _voidSale(sale),
+                color: cs.error,
+                size: 20,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusPill(
+    String status,
+    Color color,
+    Brightness brightness,
+    BuildContext context,
+  ) {
+    final label = _statusLabel(status);
+    final isConfirmed = status == 'confirmed';
+    final backgroundColor = isConfirmed ? color : color.withValues(alpha: 0.16);
+    final foregroundColor = isConfirmed
+        ? AppSemanticColors.resolveOn(AppSemanticColors.onSuccess, brightness)
+        : color;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Text(
+        label,
+        style: AppTypography.labelSmall(context).copyWith(
+          fontWeight: FontWeight.w700,
+          color: foregroundColor,
+        ),
+      ),
     );
   }
 
@@ -883,23 +1033,24 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     return '$hour:$minute $period';
   }
 
-  Color _statusColor(String status, ColorScheme cs) {
+  Color _statusColor(String status) {
     final brightness = Theme.of(context).brightness;
     return switch (status) {
       'confirmed' =>
         AppSemanticColors.resolve(AppSemanticColors.success, brightness),
       'pending' =>
         AppSemanticColors.resolve(AppSemanticColors.warning, brightness),
-      'cancelled' || 'refunded' => cs.error,
-      _ => cs.outline,
+      'cancelled' || 'refunded' =>
+        AppSemanticColors.resolve(AppSemanticColors.error, brightness),
+      _ => Theme.of(context).colorScheme.outline,
     };
   }
 
   IconData _statusIcon(String status) {
     return switch (status) {
-      'confirmed' => Icons.check_circle,
-      'pending' => Icons.hourglass_empty,
-      'cancelled' || 'refunded' => Icons.cancel,
+      'confirmed' => Icons.check,
+      'pending' => Icons.warning_amber,
+      'cancelled' || 'refunded' => Icons.error,
       _ => Icons.help,
     };
   }
@@ -926,7 +1077,7 @@ class _MethodChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final foreground = selected ? cs.onPrimary : cs.onSurface;
+    final foreground = selected ? cs.onPrimary : cs.onSurfaceVariant;
     return ChoiceChip(
       label: Text(
         label,

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/user.dart';
-import 'package:pinoy_pos/ui/widgets/app_button.dart';
 
 /// Accent palette used by dashboard cards, icon badges and quick actions.
 enum DashAccent {
@@ -20,14 +20,17 @@ enum DashAccent {
 Color dashAccentColor(BuildContext context, DashAccent accent) {
   final b = Theme.of(context).brightness;
   return switch (accent) {
-    DashAccent.blue => AppSemanticColors.resolve(AppSemanticColors.info, b),
+    DashAccent.blue => AppSemanticColors.resolve(
+        AppSemanticColors.primaryLight,
+        b,
+      ),
     DashAccent.teal => AppSemanticColors.resolve(AppSemanticColors.teal, b),
     DashAccent.green => AppSemanticColors.resolve(AppSemanticColors.success, b),
     DashAccent.amber => AppSemanticColors.resolve(AppSemanticColors.warning, b),
-    DashAccent.deep => AppSemanticColors.resolve(AppSemanticColors.violet, b),
+    DashAccent.deep => AppSemanticColors.resolve(AppSemanticColors.primary, b),
     DashAccent.grey => AppSemanticColors.resolve(AppSemanticColors.neutral, b),
     DashAccent.red => AppSemanticColors.resolve(AppSemanticColors.error, b),
-    DashAccent.purple => AppSemanticColors.resolve(AppSemanticColors.purple, b),
+    DashAccent.purple => AppSemanticColors.resolve(AppSemanticColors.violet, b),
   };
 }
 
@@ -48,28 +51,105 @@ class DashboardWelcome extends StatelessWidget {
     this.greeting,
   });
 
+  String _greeting(UserRole? role) {
+    if (greeting != null) return greeting!;
+    if (role == UserRole.admin) return 'Welcome back';
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  }
+
+  (Color, Color) _rolePillColors(UserRole? role, Brightness brightness) {
+    return switch (role) {
+      UserRole.owner => (
+          AppSemanticColors.resolve(
+            AppSemanticColors.info,
+            brightness,
+          ).withValues(alpha: 0.18),
+          AppSemanticColors.resolve(AppSemanticColors.info, brightness),
+        ),
+      UserRole.admin => (
+          AppSemanticColors.resolve(
+            AppSemanticColors.teal,
+            brightness,
+          ).withValues(alpha: 0.16),
+          AppSemanticColors.resolve(AppSemanticColors.teal, brightness),
+        ),
+      UserRole.staff => (
+          AppSemanticColors.resolve(
+            AppSemanticColors.success,
+            brightness,
+          ).withValues(alpha: 0.16),
+          AppSemanticColors.resolve(AppSemanticColors.success, brightness),
+        ),
+      null => (Colors.transparent, Colors.transparent),
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final b = Theme.of(context).brightness;
     final name = user?.fullName ?? '';
-    final title = greeting ?? 'Welcome back';
+    final userRole = user?.role;
+    final title = _greeting(userRole);
+    final (roleBg, roleFg) = _rolePillColors(userRole, b);
+    final roleLabel = userRole?.displayName ?? '';
+    final date = DateFormat('EEE, MMM d').format(DateTime.now());
 
-    return Column(
+    return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: AppTypography.titleMedium(context).copyWith(
-            color: cs.onSurfaceVariant,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: AppTypography.bodySmall(context).copyWith(
+                  color: cs.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (name.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  name,
+                  style: AppTypography.titleLargeBold(context).copyWith(
+                    color: cs.onSurface,
+                    fontSize: 18,
+                  ),
+                ),
+              ],
+              if (roleLabel.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: roleBg,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    roleLabel,
+                    style: AppTypography.labelSmall(context).copyWith(
+                      color: roleFg,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
-        if (name.isNotEmpty)
-          Text(
-            name,
-            style: AppTypography.headlineSmallBold(context).copyWith(
-              color: cs.onSurface,
-            ),
+        Text(
+          date,
+          style: AppTypography.bodySmall(context).copyWith(
+            color: cs.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
           ),
+        ),
       ],
     );
   }
@@ -98,68 +178,67 @@ class HeroKpiCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final b = Theme.of(context).brightness;
-
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final start = isDark
+        ? AppColorTokens.primaryBlueStrong
+        : AppColorTokens.lightPrimary;
+    final end = isDark
+        ? AppColorTokens.primaryBlueDeep
+        : AppColorTokens.primaryBlueStrong;
+    final gradient = LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [start, end],
+    );
     final delta = deltaPercent;
-    final Widget? deltaWidget = delta != null
-        ? Text(
-            '${delta >= 0 ? '+' : ''}${delta.toStringAsFixed(1)}% ${deltaSuffix ?? ''}',
-            style: AppTypography.bodySmall(context).copyWith(
-              color: delta >= 0
-                  ? AppSemanticColors.resolve(AppSemanticColors.success, b)
-                  : AppSemanticColors.resolve(AppSemanticColors.error, b),
-              fontWeight: FontWeight.w600,
-            ),
-          )
-        : null;
 
     return Container(
       padding: const EdgeInsets.all(Spacing.lg),
       decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
+        gradient: gradient,
+        borderRadius: BorderRadius.circular(AppRadius.card),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, color: cs.primary, size: 20),
-              const SizedBox(width: Spacing.sm),
-              Text(
-                label,
-                style: AppTypography.bodySmall(context).copyWith(
-                  color: cs.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _HeroLabel(icon: icon, label: label),
+                    const SizedBox(height: 6),
+                    Text(
+                      amount,
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 34,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                    ),
+                    if (delta != null) ...[
+                      const SizedBox(height: Spacing.sm),
+                      _DeltaPill(delta: delta, suffix: deltaSuffix),
+                    ],
+                  ],
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: Spacing.sm),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                amount,
-                style: AppTypography.headlineSmallBold(context).copyWith(
-                  color: cs.onSurface,
+              if (sparkValues != null && sparkValues!.isNotEmpty) ...[
+                const SizedBox(width: Spacing.md),
+                _LineSparkline(
+                  values: sparkValues!,
+                  width: 90,
+                  height: 40,
                 ),
-              ),
-              if (deltaWidget != null) ...[
-                const SizedBox(width: Spacing.sm),
-                deltaWidget,
               ],
             ],
           ),
-          if (sparkValues != null && sparkValues!.isNotEmpty) ...[
-            const SizedBox(height: Spacing.md),
-            _Sparkline(values: sparkValues!),
-          ],
           if (footStats != null && footStats!.isNotEmpty) ...[
             const SizedBox(height: Spacing.md),
-            const Divider(height: 1),
+            Divider(height: 1, color: Colors.white.withValues(alpha: 0.18)),
             const SizedBox(height: Spacing.md),
             Row(
               children: footStats!
@@ -173,41 +252,146 @@ class HeroKpiCard extends StatelessWidget {
   }
 }
 
-class _Sparkline extends StatelessWidget {
-  final List<double> values;
+class _HeroLabel extends StatelessWidget {
+  final IconData icon;
+  final String label;
 
-  const _Sparkline({required this.values});
+  const _HeroLabel({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final max = values.isEmpty
-        ? 1.0
-        : values.reduce((a, b) => a > b ? a : b);
-    final safeMax = max <= 0 ? 1.0 : max;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          icon,
+          size: 14,
+          color: Colors.white.withValues(alpha: 0.85),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: AppTypography.bodySmall(context).copyWith(
+            color: Colors.white.withValues(alpha: 0.85),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+}
 
-    return SizedBox(
-      height: 40,
+class _DeltaPill extends StatelessWidget {
+  final double delta;
+  final String? suffix;
+
+  const _DeltaPill({required this.delta, this.suffix});
+
+  @override
+  Widget build(BuildContext context) {
+    final positive = delta >= 0;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(20),
+      ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          for (int i = 0; i < values.length; i++)
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 2),
-                child: Container(
-                  height: (values[i] / safeMax) * 40,
-                  decoration: BoxDecoration(
-                    color: i == values.length - 1 ? cs.tertiary : cs.primary,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ),
+          Icon(
+            positive ? Icons.trending_up : Icons.trending_down,
+            size: 12,
+            color: Colors.white,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            '${positive ? '+' : ''}${delta.toStringAsFixed(1)}% ${suffix ?? ''}'
+                .trim(),
+            style: AppTypography.bodySmall(context).copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
             ),
+          ),
         ],
       ),
     );
   }
+}
+
+class _LineSparkline extends StatelessWidget {
+  final List<double> values;
+  final double width;
+  final double height;
+
+  const _LineSparkline({
+    required this.values,
+    this.width = 90,
+    this.height = 40,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      height: height,
+      child: CustomPaint(
+        painter: _SparklinePainter(
+          values: values,
+          color: Colors.white.withValues(alpha: 0.8),
+        ),
+      ),
+    );
+  }
+}
+
+class _SparklinePainter extends CustomPainter {
+  final List<double> values;
+  final Color color;
+
+  _SparklinePainter({required this.values, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (values.isEmpty) return;
+
+    final max = values.reduce((a, b) => a > b ? a : b);
+    final safeMax = max <= 0 ? 1.0 : max;
+
+    if (values.length == 1) {
+      final y = size.height - (values[0] / safeMax) * size.height;
+      canvas.drawCircle(
+        Offset(size.width, y),
+        3,
+        Paint()..color = Colors.white,
+      );
+      return;
+    }
+
+    final points = List<Offset>.generate(values.length, (i) {
+      final x = (i / (values.length - 1)) * size.width;
+      final y = size.height - (values[i] / safeMax) * size.height;
+      return Offset(x, y);
+    });
+
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 2.5
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final path = Path()..moveTo(points.first.dx, points.first.dy);
+    for (int i = 1; i < points.length; i++) {
+      path.lineTo(points[i].dx, points[i].dy);
+    }
+    canvas.drawPath(path, paint);
+    canvas.drawCircle(points.last, 3, Paint()..color = Colors.white);
+  }
+
+  @override
+  bool shouldRepaint(covariant _SparklinePainter old) =>
+      old.values.length != values.length || old.values != values;
 }
 
 /// A single foot-stat shown below the hero KPI value.
@@ -219,21 +403,19 @@ class HeroFootStat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           value,
           style: AppTypography.titleSmallBold(context).copyWith(
-            color: cs.onSurface,
+            color: Colors.white,
           ),
         ),
         Text(
           label,
           style: AppTypography.bodySmall(context).copyWith(
-            color: cs.onSurfaceVariant,
+            color: Colors.white.withValues(alpha: 0.85),
           ),
         ),
       ],
@@ -260,7 +442,7 @@ class StatStrip extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       mainAxisSpacing: Spacing.md,
       crossAxisSpacing: Spacing.md,
-      childAspectRatio: 2.6,
+      childAspectRatio: 1.5,
       children: items,
     );
   }
@@ -284,36 +466,49 @@ class StatItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = dashAccentColor(context, accent);
+    final cs = Theme.of(context).colorScheme;
 
-    return Row(
-      children: [
-        IconBadge(
-          icon: icon,
-          color: color,
-          small: true,
-        ),
-        const SizedBox(width: Spacing.sm),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                value,
-                style: AppTypography.titleMediumBold(context),
-                overflow: TextOverflow.ellipsis,
-              ),
-              Text(
-                label,
-                style: AppTypography.bodySmall(context).copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: cs.outline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 26,
+            height: 26,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.16),
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Icon(icon, color: color, size: 13),
           ),
-        ),
-      ],
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: AppTypography.titleMediumBold(context).copyWith(
+              color: cs.onSurface,
+              fontSize: 20,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+          Text(
+            label.toUpperCase(),
+            style: AppTypography.labelSmall(context).copyWith(
+              color: cs.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.4,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -330,7 +525,7 @@ class DashCard extends StatelessWidget {
 
   const DashCard({
     super.key,
-    required this.title,
+    this.title = '',
     this.icon,
     this.iconAccent,
     this.trailing,
@@ -342,58 +537,59 @@ class DashCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final b = cs.brightness;
+    final warning = AppSemanticColors.resolve(AppSemanticColors.warning, b);
     final bg = alert
-        ? Color.lerp(cs.surface, cs.errorContainer, 0.12) ?? cs.surface
-        : cs.surface;
+        ? Color.lerp(cs.surface, warning, 0.04) ?? cs.surface
+        : elevated
+            ? cs.surfaceContainer
+            : cs.surface;
+    final borderColor = alert
+        ? warning.withValues(alpha: 0.35)
+        : cs.outline;
+    final showHeader = title.isNotEmpty || icon != null || trailing != null;
 
     return Container(
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: alert ? cs.error : cs.outlineVariant.withValues(alpha: 0.5),
-          width: alert ? 1.5 : 1,
-        ),
-        boxShadow: elevated
-            ? [
-                BoxShadow(
-                  color: cs.shadow.withValues(alpha: 0.08),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ]
-            : null,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: borderColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(Spacing.lg, Spacing.lg, Spacing.lg, 0),
-            child: Row(
-              children: [
-                if (icon != null)
-                  Padding(
-                    padding: const EdgeInsets.only(right: Spacing.sm),
-                    child: IconBadge(
-                      icon: icon!,
-                      color: dashAccentColor(
-                        context,
-                        iconAccent ?? DashAccent.blue,
+          if (showHeader)
+            Padding(
+              padding:
+                  const EdgeInsets.fromLTRB(Spacing.lg, Spacing.lg, Spacing.lg, 0),
+              child: Row(
+                children: [
+                  if (icon != null)
+                    Padding(
+                      padding: const EdgeInsets.only(right: Spacing.sm),
+                      child: IconBadge(
+                        icon: icon!,
+                        color: dashAccentColor(
+                          context,
+                          iconAccent ?? DashAccent.blue,
+                        ),
+                        size: 38,
+                        iconSize: 19,
+                        square: true,
+                        filled: false,
                       ),
-                      small: true,
+                    ),
+                  Text(
+                    title,
+                    style: AppTypography.titleMediumBold(context).copyWith(
+                      color: cs.onSurface,
                     ),
                   ),
-                Text(
-                  title,
-                  style: AppTypography.titleMediumBold(context).copyWith(
-                    color: cs.onSurface,
-                  ),
-                ),
-                const Spacer(),
-                trailing ?? const SizedBox.shrink(),
-              ],
+                  const Spacer(),
+                  trailing ?? const SizedBox.shrink(),
+                ],
+              ),
             ),
-          ),
           Padding(
             padding: const EdgeInsets.all(Spacing.lg),
             child: Column(
@@ -431,53 +627,49 @@ class QuickActionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final b = Theme.of(context).brightness;
 
     final Color bg;
+    final Color borderColor;
     final Color fg;
     final Widget iconWidget;
 
     if (primary) {
       bg = cs.primary;
+      borderColor = Colors.transparent;
       fg = cs.onPrimary;
-      iconWidget = Icon(icon, color: fg, size: 28);
+      iconWidget = _QuickIconCircle(icon: icon, primary: true);
     } else if (accent != null) {
       final accentColor = dashAccentColor(context, accent!);
-      bg = accentColor.withValues(alpha: 0.12);
-      fg = labelColor ?? accentColor;
-      iconWidget = IconBadge(
-        icon: icon,
-        color: accentColor,
-        small: true,
-      );
+      bg = cs.surface;
+      borderColor = cs.outline;
+      fg = labelColor ??
+          AppSemanticColors.resolve(AppSemanticColors.neutral, b);
+      iconWidget = _QuickIconCircle(icon: icon, color: accentColor);
     } else {
       bg = cs.surface;
+      borderColor = cs.outline;
       fg = labelColor ?? cs.onSurface;
-      iconWidget = Icon(icon, color: fg, size: 28);
+      iconWidget = _QuickIconCircle(icon: icon);
     }
-
-    final borderColor = primary
-        ? Colors.transparent
-        : accent != null
-            ? dashAccentColor(context, accent!).withValues(alpha: 0.3)
-            : cs.outlineVariant;
 
     return Material(
       color: bg,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(14),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(color: borderColor),
           ),
-          padding: const EdgeInsets.all(Spacing.md),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               iconWidget,
-              const SizedBox(height: Spacing.sm),
+              const SizedBox(height: 8),
               Text(
                 label,
                 textAlign: TextAlign.center,
@@ -491,6 +683,49 @@ class QuickActionTile extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _QuickIconCircle extends StatelessWidget {
+  final IconData icon;
+  final Color? color;
+  final bool primary;
+
+  const _QuickIconCircle({
+    required this.icon,
+    this.color,
+    this.primary = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const double size = 34;
+    const double iconSize = 18;
+    final Color bgColor;
+    final Color iconColor;
+
+    if (primary) {
+      bgColor = Colors.white.withValues(alpha: 0.22);
+      iconColor = Colors.white;
+    } else if (color != null) {
+      bgColor = color!.withValues(alpha: 0.16);
+      iconColor = color!;
+    } else {
+      final cs = Theme.of(context).colorScheme;
+      bgColor = cs.surfaceContainerHighest;
+      iconColor = cs.onSurface;
+    }
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: bgColor,
+        shape: BoxShape.circle,
+      ),
+      alignment: Alignment.center,
+      child: Icon(icon, color: iconColor, size: iconSize),
     );
   }
 }
@@ -546,16 +781,14 @@ class DashRow extends StatelessWidget {
         if (showDivider)
           Divider(
             height: 1,
-            color: cs.outlineVariant.withValues(alpha: 0.5),
+            color: cs.outline.withValues(alpha: 0.5),
           ),
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: Spacing.md),
+          padding: const EdgeInsets.symmetric(vertical: 12),
           child: Row(
             children: [
               leading ?? const SizedBox.shrink(),
-              leading != null
-                  ? const SizedBox(width: Spacing.sm)
-                  : const SizedBox.shrink(),
+              if (leading != null) const SizedBox(width: Spacing.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -563,7 +796,8 @@ class DashRow extends StatelessWidget {
                     if (title != null)
                       Text(
                         title!,
-                        style: AppTypography.bodyMediumSemibold(context).copyWith(
+                        style: AppTypography.bodyMediumSemibold(context)
+                            .copyWith(
                           color: cs.onSurface,
                         ),
                       ),
@@ -604,18 +838,19 @@ class DashThumb extends StatelessWidget {
     final initial = label.isNotEmpty ? label[0].toUpperCase() : '?';
 
     return Container(
-      width: 40,
-      height: 40,
+      width: 42,
+      height: 42,
       decoration: BoxDecoration(
         color: cs.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: cs.outline),
       ),
       alignment: Alignment.center,
       child: Text(
         initial,
-        style: AppTypography.titleSmallBold(context).copyWith(
+        style: AppTypography.titleMediumBold(context).copyWith(
           color: cs.onSurfaceVariant,
+          fontSize: 22,
         ),
       ),
     );
@@ -641,8 +876,8 @@ class DashAvatar extends StatelessWidget {
     final initials = _initials(name);
 
     return Container(
-      width: 40,
-      height: 40,
+      width: 34,
+      height: 34,
       decoration: BoxDecoration(
         color: bg,
         shape: BoxShape.circle,
@@ -673,6 +908,9 @@ class IconBadge extends StatelessWidget {
   final Color color;
   final bool square;
   final bool small;
+  final double? size;
+  final double? iconSize;
+  final bool filled;
 
   const IconBadge({
     super.key,
@@ -680,23 +918,29 @@ class IconBadge extends StatelessWidget {
     required this.color,
     this.square = false,
     this.small = false,
+    this.size,
+    this.iconSize,
+    this.filled = true,
   });
 
   @override
   Widget build(BuildContext context) {
-    final fg = _Contrast.onColor(context, color);
-    final size = small ? 32.0 : 40.0;
-    final iconSize = small ? 16.0 : 20.0;
+    final effectiveSize = size ?? (small ? 32.0 : 40.0);
+    final effectiveIconSize = iconSize ?? (small ? 16.0 : 20.0);
+    final bg = filled ? color : color.withValues(alpha: 0.16);
+    final fg = filled ? _Contrast.onColor(context, color) : color;
 
     return Container(
-      width: size,
-      height: size,
+      width: effectiveSize,
+      height: effectiveSize,
       decoration: BoxDecoration(
-        color: color,
-        borderRadius: square ? BorderRadius.circular(10) : BorderRadius.circular(size / 2),
+        color: bg,
+        borderRadius: square
+            ? BorderRadius.circular(10)
+            : BorderRadius.circular(effectiveSize / 2),
       ),
       alignment: Alignment.center,
-      child: Icon(icon, color: fg, size: iconSize),
+      child: Icon(icon, color: fg, size: effectiveIconSize),
     );
   }
 }
@@ -716,7 +960,7 @@ class StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = color.withValues(alpha: 0.12);
+    final bg = color.withValues(alpha: 0.16);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -728,13 +972,14 @@ class StatusPill extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(icon, color: color, size: 14),
+            Icon(icon, color: color, size: 12),
             const SizedBox(width: 4),
           ],
           Text(
             label,
-            style: AppTypography.bodySmallSemibold(context).copyWith(
+            style: AppTypography.labelSmall(context).copyWith(
               color: color,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
@@ -765,7 +1010,7 @@ class DashRowEnd extends StatelessWidget {
         Text(
           amount,
           style: AppTypography.titleSmallBold(context).copyWith(
-            color: cs.onSurface,
+            color: cs.primary,
           ),
         ),
         if (pill != null) ...[
@@ -779,7 +1024,7 @@ class DashRowEnd extends StatelessWidget {
 
 /// Returns a very light tint of [color] for use behind text in the same color.
 Color dashAccentTint(Color color) {
-  return color.withValues(alpha: 0.12);
+  return color.withValues(alpha: 0.16);
 }
 
 /// A wide, prominent CTA button used on dashboard screens.
@@ -797,12 +1042,33 @@ class BigCtaButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppButton.filled(
-      label: label,
-      icon: icon,
-      onPressed: onTap,
-      fullWidth: true,
-      size: AppButtonSize.large,
+    final cs = Theme.of(context).colorScheme;
+
+    return Material(
+      color: cs.primary,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          alignment: Alignment.center,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: cs.onPrimary, size: 18),
+              const SizedBox(width: Spacing.sm),
+              Text(
+                label,
+                style: AppTypography.titleSmallBold(context).copyWith(
+                  color: cs.onPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -824,26 +1090,33 @@ class AdvisorBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
     return Material(
-      color: cs.surface,
-      borderRadius: BorderRadius.circular(20),
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(AppRadius.card),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.card),
         child: Container(
           padding: const EdgeInsets.all(Spacing.lg),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppColorTokens.primaryBlueStrong.withValues(alpha: 0.35),
+                AppColorTokens.primaryBlueDeep.withValues(alpha: 0.45),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(AppRadius.card),
           ),
           child: Row(
             children: [
               IconBadge(
                 icon: icon,
                 color: dashAccentColor(context, DashAccent.deep),
-                small: true,
+                size: 34,
+                iconSize: 18,
+                filled: true,
               ),
               const SizedBox(width: Spacing.md),
               Expanded(
@@ -853,13 +1126,13 @@ class AdvisorBanner extends StatelessWidget {
                     Text(
                       title,
                       style: AppTypography.titleMediumBold(context).copyWith(
-                        color: cs.onSurface,
+                        color: Colors.white,
                       ),
                     ),
                     Text(
                       subtitle,
                       style: AppTypography.bodySmall(context).copyWith(
-                        color: cs.onSurfaceVariant,
+                        color: Colors.white.withValues(alpha: 0.85),
                       ),
                     ),
                   ],
@@ -867,7 +1140,7 @@ class AdvisorBanner extends StatelessWidget {
               ),
               Icon(
                 Icons.arrow_forward_ios,
-                color: cs.onSurfaceVariant,
+                color: Colors.white.withValues(alpha: 0.85),
                 size: 16,
               ),
             ],
@@ -907,14 +1180,21 @@ class PaymentProgressRow extends StatelessWidget {
         if (showDivider)
           Divider(
             height: 1,
-            color: cs.outlineVariant.withValues(alpha: 0.5),
+            color: cs.outline.withValues(alpha: 0.5),
           ),
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: Spacing.md),
+          padding: const EdgeInsets.symmetric(vertical: 12),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              IconBadge(icon: icon, color: color, small: true),
-              const SizedBox(width: Spacing.sm),
+              IconBadge(
+                icon: icon,
+                color: color,
+                size: 34,
+                iconSize: 17,
+                filled: false,
+              ),
+              const SizedBox(width: Spacing.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -930,8 +1210,7 @@ class PaymentProgressRow extends StatelessWidget {
                       borderRadius: BorderRadius.circular(4),
                       child: LinearProgressIndicator(
                         value: percent / 100,
-                        backgroundColor:
-                            cs.surfaceContainerHighest,
+                        backgroundColor: cs.surfaceContainerHighest,
                         valueColor: AlwaysStoppedAnimation<Color>(color),
                         minHeight: 6,
                       ),
@@ -940,22 +1219,12 @@ class PaymentProgressRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: Spacing.sm),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    amount,
-                    style: AppTypography.titleSmallBold(context).copyWith(
-                      color: cs.onSurface,
-                    ),
-                  ),
-                  Text(
-                    '${percent.toStringAsFixed(0)}%',
-                    style: AppTypography.bodySmall(context).copyWith(
-                      color: cs.onSurfaceVariant,
-                    ),
-                  ),
-                ],
+              DashRowEnd(
+                amount: amount,
+                pill: StatusPill(
+                  label: '${percent.toStringAsFixed(0)}%',
+                  color: color,
+                ),
               ),
             ],
           ),

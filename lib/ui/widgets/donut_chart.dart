@@ -1,5 +1,7 @@
 import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 
 /// One segment of a [DonutChart].
@@ -8,7 +10,11 @@ class DonutSegment {
   final int value;
   final Color color;
 
-  const DonutSegment({required this.label, required this.value, required this.color});
+  const DonutSegment({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
 }
 
 /// A lightweight, dependency-free donut chart with a legend.
@@ -30,8 +36,9 @@ class DonutChart extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final total = segments.fold<int>(0, (s, seg) => s + seg.value);
+    final strokeWidth = size * 0.23;
 
-    return Row(
+    return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         SizedBox(
@@ -41,67 +48,55 @@ class DonutChart extends StatelessWidget {
             painter: _DonutPainter(
               segments: segments,
               total: total,
+              strokeWidth: strokeWidth,
               trackColor: cs.surfaceContainerHighest,
             ),
             child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '$total',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                  Text(
-                    'Total',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: cs.onSurfaceVariant,
-                        ),
-                  ),
-                ],
+              child: Text(
+                '$total',
+                style: AppTypography.titleSmallBold(context).copyWith(
+                  fontSize: 18,
+                  color: cs.onSurface,
+                ),
               ),
             ),
           ),
         ),
-        const SizedBox(width: Spacing.lg),
-        Flexible(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (final seg in segments)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 3),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color: seg.color,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: Spacing.sm),
-                      Expanded(
-                        child: Text(
-                          seg.label,
-                          style: Theme.of(context).textTheme.bodySmall,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      Text(
-                        '${seg.value}',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                      ),
-                    ],
+        const SizedBox(height: Spacing.md),
+        Wrap(
+          spacing: Spacing.sm,
+          runSpacing: Spacing.sm,
+          alignment: WrapAlignment.center,
+          children: [
+            for (final seg in segments)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: seg.color,
+                      shape: BoxShape.circle,
+                    ),
                   ),
-                ),
-            ],
-          ),
+                  const SizedBox(width: 5),
+                  Text(
+                    '${seg.label} ',
+                    style: AppTypography.bodySmall(context).copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                  Text(
+                    '${seg.value}',
+                    style: AppTypography.bodySmall(context).copyWith(
+                      color: cs.onSurface,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+          ],
         ),
       ],
     );
@@ -111,11 +106,13 @@ class DonutChart extends StatelessWidget {
 class _DonutPainter extends CustomPainter {
   final List<DonutSegment> segments;
   final int total;
+  final double strokeWidth;
   final Color trackColor;
 
   _DonutPainter({
     required this.segments,
     required this.total,
+    required this.strokeWidth,
     required this.trackColor,
   });
 
@@ -123,8 +120,10 @@ class _DonutPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.shortestSide / 2;
-    const strokeWidth = 18.0;
-    final rect = Rect.fromCircle(center: center, radius: radius - strokeWidth / 2);
+    final rect = Rect.fromCircle(
+      center: center,
+      radius: radius - strokeWidth / 2,
+    );
 
     // Track ring (shown when total is 0 or as the background).
     canvas.drawArc(
@@ -162,6 +161,7 @@ class _DonutPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _DonutPainter old) =>
       old.total != total ||
+      old.strokeWidth != strokeWidth ||
       old.trackColor != trackColor ||
       old.segments.length != segments.length;
 }

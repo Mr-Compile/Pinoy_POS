@@ -149,6 +149,7 @@ class AppSemanticColors {
   /// Accent colors for dashboards, charts and role badges.
   static const Color teal = Color(0xFF06B6D4);
   static const Color violet = Color(0xFF8B5CF6);
+  static const Color pink = Color(0xFFEC4899);
 
   // ── Theme-aware resolution: light constant → dark variant ─────────────
 
@@ -186,6 +187,7 @@ class AppSemanticColors {
     // Dashboard accents
     teal: const Color(0xFF22D3EE),
     violet: const Color(0xFFA78BFA),
+    pink: const Color(0xFFF472B6),
 
     // On-colors (onSuccess/onError/onNeutral/onPurple/onInfo alias onPrimary)
     onPrimary: AppColorTokens.onPrimaryBlue,
@@ -503,7 +505,7 @@ class AppColors {
       // ── Input decoration ─────────────────────────────────────────
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: colorScheme.surfaceDim,
+        fillColor: colorScheme.surface,
         isDense: false,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
@@ -548,7 +550,7 @@ class AppColors {
         }),
         hintStyle: TextStyle(
           fontFamily: 'Inter',
-          fontSize: 14,
+          fontSize: 13,
           color: colorScheme.onSurfaceVariant,
         ),
         helperStyle: TextStyle(

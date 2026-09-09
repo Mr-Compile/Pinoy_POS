@@ -143,7 +143,6 @@ class _ProfileDropdownContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final brightness = theme.brightness;
     final successColor = AppSemanticColors.resolve(
       AppSemanticColors.success,
@@ -175,26 +174,14 @@ class _ProfileDropdownContent extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              user.fullName,
-                              style: AppTypography.titleMediumBold(context),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          _RolePill(role: user.role.displayName, color: successColor),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
                       Text(
-                        '@${user.username}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
+                        user.fullName,
+                        style: AppTypography.titleMediumBold(context),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
+                      const SizedBox(height: 4),
+                      _RolePill(role: user.role.displayName, color: successColor),
                     ],
                   ),
                 ),
@@ -239,7 +226,6 @@ class _RolePill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(left: 6),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.16),

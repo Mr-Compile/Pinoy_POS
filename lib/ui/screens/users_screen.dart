@@ -12,6 +12,7 @@ import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_icon_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
 import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
+import 'package:pinoy_pos/ui/widgets/dashboard_blocks.dart';
 import 'package:pinoy_pos/ui/widgets/app_list_item.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/responsive_create_action.dart';
@@ -826,13 +827,13 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
 
         final chips = <Widget>[
           if (!user.isActive)
-            _StatusBadge(
+            StatusPill(
               label: 'Inactive',
               color: colorScheme.error,
               icon: Icons.pause_circle,
             ),
           if (user.mustChangePassword)
-            _StatusBadge(
+            StatusPill(
               label: 'Temp Password',
               color: AppSemanticColors.resolve(
                 AppSemanticColors.warning,
@@ -841,7 +842,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
               icon: Icons.key,
             ),
           if (user.hasPin)
-            _StatusBadge(
+            StatusPill(
               label: 'PIN',
               color: AppSemanticColors.resolve(
                 AppSemanticColors.info,
@@ -857,12 +858,15 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
             leading: AppAvatar(
               imagePath: user.profileImagePath,
               initials: user.fullName,
-              radius: 24,
+              radius: 22,
               backgroundColor: roleColor,
             ),
             title: user.fullName,
             subtitle: '@${user.username}',
-            trailing: _RoleBadge(role: user.role, color: roleColor),
+            trailing: StatusPill(
+              label: user.role.displayName,
+              color: roleColor,
+            ),
             chips: chips,
             onTap: (canEdit || canDelete) && !isSelf
                 ? () => _showUserActionsSheet(
@@ -901,7 +905,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
               leading: AppAvatar(
                 imagePath: user.profileImagePath,
                 initials: user.fullName,
-                radius: 24,
+                radius: 22,
                 backgroundColor: roleColor,
               ),
               title: Text(user.fullName),
@@ -993,70 +997,6 @@ class _FilterChip extends StatelessWidget {
             color: selected ? cs.onPrimary : cs.onSurfaceVariant,
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _RoleBadge extends StatelessWidget {
-  final UserRole role;
-  final Color color;
-
-  const _RoleBadge({required this.role, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        role.displayName,
-        style: TextStyle(
-          fontSize: 10.5,
-          fontWeight: FontWeight.w700,
-          color: color,
-        ),
-      ),
-    );
-  }
-}
-
-class _StatusBadge extends StatelessWidget {
-  final String label;
-  final Color color;
-  final IconData icon;
-
-  const _StatusBadge({
-    required this.label,
-    required this.color,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: color),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10.5,
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
-          ),
-        ],
       ),
     );
   }

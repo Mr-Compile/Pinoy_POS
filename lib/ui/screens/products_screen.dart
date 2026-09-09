@@ -11,6 +11,7 @@ import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/dialogs/category_dialog.dart';
 import 'package:pinoy_pos/ui/dialogs/product_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_button.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
@@ -417,7 +418,16 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
       statusIcon = null;
     }
 
+    final canView =
+        ref.read(authStateProvider.notifier).hasPermission('view_products');
+
     final actions = <AppListAction>[
+      if (canView)
+        AppListAction(
+          icon: Icons.visibility_outlined,
+          onPressed: () => _showProductView(product, category),
+          tooltip: 'View product',
+        ),
       if (canEdit)
         AppListAction(
           icon: Icons.edit,
@@ -427,6 +437,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
       if (canDelete)
         AppListAction(
           icon: Icons.delete,
+          color: cs.error,
           onPressed: () => _deleteProduct(product),
           tooltip: 'Delete product',
         ),
@@ -448,10 +459,22 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
         ),
         title: product.name,
         subtitle: 'Stock: ${product.stock}',
-        trailing: Text(
-          CurrencyUtils.format(product.price),
-          style: AppTypography.titleMediumBold(context)
-              .copyWith(color: cs.primary),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (statusLabel != null && statusColor != null)
+              AppStatusChip(
+                label: statusLabel,
+                color: statusColor,
+                icon: statusIcon,
+              ),
+            if (statusLabel != null) const SizedBox(width: Spacing.sm),
+            Text(
+              CurrencyUtils.format(product.price),
+              style: AppTypography.titleMediumBold(context)
+                  .copyWith(color: cs.primary),
+            ),
+          ],
         ),
         chips: [
           AppStatusChip(
@@ -461,11 +484,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
             filled: false,
           ),
         ],
-        statusLabel: statusLabel,
-        statusColor: statusColor,
-        statusIcon: statusIcon,
         actions: actions.isNotEmpty ? actions : null,
-        onTap: canEdit ? () => _showProductDialog(product: product) : null,
+        onTap: canView ? () => _showProductView(product, category) : null,
       ),
     );
   }
@@ -488,6 +508,76 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
         );
       }
     }
+  }
+
+  void _showProductView(Product product, Category category) {
+    showDialog(
+      context: context,
+      useRootNavigator: true,
+      builder: (context) {
+        return AppDialog(
+          type: AppDialogType.info,
+          title: product.name,
+          message: 'Product details',
+          actions: [
+            AppDialogAction(
+              label: 'Close',
+              onPressed: (dialogContext) => Navigator.of(dialogContext).pop(),
+            ),
+          ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  child: SizedBox(
+                    width: 80,
+                    height: 80,
+                    child: AppImage(
+                      imagePath: product.imageUrl,
+                      placeholderIcon: Icons.inventory_2,
+                      placeholderIconSize: 36,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: Spacing.lg),
+              _buildViewRow('Category', category.name),
+              _buildViewRow('Price', CurrencyUtils.format(product.price)),
+              _buildViewRow('Stock', '${product.stock}'),
+              _buildViewRow('Minimum Stock', '${product.minStock}'),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildViewRow(String label, String value) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: AppTypography.bodyMedium(context).copyWith(
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+          Text(
+            value,
+            style: AppTypography.titleSmall(context).copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _showCreateCategoryDialog() async {

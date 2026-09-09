@@ -23,60 +23,31 @@ void main() {
       expect(AppDialogType.loading.icon, isNull);
     });
 
-    test('icon container colours use the semantic container colours', () {
+    test('icon container colours are 16% alpha of the semantic icon colour', () {
       const light = Brightness.light;
       const dark = Brightness.dark;
 
-      // Light mode: subtle tinted container surfaces.
-      expect(
-        AppDialogType.success.iconBgColor(light),
-        AppSemanticColors.resolve(AppSemanticColors.successContainer, light),
-      );
-      expect(
-        AppDialogType.error.iconBgColor(light),
-        AppSemanticColors.resolve(AppSemanticColors.errorContainer, light),
-      );
-      expect(
-        AppDialogType.warning.iconBgColor(light),
-        AppSemanticColors.resolve(AppSemanticColors.warningContainer, light),
-      );
-      expect(
-        AppDialogType.info.iconBgColor(light),
-        AppSemanticColors.resolve(AppSemanticColors.infoContainer, light),
-      );
-      expect(
-        AppDialogType.delete.iconBgColor(light),
-        AppSemanticColors.resolve(AppSemanticColors.errorContainer, light),
-      );
-      expect(
-        AppDialogType.restore.iconBgColor(light),
-        AppSemanticColors.resolve(AppSemanticColors.successContainer, light),
-      );
-      expect(
-        AppDialogType.ai.iconBgColor(light),
-        AppSemanticColors.resolve(AppSemanticColors.purpleContainer, light),
-      );
-      expect(
-        AppDialogType.logout.iconBgColor(light),
-        AppSemanticColors.resolve(AppSemanticColors.errorContainer, light),
-      );
-      expect(
-        AppDialogType.restriction.iconBgColor(light),
-        AppSemanticColors.resolve(AppSemanticColors.neutralContainer, light),
-      );
+      for (final type in AppDialogType.values) {
+        final iconColor = type.iconColor(light);
+        final containerColor = type.iconBgColor(light);
+        expect(
+          containerColor,
+          iconColor.withValues(alpha: 0.16),
+          reason: '$type light container should be 16% of its icon color',
+        );
+      }
 
-      // Dark mode: dark tinted container surfaces.
-      expect(
-        AppDialogType.success.iconBgColor(dark),
-        AppSemanticColors.resolve(AppSemanticColors.successContainer, dark),
-      );
-      expect(
-        AppDialogType.error.iconBgColor(dark),
-        AppSemanticColors.resolve(AppSemanticColors.errorContainer, dark),
-      );
+      for (final type in AppDialogType.values) {
+        final iconColor = type.iconColor(dark);
+        final containerColor = type.iconBgColor(dark);
+        expect(
+          containerColor,
+          iconColor.withValues(alpha: 0.16),
+          reason: '$type dark container should be 16% of its icon color',
+        );
+      }
 
-      // The icon symbol uses the semantic colour itself (e.g. green on a
-      // green-tinted surface, red on a red-tinted surface).
+      // The icon symbol uses the semantic colour itself.
       expect(
         AppDialogType.success.iconColor(light),
         AppSemanticColors.resolve(AppSemanticColors.success, light),
@@ -99,7 +70,7 @@ void main() {
       );
       expect(
         AppDialogType.ai.iconColor(light),
-        AppSemanticColors.resolve(AppSemanticColors.purple, light),
+        AppSemanticColors.resolve(AppSemanticColors.violet, light),
       );
     });
 
@@ -198,7 +169,7 @@ void main() {
       final container = tester.widget<Container>(findIconContainer(Icons.check_circle_outline));
       expect(
         (container.decoration as BoxDecoration).color,
-        AppSemanticColors.resolve(AppSemanticColors.successContainer, Brightness.light),
+        AppDialogType.success.iconColor(Brightness.light).withValues(alpha: 0.16),
       );
 
       final bg = filledBackgroundColor('Done', Brightness.light, tester);
@@ -222,7 +193,7 @@ void main() {
       final container = tester.widget<Container>(findIconContainer(Icons.cancel_outlined));
       expect(
         (container.decoration as BoxDecoration).color,
-        AppSemanticColors.resolve(AppSemanticColors.errorContainer, Brightness.light),
+        AppDialogType.error.iconColor(Brightness.light).withValues(alpha: 0.16),
       );
 
       final bg = filledBackgroundColor('Close', Brightness.light, tester);
@@ -279,7 +250,7 @@ void main() {
       final container = tester.widget<Container>(findIconContainer(Icons.restore));
       expect(
         (container.decoration as BoxDecoration).color,
-        AppSemanticColors.resolve(AppSemanticColors.successContainer, Brightness.light),
+        AppDialogType.restore.iconColor(Brightness.light).withValues(alpha: 0.16),
       );
 
       final bg = filledBackgroundColor('Restore', Brightness.light, tester);

@@ -8,10 +8,12 @@ import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/catalog_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/dialogs/category_dialog.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/app_list_item.dart';
+import 'package:pinoy_pos/ui/widgets/app_status_chip.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/responsive_create_action.dart';
@@ -448,14 +450,16 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
   ) {
     final cs = Theme.of(context).colorScheme;
     final statusColor = category.isActive ? cs.primary : cs.outline;
+    final canView =
+        ref.read(authStateProvider.notifier).hasPermission('view_categories');
+    final count = _productCounts[category.id] ?? 0;
 
     final actions = <AppListAction>[
-      if (canToggleStatus)
+      if (canView)
         AppListAction(
-          icon: category.isActive ? Icons.toggle_on : Icons.toggle_off,
-          tooltip: category.isActive ? 'Deactivate' : 'Activate',
-          color: statusColor,
-          onPressed: () => _toggleCategoryStatus(category),
+          icon: Icons.visibility_outlined,
+          tooltip: 'View category',
+          onPressed: () => _showCategoryView(category, count),
         ),
       if (canEdit)
         AppListAction(
@@ -470,10 +474,16 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
           color: cs.error,
           onPressed: () => _deleteCategory(category),
         ),
+      if (!canEdit && canToggleStatus)
+        AppListAction(
+          icon: category.isActive ? Icons.toggle_on : Icons.toggle_off,
+          tooltip: category.isActive ? 'Deactivate' : 'Activate',
+          color: statusColor,
+          onPressed: () => _toggleCategoryStatus(category),
+        ),
     ];
 
     final badgeColor = _categoryBadgeColor(category, Theme.of(context).brightness);
-    final count = _productCounts[category.id] ?? 0;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: Spacing.md),
@@ -493,10 +503,12 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
         ),
         title: category.name,
         subtitle: '$count product${count == 1 ? '' : 's'}',
-        statusLabel: category.isActive ? 'Active' : 'Inactive',
-        statusColor: statusColor,
+        trailing: AppStatusChip(
+          label: category.isActive ? 'Active' : 'Inactive',
+          color: statusColor,
+        ),
         actions: actions.isNotEmpty ? actions : null,
-        onTap: canEdit ? () => _showCategoryDialog(category: category) : null,
+        onTap: canView ? () => _showCategoryView(category, count) : null,
       ),
     );
   }
@@ -546,6 +558,100 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
               onPressed: _clearFilters,
             )
           : null,
+    );
+  }
+
+  void _showCategoryView(Category category, int count) {
+    showDialog(
+      context: context,
+      useRootNavigator: true,
+      builder: (context) {
+        final cs = Theme.of(context).colorScheme;
+        return AppDialog(
+          type: AppDialogType.info,
+          title: category.name,
+          message: 'Category details',
+          actions: [
+            AppDialogAction(
+              label: 'Close',
+              onPressed: (dialogContext) => Navigator.of(dialogContext).pop(),
+            ),
+          ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: _categoryBadgeColor(category, Theme.of(context).brightness)
+                          .withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                    ),
+                    child: Icon(
+                      _categoryIcon(category),
+                      color: _categoryBadgeColor(category, Theme.of(context).brightness),
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: Spacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          category.name,
+                          style: AppTypography.titleMediumSemibold(context),
+                        ),
+                        Text(
+                          '$count product${count == 1 ? '' : 's'}',
+                          style: AppTypography.bodySmall(context).copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  AppStatusChip(
+                    label: category.isActive ? 'Active' : 'Inactive',
+                    color: category.isActive ? cs.primary : cs.outline,
+                  ),
+                ],
+              ),
+              const SizedBox(height: Spacing.lg),
+              _buildViewRow('Status', category.isActive ? 'Active' : 'Inactive'),
+              _buildViewRow('Products', '$count'),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildViewRow(String label, String value) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: AppTypography.bodyMedium(context).copyWith(
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+          Text(
+            value,
+            style: AppTypography.titleSmall(context).copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

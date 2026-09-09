@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/route_guard.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/dashboard_blocks.dart';
 import 'package:pinoy_pos/ui/screens/activity_logs_screen.dart';
 import 'package:pinoy_pos/ui/screens/ai_config_screen.dart';
@@ -157,12 +159,14 @@ class MoreScreen extends ConsumerWidget {
             LayoutClass.expanded => 4,
           };
 
-          return GridView.count(
+          return GridView(
             padding: const EdgeInsets.all(16),
-            crossAxisCount: crossAxisCount,
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 1.1,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              mainAxisExtent: 112,
+            ),
             children: entries.map((entry) {
               return _buildEntryCard(context, ref, entry);
             }).toList(),
@@ -174,13 +178,11 @@ class MoreScreen extends ConsumerWidget {
 
   Widget _buildEntryCard(BuildContext context, WidgetRef ref, MoreEntry entry) {
     final cs = Theme.of(context).colorScheme;
+    final accentColor = _colorFor(entry.title, context);
 
-    return QuickActionTile(
-      icon: entry.icon,
-      label: entry.title,
-      accent: _accentFor(entry.title),
-      maxLines: 2,
-      labelColor: cs.onSurface,
+    return AppCard(
+      variant: AppCardVariant.outlined,
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
       onTap: () => RouteGuard.pushIfAuthorized(
         context,
         ref,
@@ -188,22 +190,49 @@ class MoreScreen extends ConsumerWidget {
         permission: entry.permission,
         routeName: entry.routeName,
       ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          IconBadge(
+            icon: entry.icon,
+            color: accentColor,
+            filled: false,
+            size: 40,
+            iconSize: 20,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            entry.title,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: AppTypography.bodySmall(context).copyWith(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              height: 1.15,
+              color: cs.onSurface,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  DashAccent _accentFor(String title) {
-    return switch (title) {
-      'Categories' => DashAccent.purple,
-      'Stock' => DashAccent.amber,
-      'Reports' => DashAccent.blue,
-      'Submitted Reports' => DashAccent.teal,
-      'My Reports' => DashAccent.amber,
-      'Announcements' => DashAccent.amber,
-      'Staff Management' => DashAccent.green,
-      'Activity Logs' => DashAccent.grey,
-      'Trash' => DashAccent.red,
-      'AI Configuration' => DashAccent.teal,
-      _ => DashAccent.blue,
+  Color _colorFor(String title, BuildContext context) {
+    final b = Theme.of(context).brightness;
+    final color = switch (title) {
+      'Categories' => AppSemanticColors.violet,
+      'Stock' => AppSemanticColors.warning,
+      'Reports' => AppSemanticColors.primaryLight,
+      'Submitted Reports' => AppSemanticColors.teal,
+      'My Reports' => AppSemanticColors.pink,
+      'Announcements' => AppSemanticColors.warning,
+      'Staff Management' => AppSemanticColors.success,
+      'Activity Logs' => AppSemanticColors.neutral,
+      'Trash' => AppSemanticColors.error,
+      'AI Configuration' => AppSemanticColors.teal,
+      _ => AppSemanticColors.primaryLight,
     };
+    return AppSemanticColors.resolve(color, b);
   }
 }

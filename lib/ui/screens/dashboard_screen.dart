@@ -114,8 +114,6 @@ class _DashboardLoadedView extends ConsumerWidget {
     }
 
     final isAdmin = data is AdminDashboardData;
-    final greeting =
-        user!.role == UserRole.admin ? 'Welcome back' : null;
 
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -123,7 +121,7 @@ class _DashboardLoadedView extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          DashboardWelcome(user: user!, greeting: greeting),
+          DashboardWelcome(user: user!),
           const SizedBox(height: Spacing.lg),
           if (!isAdmin) ...[
             const SalesPeriodSelector(),
@@ -363,6 +361,7 @@ class _OwnerDashboard extends ConsumerWidget {
         QuickActionTile(
           icon: Icons.add_box_outlined,
           label: 'Add Product',
+          accent: DashAccent.blue,
           onTap: () => RouteGuard.pushIfAuthorized(
             context, ref,
             screen: const ProductsScreen(),
@@ -386,6 +385,7 @@ class _OwnerDashboard extends ConsumerWidget {
         QuickActionTile(
           icon: Icons.receipt_long,
           label: 'View Sales',
+          accent: DashAccent.blue,
           onTap: () => RouteGuard.pushIfAuthorized(
             context, ref,
             screen: const SalesScreen(),
@@ -409,6 +409,7 @@ class _OwnerDashboard extends ConsumerWidget {
         QuickActionTile(
           icon: Icons.people,
           label: 'Manage Staff',
+          accent: DashAccent.blue,
           onTap: () => RouteGuard.pushIfAuthorized(
             context, ref,
             screen: const StaffManagementScreen(),
@@ -429,7 +430,10 @@ class _OwnerDashboard extends ConsumerWidget {
           ),
         ),
     ];
-    return QuickActionPanel(children: children);
+    return DashCard(
+      title: '',
+      children: [QuickActionPanel(columns: 4, children: children)],
+    );
   }
 
   Widget _buildSalesTrendCard(
@@ -508,7 +512,7 @@ class _OwnerDashboard extends ConsumerWidget {
     BuildContext context,
     SalesAnalytics analytics,
   ) {
-    final summaries = analytics.staffSummaries;
+    final summaries = analytics.staffSummaries.take(3).toList();
     if (summaries.isEmpty) {
       return const DashCard(
         title: 'Staff Performance',
@@ -518,7 +522,7 @@ class _OwnerDashboard extends ConsumerWidget {
 
     return DashCard(
       title: 'Staff Performance',
-      children: _staffRows(context, summaries),
+      children: _staffRows(context, summaries, analytics.sales),
     );
   }
 
@@ -551,7 +555,9 @@ class _OwnerDashboard extends ConsumerWidget {
                 icon: Icons.check_circle,
                 color: AppSemanticColors.resolve(
                     AppSemanticColors.success, cs.brightness),
-                small: true,
+                size: 32,
+                iconSize: 15,
+                filled: false,
               ),
               const SizedBox(width: Spacing.md),
               const Text('Inventory is healthy'),
@@ -574,7 +580,10 @@ class _OwnerDashboard extends ConsumerWidget {
                 child: Text(
                   'View Stock →',
                   style: AppTypography.bodySmall(context).copyWith(
-                    color: cs.primary,
+                    color: AppSemanticColors.resolve(
+                      AppSemanticColors.info,
+                      cs.brightness,
+                    ),
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -593,11 +602,11 @@ class _OwnerDashboard extends ConsumerWidget {
 
     return DashCard(
       title: 'Recent Sales',
-      trailing: Text(
-        '$count today',
-        style: AppTypography.bodySmall(context).copyWith(
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-          fontWeight: FontWeight.w600,
+      trailing: StatusPill(
+        label: '$count',
+        color: AppSemanticColors.resolve(
+          AppSemanticColors.info,
+          Theme.of(context).brightness,
         ),
       ),
       children: sales.isEmpty
@@ -687,7 +696,7 @@ class _AdminDashboard extends ConsumerWidget {
               icon: Icons.history,
               accent: DashAccent.blue,
               value: '${data.recentActivityCount}',
-              label: 'Last 7 days',
+              label: 'Recent activity',
             ),
             StatItem(
               icon: Icons.delete_outline,
@@ -721,6 +730,7 @@ class _AdminDashboard extends ConsumerWidget {
         QuickActionTile(
           icon: Icons.people,
           label: 'Manage Users',
+          accent: DashAccent.blue,
           onTap: () => RouteGuard.pushIfAuthorized(
             context, ref,
             screen: const UsersScreen(),
@@ -732,6 +742,7 @@ class _AdminDashboard extends ConsumerWidget {
         QuickActionTile(
           icon: Icons.backup,
           label: 'Backup',
+          accent: DashAccent.blue,
           onTap: () => RouteGuard.pushIfAuthorized(
             context, ref,
             screen: const BackupRestoreScreen(),
@@ -755,6 +766,7 @@ class _AdminDashboard extends ConsumerWidget {
         QuickActionTile(
           icon: Icons.history,
           label: 'Activity Logs',
+          accent: DashAccent.grey,
           onTap: () => RouteGuard.pushIfAuthorized(
             context, ref,
             screen: const ActivityLogsScreen(),
@@ -778,6 +790,7 @@ class _AdminDashboard extends ConsumerWidget {
         QuickActionTile(
           icon: Icons.settings,
           label: 'Settings',
+          accent: DashAccent.grey,
           onTap: () => RouteGuard.pushIfAuthorized(
             context, ref,
             screen: const SettingsScreen(),
@@ -786,7 +799,10 @@ class _AdminDashboard extends ConsumerWidget {
           ),
         ),
     ];
-    return QuickActionPanel(columns: 3, children: children);
+    return DashCard(
+      title: '',
+      children: [QuickActionPanel(columns: 3, children: children)],
+    );
   }
 
   Widget _buildUsersByRoleCard(BuildContext context) {
@@ -840,6 +856,9 @@ class _AdminDashboard extends ConsumerWidget {
             color: backupOk
                 ? AppSemanticColors.resolve(AppSemanticColors.success, b)
                 : AppSemanticColors.resolve(AppSemanticColors.warning, b),
+            size: 34,
+            iconSize: 17,
+            filled: false,
           ),
           title: backupOk ? 'Backup up to date' : 'No backup created yet',
           subtitle: backupOk && data.backupStatus.lastBackupDate != null
@@ -853,6 +872,9 @@ class _AdminDashboard extends ConsumerWidget {
             color: aiOk
                 ? AppSemanticColors.resolve(AppSemanticColors.success, b)
                 : AppSemanticColors.resolve(AppSemanticColors.warning, b),
+            size: 34,
+            iconSize: 17,
+            filled: false,
           ),
           title: aiOk ? 'Groq API configured' : 'No Groq API key configured',
           subtitle: aiOk
@@ -864,6 +886,9 @@ class _AdminDashboard extends ConsumerWidget {
           leading: IconBadge(
             icon: Icons.file_download_outlined,
             color: AppSemanticColors.resolve(AppSemanticColors.info, b),
+            size: 34,
+            iconSize: 17,
+            filled: false,
           ),
           title: 'Export history',
           subtitle: data.lastExportAt != null
@@ -920,6 +945,9 @@ class _AdminDashboard extends ConsumerWidget {
                 leading: IconBadge(
                   icon: items[i].icon,
                   color: warning,
+                  size: 34,
+                  iconSize: 17,
+                  filled: false,
                 ),
                 title: items[i].title,
                 subtitle: items[i].subtitle,
@@ -932,6 +960,9 @@ class _AdminDashboard extends ConsumerWidget {
                   icon: Icons.check_circle,
                   color: AppSemanticColors.resolve(
                       AppSemanticColors.success, b),
+                  size: 34,
+                  iconSize: 17,
+                  filled: false,
                 ),
                 title: 'Nothing needs attention',
                 showDivider: false,
@@ -1049,6 +1080,7 @@ class _StaffDashboard extends ConsumerWidget {
         QuickActionTile(
           icon: Icons.receipt_long,
           label: 'My Sales',
+          accent: DashAccent.blue,
           onTap: () => RouteGuard.pushIfAuthorized(
             context, ref,
             screen: const SalesScreen(),
@@ -1069,7 +1101,10 @@ class _StaffDashboard extends ConsumerWidget {
           ),
         ),
     ];
-    return QuickActionPanel(columns: 3, children: children);
+    return DashCard(
+      title: '',
+      children: [QuickActionPanel(columns: 4, children: children)],
+    );
   }
 
   Widget _buildStaffSalesTrendCard(
@@ -1205,7 +1240,9 @@ class _StaffDashboard extends ConsumerWidget {
                 icon: Icons.check_circle,
                 color: AppSemanticColors.resolve(
                     AppSemanticColors.success, cs.brightness),
-                small: true,
+                size: 32,
+                iconSize: 15,
+                filled: false,
               ),
               const SizedBox(width: Spacing.md),
               const Text('Inventory is healthy'),
@@ -1228,7 +1265,10 @@ class _StaffDashboard extends ConsumerWidget {
                 child: Text(
                   'View Stock →',
                   style: AppTypography.bodySmall(context).copyWith(
-                    color: cs.primary,
+                    color: AppSemanticColors.resolve(
+                      AppSemanticColors.info,
+                      cs.brightness,
+                    ),
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -1317,7 +1357,7 @@ List<Widget> _paymentRows(
       icon: icon,
       accent: accent,
       method: item.method,
-      amount: CurrencyUtils.format(item.total),
+      amount: CurrencyUtils.formatWhole(item.total),
       percent: percent,
       showDivider: i > 0,
     );
@@ -1333,12 +1373,18 @@ List<Widget> _paymentBreakdownRows(
     final (icon, accent) = _paymentIconAccent(item.method);
     final color = dashAccentColor(context, accent);
     return DashRow(
-      leading: IconBadge(icon: icon, color: color),
+      leading: IconBadge(
+        icon: icon,
+        color: color,
+        size: 34,
+        iconSize: 17,
+        filled: false,
+      ),
       title: item.method,
       subtitle:
           '${item.count} transaction${item.count == 1 ? '' : 's'}',
       showDivider: i > 0,
-      trailing: DashRowEnd(amount: CurrencyUtils.format(item.total)),
+      trailing: DashRowEnd(amount: CurrencyUtils.formatWhole(item.total)),
     );
   });
 }
@@ -1357,7 +1403,7 @@ List<Widget> _topProductRows(
           '${p.categoryName ?? 'Product'} · ${p.totalQuantity} sold',
       showDivider: i > 0,
       trailing: DashRowEnd(
-        amount: CurrencyUtils.format(p.revenue),
+        amount: CurrencyUtils.formatWhole(p.revenue),
         pill: _rankPill(i + 1, b),
       ),
     );
@@ -1367,9 +1413,15 @@ List<Widget> _topProductRows(
 List<Widget> _staffRows(
   BuildContext context,
   List<StaffSalesSummary> summaries,
+  List<Sale> sales,
 ) {
   return List<Widget>.generate(summaries.length, (i) {
-    return _StaffRow(index: i, summary: summaries[i], showDivider: i > 0);
+    return _StaffRow(
+      index: i,
+      summary: summaries[i],
+      sales: sales,
+      showDivider: i > 0,
+    );
   });
 }
 
@@ -1406,13 +1458,25 @@ List<Widget> _lowStockRows(
 class _StaffRow extends StatelessWidget {
   final int index;
   final StaffSalesSummary summary;
+  final List<Sale> sales;
   final bool showDivider;
 
   const _StaffRow({
     required this.index,
     required this.summary,
+    required this.sales,
     this.showDivider = true,
   });
+
+  String _firstSaleTime() {
+    final times = sales
+        .where((s) => s.userId == summary.userId)
+        .map((s) => s.createdAt)
+        .toList();
+    if (times.isEmpty) return '';
+    times.sort();
+    return _formatShortTime(times.first);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1437,13 +1501,18 @@ class _StaffRow extends StatelessWidget {
       );
     }
 
+    final firstSale = _firstSaleTime();
+    final subtitle = firstSale.isNotEmpty
+        ? '${summary.transactionCount} sales · $firstSale'
+        : '${summary.transactionCount} sales';
+
     return DashRow(
       leading: DashAvatar(name: summary.fullName, color: bgColor),
       title: summary.fullName,
-      subtitle: '${summary.transactionCount} sales',
+      subtitle: subtitle,
       showDivider: showDivider,
       trailing: DashRowEnd(
-        amount: CurrencyUtils.format(summary.totalSales),
+        amount: CurrencyUtils.formatWhole(summary.totalSales),
         pill: pill,
       ),
     );
@@ -1514,7 +1583,9 @@ class _SaleRow extends StatelessWidget {
         icon: Icons.receipt_long,
         color: AppSemanticColors.resolve(AppSemanticColors.info, cs.brightness),
         square: true,
-        small: true,
+        size: 32,
+        iconSize: 15,
+        filled: false,
       ),
       title: '#${sale.receiptNumber ?? sale.id}',
       subtitle: subtitle,
@@ -1535,18 +1606,20 @@ class _ActivityRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final b = Theme.of(context).brightness;
-    final time = _formatDateTime(activity.createdAt);
-    final subtitle = activity.details?.isNotEmpty == true
-        ? '${activity.details} · $time'
-        : time;
+    final cs = Theme.of(context).colorScheme;
+    final hasDetails = activity.details?.isNotEmpty == true;
+    final subtitle = hasDetails
+        ? '${activity.details} · ${_formatShortTime(activity.createdAt)}'
+        : _formatDateTime(activity.createdAt);
 
     return DashRow(
       leading: IconBadge(
         icon: Icons.history,
-        color: AppSemanticColors.resolve(AppSemanticColors.neutral, b),
+        color: cs.onSurfaceVariant,
         square: true,
-        small: true,
+        size: 32,
+        iconSize: 15,
+        filled: false,
       ),
       title: _humanizeAction(activity.action),
       subtitle: subtitle,
@@ -1570,6 +1643,7 @@ class _MockupBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
     final cs = Theme.of(context).colorScheme;
     final ratio =
         maxValue <= 0 ? 0.0 : (value / maxValue).clamp(0.0, 1.0);
@@ -1580,7 +1654,12 @@ class _MockupBar extends StatelessWidget {
           width: width ?? double.infinity,
           height: h * ratio,
           decoration: BoxDecoration(
-            color: isHot ? cs.primary : cs.primary.withValues(alpha: 0.25),
+            color: isHot
+                ? cs.primary
+                : AppSemanticColors.resolve(
+                    AppSemanticColors.primaryLight,
+                    b,
+                  ).withValues(alpha: 0.25),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
           ),
         );
@@ -1605,7 +1684,7 @@ List<Widget> _buildTrendBars(
   return List<Widget>.generate(points.length, (i) {
     return Expanded(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 3),
         child: _MockupBar(
           value: points[i].value,
           maxValue: maxValue,
@@ -1690,7 +1769,7 @@ Widget _rankPill(int rank, Brightness b) {
 }
 
 String _formatDateTime(DateTime dt) {
-  return DateFormat('MMM d \u00b7 h:mm a').format(dt.toLocal());
+  return DateFormat('MMM d, y \u00b7 h:mm a').format(dt.toLocal());
 }
 
 String _formatShortTime(DateTime dt) {

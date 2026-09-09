@@ -93,6 +93,10 @@ void main() {
     expect(find.byType(TextField), findsOneWidget);
     expect(find.text('Search receipt, customer, or reference...'), findsOneWidget);
 
+    // Scroll the sale content into view so SliverList children are built.
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -400));
+    await tester.pumpAndSettle();
+
     // Sale content is still rendered and scrollable.
     expect(find.text('Sale #SALE-001'), findsOneWidget);
     expect(find.text('Total Sales'), findsOneWidget);
@@ -122,6 +126,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(CustomScrollView), findsOneWidget);
+
+    // Scroll the empty state into view so the SliverToBoxAdapter child is built.
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -300));
+    await tester.pumpAndSettle();
+
     expect(find.text('No Sales'), findsOneWidget);
     expect(find.text('Start selling to see sales history'), findsOneWidget);
   });

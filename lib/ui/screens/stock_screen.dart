@@ -733,6 +733,70 @@ class _StockScreenState extends ConsumerState<StockScreen> {
     );
   }
 
+  // ── Stock row actions (three-dot menu) ─────────────────────────────
+
+  Widget _buildStockActions(
+    Product product,
+    bool canAddStock,
+    bool canAdjustStock,
+    bool canViewStock,
+  ) {
+    final cs = Theme.of(context).colorScheme;
+    return PopupMenuButton<String>(
+      icon: Icon(Icons.more_vert, color: cs.onSurfaceVariant),
+      tooltip: 'Stock options',
+      padding: EdgeInsets.zero,
+      onSelected: (value) {
+        switch (value) {
+          case 'add':
+            _showAddStockDialog(product);
+            break;
+          case 'adjust':
+            _showAdjustStockDialog(product);
+            break;
+          case 'history':
+            _showStockHistory(product);
+            break;
+        }
+      },
+      itemBuilder: (context) => [
+        if (canAddStock)
+          const PopupMenuItem<String>(
+            value: 'add',
+            child: Row(
+              children: [
+                Icon(Icons.add, size: 18),
+                SizedBox(width: 8),
+                Text('Add stock'),
+              ],
+            ),
+          ),
+        if (canAdjustStock)
+          const PopupMenuItem<String>(
+            value: 'adjust',
+            child: Row(
+              children: [
+                Icon(Icons.edit, size: 18),
+                SizedBox(width: 8),
+                Text('Adjust'),
+              ],
+            ),
+          ),
+        if (canViewStock)
+          const PopupMenuItem<String>(
+            value: 'history',
+            child: Row(
+              children: [
+                Icon(Icons.history, size: 18),
+                SizedBox(width: 8),
+                Text('History'),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
   // ── Mobile stock list ──────────────────────────────────────────────
 
   Widget _buildMobileStockList(
@@ -812,27 +876,15 @@ class _StockScreenState extends ConsumerState<StockScreen> {
               ),
               const SizedBox(height: Spacing.sm),
               // Actions
-              Wrap(
-                spacing: Spacing.sm,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  if (canAddStock)
-                    FilledButton.tonalIcon(
-                      icon: const Icon(Icons.add, size: 18),
-                      label: const Text('Add Stock'),
-                      onPressed: _isProcessing ? null : () => _showAddStockDialog(product),
-                    ),
-                  if (canAdjustStock)
-                    FilledButton.tonalIcon(
-                      icon: const Icon(Icons.tune, size: 18),
-                      label: const Text('Adjust'),
-                      onPressed: _isProcessing ? null : () => _showAdjustStockDialog(product),
-                    ),
-                  if (canViewStock)
-                    TextButton.icon(
-                      icon: const Icon(Icons.history, size: 18),
-                      label: const Text('History'),
-                      onPressed: () => _showStockHistory(product),
-                    ),
+                  _buildStockActions(
+                    product,
+                    canAddStock,
+                    canAdjustStock,
+                    canViewStock,
+                  ),
                 ],
               ),
             ],
@@ -942,31 +994,11 @@ class _StockScreenState extends ConsumerState<StockScreen> {
                 child: _buildStockStatusBadge(product),
               ),
               // Actions
-              SizedBox(
-                width: 180,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (canAddStock)
-                      IconButton(
-                        icon: const Icon(Icons.add_circle_outline),
-                        tooltip: 'Add Stock',
-                        onPressed: _isProcessing ? null : () => _showAddStockDialog(product),
-                      ),
-                    if (canAdjustStock)
-                      IconButton(
-                        icon: const Icon(Icons.tune),
-                        tooltip: 'Adjust Stock',
-                        onPressed: _isProcessing ? null : () => _showAdjustStockDialog(product),
-                      ),
-                    if (canViewStock)
-                      IconButton(
-                        icon: const Icon(Icons.history),
-                        tooltip: 'Stock History',
-                        onPressed: () => _showStockHistory(product),
-                      ),
-                  ],
-                ),
+              _buildStockActions(
+                product,
+                canAddStock,
+                canAdjustStock,
+                canViewStock,
               ),
             ],
           ),

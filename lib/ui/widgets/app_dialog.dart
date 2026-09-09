@@ -107,7 +107,7 @@ extension AppDialogTypeX on AppDialogType {
       AppDialogType.payment =>
         AppSemanticColors.resolve(AppSemanticColors.primary, brightness),
       AppDialogType.ai =>
-        AppSemanticColors.resolve(AppSemanticColors.purple, brightness),
+        AppSemanticColors.resolve(AppSemanticColors.violet, brightness),
       AppDialogType.loading =>
         AppSemanticColors.resolve(AppSemanticColors.primary, brightness),
     };
@@ -115,37 +115,11 @@ extension AppDialogTypeX on AppDialogType {
 
   /// Background colour of the circular icon container.
   ///
-  /// Uses the theme-aware container colour so the surface is subtly tinted in
+  /// Matches the CRUD mockup `.c-*` classes: the role colour at 16% opacity
+  /// blended with the dialog surface. This keeps the icon background subtle in
   /// light mode and darkly tinted in dark mode.
   Color iconBgColor(Brightness brightness) {
-    return switch (this) {
-      AppDialogType.success ||
-      AppDialogType.restore =>
-        AppSemanticColors.resolve(AppSemanticColors.successContainer, brightness),
-      AppDialogType.error ||
-      AppDialogType.delete ||
-      AppDialogType.permanentDelete ||
-      AppDialogType.logout =>
-        AppSemanticColors.resolve(AppSemanticColors.errorContainer, brightness),
-      AppDialogType.warning ||
-      AppDialogType.offline =>
-        AppSemanticColors.resolve(AppSemanticColors.warningContainer, brightness),
-      AppDialogType.validation =>
-        AppSemanticColors.resolve(AppSemanticColors.errorContainer, brightness),
-      AppDialogType.info ||
-      AppDialogType.add ||
-      AppDialogType.edit =>
-        AppSemanticColors.resolve(AppSemanticColors.infoContainer, brightness),
-      AppDialogType.restriction =>
-        AppSemanticColors.resolve(AppSemanticColors.neutralContainer, brightness),
-      AppDialogType.confirmation ||
-      AppDialogType.payment =>
-        AppSemanticColors.resolve(AppSemanticColors.infoContainer, brightness),
-      AppDialogType.ai =>
-        AppSemanticColors.resolve(AppSemanticColors.purpleContainer, brightness),
-      AppDialogType.loading =>
-        AppSemanticColors.resolve(AppSemanticColors.neutralContainer, brightness),
-    };
+    return iconColor(brightness).withValues(alpha: 0.16);
   }
 
   /// Colour for the [CircularProgressIndicator] shown in loading dialogs.

@@ -21,6 +21,7 @@ import 'package:pinoy_pos/providers/sales_analytics_provider.dart';
 import 'package:pinoy_pos/services/backup_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
+import 'package:pinoy_pos/ui/widgets/dashboard_blocks.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
@@ -578,15 +579,15 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                                   color: cs.onSurfaceVariant,
                                 ),
                           ),
-                          const SizedBox(height: Spacing.xxl),
+                          const SizedBox(height: Spacing.lg),
 
                           _buildLocationCard(context),
-                          const SizedBox(height: Spacing.xxl),
+                          const SizedBox(height: Spacing.lg),
 
                           _buildSectionHeader(context, 'Quick Actions'),
                           const SizedBox(height: Spacing.md),
                           _buildQuickActions(context, isTablet),
-                          const SizedBox(height: Spacing.xxl),
+                          const SizedBox(height: Spacing.lg),
 
                           _buildSectionHeader(context, 'Recent Backups'),
                           const SizedBox(height: Spacing.md),
@@ -606,7 +607,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                           else
                             _buildBackupList(context, isTablet),
 
-                          const SizedBox(height: Spacing.xxl),
+                          const SizedBox(height: Spacing.lg),
                         ],
                       ),
                     ),
@@ -626,18 +627,13 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
     double size = 38,
     double iconSize = 19,
   }) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(AppRadius.control),
-      ),
-      child: Icon(
-        icon,
-        size: iconSize,
-        color: color,
-      ),
+    return IconBadge(
+      icon: icon,
+      color: color,
+      square: true,
+      filled: false,
+      size: size,
+      iconSize: iconSize,
     );
   }
 
@@ -653,7 +649,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
 
     if (_locationLoading) {
       return AppCard(
-        padding: const EdgeInsets.all(Spacing.xl),
+        padding: const EdgeInsets.all(Spacing.lg),
         child: Row(
           children: [
             _buildIconBadge(
@@ -688,7 +684,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
     // download. Do not show a non-functional "Choose Backup Folder" button.
     if (isWeb) {
       return AppCard(
-        padding: const EdgeInsets.all(Spacing.xl),
+        padding: const EdgeInsets.all(Spacing.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -736,7 +732,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
     }
 
     return AppCard(
-      padding: const EdgeInsets.all(Spacing.xl),
+      padding: const EdgeInsets.all(Spacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -758,18 +754,12 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
           if (hasLocation) ...[
             Row(
               children: [
-                Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: successColor.withValues(alpha: 0.16),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.check,
-                    size: 15,
-                    color: successColor,
-                  ),
+                IconBadge(
+                  icon: Icons.check,
+                  color: successColor,
+                  filled: false,
+                  size: 28,
+                  iconSize: 15,
                 ),
                 const SizedBox(width: Spacing.sm),
                 Expanded(
@@ -972,18 +962,13 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
         children: [
           Row(
             children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: cs.primary.withValues(alpha: 0.16),
-                  borderRadius: BorderRadius.circular(AppRadius.control),
-                ),
-                child: Icon(
-                  Icons.archive_outlined,
-                  size: 19,
-                  color: cs.primary,
-                ),
+              IconBadge(
+                icon: Icons.archive_outlined,
+                color: cs.primary,
+                square: true,
+                filled: false,
+                size: 38,
+                iconSize: 19,
               ),
               const SizedBox(width: Spacing.md),
               Expanded(
@@ -1157,18 +1142,13 @@ class _QuickActionCard extends StatelessWidget {
                   ),
                 )
               else
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: iconColor.withValues(alpha: 0.16),
-                    borderRadius: BorderRadius.circular(AppRadius.control),
-                  ),
-                  child: Icon(
-                    icon,
-                    size: 19,
-                    color: iconColor,
-                  ),
+                IconBadge(
+                  icon: icon,
+                  color: iconColor,
+                  square: true,
+                  filled: false,
+                  size: 38,
+                  iconSize: 19,
                 ),
               const SizedBox(width: Spacing.md),
               Expanded(
