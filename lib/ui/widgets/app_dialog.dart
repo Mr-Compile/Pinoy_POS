@@ -8,10 +8,13 @@ import 'package:pinoy_pos/ui/widgets/app_button.dart';
 
 /// Semantic roles for every Pinoy POS dialog.
 ///
-/// Each role maps to a fixed icon, a solid semantic icon container colour,
-/// and a default primary-button colour so the entire dialog system stays
-/// consistent. The values here are the source of truth for the visual
-/// language described in the global semantic dialog foundation.
+/// Each role maps to a fixed icon, a semantic icon container colour, and a
+/// default primary-button colour so the entire dialog system stays consistent.
+/// The values here are the source of truth for the visual language described
+/// in the global semantic dialog foundation.
+///
+/// Icons are Material designs that match the Lucide names used in the design
+/// reference, because the project’s icon system is Material.
 enum AppDialogType {
   success,
   error,
@@ -26,7 +29,10 @@ enum AppDialogType {
   permanentDelete,
   restore,
   ai,
+  payment,
   logout,
+  add,
+  edit,
 }
 
 /// Icon, colour and accessibility metadata for [AppDialogType].
@@ -36,28 +42,36 @@ extension AppDialogTypeX on AppDialogType {
   IconData? get icon {
     switch (this) {
       case AppDialogType.success:
-      case AppDialogType.confirmation:
-        return Icons.check_circle;
+        return Icons.check_circle_outline;
+      case AppDialogType.restore:
+        return Icons.restore;
       case AppDialogType.error:
-        return Icons.cancel;
-      case AppDialogType.warning:
       case AppDialogType.validation:
-      case AppDialogType.permanentDelete:
-        return Icons.warning_amber_rounded;
+        return Icons.cancel_outlined;
+      case AppDialogType.warning:
+        return Icons.warning_amber_outlined;
       case AppDialogType.info:
-        return Icons.info;
+        return Icons.info_outline;
       case AppDialogType.restriction:
         return Icons.lock_outline;
       case AppDialogType.offline:
         return Icons.wifi_off;
       case AppDialogType.delete:
         return Icons.delete_outline;
-      case AppDialogType.restore:
-        return Icons.restore;
+      case AppDialogType.permanentDelete:
+        return Icons.delete_forever;
+      case AppDialogType.confirmation:
+        return Icons.help_outline;
       case AppDialogType.ai:
         return Icons.auto_awesome;
+      case AppDialogType.payment:
+        return Icons.account_balance_wallet_outlined;
       case AppDialogType.logout:
         return Icons.logout;
+      case AppDialogType.add:
+        return Icons.add;
+      case AppDialogType.edit:
+        return Icons.edit_outlined;
       case AppDialogType.loading:
         return null;
     }
@@ -65,38 +79,73 @@ extension AppDialogTypeX on AppDialogType {
 
   /// Foreground colour for the icon symbol.
   ///
-  /// The icon sits on a solid semantic circle, and a light/white symbol keeps
-  /// the design consistent with the reference image.
-  Color iconColor(Brightness brightness) => AppColorTokens.onPrimaryBlue;
+  /// The icon is the semantic colour itself, sitting on a subtle tinted
+  /// background. This gives each dialog its meaning while keeping both light
+  /// and dark variants readable.
+  Color iconColor(Brightness brightness) {
+    return switch (this) {
+      AppDialogType.success ||
+      AppDialogType.restore =>
+        AppSemanticColors.resolve(AppSemanticColors.success, brightness),
+      AppDialogType.error ||
+      AppDialogType.delete ||
+      AppDialogType.permanentDelete ||
+      AppDialogType.logout =>
+        AppSemanticColors.resolve(AppSemanticColors.error, brightness),
+      AppDialogType.warning ||
+      AppDialogType.offline =>
+        AppSemanticColors.resolve(AppSemanticColors.warning, brightness),
+      AppDialogType.validation =>
+        AppSemanticColors.resolve(AppSemanticColors.error, brightness),
+      AppDialogType.info ||
+      AppDialogType.add ||
+      AppDialogType.edit =>
+        AppSemanticColors.resolve(AppSemanticColors.info, brightness),
+      AppDialogType.restriction =>
+        AppSemanticColors.resolve(AppSemanticColors.neutral, brightness),
+      AppDialogType.confirmation ||
+      AppDialogType.payment =>
+        AppSemanticColors.resolve(AppSemanticColors.primary, brightness),
+      AppDialogType.ai =>
+        AppSemanticColors.resolve(AppSemanticColors.purple, brightness),
+      AppDialogType.loading =>
+        AppSemanticColors.resolve(AppSemanticColors.primary, brightness),
+    };
+  }
 
   /// Background colour of the circular icon container.
   ///
-  /// Uses the canonical saturated semantic colour so the icon is recognisable
-  /// in both light and dark mode.
+  /// Uses the theme-aware container colour so the surface is subtly tinted in
+  /// light mode and darkly tinted in dark mode.
   Color iconBgColor(Brightness brightness) {
-    switch (this) {
-      case AppDialogType.success:
-      case AppDialogType.confirmation:
-      case AppDialogType.restore:
-        return AppSemanticColors.success;
-      case AppDialogType.error:
-      case AppDialogType.delete:
-      case AppDialogType.permanentDelete:
-      case AppDialogType.logout:
-        return AppSemanticColors.error;
-      case AppDialogType.warning:
-      case AppDialogType.validation:
-        return AppSemanticColors.warning;
-      case AppDialogType.info:
-      case AppDialogType.offline:
-        return AppSemanticColors.info;
-      case AppDialogType.restriction:
-        return AppSemanticColors.neutral;
-      case AppDialogType.ai:
-        return AppSemanticColors.purple;
-      case AppDialogType.loading:
-        return AppSemanticColors.primary;
-    }
+    return switch (this) {
+      AppDialogType.success ||
+      AppDialogType.restore =>
+        AppSemanticColors.resolve(AppSemanticColors.successContainer, brightness),
+      AppDialogType.error ||
+      AppDialogType.delete ||
+      AppDialogType.permanentDelete ||
+      AppDialogType.logout =>
+        AppSemanticColors.resolve(AppSemanticColors.errorContainer, brightness),
+      AppDialogType.warning ||
+      AppDialogType.offline =>
+        AppSemanticColors.resolve(AppSemanticColors.warningContainer, brightness),
+      AppDialogType.validation =>
+        AppSemanticColors.resolve(AppSemanticColors.errorContainer, brightness),
+      AppDialogType.info ||
+      AppDialogType.add ||
+      AppDialogType.edit =>
+        AppSemanticColors.resolve(AppSemanticColors.infoContainer, brightness),
+      AppDialogType.restriction =>
+        AppSemanticColors.resolve(AppSemanticColors.neutralContainer, brightness),
+      AppDialogType.confirmation ||
+      AppDialogType.payment =>
+        AppSemanticColors.resolve(AppSemanticColors.infoContainer, brightness),
+      AppDialogType.ai =>
+        AppSemanticColors.resolve(AppSemanticColors.purpleContainer, brightness),
+      AppDialogType.loading =>
+        AppSemanticColors.resolve(AppSemanticColors.neutralContainer, brightness),
+    };
   }
 
   /// Colour for the [CircularProgressIndicator] shown in loading dialogs.
@@ -133,8 +182,14 @@ extension AppDialogTypeX on AppDialogType {
         return 'Restore item';
       case AppDialogType.ai:
         return 'AI Assistant';
+      case AppDialogType.payment:
+        return 'Payment';
       case AppDialogType.logout:
         return 'Log out';
+      case AppDialogType.add:
+        return 'Add item';
+      case AppDialogType.edit:
+        return 'Edit item';
     }
   }
 
@@ -143,10 +198,17 @@ extension AppDialogTypeX on AppDialogType {
   AppButtonColor get primaryButtonColor {
     switch (this) {
       case AppDialogType.success:
-      case AppDialogType.confirmation:
       case AppDialogType.restore:
-        return AppButtonColor.success;
+      case AppDialogType.restriction:
+      case AppDialogType.confirmation:
+      case AppDialogType.info:
       case AppDialogType.error:
+      case AppDialogType.offline:
+      case AppDialogType.payment:
+      case AppDialogType.add:
+      case AppDialogType.edit:
+      case AppDialogType.ai:
+        return AppButtonColor.primary;
       case AppDialogType.delete:
       case AppDialogType.permanentDelete:
       case AppDialogType.logout:
@@ -154,12 +216,6 @@ extension AppDialogTypeX on AppDialogType {
       case AppDialogType.warning:
       case AppDialogType.validation:
         return AppButtonColor.warning;
-      case AppDialogType.restriction:
-        return AppButtonColor.neutral;
-      case AppDialogType.ai:
-        return AppButtonColor.purple;
-      case AppDialogType.info:
-      case AppDialogType.offline:
       case AppDialogType.loading:
         return AppButtonColor.primary;
     }
@@ -282,6 +338,10 @@ class _AppDialogState extends State<AppDialog> {
       LayoutClass.expanded => min(560.0, max(120.0, screenWidth - 48.0)),
     };
 
+    // Compact dialogs use slightly tighter padding, while tablet/desktop keep
+    // the standard 24 dp.
+    final contentPadding = Spacing.xl;
+
     return Semantics(
       label: widget.type.semanticLabel,
       container: true,
@@ -299,7 +359,7 @@ class _AppDialogState extends State<AppDialog> {
                 maxHeight: constraints.maxHeight,
               ),
               child: Padding(
-                padding: const EdgeInsets.all(Spacing.xxl),
+                padding: EdgeInsets.all(contentPadding),
                 child: _buildContent(context, isTablet),
               ),
             );
@@ -328,7 +388,7 @@ class _AppDialogState extends State<AppDialog> {
           ),
         ),
         if (widget.actions.isNotEmpty) ...[
-          const SizedBox(height: Spacing.xxl),
+          const SizedBox(height: Spacing.lg),
           _buildActions(context, isTablet),
         ],
       ],
@@ -336,37 +396,37 @@ class _AppDialogState extends State<AppDialog> {
   }
 
   Widget _buildFormHeader(BuildContext context) {
-    return Column(
+    final content = Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (widget.showIcon) ...[
-                    Center(child: _buildIcon(context, false)),
-                    const SizedBox(height: Spacing.lg),
-                  ],
-                  Text(
-                    widget.title,
-                    style: AppTypography.headlineSmallSemibold(context),
-                    textAlign: TextAlign.start,
-                  ),
-                ],
-              ),
-            ),
-            if (widget.showClose) _buildCloseButton(context),
-          ],
-        ),
+        if (widget.showIcon) ...[
+          _buildIcon(context, true),
+          const SizedBox(height: Spacing.lg),
+        ],
+        _buildTitle(context, true),
         if (widget.message != null) ...[
           const SizedBox(height: Spacing.sm),
-          _buildMessage(context, false),
+          _buildMessage(context, true),
         ],
+        if (widget.details != null) ...[
+          const SizedBox(height: Spacing.sm),
+          _buildDetails(context),
+        ],
+      ],
+    );
+
+    if (!widget.showClose) return content;
+
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        content,
+        Positioned(
+          right: 0,
+          top: 0,
+          child: _buildCloseButton(context),
+        ),
       ],
     );
   }
@@ -420,8 +480,8 @@ class _AppDialogState extends State<AppDialog> {
     if (widget.type == AppDialogType.loading) {
       return Center(
         child: SizedBox(
-          width: 48,
-          height: 48,
+          width: 28,
+          height: 28,
           child: CircularProgressIndicator(
             strokeWidth: 3,
             color: widget.type.spinnerColor(brightness),
@@ -435,15 +495,15 @@ class _AppDialogState extends State<AppDialog> {
 
     return Center(
       child: Container(
-        width: 56,
-        height: 56,
+        width: 40,
+        height: 40,
         decoration: BoxDecoration(
           color: widget.type.iconBgColor(brightness),
           shape: BoxShape.circle,
         ),
         child: Icon(
           iconData,
-          size: 32,
+          size: 20,
           color: widget.type.iconColor(brightness),
         ),
       ),
@@ -454,7 +514,10 @@ class _AppDialogState extends State<AppDialog> {
     return Text(
       widget.title,
       textAlign: centered ? TextAlign.center : TextAlign.start,
-      style: AppTypography.headlineSmallSemibold(context),
+      style: AppTypography.titleLargeBold(context).copyWith(
+        fontSize: 18,
+        fontWeight: FontWeight.w800,
+      ),
     );
   }
 
@@ -463,9 +526,9 @@ class _AppDialogState extends State<AppDialog> {
       widget.message!,
       softWrap: true,
       textAlign: centered ? TextAlign.center : TextAlign.start,
-      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
+      style: AppTypography.bodyMedium(context).copyWith(
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
     );
   }
 
@@ -480,60 +543,54 @@ class _AppDialogState extends State<AppDialog> {
       child: Text(
         widget.details!,
         softWrap: true,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
+        style: AppTypography.bodyMedium(context).copyWith(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
       ),
     );
   }
 
   Widget _buildActions(BuildContext context, bool isTablet) {
-    final stackVertically = widget.actions.length > 2 || !isTablet;
-
     Widget buildAction(AppDialogAction action, {required bool fullWidth}) {
       final handler = action.onPressed == null || action.isLoading
           ? null
           : () => action.onPressed!(context);
 
-      if (action.isDestructive) {
-        return AppButton.destructive(
-          onPressed: handler,
-          label: action.label,
-          isLoading: action.isLoading,
-          fullWidth: fullWidth,
-        );
-      }
+      final color = action.isPrimary
+          ? (action.color ??
+              (action.isDestructive
+                  ? AppButtonColor.error
+                  : widget.type.primaryButtonColor))
+          : (action.color ??
+              (action.isDestructive ? AppButtonColor.error : AppButtonColor.neutral));
 
-      if (action.isPrimary) {
-        return AppButton.filled(
-          onPressed: handler,
-          label: action.label,
-          color: action.color ?? widget.type.primaryButtonColor,
-          isLoading: action.isLoading,
-          fullWidth: fullWidth,
-        );
-      }
+      // The mockup uses filled buttons for primary blue actions and
+      // outlined buttons for warning/error actions, even when they are
+      // the primary action (e.g. Discard, Delete, Log out).
+      final bool isOutlined = !action.isPrimary ||
+          color == AppButtonColor.warning ||
+          color == AppButtonColor.error;
 
-      if (action.color != null) {
+      if (isOutlined) {
         return AppButton.outlined(
           onPressed: handler,
           label: action.label,
-          color: action.color!,
+          color: color,
           isLoading: action.isLoading,
           fullWidth: fullWidth,
         );
       }
 
-      return AppButton.outlined(
+      return AppButton.filled(
         onPressed: handler,
         label: action.label,
-        color: AppButtonColor.neutral,
+        color: color,
         isLoading: action.isLoading,
         fullWidth: fullWidth,
       );
     }
 
-    if (stackVertically) {
+    if (widget.actions.length > 2) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: widget.actions.asMap().entries.map((entry) {
@@ -549,24 +606,20 @@ class _AppDialogState extends State<AppDialog> {
       );
     }
 
+    // One or two actions always sit side-by-side and share the width,
+    // matching the CRUD mockup action bar.
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: widget.actions.asMap().entries.map((entry) {
-        final i = entry.key;
-        final action = entry.value;
-        final isFirst = i == 0;
-        final isLast = i == widget.actions.length - 1;
-
-        return Expanded(
-          child: Padding(
-            padding: EdgeInsets.only(
-              left: isFirst ? 0 : Spacing.sm,
-              right: isLast ? 0 : Spacing.sm,
-            ),
-            child: buildAction(action, fullWidth: true),
+      children: [
+        Expanded(
+          child: buildAction(widget.actions.first, fullWidth: true),
+        ),
+        if (widget.actions.length == 2) ...[
+          const SizedBox(width: Spacing.sm),
+          Expanded(
+            child: buildAction(widget.actions.last, fullWidth: true),
           ),
-        );
-      }).toList(),
+        ],
+      ],
     );
   }
 }

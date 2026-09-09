@@ -10,7 +10,9 @@ import 'package:zxing_lib/common.dart' as zxing_common;
 import 'package:zxing_lib/multi.dart' as zxing_multi;
 import 'package:zxing_lib/zxing.dart' as zxing;
 
+import '../data/models/decoded_payment_qr.dart';
 import 'image_service.dart';
+import 'payment_qr_parser.dart';
 
 /// Outcome of a QR preview generation attempt.
 class QrPreviewResult {
@@ -139,6 +141,68 @@ class PaymentQrService {
     );
   }
 
+  /// Decodes the QR payload in [relativePath] and interprets it as a
+  /// payment QR (EMVCo/QR Ph where applicable).
+  ///
+  /// Detection order: ZXing decode → dart decoder fallback → EMVCo parser.
+  /// Returns a [DecodedPaymentQr] describing what the payload actually
+  /// contains; missing fields are left null rather than fabricated.
+  Future<DecodedPaymentQr> decodePaymentQr(String? relativePath) async {
+    if (relativePath == null || relativePath.trim().isEmpty) {
+      return const DecodedPaymentQr.notDetected();
+    }
+
+    final file = await _imageService.resolveImageFile(relativePath);
+    if (file == null) {
+      return const DecodedPaymentQr(
+        status: PaymentQrDecodeStatus.unreadable,
+      );
+    }
+
+    final Uint8List bytes;
+    final img.Image? sourceImage;
+    try {
+      bytes = await file.readAsBytes();
+      sourceImage = img.decodeImage(bytes);
+    } catch (_) {
+      return const DecodedPaymentQr(
+        status: PaymentQrDecodeStatus.unreadable,
+      );
+    }
+    if (sourceImage == null) {
+      return const DecodedPaymentQr(
+        status: PaymentQrDecodeStatus.unreadable,
+      );
+    }
+
+    final payload = await _decodePayloadText(sourceImage, bytes);
+    if (payload == null || payload.isEmpty) {
+      return const DecodedPaymentQr.notDetected();
+    }
+    return PaymentQrParser.parse(payload);
+  }
+
+  /// Extracts the payload text of the first QR found in [image]. Falls back
+  /// to the dart decoder's stronger pre-processing when ZXing finds nothing.
+  Future<String?> _decodePayloadText(img.Image image, Uint8List bytes) async {
+    final results = await _decodeResultsWithZxing(image);
+    for (final result in results) {
+      if (result.text.isNotEmpty) return result.text;
+    }
+
+    try {
+      final decoder = QrCodeDartDecoder(
+        formats: [BarcodeFormat.qrCode],
+      );
+      final result = await decoder.decodeFile(bytes);
+      final text = result?.text;
+      if (text != null && text.isNotEmpty) return text;
+    } catch (_) {
+      // Fall through: no payload could be decoded.
+    }
+    return null;
+  }
+
   /// Deletes a previously generated preview file. Safe to call with null.
   Future<void> deletePreview(String? previewRelativePath) async {
     if (previewRelativePath == null || previewRelativePath.isEmpty) return;
@@ -180,6 +244,17 @@ class PaymentQrService {
 
   /// Detects QR codes using the ZXing multi-reader.
   Future<List<_QrBounds>> _detectWithZxing(img.Image image) async {
+    final results = await _decodeResultsWithZxing(image);
+    return results
+        .where((r) => r.resultPoints != null && r.resultPoints!.isNotEmpty)
+        .map((r) => _boundsFromPoints(r.resultPoints!))
+        .toList();
+  }
+
+  /// Decodes QR codes using the ZXing multi-reader and returns the raw
+  /// decode results (payload text plus finder points). Returns an empty list
+  /// when nothing is found or decoding fails.
+  Future<List<zxing.Result>> _decodeResultsWithZxing(img.Image image) async {
     try {
       final rgbaImage = image.convert(
         format: img.Format.uint8,
@@ -195,18 +270,13 @@ class PaymentQrService {
       final bitmap = zxing.BinaryBitmap(zxing_common.HybridBinarizer(source));
       final reader = zxing_multi.QRCodeMultiReader();
 
-      final results = reader.decodeMultiple(
+      return reader.decodeMultiple(
         bitmap,
         const zxing.DecodeHint(
           tryHarder: true,
           alsoInverted: true,
         ),
       );
-
-      return results
-          .where((r) => r.resultPoints != null && r.resultPoints!.isNotEmpty)
-          .map((r) => _boundsFromPoints(r.resultPoints!))
-          .toList();
     } on zxing.NotFoundException {
       return const [];
     } catch (_) {

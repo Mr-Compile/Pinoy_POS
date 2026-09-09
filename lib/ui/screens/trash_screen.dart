@@ -16,6 +16,7 @@ import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
+import 'package:pinoy_pos/ui/widgets/app_icon_circle.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
 import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
@@ -38,6 +39,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
   final Set<int> _selectedIds = {};
   bool _selectionMode = false;
   List<String> _allowedTypes = [];
+  String _selectedType = 'all';
   final _dateFormat = DateFormat('MMM d, y h:mm a');
 
   @override
@@ -100,11 +102,23 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
         if (!_allowedTypes.contains(item.entityType)) {
           return false;
         }
+        if (_selectedType != 'all' && item.entityType != _selectedType) {
+          return false;
+        }
         if (query.isEmpty) return true;
 
         return _matchesSearch(item, query);
       }).toList();
     });
+  }
+
+  void _selectType(String type) {
+    setState(() {
+      _selectedType = type;
+      _selectionMode = false;
+      _selectedIds.clear();
+    });
+    _filterItems();
   }
 
   bool _matchesSearch(TrashItem item, String query) {
@@ -455,10 +469,54 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
               },
             ),
           ),
+          _buildTypeFilter(),
           Expanded(
             child: _buildBody(),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTypeFilter() {
+    final cs = Theme.of(context).colorScheme;
+
+    final chips = ['all', ..._allowedTypes];
+    final labels = {
+      'all': 'All',
+      'product': 'Products',
+      'category': 'Categories',
+      'user': 'Users',
+      'merchant_qr': 'QR',
+      'announcement': 'Announcements',
+    };
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            for (final type in chips) ...[
+              ChoiceChip(
+                label: Text(labels[type] ?? type),
+                selected: _selectedType == type,
+                onSelected: (_) => _selectType(type),
+                selectedColor: cs.primary,
+                backgroundColor: cs.surface,
+                side: BorderSide(color: cs.outline),
+                shape: const StadiumBorder(),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                labelStyle: TextStyle(
+                  color: _selectedType == type ? cs.onPrimary : cs.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12.5,
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -487,43 +545,118 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
     final authNotifier = ref.read(authStateProvider.notifier);
     final canRestore = _canRestoreItem(item, authNotifier);
     final canDelete = _canDeleteItem(item, authNotifier);
+    final cs = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
 
     return AppCard(
       margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: _buildLeading(item),
-        title: Text(_titleForItem(item)),
-        subtitle: _buildSubtitle(item),
-        trailing: _selectionMode || (canRestore == false && canDelete == false)
-            ? null
-            : Row(
+      padding: const EdgeInsets.all(14),
+      child: InkWell(
+        onTap: _selectionMode ? () => _toggleSelection(item.id!) : null,
+        onLongPress: item.id != null ? () => _startSelection(item.id!) : null,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildLeading(item),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _titleForItem(item),
+                    style: AppTypography.titleSmall(context),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _descriptionForItem(item),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Deleted by ${item.deletedByName ?? 'Unknown'} '
+                    '• ${_dateFormat.format(item.deletedAt)} '
+                    '• ${_expiryText(item)}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            if (!_selectionMode && (canRestore || canDelete)) ...[
+              const SizedBox(width: 8),
+              Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (canRestore)
-                    IconButton(
-                      icon: Icon(
-                        Icons.restore,
-                        color: AppSemanticColors.resolve(
-                          AppSemanticColors.success,
-                          Theme.of(context).brightness,
-                        ),
+                    _buildActionIcon(
+                      Icons.restore,
+                      AppSemanticColors.resolve(
+                        AppSemanticColors.success,
+                        brightness,
                       ),
-                      tooltip: 'Restore',
-                      onPressed: () => _restoreItem(item),
+                      'Restore',
+                      () => _restoreItem(item),
                     ),
+                  if (canRestore && canDelete) const SizedBox(width: 6),
                   if (canDelete)
-                    IconButton(
-                      icon: Icon(Icons.delete_forever,
-                          color: Theme.of(context).colorScheme.error),
-                      tooltip: 'Delete Permanently',
-                      onPressed: () => _permanentlyDeleteItem(item),
+                    _buildActionIcon(
+                      Icons.delete_forever,
+                      AppSemanticColors.resolve(
+                        AppSemanticColors.error,
+                        brightness,
+                      ),
+                      'Delete Permanently',
+                      () => _permanentlyDeleteItem(item),
                     ),
                 ],
               ),
-        onTap: _selectionMode ? () => _toggleSelection(item.id!) : null,
-        onLongPress: item.id != null ? () => _startSelection(item.id!) : null,
+            ],
+          ],
+        ),
       ),
     );
+  }
+
+  Widget _buildActionIcon(
+    IconData icon,
+    Color color,
+    String tooltip,
+    VoidCallback onPressed,
+  ) {
+    final cs = Theme.of(context).colorScheme;
+    return IconButton(
+      icon: Icon(icon, size: 18, color: color),
+      tooltip: tooltip,
+      onPressed: onPressed,
+      style: IconButton.styleFrom(
+        minimumSize: const Size(32, 32),
+        backgroundColor: cs.surfaceContainerHigh,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+      ),
+    );
+  }
+
+  Color _typeColor(String type, Brightness brightness) {
+    return switch (type) {
+      'category' || 'announcement' =>
+        AppSemanticColors.resolve(AppSemanticColors.warning, brightness),
+      'user' =>
+        AppSemanticColors.resolve(AppSemanticColors.info, brightness),
+      'merchant_qr' =>
+        AppSemanticColors.resolve(AppSemanticColors.error, brightness),
+      _ => AppSemanticColors.resolve(AppSemanticColors.neutral, brightness),
+    };
   }
 
   Widget _buildLeading(TrashItem item) {
@@ -534,104 +667,95 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
       );
     }
 
-    const size = 56.0;
+    final brightness = Theme.of(context).brightness;
+    final cs = Theme.of(context).colorScheme;
+
     switch (item.entityType) {
       case 'product':
         final product = _parseProduct(item);
-        return SizedBox(
-          width: size,
-          height: size,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(AppRadius.sm),
-            child: AppImage(
-              imagePath: product?.imageUrl,
-              placeholderIcon: Icons.inventory_2,
-              fit: BoxFit.cover,
-              cacheWidth: 512,
-            ),
+        return Container(
+          width: 50,
+          height: 50,
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(color: cs.outline),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: AppImage(
+            imagePath: product?.imageUrl,
+            placeholderIcon: Icons.inventory_2,
+            fit: BoxFit.cover,
+            cacheWidth: 512,
           ),
         );
       case 'category':
-        return const SizedBox(
-          width: size,
-          height: size,
-          child: CircleAvatar(
-            child: Icon(Icons.category),
+        final color = _typeColor(item.entityType, brightness);
+        return Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.16),
+            borderRadius: BorderRadius.circular(AppRadius.icon),
           ),
+          alignment: Alignment.center,
+          child: Icon(Icons.category, color: color, size: 19),
         );
       case 'user':
         final user = _parseUser(item);
-        return SizedBox(
-          width: size,
-          height: size,
-          child: CircleAvatar(
-            child: Text(
-              user != null && user.fullName.isNotEmpty
-                  ? user.fullName[0].toUpperCase()
-                  : '?',
+        final initial = user != null && user.fullName.isNotEmpty
+            ? user.fullName[0].toUpperCase()
+            : '?';
+        return Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: cs.primary,
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            initial,
+            style: TextStyle(
+              color: cs.onPrimary,
+              fontWeight: FontWeight.w700,
+              fontSize: 15,
             ),
           ),
         );
       case 'merchant_qr':
         final snapshot = item.snapshotMap;
         final path = snapshot?['path'] as String?;
-        return SizedBox(
-          width: size,
-          height: size,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(AppRadius.sm),
-            child: AppImage(
-              imagePath: path,
-              placeholderIcon: Icons.qr_code,
-              fit: BoxFit.contain,
-              cacheWidth: null,
-            ),
+        return Container(
+          width: 50,
+          height: 50,
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(color: cs.outline),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: AppImage(
+            imagePath: path,
+            placeholderIcon: Icons.qr_code,
+            fit: BoxFit.contain,
+            cacheWidth: null,
           ),
         );
       case 'announcement':
-        return const SizedBox(
-          width: size,
-          height: size,
-          child: CircleAvatar(
-            child: Icon(Icons.campaign),
-          ),
+        final color = _typeColor(item.entityType, brightness);
+        return AppIconCircle.medium(
+          icon: Icons.campaign,
+          backgroundColor: color.withValues(alpha: 0.16),
+          iconColor: color,
         );
       default:
-        return const SizedBox(
-          width: size,
-          height: size,
-          child: CircleAvatar(
-            child: Icon(Icons.delete),
-          ),
+        return AppIconCircle.medium(
+          icon: Icons.delete,
+          backgroundColor: cs.surfaceContainerHigh,
+          iconColor: cs.onSurfaceVariant,
         );
     }
-  }
-
-  Widget _buildSubtitle(TrashItem item) {
-    final theme = Theme.of(context);
-    final description = _descriptionForItem(item);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (description.isNotEmpty)
-          Text(
-            description,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodyMedium,
-          ),
-        if (description.isNotEmpty) const SizedBox(height: 4),
-        Text(
-          'Deleted by ${item.deletedByName ?? 'Unknown'} '
-          '• ${_dateFormat.format(item.deletedAt)} '
-          '• ${_expiryText(item)}',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ],
-    );
   }
 
   String _titleForItem(TrashItem item) {

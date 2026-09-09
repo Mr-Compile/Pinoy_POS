@@ -139,6 +139,27 @@ class SettingsService {
     return true;
   }
 
+  /// Updates only the global session (inactivity timeout and warning) fields.
+  /// Requires the [manage_session_settings] permission.
+  Future<bool> updateSessionSettings(Settings settings) async {
+    if (!_sessionManager.hasPermission('manage_session_settings')) {
+      throw AuthorizationException('manage_session_settings');
+    }
+
+    final current = await _settingsRepository.getSettings();
+    if (current == null) return false;
+
+    final updated = current.copyWith(
+      inactivityTimeoutMinutes: settings.inactivityTimeoutMinutes,
+      sessionWarningSeconds: settings.sessionWarningSeconds,
+      updatedAt: DateTime.now(),
+    );
+    await _settingsRepository.update(updated);
+    _currentSettings = updated;
+    _storeInfo = null;
+    return true;
+  }
+
   /// Returns true if any GCash payment field differs between [a] and [b].
   bool _gcashSettingsDiffer(Settings a, Settings b) {
     return a.gcashEnabled != b.gcashEnabled ||

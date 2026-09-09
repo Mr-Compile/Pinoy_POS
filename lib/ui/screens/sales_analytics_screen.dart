@@ -6,7 +6,6 @@ import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/data/models/sales_period.dart';
-import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/sales_analytics_provider.dart';
 import 'package:pinoy_pos/providers/sales_period_filter_provider.dart';
@@ -462,8 +461,13 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
     final analytics = ref.read(salesAnalyticsProvider).analytics;
     if (analytics == null) return;
 
-    final isStaff =
-        ref.read(authStateProvider.notifier).currentUser?.role == UserRole.staff;
+    // "Submit to Owner" is the Staff report workflow. It is gated on the
+    // Staff-only `submit_reports` permission (enforced again in
+    // ReportExportService.submitSalesReport) so the Owner is never offered
+    // a staff-style submission path.
+    final canSubmit = ref
+        .read(authStateProvider.notifier)
+        .hasPermission('submit_reports');
 
     showModalBottomSheet(
       context: context,
@@ -474,7 +478,7 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                isStaff ? 'Report' : 'Export Report',
+                canSubmit ? 'Report' : 'Export Report',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: Spacing.md),
@@ -493,7 +497,7 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
                 label: 'CSV',
                 onTap: () => _export(ExportFormat.csv),
               ),
-              if (isStaff) ...[
+              if (canSubmit) ...[
                 const Divider(),
                 _ExportFormatTile(
                   icon: Icons.send,

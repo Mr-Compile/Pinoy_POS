@@ -20,12 +20,18 @@ import 'package:pinoy_pos/ui/widgets/responsive_create_action.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 
-/// Owner/Staff report inbox.
+/// Role-aware report screen.
 ///
-/// Owners see reports submitted by Staff. Staff see their own report history.
+/// - `submissionsOnly: true` — Owner inbox ("Submitted Reports"): reports
+///   submitted by Staff for review. Requires `view_report_submissions`.
+/// - `submissionsOnly: false` — Staff history ("My Reports"): reports
+///   authored by the current Staff user. Requires `submit_reports`.
+///
+/// The Owner is never a report author, so no role combination shows them a
+/// "My Reports" view or a submit/import-report authoring action.
 class ReportSubmissionsScreen extends ConsumerStatefulWidget {
   /// If true, show only the staff-to-owner submission inbox.
-  /// If false, show the current user's own report history.
+  /// If false, show the current staff user's own report history.
   final bool submissionsOnly;
 
   const ReportSubmissionsScreen({
@@ -59,12 +65,13 @@ class _ReportSubmissionsScreenState
 
     try {
       final reportService = ref.read(reportServiceProvider);
-      final isOwner =
-          ref.read(authStateProvider.notifier).hasPermission('view_report_submissions');
+      final auth = ref.read(authStateProvider.notifier);
+      final canReview = auth.hasPermission('view_report_submissions');
+      final canSubmit = auth.hasPermission('submit_reports');
 
-      final reports = widget.submissionsOnly && isOwner
-          ? await reportService.getSubmittedReports()
-          : await reportService.getMyReports();
+      final reports = widget.submissionsOnly
+          ? (canReview ? await reportService.getSubmittedReports() : <ExportHistory>[])
+          : (canSubmit ? await reportService.getMyReports() : <ExportHistory>[]);
 
       final userIds = reports
           .where((r) => r.createdBy != null)
@@ -99,33 +106,69 @@ class _ReportSubmissionsScreenState
 
   @override
   Widget build(BuildContext context) {
-    final isOwner =
-        ref.read(authStateProvider.notifier).hasPermission('view_report_submissions');
-    final title = widget.submissionsOnly && isOwner ? 'Submitted Reports' : 'My Reports';
+    final auth = ref.read(authStateProvider.notifier);
+    final canReview = auth.hasPermission('view_report_submissions');
+    final canSubmit = auth.hasPermission('submit_reports');
+    final isAuthorized =
+        widget.submissionsOnly ? canReview : canSubmit;
+    final title =
+        widget.submissionsOnly ? 'Submitted Reports' : 'My Reports';
 
-    final createAction = isOwner
+    // Only report authors (Staff) can import an external report file into
+    // their own history. The Owner's inbox has no create/import action —
+    // they review what Staff submit and manage sales data via Sales.
+    final createAction = (!widget.submissionsOnly && canSubmit)
         ? ResponsiveCreateAction(
-            label: 'Import',
+            label: 'Import Report',
             icon: Icons.file_upload_outlined,
             onPressed: _isLoading ? null : _importReport,
           )
         : null;
 
-    final appBarAction = createAction?.appBarAction(context);
+    final toolbarAction = createAction?.contentAction(context);
     final createFab = createAction?.fab(context);
+    final bottomClearance =
+        createAction?.contentBottomClearance(context) ?? 0;
 
     return Scaffold(
       appBar: AppHeader(
         title: title,
         showBackButton: true,
-        actions: appBarAction != null ? [appBarAction] : null,
       ),
       floatingActionButton: createFab,
-      body: _buildBody(context, isOwner),
+      body: Column(
+        children: [
+          if (toolbarAction != null)
+            CrudToolbar(
+              padding: const EdgeInsets.fromLTRB(
+                Spacing.md,
+                Spacing.md,
+                Spacing.md,
+                0,
+              ),
+              primaryAction: toolbarAction,
+            ),
+          Expanded(
+            child: _buildBody(context, isAuthorized, bottomClearance),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildBody(BuildContext context, bool isOwner) {
+  Widget _buildBody(
+    BuildContext context,
+    bool isAuthorized,
+    double bottomClearance,
+  ) {
+    if (!isAuthorized) {
+      return const EmptyState(
+        icon: Icons.lock_outline,
+        title: 'Access restricted',
+        message: 'You do not have permission to view this report list.',
+      );
+    }
+
     if (_isLoading) {
       return const LoadingState(message: 'Loading reports...');
     }
@@ -144,23 +187,28 @@ class _ReportSubmissionsScreenState
     }
 
     if (_reports.isEmpty) {
-      final isSubmissionsView = widget.submissionsOnly && isOwner;
+      final isInboxView = widget.submissionsOnly;
       return EmptyState(
         icon: Icons.inbox_outlined,
-        title: isSubmissionsView
+        title: isInboxView
             ? 'No submitted reports yet'
             : 'No reports yet',
-        message: isSubmissionsView
-            ? 'Staff reports submitted to you will appear here.'
-            : 'Generate and submit a report from the Reports screen, '
-                'or import an external report.',
+        message: isInboxView
+            ? 'Reports submitted by Staff for your review will appear here.'
+            : 'Submit a report from the Reports screen, '
+                'or import a report file.',
       );
     }
 
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView.builder(
-        padding: const EdgeInsets.all(Spacing.md),
+        padding: EdgeInsets.fromLTRB(
+          Spacing.md,
+          Spacing.md,
+          Spacing.md,
+          Spacing.md + bottomClearance,
+        ),
         itemCount: _reports.length,
         itemBuilder: (context, index) {
           final report = _reports[index];
@@ -169,7 +217,7 @@ class _ReportSubmissionsScreenState
             child: _ReportCard(
               report: report,
               staffName: _staffNames[report.createdBy],
-              isOwner: isOwner,
+              showStaffName: widget.submissionsOnly,
               onTap: () => _openReport(context, report),
             ),
           );
@@ -237,8 +285,15 @@ class _ReportSubmissionsScreenState
   }
 
   Future<void> _openReport(BuildContext context, ExportHistory report) async {
-    final reportService = ref.read(reportServiceProvider);
-    await reportService.markReportViewed(report.id!);
+    // Only reviewers (Owner) mark a submission as viewed; a report author
+    // opening their own history entry does not change its status.
+    if (widget.submissionsOnly &&
+        ref
+            .read(authStateProvider.notifier)
+            .hasPermission('view_report_submissions')) {
+      final reportService = ref.read(reportServiceProvider);
+      await reportService.markReportViewed(report.id!);
+    }
 
     if (context.mounted) {
       await Navigator.push(
@@ -255,13 +310,16 @@ class _ReportSubmissionsScreenState
 class _ReportCard extends StatelessWidget {
   final ExportHistory report;
   final String? staffName;
-  final bool isOwner;
+
+  /// True in the Owner review inbox, where each card names the Staff member
+  /// who submitted the report.
+  final bool showStaffName;
   final VoidCallback onTap;
 
   const _ReportCard({
     required this.report,
     this.staffName,
-    required this.isOwner,
+    required this.showStaffName,
     required this.onTap,
   });
 
@@ -293,7 +351,7 @@ class _ReportCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      isOwner
+                      showStaffName
                           ? 'Staff: ${staffName ?? 'Unknown'}'
                           : 'Report #${report.reportNumber ?? report.id}',
                       style: AppTypography.bodySmall(context).copyWith(

@@ -1,7 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
-import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/constants.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/user.dart';
@@ -70,7 +69,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
       UserRole.owner =>
         AppSemanticColors.resolve(AppSemanticColors.primary, brightness),
       UserRole.admin =>
-        AppSemanticColors.resolve(AppSemanticColors.info, brightness),
+        AppSemanticColors.resolve(AppSemanticColors.purple, brightness),
       UserRole.staff =>
         AppSemanticColors.resolve(AppSemanticColors.neutral, brightness),
     };
@@ -163,52 +162,14 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
       return;
     }
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AppDialog(
-        type: AppDialogType.warning,
-        title: 'Reset Password?',
-        message:
-            'This will reset the password for ${user.fullName} (@${user.username}) to the default temporary password.',
-        actions: [
-          AppDialogAction(
-            label: 'Cancel',
-            onPressed: (context) => Navigator.pop(context, false),
-          ),
-          AppDialogAction(
-            label: 'Reset',
-            isPrimary: true,
-            isDestructive: true,
-            onPressed: (context) => Navigator.pop(context, true),
-          ),
-        ],
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(AppRadius.sm),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                Icons.info_outline,
-                size: 20,
-                color: AppSemanticColors.resolve(
-                  AppSemanticColors.info,
-                  Theme.of(context).brightness,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'The user will be required to change it on next login.',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    final confirmed = await AppDialogService.confirmation(
+      context,
+      title: 'Reset Password?',
+      message:
+          'This will reset the password for ${user.fullName} (@${user.username}) to the default temporary password.',
+      details: 'The user will be required to change it on next login.',
+      confirmLabel: 'Reset',
+      destructive: true,
     );
 
     if (confirmed == true && mounted) {
@@ -258,7 +219,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
       barrierDismissible: false,
       useRootNavigator: true,
       builder: (dialogContext) => AppDialogForm<ModalResult<void>>(
-        type: AppDialogType.info,
+        type: AppDialogType.edit,
         title: 'Edit User: ${user.username}',
         canPop: false,
         onPopInvokedWithResult: (context, state, didPop, result) {
@@ -280,16 +241,19 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                 Center(
                   child: AppAvatar(
                     imagePath: user.profileImagePath,
-                    initials: user.fullName.isNotEmpty
-                        ? user.fullName[0].toUpperCase()
-                        : '?',
+                    initials: user.fullName,
                     radius: 40,
+                    backgroundColor: _roleColor(
+                      user.role,
+                      Theme.of(context).colorScheme,
+                    ),
                   ),
                 ),
                 const SizedBox(height: Spacing.md),
                 AppTextFormField(
                   controller: usernameController,
                   label: 'Username',
+                  prefixIcon: Icons.person_outline,
                   validator: (value) =>
                       Validators.required(value, 'Username'),
                   onChanged: (_) => state.markChanged(),
@@ -298,6 +262,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                 AppTextFormField(
                   controller: fullNameController,
                   label: 'Full Name',
+                  prefixIcon: Icons.person,
                   validator: (value) =>
                       Validators.required(value, 'Full Name'),
                   onChanged: (_) => state.markChanged(),
@@ -306,6 +271,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                 AppTextFormField(
                   controller: pinController,
                   label: 'PIN (optional)',
+                  prefixIcon: Icons.lock_outline,
                   hint: user.hasPin
                       ? 'Enter new PIN to replace (${user.configuredPinLength} digits)'
                       : '4-6 digits',
@@ -320,6 +286,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                 AppDropdownField<int>(
                   label: 'Inactivity timeout',
                   hint: 'Use store default',
+                  prefixIcon: Icons.timer_outlined,
                   items: const [
                     DropdownMenuItem(value: null, child: Text('Use store default')),
                     DropdownMenuItem(value: 5, child: Text('5 minutes')),
@@ -335,6 +302,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                 const SizedBox(height: 12),
                 AppDropdownField<UserRole>(
                   label: 'Role',
+                  prefixIcon: Icons.badge_outlined,
                   items: roleItems
                       .map((role) => DropdownMenuItem(
                             value: role,
@@ -451,7 +419,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
       context: context,
       useRootNavigator: true,
       builder: (dialogContext) => AppDialogForm<ModalResult<void>>(
-        type: AppDialogType.info,
+        type: AppDialogType.add,
         title: 'Add User',
         childBuilder: (context, state) {
           final usernameController = state.textController('username');
@@ -494,6 +462,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                   AppTextFormField(
                     controller: usernameController,
                     label: 'Username',
+                    prefixIcon: Icons.person_outline,
                     textInputAction: TextInputAction.next,
                     validator: (value) =>
                         Validators.required(value, 'Username'),
@@ -505,6 +474,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                   AppTextFormField(
                     controller: fullNameController,
                     label: 'Full Name',
+                    prefixIcon: Icons.person,
                     textInputAction: TextInputAction.next,
                     validator: (value) =>
                         Validators.required(value, 'Full Name'),
@@ -517,6 +487,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                     controller: pinController,
                     label: 'PIN (optional)',
                     hint: '4-6 digits',
+                    prefixIcon: Icons.lock_outline,
                     keyboardType: TextInputType.number,
                     textInputAction: TextInputAction.next,
                     validator: (value) {
@@ -531,6 +502,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                   AppDropdownField<int>(
                     label: 'Inactivity timeout',
                     hint: 'Use store default',
+                    prefixIcon: Icons.timer_outlined,
                     items: const [
                       DropdownMenuItem(value: null, child: Text('Use store default')),
                       DropdownMenuItem(value: 5, child: Text('5 minutes')),
@@ -546,6 +518,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                   const SizedBox(height: 12),
                   AppDropdownField<UserRole>(
                     label: 'Role',
+                    prefixIcon: Icons.badge_outlined,
                     items: manageableRoles
                         .map((role) => DropdownMenuItem(
                               value: role,
@@ -645,8 +618,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     final canResetPassword = authNotifier.hasPermission('reset_password');
     final canToggleActive = authNotifier.hasPermission('toggle_user_active');
     final currentUser = ref.read(authStateProvider).user;
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
 
     final createAction = canManage
         ? ResponsiveCreateAction(
@@ -656,84 +628,54 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
           )
         : null;
 
-    final appBarAction = createAction?.appBarAction(context);
+    final toolbarAction = createAction?.contentAction(context);
     final createFab = createAction?.fab(context);
+    final bottomClearance =
+        createAction?.contentBottomClearance(context) ?? 0;
+    final showSearch =
+        userState.users.isNotEmpty || _searchQuery.isNotEmpty;
 
     return Scaffold(
-      appBar: AppHeader(
+      appBar: const AppHeader(
         title: 'Users',
-        actions: appBarAction != null ? [appBarAction] : null,
+        showBackButton: true,
       ),
       floatingActionButton: createFab,
       body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Search bar ──
-          if (userState.users.isNotEmpty || _searchQuery.isNotEmpty)
-            Padding(
+          // ── Content toolbar: search + refresh + primary add action ──
+          if (showSearch || toolbarAction != null)
+            CrudToolbar(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final isCompact =
-                      layoutClassFor(constraints.maxWidth) ==
-                          LayoutClass.compact;
-
-                  if (isCompact) {
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        AppSearchField(
-                          controller: _searchController,
-                          hint: 'Search by name or username...',
-                          onChanged: (value) =>
-                              setState(() => _searchQuery = value),
-                          onClear: () {
-                            _searchController.clear();
-                            setState(() => _searchQuery = '');
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            AppIconButton(
-                              icon: Icons.refresh,
-                              tooltip: 'Refresh',
-                              onPressed: _refresh,
-                            ),
-                          ],
-                        ),
-                      ],
-                    );
-                  }
-
-                  return Row(
-                    children: [
-                      Expanded(
-                        child: AppSearchField(
-                          controller: _searchController,
-                          hint: 'Search by name or username...',
-                          onChanged: (value) =>
-                              setState(() => _searchQuery = value),
-                          onClear: () {
-                            _searchController.clear();
-                            setState(() => _searchQuery = '');
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      AppIconButton(
-                        icon: Icons.refresh,
-                        tooltip: 'Refresh',
-                        onPressed: _refresh,
-                      ),
-                    ],
-                  );
-                },
-              ),
+              search: showSearch
+                  ? AppSearchField(
+                      controller: _searchController,
+                      hint: 'Search by name or username',
+                      onChanged: (value) =>
+                          setState(() => _searchQuery = value),
+                      onClear: () {
+                        _searchController.clear();
+                        setState(() => _searchQuery = '');
+                      },
+                    )
+                  : null,
+              pinnedControls: [
+                AppIconButton(
+                  icon: Icons.refresh,
+                  tooltip: 'Refresh',
+                  onPressed: _refresh,
+                ),
+              ],
+              primaryAction: toolbarAction,
             ),
           // ── Role filter chips ──
           if (userState.users.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              padding: const EdgeInsets.symmetric(
+                horizontal: Spacing.lg,
+                vertical: Spacing.xs,
+              ),
               child: SizedBox(
                 height: 40,
                 child: ListView(
@@ -774,14 +716,13 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
           Expanded(
             child: _buildBody(
               userState,
-              canManage,
               canEdit,
               canDelete,
               canResetPassword,
               canToggleActive,
               currentUser,
-              theme,
               colorScheme,
+              bottomClearance,
             ),
           ),
         ],
@@ -791,14 +732,13 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
 
   Widget _buildBody(
     UserListState userState,
-    bool canManage,
     bool canEdit,
     bool canDelete,
     bool canResetPassword,
     bool canToggleActive,
     User? currentUser,
-    ThemeData theme,
     ColorScheme colorScheme,
+    double bottomClearance,
   ) {
     if (userState.isLoading) {
       return const LoadingState();
@@ -838,6 +778,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
       canDelete,
       canResetPassword,
       canToggleActive,
+      bottomClearance,
     );
   }
 
@@ -849,17 +790,41 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     bool canDelete,
     bool canResetPassword,
     bool canToggleActive,
+    double bottomClearance,
   ) {
+    final count = filteredUsers.length;
+
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-      itemCount: filteredUsers.length,
+      padding: EdgeInsets.fromLTRB(
+        Spacing.lg,
+        Spacing.xs,
+        Spacing.lg,
+        Spacing.lg + bottomClearance,
+      ),
+      itemCount: count + 1,
       itemBuilder: (context, index) {
-        final user = filteredUsers[index];
+        if (index == 0) {
+          return Padding(
+            padding: const EdgeInsets.only(
+              left: Spacing.sm,
+              top: Spacing.sm,
+              bottom: Spacing.md,
+            ),
+            child: Text(
+              '$count user${count == 1 ? '' : 's'}',
+              style: AppTypography.labelMedium(context).copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+          );
+        }
+
+        final user = filteredUsers[index - 1];
         final isSelf = currentUser?.id == user.id;
         final roleColor = _roleColor(user.role, colorScheme);
 
         final chips = <Widget>[
-          _RoleBadge(role: user.role, color: roleColor),
           if (!user.isActive)
             _StatusBadge(
               label: 'Inactive',
@@ -891,13 +856,13 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
           child: AppListItem(
             leading: AppAvatar(
               imagePath: user.profileImagePath,
-              initials: user.fullName.isNotEmpty
-                  ? user.fullName[0].toUpperCase()
-                  : '?',
+              initials: user.fullName,
               radius: 24,
+              backgroundColor: roleColor,
             ),
             title: user.fullName,
             subtitle: '@${user.username}',
+            trailing: _RoleBadge(role: user.role, color: roleColor),
             chips: chips,
             onTap: (canEdit || canDelete) && !isSelf
                 ? () => _showUserActionsSheet(
@@ -908,20 +873,6 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                       canToggleActive,
                       isSelf,
                     )
-                : null,
-            trailing: (canEdit || canDelete) && !isSelf
-                ? _UserActionsMenu(
-                    user: user,
-                    canEdit: canEdit,
-                    canDelete: canDelete,
-                    canResetPassword: canResetPassword,
-                    canToggleActive: canToggleActive,
-                    isSelf: isSelf,
-                    onEdit: _editUser,
-                    onResetPassword: _resetPassword,
-                    onToggleActive: _toggleUserActive,
-                    onDelete: _deleteUser,
-                  )
                 : null,
           ),
         );
@@ -937,6 +888,8 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     bool canToggleActive,
     bool isSelf,
   ) {
+    final roleColor = _roleColor(user.role, Theme.of(context).colorScheme);
+
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
@@ -947,10 +900,9 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
             ListTile(
               leading: AppAvatar(
                 imagePath: user.profileImagePath,
-                initials: user.fullName.isNotEmpty
-                    ? user.fullName[0].toUpperCase()
-                    : '?',
+                initials: user.fullName,
                 radius: 24,
+                backgroundColor: roleColor,
               ),
               title: Text(user.fullName),
               subtitle: Text('@${user.username}'),
@@ -1005,89 +957,6 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
   }
 }
 
-class _UserActionsMenu extends StatelessWidget {
-  final User user;
-  final bool canEdit;
-  final bool canDelete;
-  final bool canResetPassword;
-  final bool canToggleActive;
-  final bool isSelf;
-  final void Function(User) onEdit;
-  final void Function(User) onResetPassword;
-  final void Function(User) onToggleActive;
-  final void Function(User) onDelete;
-
-  const _UserActionsMenu({
-    required this.user,
-    required this.canEdit,
-    required this.canDelete,
-    required this.canResetPassword,
-    required this.canToggleActive,
-    required this.isSelf,
-    required this.onEdit,
-    required this.onResetPassword,
-    required this.onToggleActive,
-    required this.onDelete,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return PopupMenuButton<String>(
-      tooltip: 'Actions',
-      onSelected: (action) {
-        switch (action) {
-          case 'edit':
-            onEdit(user);
-          case 'reset_password':
-            onResetPassword(user);
-          case 'toggle_active':
-            onToggleActive(user);
-          case 'delete':
-            onDelete(user);
-        }
-      },
-      itemBuilder: (context) => [
-        if (canEdit)
-          const PopupMenuItem(
-            value: 'edit',
-            child: ListTile(
-              leading: Icon(Icons.edit),
-              title: Text('Edit'),
-              contentPadding: EdgeInsets.zero,
-            ),
-          ),
-        if (canResetPassword)
-          const PopupMenuItem(
-            value: 'reset_password',
-            child: ListTile(
-              leading: Icon(Icons.lock_reset),
-              title: Text('Reset Password'),
-              contentPadding: EdgeInsets.zero,
-            ),
-          ),
-        if (canToggleActive && !isSelf)
-          PopupMenuItem(
-            value: 'toggle_active',
-            child: ListTile(
-              leading: Icon(user.isActive ? Icons.person_off : Icons.person),
-              title: Text(user.isActive ? 'Deactivate' : 'Activate'),
-              contentPadding: EdgeInsets.zero,
-            ),
-          ),
-        if (canDelete)
-          const PopupMenuItem(
-            value: 'delete',
-            child: ListTile(
-              leading: Icon(Icons.delete),
-              title: Text('Delete'),
-              contentPadding: EdgeInsets.zero,
-            ),
-          ),
-      ],
-    );
-  }
-}
-
 class _FilterChip extends StatelessWidget {
   final String label;
   final bool selected;
@@ -1101,11 +970,30 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FilterChip(
-      label: Text(label),
-      selected: selected,
-      onSelected: (_) => onSelected(),
-      showCheckmark: false,
+    final cs = Theme.of(context).colorScheme;
+    return GestureDetector(
+      onTap: onSelected,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 7,
+        ),
+        decoration: BoxDecoration(
+          color: selected ? cs.primary : cs.surface,
+          border: Border.all(
+            color: selected ? cs.primary : cs.outline,
+          ),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+            color: selected ? cs.onPrimary : cs.onSurfaceVariant,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1119,18 +1007,18 @@ class _RoleBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        color: color.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
         role.displayName,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w600,
-            ),
+        style: TextStyle(
+          fontSize: 10.5,
+          fontWeight: FontWeight.w700,
+          color: color,
+        ),
       ),
     );
   }
@@ -1150,10 +1038,10 @@ class _StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(AppRadius.sm),
+        color: color.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1162,10 +1050,11 @@ class _StatusBadge extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             label,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w500,
-                ),
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
           ),
         ],
       ),

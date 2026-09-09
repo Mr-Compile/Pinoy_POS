@@ -275,21 +275,20 @@ class SalesService {
   /// Steps:
   /// 1. Validate all items have sufficient stock (pre-check).
   /// 2. Validate payment rules (cash, GCash reference, customer, proof).
-  /// 3. Enforce the GCash verification policy: when the operator's sale
-  ///    requires verification, [verifiedByUserId] must identify an
-  ///    authorized verifier (see [PaymentVerificationService]).
+  /// 3. Apply the GCash verification policy: Staff-tendered GCash sales
+  ///    that require verification are created with [paymentStatus] `pending`;
+  ///    the Owner's own sales are confirmed immediately.
   /// 4. Insert sale record.
   /// 5. Insert sale_items.
   /// 6. Deduct stock for each item.
   /// 7. If any step fails, the transaction rolls back automatically.
   ///
-  /// Verification happens before the sale is finalized: no 'pending' sale
-  /// is created at the till. The Owner's own sales are never held for
-  /// verification.
+  /// Pending GCash sales are confirmed later by an Owner from the sale
+  /// detail screen. The Owner's own sales are never held for verification.
   ///
   /// Throws [PaymentValidationException] for validation errors such as
   /// missing required GCash fields, duplicate reference numbers, or a
-  /// missing/unauthorized verifier.
+  /// unauthorized operator.
   Future<bool> createSale({
     required List<SaleItem> items,
     required double totalAmount,
@@ -300,7 +299,6 @@ class SalesService {
     String? customerName,
     String? paymentProofPath,
     String? paymentProofType,
-    int? verifiedByUserId,
   }) async {
     if (!_sessionManager.hasPermission('create_sales')) {
       await _activityLogService.logActivity(
@@ -365,7 +363,7 @@ class SalesService {
       );
     }
 
-    const paymentStatus = 'confirmed';
+    var paymentStatus = 'confirmed';
     DateTime? verifiedAt;
     int? verifiedBy;
 
@@ -400,39 +398,22 @@ class SalesService {
         );
       }
 
-      // Enforce the verification policy before the sale is written.
-      // The Owner's own sales are exempt; other operators (e.g. Staff)
-      // must present an authorized verifier when the policy is enabled.
+      // Apply the GCash verification policy: the Owner's own sales are
+      // finalized immediately; Staff-tendered GCash sales that require
+      // verification are created as 'pending' and confirmed later by an Owner.
+      final currentUser = _sessionManager.currentUser;
       final needsVerification = _verificationService.requiresVerificationFor(
-        operatorRole: _sessionManager.currentUser?.role,
+        operatorRole: currentUser?.role,
         paymentMethod: paymentMethod,
         settings: paymentSettings,
       );
 
       if (needsVerification) {
-        if (verifiedByUserId == null) {
-          throw PaymentValidationException(
-            'GCash verification required',
-            details:
-                'An authorized verifier must approve this payment before the sale can be completed.',
-          );
-        }
-
-        final verifier = await _userRepository.getById(verifiedByUserId);
-        if (verifier == null ||
-            verifier.id == _sessionManager.currentUser?.id ||
-            !_verificationService.canRoleVerify(
-              verifier.role,
-              paymentSettings,
-            )) {
-          throw PaymentValidationException(
-            'Verifier is not authorized',
-            details: 'The selected verifier cannot approve GCash payments.',
-          );
-        }
-
+        paymentStatus = 'pending';
+      } else {
+        // Confirmed now: record the operator as the verifier when available.
         verifiedAt = DateTime.now();
-        verifiedBy = verifiedByUserId;
+        verifiedBy = currentUser?.id;
       }
     }
 

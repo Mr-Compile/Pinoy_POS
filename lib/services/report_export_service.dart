@@ -13,6 +13,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/data/models/sale_item.dart';
 import 'package:pinoy_pos/data/models/sales_analytics.dart';
@@ -92,6 +93,7 @@ class ProductExportSummary {
 class ReportExportService {
   final SaleItemRepository _saleItemRepository = SaleItemRepository();
   final UserRepository _userRepository = UserRepository();
+  final SessionManager _sessionManager = SessionManager();
 
   /// Exports the provided [analytics] as a PDF, Excel, or CSV report.
   ///
@@ -176,6 +178,11 @@ class ReportExportService {
   /// Generates a report for the current user and stores it in the app's
   /// reports directory as a submission to the Owner.
   ///
+  /// This is the Staff report-submission workflow and is restricted to the
+  /// `submit_reports` permission, which only Staff hold. The Owner exports
+  /// sales directly via [exportSalesReport] and can never be routed into a
+  /// staff submission, even if a caller bypasses the UI.
+  ///
   /// Returns the saved report file path, or `null` if the report could not be
   /// generated or saved. On web this returns `null` because there is no
   /// persistent local report storage.
@@ -185,6 +192,7 @@ class ReportExportService {
     ExportFormat format = ExportFormat.pdf,
   }) async {
     if (kIsWeb) return null;
+    if (!_sessionManager.hasPermission('submit_reports')) return null;
 
     final allSales = await SalesService().getFilteredSales(
       start: analytics.bounds.start,
@@ -320,124 +328,355 @@ class ReportExportService {
     final cs = AppColors.getLightColorScheme();
     PdfColor toPdfColor(Color color) => PdfColor.fromInt(color.pdfValue);
 
-    final primary = cs.primary;
-    final onPrimary = cs.onPrimary;
+    final primary = toPdfColor(cs.primary);
+    final primaryDark = toPdfColor(AppColorTokens.primaryBlueStrong);
+    final primaryLight = toPdfColor(AppColorTokens.primaryBlueLight);
+    final onPrimary = toPdfColor(cs.onPrimary);
+    final surfaceSoft = toPdfColor(AppColorTokens.lightSurfaceSoft);
+    final surfaceSoft2 = toPdfColor(AppColorTokens.lightBackground);
     final outline = toPdfColor(cs.outlineVariant);
+    final onSurface = toPdfColor(cs.onSurface);
     final onSurfaceVariant = toPdfColor(cs.onSurfaceVariant);
-    final successLight = toPdfColor(AppSemanticColors.successContainer);
-    final successDark = toPdfColor(AppSemanticColors.success);
+    final success = toPdfColor(AppSemanticColors.success);
+    final successContainer = toPdfColor(AppSemanticColors.successContainer);
 
-    PdfColor methodColor(String method) {
-      final color = switch (method.toLowerCase()) {
-        'cash' => cs.primary,
-        'gcash' => AppSemanticColors.success,
-        'card' => AppSemanticColors.info,
-        _ => AppSemanticColors.neutral,
-      };
-      return toPdfColor(color);
+    String storeInitials(String name) {
+      final parts = name.trim().split(RegExp(r'\s+'));
+      final first = parts.isNotEmpty && parts.first.isNotEmpty ? parts.first[0] : '';
+      final second = parts.length > 1 && parts[1].isNotEmpty ? parts[1][0] : '';
+      return '$first$second'.toUpperCase();
     }
 
-    PdfColor methodBackground(String method) {
-      final color = switch (method.toLowerCase()) {
-        'cash' => cs.primaryContainer,
-        'gcash' => AppSemanticColors.successContainer,
-        'card' => AppSemanticColors.infoContainer,
-        _ => AppSemanticColors.neutralContainer,
+    PdfColor methodTextColor(String method) {
+      return switch (method.toLowerCase()) {
+        'cash' => primaryDark,
+        'gcash' => success,
+        'card' => primary,
+        _ => onSurfaceVariant,
       };
-      return toPdfColor(color);
     }
 
-    pw.Widget headerCell(String text) => pw.Container(
-          alignment: pw.Alignment.centerLeft,
-          padding: const pw.EdgeInsets.all(5),
-          color: toPdfColor(primary),
-          child: pw.Text(
-            text,
-            style: PdfFontService.small(
-              fontWeight: pw.FontWeight.bold,
-              color: toPdfColor(onPrimary),
-            ),
-          ),
-        );
+    PdfColor methodBackgroundColor(String method) {
+      return switch (method.toLowerCase()) {
+        'cash' => toPdfColor(AppColorTokens.primaryBlueLight.withValues(alpha: 0.16)),
+        'gcash' => toPdfColor(AppSemanticColors.success.withValues(alpha: 0.16)),
+        'card' => toPdfColor(AppSemanticColors.info.withValues(alpha: 0.16)),
+        _ => toPdfColor(AppSemanticColors.neutralContainer),
+      };
+    }
 
-    pw.Widget dataCell(
-      String text, {
-      PdfColor? backgroundColor,
-      PdfColor? textColor,
-      pw.Alignment? alignment,
-      bool bold = false,
+    pw.Widget buildCell(
+      pw.Widget child, {
+      bool right = false,
+      PdfColor? background,
     }) =>
         pw.Container(
-          alignment: alignment ?? pw.Alignment.centerLeft,
-          padding: const pw.EdgeInsets.all(4),
-          color: backgroundColor,
-          child: pw.Text(
-            text,
-            style: PdfFontService.small(
-              fontWeight: bold ? pw.FontWeight.bold : null,
-              color: textColor,
+          alignment: right ? pw.Alignment.centerRight : pw.Alignment.centerLeft,
+          padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+          color: background,
+          child: child,
+        );
+
+    pw.Widget buildText(
+      String text, {
+      PdfColor? color,
+      bool bold = false,
+      pw.TextAlign? textAlign,
+    }) =>
+        pw.Text(
+          text,
+          style: PdfFontService.small(
+            fontWeight: bold ? pw.FontWeight.bold : null,
+            color: color,
+          ),
+          textAlign: textAlign,
+        );
+
+    pw.Widget buildHeaderCell(String text, {bool right = false}) => buildCell(
+          buildText(text, color: onPrimary, bold: true),
+          background: primaryDark,
+          right: right,
+        );
+
+    pw.Widget buildMethodBadge(String method) => pw.Container(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+          decoration: pw.BoxDecoration(
+            color: methodBackgroundColor(method),
+            borderRadius: pw.BorderRadius.circular(20),
+          ),
+          child: buildText(method, color: methodTextColor(method), bold: true),
+        );
+
+    pw.Widget buildStoreHeader() => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              children: [
+                pw.Container(
+                  width: 46,
+                  height: 46,
+                  decoration: pw.BoxDecoration(
+                    borderRadius: pw.BorderRadius.circular(12),
+                    gradient: pw.LinearGradient(
+                      colors: [primary, primaryDark],
+                      begin: pw.Alignment.bottomLeft,
+                      end: pw.Alignment.topRight,
+                    ),
+                  ),
+                  child: pw.Center(
+                    child: pw.Text(
+                      storeInitials(store.storeName),
+                      style: PdfFontService.title(
+                        fontWeight: pw.FontWeight.bold,
+                        color: onPrimary,
+                      ),
+                    ),
+                  ),
+                ),
+                pw.SizedBox(width: 12),
+                pw.Expanded(
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        store.storeName,
+                        style: PdfFontService.headline(
+                          fontWeight: pw.FontWeight.bold,
+                          color: primaryDark,
+                        ),
+                      ),
+                      if (store.storeAddress.isNotEmpty)
+                        pw.Text(
+                          store.storeAddress,
+                          style: PdfFontService.body(color: onSurfaceVariant),
+                        ),
+                      if (store.storePhone.isNotEmpty)
+                        pw.Text(
+                          'Contact: ${store.storePhone}',
+                          style: PdfFontService.body(color: onSurfaceVariant),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            pw.SizedBox(height: 18),
+            pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.end,
+              children: [
+                pw.Expanded(
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        'Sales Summary',
+                        style: PdfFontService.headline(
+                          fontWeight: pw.FontWeight.bold,
+                          color: primaryDark,
+                        ),
+                      ),
+                      pw.Text(
+                        'Generated: ${_formatDateTime(DateTime.now())}',
+                        style: PdfFontService.body(color: onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                ),
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.end,
+                  children: [
+                    pw.Text(
+                      'Period',
+                      style: PdfFontService.subhead(
+                        fontWeight: pw.FontWeight.bold,
+                        color: onSurfaceVariant,
+                      ),
+                    ),
+                    pw.Text(
+                      _formatPeriodLabel(analytics.bounds.start, analytics.bounds.end),
+                      style: PdfFontService.body(color: onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+
+    pw.Widget buildMetricCard(String label, String value, {bool primaryCard = false}) =>
+        pw.Expanded(
+          child: pw.Container(
+            decoration: pw.BoxDecoration(
+              color: primaryCard ? surfaceSoft : surfaceSoft2,
+              border: pw.Border.all(
+                color: primaryCard ? primaryLight : outline,
+                width: 0.5,
+              ),
+              borderRadius: pw.BorderRadius.circular(12),
+            ),
+            padding: const pw.EdgeInsets.all(12),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              mainAxisSize: pw.MainAxisSize.min,
+              children: [
+                pw.Text(
+                  value,
+                  style: PdfFontService.title(
+                    fontWeight: pw.FontWeight.bold,
+                    color: primaryCard ? primaryDark : onSurface,
+                  ),
+                ),
+                pw.SizedBox(height: 6),
+                pw.Text(
+                  label.toUpperCase(),
+                  style: PdfFontService.small(
+                    fontWeight: pw.FontWeight.bold,
+                    color: onSurfaceVariant,
+                  ),
+                ),
+              ],
             ),
           ),
         );
 
-    pw.Widget buildHeader() => pw.Column(
+    pw.Widget buildSummaryMetrics() => pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            pw.Text(
-              store.storeName,
-              style: PdfFontService.display(
-                fontWeight: pw.FontWeight.bold,
-                color: toPdfColor(primary),
-              ),
+            pw.SizedBox(height: 16),
+            pw.Row(
+              children: [
+                buildMetricCard(
+                  'Total Sales',
+                  '$currency ${analytics.totalSales.toStringAsFixed(2)}',
+                  primaryCard: true,
+                ),
+                pw.SizedBox(width: 10),
+                buildMetricCard('Transactions', '${analytics.transactionCount}'),
+              ],
             ),
-            if (store.storeAddress.isNotEmpty)
-              pw.Text(
-                store.storeAddress,
-                style: PdfFontService.body(
-                  color: onSurfaceVariant,
+            pw.SizedBox(height: 10),
+            pw.Row(
+              children: [
+                buildMetricCard(
+                  'Avg Transaction',
+                  '$currency ${analytics.averageTransaction.toStringAsFixed(2)}',
                 ),
-              ),
-            if (store.storePhone.isNotEmpty)
-              pw.Text(
-                'Contact: ${store.storePhone}',
-                style: PdfFontService.body(
-                  color: onSurfaceVariant,
-                ),
-              ),
-            if (store.receiptFooter?.isNotEmpty == true)
-              pw.Text(
-                store.receiptFooter!,
-                style: PdfFontService.body(
-                  color: onSurfaceVariant,
-                ),
-              ),
+                pw.SizedBox(width: 10),
+                buildMetricCard('Items Sold', '${analytics.itemsSold}'),
+              ],
+            ),
           ],
+        );
+
+    pw.Widget buildTrendChart() {
+      if (analytics.trend.isEmpty) return pw.SizedBox.shrink();
+      final maxTotal = analytics.trend.fold<double>(
+        0,
+        (max, t) => t.total > max ? t.total : max,
+      );
+      const chartHeight = 70.0;
+
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.SizedBox(height: 18),
+          pw.Text(
+            'Sales Trend',
+            style: PdfFontService.subhead(
+              fontWeight: pw.FontWeight.bold,
+              color: primaryDark,
+            ),
+          ),
+          pw.SizedBox(height: 10),
+          pw.Container(
+            height: chartHeight + 20,
+            padding: const pw.EdgeInsets.all(12),
+            decoration: pw.BoxDecoration(
+              color: surfaceSoft2,
+              border: pw.Border.all(color: outline, width: 0.5),
+              borderRadius: pw.BorderRadius.circular(12),
+            ),
+            child: pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.end,
+              children: analytics.trend.map((t) {
+                final ratio = maxTotal == 0 ? 0.05 : t.total / maxTotal;
+                final barHeight = chartHeight * ratio;
+                return pw.Expanded(
+                  child: pw.Column(
+                    mainAxisAlignment: pw.MainAxisAlignment.end,
+                    mainAxisSize: pw.MainAxisSize.min,
+                    children: [
+                      pw.Container(
+                        height: barHeight,
+                        decoration: pw.BoxDecoration(
+                          gradient: pw.LinearGradient(
+                            colors: [primaryDark, primaryLight],
+                            begin: pw.Alignment.bottomCenter,
+                            end: pw.Alignment.topCenter,
+                          ),
+                          borderRadius: const pw.BorderRadius.vertical(
+                            top: pw.Radius.circular(4),
+                          ),
+                        ),
+                      ),
+                      pw.SizedBox(height: 4),
+                      pw.Text(
+                        DateFormat('MMM d').format(t.date.toLocal()),
+                        style: PdfFontService.small(color: onSurfaceVariant),
+                        textAlign: pw.TextAlign.center,
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      );
+    }
+
+    pw.Widget buildSectionTitle(String title) => pw.Padding(
+          padding: const pw.EdgeInsets.only(top: 18, bottom: 8),
+          child: pw.Text(
+            title,
+            style: PdfFontService.subhead(
+              fontWeight: pw.FontWeight.bold,
+              color: primaryDark,
+            ),
+          ),
         );
 
     pw.Table buildTable(
       List<String> headers,
-      List<int> widths,
+      List<int?> widths,
       List<List<String>> rows,
-      List<int> rightAlignCols,
-      List<int> methodCols, {
+      List<int> rightAlignCols, {
+      List<int>? methodCols,
       List<String>? grandTotal,
     }) {
       final tableRows = <pw.TableRow>[
-        pw.TableRow(children: headers.map(headerCell).toList()),
+        pw.TableRow(
+          children: List.generate(headers.length, (i) {
+            return buildHeaderCell(headers[i], right: rightAlignCols.contains(i));
+          }),
+        ),
       ];
 
       for (final row in rows) {
         final cells = <pw.Widget>[];
         for (var i = 0; i < row.length; i++) {
           final text = row[i];
-          final isMethod = methodCols.contains(i);
-          cells.add(dataCell(
-            text,
-            alignment:
-                rightAlignCols.contains(i) ? pw.Alignment.centerRight : null,
-            backgroundColor: isMethod ? methodBackground(text) : null,
-            textColor: isMethod ? methodColor(text) : null,
-          ));
+          final isMethod = methodCols != null && methodCols.contains(i);
+          final isRight = rightAlignCols.contains(i);
+          if (isMethod) {
+            cells.add(buildCell(buildMethodBadge(text)));
+          } else {
+            cells.add(buildCell(
+              buildText(text),
+              right: isRight,
+            ));
+          }
         }
         tableRows.add(pw.TableRow(children: cells));
       }
@@ -448,14 +687,10 @@ class ReportExportService {
           final text = grandTotal[i];
           cells.add(text.isEmpty
               ? pw.SizedBox.shrink()
-              : dataCell(
-                  text,
-                  backgroundColor: successLight,
-                  textColor: successDark,
-                  bold: true,
-                  alignment: rightAlignCols.contains(i)
-                      ? pw.Alignment.centerRight
-                      : null,
+              : buildCell(
+                  buildText(text, color: success, bold: true),
+                  right: rightAlignCols.contains(i),
+                  background: successContainer,
                 ));
         }
         tableRows.add(pw.TableRow(children: cells));
@@ -463,9 +698,11 @@ class ReportExportService {
 
       final columnWidths = <int, pw.TableColumnWidth>{};
       for (var i = 0; i < widths.length; i++) {
-        columnWidths[i] = widths[i] == 0
-            ? const pw.FlexColumnWidth()
-            : pw.FixedColumnWidth(widths[i].toDouble());
+        if (widths[i] == null) {
+          columnWidths[i] = const pw.FlexColumnWidth();
+        } else {
+          columnWidths[i] = pw.FixedColumnWidth(widths[i]!.toDouble());
+        }
       }
 
       return pw.Table(
@@ -475,38 +712,12 @@ class ReportExportService {
       );
     }
 
-    final summaryRows = [
-      ['Total Sales', '$currency ${analytics.totalSales.toStringAsFixed(2)}'],
-      ['Transaction Count', '${analytics.transactionCount}'],
-      [
-        'Average Transaction',
-        '$currency ${analytics.averageTransaction.toStringAsFixed(2)}'
-      ],
-      ['Items Sold', '${analytics.itemsSold}'],
-    ];
-
     final paymentRows = analytics.paymentBreakdown
-        .map((p) => [
-              p.method,
-              '${p.count}',
-              '$currency ${p.total.toStringAsFixed(2)}'
-            ])
-        .toList();
-
-    final trendRows = analytics.trend
-        .map((t) => [
-              _formatDateTime(t.date),
-              '$currency ${t.total.toStringAsFixed(2)}',
-              '${t.count}'
-            ])
+        .map((p) => [p.method, '${p.count}', '$currency ${p.total.toStringAsFixed(2)}'])
         .toList();
 
     final topProductRows = analytics.topProducts
-        .map((p) => [
-              p.productName,
-              '${p.totalQuantity}',
-              '$currency ${p.revenue.toStringAsFixed(2)}'
-            ])
+        .map((p) => [p.productName, '${p.totalQuantity}', '$currency ${p.revenue.toStringAsFixed(2)}'])
         .toList();
 
     final transactionRows = bundles
@@ -551,140 +762,97 @@ class ReportExportService {
 
     final productSales = _buildProductSummaries(bundles);
     final productRows = productSales
-        .map((p) => [
-              p.name,
-              '${p.quantity}',
-              '$currency ${p.total.toStringAsFixed(2)}',
-            ])
+        .map((p) => [p.name, '${p.quantity}', '$currency ${p.total.toStringAsFixed(2)}'])
         .toList();
 
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(40),
+        margin: const pw.EdgeInsets.all(32),
         build: (pw.Context context) => [
-          buildHeader(),
-          pw.SizedBox(height: 16),
-          pw.Text(
-            'Sales Report',
-            style: PdfFontService.headline(
-              fontWeight: pw.FontWeight.bold,
-              color: toPdfColor(primary),
-            ),
-          ),
-          pw.Text(
-            'Generated: ${_formatDateTime(DateTime.now())}',
-            style: PdfFontService.body(
-              color: onSurfaceVariant,
-            ),
-          ),
-          pw.Text(
-            'Period: ${_formatPeriodLabel(analytics.bounds.start, analytics.bounds.end)}',
-            style: PdfFontService.body(
-              color: onSurfaceVariant,
-            ),
-          ),
-          pw.SizedBox(height: 20),
-          pw.Header(level: 1, child: pw.Text('Summary')),
-          buildTable(
-            ['Metric', 'Value'],
-            [0, 120],
-            summaryRows,
-            [1],
-            [],
-          ),
+          buildStoreHeader(),
+          buildSummaryMetrics(),
+          buildTrendChart(),
           if (paymentRows.isNotEmpty) ...[
-            pw.SizedBox(height: 20),
-            pw.Header(level: 1, child: pw.Text('Payment Breakdown')),
+            buildSectionTitle('Payment Breakdown'),
             buildTable(
               ['Method', 'Count', 'Total ($currency)'],
-              [0, 60, 100],
+              [null, 60, 100],
               paymentRows,
               [1, 2],
-              [0],
-            ),
-          ],
-          if (trendRows.isNotEmpty) ...[
-            pw.SizedBox(height: 20),
-            pw.Header(level: 1, child: pw.Text('Trend')),
-            buildTable(
-              ['Date/Time', 'Total ($currency)', 'Transactions'],
-              [0, 100, 90],
-              trendRows,
-              [1, 2],
-              [],
+              methodCols: [0],
             ),
           ],
           if (topProductRows.isNotEmpty) ...[
-            pw.SizedBox(height: 20),
-            pw.Header(level: 1, child: pw.Text('Top Products')),
+            buildSectionTitle('Top Products'),
             buildTable(
               ['Product', 'Qty', 'Revenue ($currency)'],
-              [0, 50, 100],
+              [null, 50, 100],
               topProductRows,
               [1, 2],
-              [],
             ),
           ],
-          pw.SizedBox(height: 20),
-          pw.Header(level: 1, child: pw.Text('Sales Transactions')),
-          buildTable(
-            [
-              'Receipt #',
-              'Date/Time',
-              'Cashier',
-              'Customer',
-              'Method',
-              'Reference',
-              'Items',
-              'Total'
-            ],
-            [70, 95, 75, 70, 50, 75, 40, 60],
-            transactionRows,
-            [6, 7],
-            [4],
-            grandTotal: transactionGrandTotal,
-          ),
-          pw.SizedBox(height: 20),
-          pw.Header(level: 1, child: pw.Text('Line Items')),
-          buildTable(
-            [
-              'Receipt #',
-              'Date/Time',
-              'Product',
-              'Qty',
-              'Unit Price ($currency)',
-              'Line Total ($currency)',
-              'Payment Method'
-            ],
-            [70, 95, 0, 40, 80, 80, 70],
-            lineItemRows,
-            [3, 4, 5],
-            [6],
-            grandTotal: [
-              'Grand Total',
-              '',
-              '',
-              '',
-              '',
-              '$currency ${analytics.totalSales.toStringAsFixed(2)}',
-              '',
-            ],
-          ),
-          pw.SizedBox(height: 20),
-          pw.Header(level: 1, child: pw.Text('Sales by Product')),
-          buildTable(
-            ['Product', 'Qty', 'Revenue ($currency)'],
-            [0, 50, 100],
-            productRows,
-            [1, 2],
-            [],
-            grandTotal: [
-              'Grand Total',
-              '',
-              '$currency ${analytics.totalSales.toStringAsFixed(2)}',
-            ],
-          ),
+          if (transactionRows.isNotEmpty) ...[
+            buildSectionTitle('Sales Transactions'),
+            buildTable(
+              [
+                'Receipt #',
+                'Date/Time',
+                'Cashier',
+                'Customer',
+                'Method',
+                'Reference',
+                'Items',
+                'Total'
+              ],
+              [70, 95, 75, 70, 50, 75, 40, 60],
+              transactionRows,
+              [6, 7],
+              methodCols: [4],
+              grandTotal: transactionGrandTotal,
+            ),
+          ],
+          if (lineItemRows.isNotEmpty) ...[
+            buildSectionTitle('Line Items'),
+            buildTable(
+              [
+                'Receipt #',
+                'Date/Time',
+                'Product',
+                'Qty',
+                'Unit Price ($currency)',
+                'Line Total ($currency)',
+                'Payment Method'
+              ],
+              [70, 95, null, 40, 80, 80, 70],
+              lineItemRows,
+              [3, 4, 5],
+              methodCols: [6],
+              grandTotal: [
+                'Grand Total',
+                '',
+                '',
+                '',
+                '',
+                '$currency ${analytics.totalSales.toStringAsFixed(2)}',
+                '',
+              ],
+            ),
+          ],
+          if (productRows.isNotEmpty) ...[
+            buildSectionTitle('Sales by Product'),
+            buildTable(
+              ['Product', 'Qty', 'Revenue ($currency)'],
+              [null, 50, 100],
+              productRows,
+              [1, 2],
+              grandTotal: [
+                'Grand Total',
+                '',
+                '$currency ${analytics.totalSales.toStringAsFixed(2)}',
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -704,32 +872,29 @@ class ReportExportService {
     final cs = AppColors.getLightColorScheme();
     final currency = store.currency;
 
-    final primary = cs.primary;
-    final onPrimary = cs.onPrimary;
-    final successLight = AppSemanticColors.successContainer;
-    final successDark = AppSemanticColors.success;
+    final primary = AppColorTokens.primaryBlueStrong;
+    final onPrimary = AppColorTokens.onPrimaryBlue;
+    final success = AppSemanticColors.success;
+    final successContainer = AppSemanticColors.successContainer;
 
-    ExcelColor toExcelColor(Color color) =>
-        ExcelColor.fromHexString(color.excelHex);
+    ExcelColor toExcelColor(Color color) => ExcelColor.fromHexString(color.excelHex);
 
     ExcelColor methodColor(String method) {
-      final color = switch (method.toLowerCase()) {
-        'cash' => cs.primary,
-        'gcash' => AppSemanticColors.success,
-        'card' => AppSemanticColors.info,
-        _ => AppSemanticColors.neutral,
+      return switch (method.toLowerCase()) {
+        'cash' => toExcelColor(AppColorTokens.primaryBlueStrong),
+        'gcash' => toExcelColor(success),
+        'card' => toExcelColor(AppSemanticColors.info),
+        _ => toExcelColor(AppSemanticColors.neutral),
       };
-      return toExcelColor(color);
     }
 
     ExcelColor methodBackground(String method) {
-      final color = switch (method.toLowerCase()) {
-        'cash' => cs.primaryContainer,
-        'gcash' => AppSemanticColors.successContainer,
-        'card' => AppSemanticColors.infoContainer,
-        _ => AppSemanticColors.neutralContainer,
+      return switch (method.toLowerCase()) {
+        'cash' => toExcelColor(cs.primaryContainer),
+        'gcash' => toExcelColor(AppSemanticColors.successContainer),
+        'card' => toExcelColor(AppSemanticColors.infoContainer),
+        _ => toExcelColor(AppSemanticColors.neutralContainer),
       };
-      return toExcelColor(color);
     }
 
     CellStyle headerStyle() => CellStyle(
@@ -739,8 +904,8 @@ class ReportExportService {
         );
 
     CellStyle totalStyle() => CellStyle(
-          backgroundColorHex: toExcelColor(successLight),
-          fontColorHex: toExcelColor(successDark),
+          backgroundColorHex: toExcelColor(successContainer),
+          fontColorHex: toExcelColor(success),
           bold: true,
           numberFormat: NumFormat.standard_4,
           horizontalAlign: HorizontalAlign.Right,
@@ -770,35 +935,33 @@ class ReportExportService {
       if (style != null) cell.cellStyle = style;
     }
 
-    void writeHeaderRow(Sheet sheet, int row, List<String> headers) {
-      for (var i = 0; i < headers.length; i++) {
-        writeCell(
-          sheet,
-          row,
-          i,
-          TextCellValue(headers[i]),
-          style: headerStyle(),
-        );
-      }
-    }
-
-    void writeText(Sheet sheet, int row, int col, String text,
-        {CellStyle? style}) {
+    void writeText(Sheet sheet, int row, int col, String text, {CellStyle? style}) {
       writeCell(sheet, row, col, TextCellValue(text), style: style);
     }
 
-    // -- Summary sheet --
+    void writeHeaderRow(Sheet sheet, int row, List<String> headers) {
+      for (var i = 0; i < headers.length; i++) {
+        writeText(sheet, row, i, headers[i], style: headerStyle());
+      }
+    }
+
     final summary = excel['Summary'];
     excel.setDefaultSheet('Summary');
 
-    writeText(summary, 0, 0, store.storeName);
+    writeText(summary, 0, 0, store.storeName, style: CellStyle(bold: true));
     if (store.storeAddress.isNotEmpty) {
       writeText(summary, 1, 0, store.storeAddress);
     }
     if (store.storePhone.isNotEmpty) {
       writeText(summary, 2, 0, 'Contact: ${store.storePhone}');
     }
-    writeText(summary, 4, 0, '${store.storeName} - Sales Report');
+    writeText(
+      summary,
+      4,
+      0,
+      '${store.storeName} - Sales Report',
+      style: CellStyle(bold: true),
+    );
     writeText(summary, 5, 0, 'Generated: ${_formatDateTime(DateTime.now())}');
     writeText(
       summary,
@@ -808,7 +971,7 @@ class ReportExportService {
     );
 
     var row = 8;
-    writeText(summary, row, 0, 'Summary');
+    writeText(summary, row, 0, 'Summary', style: CellStyle(bold: true));
     row++;
 
     final summaryRows = [
@@ -820,7 +983,7 @@ class ReportExportService {
 
     for (final entry in summaryRows) {
       final isCurrency = entry[2] as bool;
-      writeText(summary, row, 0, entry[0] as String);
+      writeText(summary, row, 0, entry[0] as String, style: CellStyle(bold: true));
       if (isCurrency) {
         writeCell(
           summary,
@@ -843,7 +1006,7 @@ class ReportExportService {
 
     if (analytics.paymentBreakdown.isNotEmpty) {
       row += 2;
-      writeText(summary, row, 0, 'Payment Breakdown');
+      writeText(summary, row, 0, 'Payment Breakdown', style: CellStyle(bold: true));
       row++;
       writeHeaderRow(summary, row, ['Method', 'Count', 'Total ($currency)']);
       row++;
@@ -858,8 +1021,7 @@ class ReportExportService {
             fontColorHex: methodColor(p.method),
           ),
         );
-        writeCell(summary, row, 1, IntCellValue(p.count),
-            style: rightAlignStyle());
+        writeCell(summary, row, 1, IntCellValue(p.count), style: rightAlignStyle());
         writeCell(
           summary,
           row,
@@ -873,7 +1035,7 @@ class ReportExportService {
 
     if (analytics.trend.isNotEmpty) {
       row += 2;
-      writeText(summary, row, 0, 'Trend');
+      writeText(summary, row, 0, 'Trend', style: CellStyle(bold: true));
       row++;
       writeHeaderRow(summary, row, ['Date/Time', 'Total ($currency)', 'Transactions']);
       row++;
@@ -886,22 +1048,20 @@ class ReportExportService {
           DoubleCellValue(t.total),
           style: currencyStyle(),
         );
-        writeCell(summary, row, 2, IntCellValue(t.count),
-            style: rightAlignStyle());
+        writeCell(summary, row, 2, IntCellValue(t.count), style: rightAlignStyle());
         row++;
       }
     }
 
     if (analytics.topProducts.isNotEmpty) {
       row += 2;
-      writeText(summary, row, 0, 'Top Products');
+      writeText(summary, row, 0, 'Top Products', style: CellStyle(bold: true));
       row++;
       writeHeaderRow(summary, row, ['Product', 'Qty', 'Revenue ($currency)']);
       row++;
       for (final p in analytics.topProducts) {
         writeText(summary, row, 0, p.productName);
-        writeCell(summary, row, 1, IntCellValue(p.totalQuantity),
-            style: rightAlignStyle());
+        writeCell(summary, row, 1, IntCellValue(p.totalQuantity), style: rightAlignStyle());
         writeCell(
           summary,
           row,
@@ -914,7 +1074,7 @@ class ReportExportService {
     }
 
     row += 2;
-    writeText(summary, row, 0, 'Sales by Product');
+    writeText(summary, row, 0, 'Sales by Product', style: CellStyle(bold: true));
     row++;
     writeHeaderRow(summary, row, ['Product', 'Qty', 'Revenue ($currency)']);
     row++;
@@ -922,8 +1082,7 @@ class ReportExportService {
     final productSales = _buildProductSummaries(bundles);
     for (final p in productSales) {
       writeText(summary, row, 0, p.name);
-      writeCell(summary, row, 1, IntCellValue(p.quantity),
-          style: rightAlignStyle());
+      writeCell(summary, row, 1, IntCellValue(p.quantity), style: rightAlignStyle());
       writeCell(
         summary,
         row,
@@ -934,8 +1093,7 @@ class ReportExportService {
       row++;
     }
 
-    writeCell(summary, row, 0, TextCellValue('Grand Total'),
-        style: totalStyle());
+    writeCell(summary, row, 0, TextCellValue('Grand Total'), style: totalStyle());
     writeCell(summary, row, 1, TextCellValue(''), style: totalStyle());
     writeCell(
       summary,
@@ -949,7 +1107,6 @@ class ReportExportService {
       summary.setColumnAutoFit(i);
     }
 
-    // -- Sales sheet --
     final salesSheet = excel['Sales'];
     final transactionHeaders = [
       'Receipt #',
@@ -968,8 +1125,7 @@ class ReportExportService {
       final s = bundle.sale;
       writeText(salesSheet, salesRow, 0, '${s.receiptNumber ?? s.id}');
       writeText(salesSheet, salesRow, 1, _formatDateTime(s.createdAt));
-      writeText(salesSheet, salesRow, 2,
-          userNames[s.userId] ?? 'User ${s.userId}');
+      writeText(salesSheet, salesRow, 2, userNames[s.userId] ?? 'User ${s.userId}');
       writeText(salesSheet, salesRow, 3, s.customerName ?? '');
       writeCell(
         salesSheet,
@@ -982,8 +1138,7 @@ class ReportExportService {
         ),
       );
       writeText(salesSheet, salesRow, 5, s.referenceNumber ?? '');
-      writeCell(salesSheet, salesRow, 6, IntCellValue(bundle.itemCount),
-          style: rightAlignStyle());
+      writeCell(salesSheet, salesRow, 6, IntCellValue(bundle.itemCount), style: rightAlignStyle());
       writeCell(
         salesSheet,
         salesRow,
@@ -994,10 +1149,9 @@ class ReportExportService {
       salesRow++;
     }
 
-    writeCell(salesSheet, salesRow, 0, TextCellValue('Grand Total'),
-        style: totalStyle());
+    writeCell(salesSheet, salesRow, 0, TextCellValue('Grand Total'), style: totalStyle());
     for (var c = 1; c < 7; c++) {
-      writeCell(salesSheet, salesRow, c, TextCellValue(''));
+      writeCell(salesSheet, salesRow, c, TextCellValue(''), style: totalStyle());
     }
     writeCell(
       salesSheet,
@@ -1011,7 +1165,6 @@ class ReportExportService {
       salesSheet.setColumnAutoFit(i);
     }
 
-    // -- Line Items sheet --
     final itemsSheet = excel['Line Items'];
     final itemHeaders = [
       'Receipt #',
@@ -1030,14 +1183,8 @@ class ReportExportService {
       for (final item in bundle.items) {
         writeText(itemsSheet, itemRow, 0, '${s.receiptNumber ?? s.id}');
         writeText(itemsSheet, itemRow, 1, _formatDateTime(s.createdAt));
-        writeText(
-          itemsSheet,
-          itemRow,
-          2,
-          item.productName ?? 'Product #${item.productId}',
-        );
-        writeCell(itemsSheet, itemRow, 3, IntCellValue(item.quantity),
-            style: rightAlignStyle());
+        writeText(itemsSheet, itemRow, 2, item.productName ?? 'Product #${item.productId}');
+        writeCell(itemsSheet, itemRow, 3, IntCellValue(item.quantity), style: rightAlignStyle());
         writeCell(
           itemsSheet,
           itemRow,
@@ -1066,10 +1213,9 @@ class ReportExportService {
       }
     }
 
-    writeCell(itemsSheet, itemRow, 0, TextCellValue('Grand Total'),
-        style: totalStyle());
+    writeCell(itemsSheet, itemRow, 0, TextCellValue('Grand Total'), style: totalStyle());
     for (var c = 1; c < 5; c++) {
-      writeCell(itemsSheet, itemRow, c, TextCellValue(''));
+      writeCell(itemsSheet, itemRow, c, TextCellValue(''), style: totalStyle());
     }
     writeCell(
       itemsSheet,

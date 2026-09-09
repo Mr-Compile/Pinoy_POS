@@ -18,8 +18,8 @@ import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
-import 'package:pinoy_pos/ui/widgets/app_section.dart';
-import 'package:pinoy_pos/ui/widgets/empty_state.dart';
+import 'package:pinoy_pos/ui/widgets/app_status_chip.dart';
+import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 
 /// In-app report preview.
@@ -105,9 +105,17 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: const AppHeader(
+      appBar: AppHeader(
         title: 'Report Preview',
+        subtitle: 'Sales Report · ${widget.report.fileFormat.toUpperCase()}',
         showBackButton: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh',
+            onPressed: _isLoading ? null : _loadFile,
+          ),
+        ],
       ),
       body: _isLoading
           ? const LoadingState(message: 'Loading report...')
@@ -117,20 +125,23 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
 
   Widget _buildBody(BuildContext context, ColorScheme cs) {
     if (_error != null) {
-      return EmptyState(
-        icon: Icons.error_outline,
+      return ErrorState(
         title: 'Report unavailable',
         message: _error,
+        onRetry: _loadFile,
       );
     }
 
     final bytes = _bytes;
+    final metadata = _buildMetadataOnly(context);
+
     if (bytes == null || bytes.isEmpty) {
-      return _buildMetadataOnly(context);
+      return metadata;
     }
 
     return Column(
       children: [
+        metadata,
         Expanded(
           child: _isPdf
               ? _buildPdfPreview(bytes)
@@ -152,7 +163,7 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
       canChangePageFormat: false,
       canDebug: false,
       scrollViewDecoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: Theme.of(context).colorScheme.surfaceContainerHigh,
       ),
     );
   }
@@ -194,22 +205,42 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
             );
           }
 
-          return SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minWidth: constraints.maxWidth),
-              child: DataTable(
-                columns: headers
-                    .map((header) => DataColumn(label: Text(header)))
-                    .toList(),
-                rows: rows
-                    .map((row) => DataRow(
-                          cells: row
-                              .map((cell) => DataCell(
-                                  Text(cell?.value?.toString() ?? '')))
-                              .toList(),
-                        ))
-                    .toList(),
+          final cs = Theme.of(context).colorScheme;
+
+          return AppCard(
+            padding: EdgeInsets.zero,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                child: DataTable(
+                  headingRowColor: WidgetStateProperty.all(
+                    cs.surfaceContainerHigh,
+                  ),
+                  headingTextStyle: TextStyle(
+                    color: cs.onSurface,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                  dataTextStyle: TextStyle(
+                    color: cs.onSurface,
+                    fontSize: 13,
+                  ),
+                  border: TableBorder(
+                    horizontalInside: BorderSide(color: cs.outline),
+                  ),
+                  columns: headers
+                      .map((header) => DataColumn(label: Text(header)))
+                      .toList(),
+                  rows: rows
+                      .map((row) => DataRow(
+                            cells: row
+                                .map((cell) => DataCell(
+                                    Text(cell?.value?.toString() ?? '')))
+                                .toList(),
+                          ))
+                      .toList(),
+                ),
               ),
             ),
           );
@@ -222,49 +253,47 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
   }
 
   Widget _buildMetadataOnly(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final dateFormat = DateFormat('MMM d, yyyy h:mm a');
     final date = widget.report.submittedAt ?? widget.report.createdAt;
 
     return Padding(
       padding: const EdgeInsets.all(Spacing.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AppSection(
-            title: 'Report Details',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _DetailRow(label: 'Report #', value: widget.report.reportNumber ?? '—'),
-                _DetailRow(
-                  label: 'Format',
-                  value: widget.report.fileFormat.toUpperCase(),
-                ),
-                _DetailRow(
-                  label: 'Period',
-                  value: _periodLabel(),
-                ),
-                _DetailRow(
-                  label: 'Date',
-                  value: dateFormat.format(date.toLocal()),
-                ),
-                if (widget.report.fileSize != null)
-                  _DetailRow(
-                    label: 'Size',
-                    value: '${(widget.report.fileSize! / 1024).toStringAsFixed(1)} KB',
-                  ),
-              ],
+      child: AppCard(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Report Details',
+              style: AppTypography.titleMediumBold(context),
             ),
-          ),
-          const SizedBox(height: Spacing.lg),
-          Text(
-            'The full preview is not available for this file. Use Export to save a copy.',
-            style: AppTypography.bodyMedium(context).copyWith(
-              color: cs.onSurfaceVariant,
+            const SizedBox(height: 14),
+            _DetailRow(label: 'Report #', value: widget.report.reportNumber ?? '—'),
+            _DetailRow(
+              label: 'Format',
+              valueWidget: AppStatusChip(
+                label: widget.report.fileFormat.toUpperCase(),
+                color: AppSemanticColors.resolve(
+                  AppSemanticColors.success,
+                  Theme.of(context).brightness,
+                ),
+              ),
             ),
-          ),
-        ],
+            _DetailRow(
+              label: 'Period',
+              value: _periodLabel(),
+            ),
+            _DetailRow(
+              label: 'Date',
+              value: dateFormat.format(date.toLocal()),
+            ),
+            if (widget.report.fileSize != null)
+              _DetailRow(
+                label: 'Size',
+                value: '${(widget.report.fileSize! / 1024).toStringAsFixed(1)} KB',
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -294,16 +323,6 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.refresh),
-                        tooltip: 'Reload',
-                        onPressed: _loadFile,
-                      ),
-                    ],
-                  ),
                   exportButton,
                   if (shareButton != null) ...[
                     const SizedBox(height: Spacing.sm),
@@ -315,12 +334,6 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
 
             return Row(
               children: [
-                IconButton(
-                  icon: const Icon(Icons.refresh),
-                  tooltip: 'Reload',
-                  onPressed: _loadFile,
-                ),
-                const SizedBox(width: Spacing.sm),
                 Expanded(child: exportButton),
                 if (shareButton != null) ...[
                   const SizedBox(width: Spacing.md),
@@ -454,9 +467,14 @@ class _SpreadsheetCellRow extends StatelessWidget {
 
 class _DetailRow extends StatelessWidget {
   final String label;
-  final String value;
+  final String? value;
+  final Widget? valueWidget;
 
-  const _DetailRow({required this.label, required this.value});
+  const _DetailRow({
+    required this.label,
+    this.value,
+    this.valueWidget,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -464,7 +482,7 @@ class _DetailRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Text(
             '$label: ',
@@ -473,12 +491,14 @@ class _DetailRow extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: Text(
-              value,
-              style: AppTypography.bodyMedium(context).copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            child: valueWidget != null
+                ? valueWidget!
+                : Text(
+                    value ?? '',
+                    style: AppTypography.bodyMedium(context).copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
           ),
         ],
       ),

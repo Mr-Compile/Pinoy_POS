@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/services/password_strength_service.dart';
+import 'package:pinoy_pos/ui/widgets/app_icon_circle.dart';
 
 /// A dynamic checklist that shows password requirements with
 /// success/error/neutral states.
@@ -72,14 +74,21 @@ class _RequirementItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(
-          satisfied ? Icons.check_circle : Icons.radio_button_unchecked,
-          size: 18,
-          semanticLabel: satisfied ? 'Requirement met' : 'Requirement not met',
-          color: satisfied
-              ? colorScheme.primary
-              : colorScheme.onSurfaceVariant,
-        ),
+        if (satisfied)
+          AppIconCircle.small(
+            icon: Icons.check,
+            backgroundColor: AppSemanticColors.resolve(
+              AppSemanticColors.success,
+              Theme.of(context).brightness,
+            ),
+            iconColor: Colors.white,
+          )
+        else
+          AppIconCircle.small(
+            icon: Icons.circle,
+            backgroundColor: colorScheme.surfaceContainerHighest,
+            iconColor: colorScheme.onSurfaceVariant,
+          ),
         const SizedBox(width: 8),
         Expanded(
           child: Text(

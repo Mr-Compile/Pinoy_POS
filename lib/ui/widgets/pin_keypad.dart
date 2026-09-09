@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 
 /// A reusable, touch-friendly numeric keypad for PIN entry.
 ///
@@ -65,20 +66,22 @@ class PinKeypad extends StatelessWidget {
         button: true,
         child: Material(
           color: Colors.transparent,
-          shape: const CircleBorder(),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: enabled ? () => onDigitPressed(digit) : null,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
             child: Container(
               decoration: BoxDecoration(
-                shape: BoxShape.circle,
                 color: cs.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+                border: Border.all(color: cs.outline),
               ),
               alignment: Alignment.center,
               child: Text(
                 digit,
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w500,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
                       color: cs.onSurface,
                     ),
               ),
@@ -100,19 +103,21 @@ class PinKeypad extends StatelessWidget {
         button: true,
         child: Material(
           color: Colors.transparent,
-          shape: const CircleBorder(),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: enabled ? onBackspacePressed : null,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
             child: Container(
               decoration: BoxDecoration(
-                shape: BoxShape.circle,
                 color: cs.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+                border: Border.all(color: cs.outline),
               ),
               alignment: Alignment.center,
               child: Icon(
                 Icons.backspace_outlined,
-                size: 28,
+                size: 26,
                 color: cs.onSurface,
               ),
             ),

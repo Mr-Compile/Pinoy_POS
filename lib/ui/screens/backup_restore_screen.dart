@@ -569,7 +569,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                               children: [
                           Text(
                             'Backup & Restore',
-                            style: AppTypography.headlineSmallSemibold(context),
+                            style: AppTypography.headlineSmallBold(context),
                           ),
                           const SizedBox(height: Spacing.xs),
                           Text(
@@ -620,19 +620,47 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
 
   // ── Location / Destination Status Card ───────────────────────────────
 
+  Widget _buildIconBadge({
+    required IconData icon,
+    required Color color,
+    double size = 38,
+    double iconSize = 19,
+  }) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(AppRadius.control),
+      ),
+      child: Icon(
+        icon,
+        size: iconSize,
+        color: color,
+      ),
+    );
+  }
+
   Widget _buildLocationCard(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final backupService = ref.read(backupServiceProvider);
     final isWeb = kIsWeb;
+    final successColor = AppSemanticColors.resolve(
+      AppSemanticColors.success,
+      theme.brightness,
+    );
 
     if (_locationLoading) {
       return AppCard(
         padding: const EdgeInsets.all(Spacing.xl),
         child: Row(
           children: [
-            Icon(Icons.folder_outlined, size: 24, color: cs.primary),
-            const SizedBox(width: Spacing.sm),
+            _buildIconBadge(
+              icon: Icons.folder_outlined,
+              color: cs.primary,
+            ),
+            const SizedBox(width: Spacing.md),
             Expanded(
               child: Text(
                 'Checking backup location...',
@@ -666,8 +694,11 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
           children: [
             Row(
               children: [
-                Icon(Icons.download_outlined, size: 24, color: cs.primary),
-                const SizedBox(width: Spacing.sm),
+                _buildIconBadge(
+                  icon: Icons.download_outlined,
+                  color: cs.primary,
+                ),
+                const SizedBox(width: Spacing.md),
                 Text(
                   'Backup Destination',
                   style: AppTypography.titleMediumBold(context),
@@ -677,7 +708,12 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
             const SizedBox(height: Spacing.lg),
             Row(
               children: [
-                Icon(Icons.info_outline, size: 20, color: cs.onSurfaceVariant),
+                _buildIconBadge(
+                  icon: Icons.info_outline,
+                  color: cs.onSurfaceVariant,
+                  size: 28,
+                  iconSize: 15,
+                ),
                 const SizedBox(width: Spacing.sm),
                 Expanded(
                   child: Text(
@@ -706,8 +742,11 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.folder_outlined, size: 24, color: cs.primary),
-              const SizedBox(width: Spacing.sm),
+              _buildIconBadge(
+                icon: Icons.folder_outlined,
+                color: cs.primary,
+              ),
+              const SizedBox(width: Spacing.md),
               Text(
                 'Backup Destination',
                 style: AppTypography.titleMediumBold(context),
@@ -719,11 +758,18 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
           if (hasLocation) ...[
             Row(
               children: [
-                Icon(
-                  Icons.check_circle,
-                  size: 20,
-                  color: AppSemanticColors.resolve(
-                      AppSemanticColors.success, theme.brightness),
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: successColor.withValues(alpha: 0.16),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.check,
+                    size: 15,
+                    color: successColor,
+                  ),
                 ),
                 const SizedBox(width: Spacing.sm),
                 Expanded(
@@ -772,7 +818,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                           color: cs.primary,
                         ),
                       )
-                    : const Icon(Icons.edit_location_alt_outlined),
+                    : const Icon(Icons.folder_open),
                 label: Text(
                   _isSelectingLocation ? 'Opening picker...' : 'Change Location',
                 ),
@@ -781,7 +827,12 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
           ] else ...[
             Row(
               children: [
-                Icon(Icons.info_outline, size: 20, color: cs.onSurfaceVariant),
+                _buildIconBadge(
+                  icon: Icons.info_outline,
+                  color: cs.onSurfaceVariant,
+                  size: 28,
+                  iconSize: 15,
+                ),
                 const SizedBox(width: Spacing.sm),
                 Expanded(
                   child: Text(
@@ -831,9 +882,15 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
   // ── Section Header ───────────────────────────────────────────────────
 
   Widget _buildSectionHeader(BuildContext context, String title) {
+    final cs = Theme.of(context).colorScheme;
     return Text(
       title,
-      style: AppTypography.titleLargeBold(context),
+      style: TextStyle(
+        fontSize: 12.5,
+        fontWeight: FontWeight.w700,
+        color: cs.onSurfaceVariant,
+        letterSpacing: 0.4,
+      ),
     );
   }
 
@@ -915,10 +972,18 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
         children: [
           Row(
             children: [
-              Icon(
-                Icons.archive_outlined,
-                size: 28,
-                color: cs.primary,
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: cs.primary.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(AppRadius.control),
+                ),
+                child: Icon(
+                  Icons.archive_outlined,
+                  size: 19,
+                  color: cs.primary,
+                ),
               ),
               const SizedBox(width: Spacing.md),
               Expanded(
@@ -991,27 +1056,46 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
           const SizedBox(height: Spacing.sm),
           Divider(color: cs.outlineVariant),
           const SizedBox(height: Spacing.sm),
-          Row(
+          Wrap(
+            spacing: Spacing.md,
+            runSpacing: Spacing.xs,
             children: [
-              Icon(Icons.insert_drive_file_outlined, size: 16, color: cs.onSurfaceVariant),
-              const SizedBox(width: Spacing.xs),
-              Text(
-                _formatFileSize(backup.fileSize),
-                style: theme.textTheme.bodySmall?.copyWith(
-                      color: cs.onSurfaceVariant,
-                    ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.insert_drive_file_outlined,
+                    size: 14,
+                    color: cs.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: Spacing.xs),
+                  Text(
+                    _formatFileSize(backup.fileSize),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                  ),
+                ],
               ),
-              const SizedBox(width: Spacing.md),
-              Icon(Icons.schedule, size: 16, color: cs.onSurfaceVariant),
-              const SizedBox(width: Spacing.xs),
-              Flexible(
-                child: Text(
-                  _formatDate(backup.createdAt),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                        color: cs.onSurfaceVariant,
-                      ),
-                  overflow: TextOverflow.ellipsis,
-                ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.schedule,
+                    size: 14,
+                    color: cs.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: Spacing.xs),
+                  Flexible(
+                    child: Text(
+                      _formatDate(backup.createdAt),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -1073,8 +1157,20 @@ class _QuickActionCard extends StatelessWidget {
                   ),
                 )
               else
-                Icon(icon, size: 24, color: iconColor),
-              const SizedBox(width: Spacing.sm),
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: iconColor.withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(AppRadius.control),
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 19,
+                    color: iconColor,
+                  ),
+                ),
+              const SizedBox(width: Spacing.md),
               Expanded(
                 child: Text(
                   title,

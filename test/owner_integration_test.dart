@@ -110,7 +110,8 @@ void main() {
       await authAsOwner();
       final svc = ReportService();
 
-      // Owner now has manage_users and backup_restore.
+      // Owner has manage_users. backup_restore is Admin-only, so
+      // getLastBackupPath returns null.
       expect(await svc.getTotalUsers(), greaterThanOrEqualTo(1));
       expect(await svc.getActiveUsers(), greaterThanOrEqualTo(1));
       expect(await svc.getLastBackupPath(), isNull);
@@ -703,7 +704,7 @@ void main() {
         'view_ai_advisor', 'view_settings', 'edit_settings',
         'view_notifications', 'view_profile', 'view_more',
         'manage_staff', 'view_staff_performance', 'view_report_submissions',
-        'backup_restore', 'manage_users', 'edit_users', 'delete_users',
+        'manage_users', 'edit_users', 'delete_users',
         'reset_password', 'toggle_user_active', 'view_users', 'empty_trash',
       ];
 

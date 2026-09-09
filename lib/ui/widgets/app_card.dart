@@ -2,18 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 
 /// Visual style of an [AppCard].
-enum AppCardVariant { elevated, filled, outlined }
+enum AppCardVariant { elevated, filled, outlined, soft }
 
 /// A reusable, accessible card with consistent radius, padding, and tap
 /// feedback. Use [AppCardVariant.filled] for grouped content,
-/// [AppCardVariant.elevated] for stand-alone call-outs, and
-/// [AppCardVariant.outlined] for selectable items.
+/// [AppCardVariant.elevated] for stand-alone call-outs,
+/// [AppCardVariant.outlined] for selectable items, and
+/// [AppCardVariant.soft] for tinted accent cards.
 class AppCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry? padding;
   final EdgeInsetsGeometry margin;
   final VoidCallback? onTap;
   final Color? color;
+  final Color? borderColor;
   final double? elevation;
   final AppCardVariant variant;
   final double borderRadius;
@@ -25,6 +27,7 @@ class AppCard extends StatelessWidget {
     this.margin = EdgeInsets.zero,
     this.onTap,
     this.color,
+    this.borderColor,
     this.elevation,
     this.variant = AppCardVariant.elevated,
     this.borderRadius = AppRadius.card,
@@ -39,23 +42,29 @@ class AppCard extends StatelessWidget {
       AppCardVariant.elevated => color,
       AppCardVariant.filled => color ?? cs.surfaceContainerLowest,
       AppCardVariant.outlined => color ?? cs.surface,
+      AppCardVariant.soft => color?.withValues(alpha: 0.12),
     };
 
     final double effectiveElevation = switch (variant) {
       AppCardVariant.elevated => elevation ?? 1,
       AppCardVariant.filled => elevation ?? 0,
       AppCardVariant.outlined => elevation ?? 0,
+      AppCardVariant.soft => elevation ?? 0,
     };
 
-    final shape = switch (variant) {
-      AppCardVariant.elevated || AppCardVariant.filled => RoundedRectangleBorder(
-          borderRadius: effectiveRadius,
-        ),
-      AppCardVariant.outlined => RoundedRectangleBorder(
-          borderRadius: effectiveRadius,
-          side: BorderSide(color: cs.outlineVariant),
-        ),
+    final Color? effectiveBorderColor = switch (variant) {
+      AppCardVariant.outlined => borderColor ?? cs.outline,
+      AppCardVariant.soft => (borderColor ?? color)?.withValues(alpha: 0.25),
+      _ => borderColor ?? cs.outline,
     };
+
+    final shape = RoundedRectangleBorder(
+      borderRadius: effectiveRadius,
+      side: BorderSide(
+        color: effectiveBorderColor ?? cs.outline,
+        width: 1,
+      ),
+    );
 
     final card = Card(
       color: effectiveColor,

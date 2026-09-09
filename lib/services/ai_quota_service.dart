@@ -209,8 +209,8 @@ class AIQuotaService {
       );
     }
 
-    if (!_sessionManager.hasPermission('edit_settings')) {
-      throw AuthorizationException('edit_settings');
+    if (!_sessionManager.hasPermission('manage_ai_quota')) {
+      throw AuthorizationException('manage_ai_quota');
     }
 
     final oldDefault = await getDefaultQuota();
@@ -258,8 +258,8 @@ class AIQuotaService {
     final valueError = _validateQuotaValue(value);
     if (valueError != null) return valueError;
 
-    if (!_sessionManager.hasPermission('manage_users')) {
-      throw AuthorizationException('manage_users');
+    if (!_sessionManager.hasPermission('manage_ai_quota')) {
+      throw AuthorizationException('manage_ai_quota');
     }
 
     final quota = await getQuotaForUser(userId);
@@ -287,8 +287,8 @@ class AIQuotaService {
     final verificationError = _requireVerification(verified);
     if (verificationError != null) return verificationError;
 
-    if (!_sessionManager.hasPermission('manage_users')) {
-      throw AuthorizationException('manage_users');
+    if (!_sessionManager.hasPermission('manage_ai_quota')) {
+      throw AuthorizationException('manage_ai_quota');
     }
 
     final quota = await ensureQuotaForUser(userId);
@@ -320,8 +320,8 @@ class AIQuotaService {
     final verificationError = _requireVerification(verified);
     if (verificationError != null) return verificationError;
 
-    if (!_sessionManager.hasPermission('manage_users')) {
-      throw AuthorizationException('manage_users');
+    if (!_sessionManager.hasPermission('manage_ai_quota')) {
+      throw AuthorizationException('manage_ai_quota');
     }
 
     final now = DateTime.now();

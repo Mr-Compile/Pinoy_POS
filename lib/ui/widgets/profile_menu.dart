@@ -75,6 +75,12 @@ class _ProfileMenuState extends ConsumerState<ProfileMenu> {
     final left = desiredLeft.clamp(0.0, maxLeft);
     final right = (screenSize.width - left - menuWidth).clamp(0.0, double.infinity);
 
+    final brightness = Theme.of(context).brightness;
+    final primaryColor = AppSemanticColors.resolve(
+      AppSemanticColors.primary,
+      brightness,
+    );
+
     showMenu<void>(
       context: context,
       useRootNavigator: true,
@@ -92,6 +98,7 @@ class _ProfileMenuState extends ConsumerState<ProfileMenu> {
           padding: EdgeInsets.zero,
           child: _ProfileDropdownContent(
             user: user,
+            primaryColor: primaryColor,
             onProfile: () {
               Navigator.of(context, rootNavigator: true).pop();
               _safePush(const ProfileScreen());
@@ -120,12 +127,14 @@ class _ProfileMenuState extends ConsumerState<ProfileMenu> {
 
 class _ProfileDropdownContent extends StatelessWidget {
   final User user;
+  final Color primaryColor;
   final VoidCallback onProfile;
   final VoidCallback onSettings;
   final VoidCallback onLogout;
 
   const _ProfileDropdownContent({
     required this.user,
+    required this.primaryColor,
     required this.onProfile,
     required this.onSettings,
     required this.onLogout,
@@ -135,6 +144,15 @@ class _ProfileDropdownContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final brightness = theme.brightness;
+    final successColor = AppSemanticColors.resolve(
+      AppSemanticColors.success,
+      brightness,
+    );
+    final errorColor = AppSemanticColors.resolve(
+      AppSemanticColors.error,
+      brightness,
+    );
 
     return SizedBox(
       width: 260,
@@ -157,15 +175,22 @@ class _ProfileDropdownContent extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        user.fullName,
-                        style: AppTypography.titleMediumBold(context),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              user.fullName,
+                              style: AppTypography.titleMediumBold(context),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          _RolePill(role: user.role.displayName, color: successColor),
+                        ],
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        user.role.displayName,
+                        '@${user.username}',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                         ),
@@ -181,27 +206,57 @@ class _ProfileDropdownContent extends StatelessWidget {
           _MenuTile(
             icon: Icons.person_outline,
             label: 'Profile',
+            iconColor: primaryColor,
             onTap: onProfile,
           ),
           const Divider(height: 1),
           _MenuTile(
             icon: Icons.settings_outlined,
             label: 'Settings',
+            iconColor: primaryColor,
             onTap: onSettings,
           ),
           const Divider(height: 1),
           _MenuTile(
             icon: Icons.logout_rounded,
             label: 'Logout',
-            iconColor: AppSemanticColors.resolve(
-              AppSemanticColors.error,
-              Theme.of(context).brightness,
-            ),
-            textColor: AppSemanticColors.resolve(
-              AppSemanticColors.error,
-              Theme.of(context).brightness,
-            ),
+            iconColor: errorColor,
+            textColor: errorColor,
             onTap: onLogout,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RolePill extends StatelessWidget {
+  final String role;
+  final Color color;
+
+  const _RolePill({required this.role, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(left: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.badge, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            role,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
           ),
         ],
       ),
@@ -226,17 +281,29 @@ class _MenuTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final resolvedIconColor = iconColor ?? colorScheme.onSurfaceVariant;
+
     return InkWell(
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: iconColor ?? Theme.of(context).colorScheme.onSurfaceVariant),
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: resolvedIconColor.withValues(alpha: 0.16),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 18, color: resolvedIconColor),
+            ),
             const SizedBox(width: 12),
             Text(
               label,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
                     color: textColor,
                   ),
             ),

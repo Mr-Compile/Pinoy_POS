@@ -62,13 +62,17 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               // ── Logo ──
-              ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxWidth: 120,
-                  maxHeight: 150,
+              Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(color: colorScheme.outline),
                 ),
+                padding: const EdgeInsets.all(24),
                 child: const AppLogo(
-                  size: 120,
+                  size: 72,
                   variant: LogoVariant.full,
                 ),
               ),

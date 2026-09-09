@@ -160,14 +160,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         child: Container(
                           decoration: BoxDecoration(
                             color: colorScheme.surface,
-                            borderRadius: BorderRadius.circular(AppRadius.xxl),
+                            borderRadius: BorderRadius.circular(AppRadius.card),
                             boxShadow: [
                               BoxShadow(
-                                color: isDark
-                                    ? colorScheme.primary.withValues(alpha: 0.10)
-                                    : colorScheme.shadow.withValues(alpha: 0.08),
-                                blurRadius: 24,
-                                offset: const Offset(0, 8),
+                                color: colorScheme.shadow.withValues(
+                                  alpha: isDark ? 0.18 : 0.10,
+                                ),
+                                blurRadius: 28,
+                                offset: const Offset(0, 10),
                               ),
                             ],
                           ),
@@ -289,13 +289,14 @@ class _IconContainer extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(AppRadius.xxl),
+        color: isDark
+            ? AppColorTokens.darkSurfaceElevated
+            : AppColorTokens.lightSurfaceSoft,
+        borderRadius: BorderRadius.circular(AppRadius.card),
         boxShadow: [
           BoxShadow(
-            color: colorScheme.primary.withValues(alpha: isDark ? 0.35 : 0.22),
-            blurRadius: isDark ? 28 : 20,
-            spreadRadius: isDark ? 2 : 0,
+            color: colorScheme.primary.withValues(alpha: isDark ? 0.22 : 0.16),
+            blurRadius: 24,
             offset: const Offset(0, 8),
           ),
         ],

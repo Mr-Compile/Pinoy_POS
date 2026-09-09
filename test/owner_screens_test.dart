@@ -42,6 +42,11 @@ class _FakeProductService extends ProductService {
 
   @override
   Future<List<Product>> searchProducts(String query) async => _products;
+
+  @override
+  Future<({int total, int lowStock, int outOfStock})> getStockSummary() async {
+    return (total: _products.length, lowStock: 0, outOfStock: 0);
+  }
 }
 
 class _FakeDashboardNotifier extends DashboardNotifier {

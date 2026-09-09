@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinoy POS — Payment Settings Mockup</title>
+<link rel="stylesheet" href="mockup.css">
+</head>
+<body>
+
+<div class="page-head">
+  <div>
+    <h1>Payment Settings</h1>
+    <p>GCash configuration and merchant identity. Owner-only business setting.</p>
+  </div>
+  <button class="theme-toggle" onclick="toggleTheme()">
+    <svg viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
+    <span id="themeLabel">Light mode</span>
+  </button>
+</div>
+
+<div class="frames">
+  <div class="frame-wrap">
+    <div class="frame-label">Payment Settings</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span>
+        <span class="icons">
+          <svg viewBox="0 0 24 24"><path d="M12 21l3.5-4.5c-.97-.74-2.18-1.16-3.5-1.16s-2.53.42-3.5 1.16L12 21zM12 3C7.31 3 3.07 4.69 0 7.55l1.93 2.43C4.48 7.9 8.01 6.4 12 6.4s7.52 1.5 10.07 3.58L24 7.55C20.93 4.69 16.69 3 12 3z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>
+        </span>
+      </div>
+      <div class="appbar">
+        <div class="back"><svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></div>
+        <div class="title"><h2>Payment Settings</h2></div>
+      </div>
+      <div class="screen">
+        <div class="screen-body">
+
+          <div class="card pad">
+            <div class="section-head" style="font-size:17px;margin-bottom:16px;">Merchant Identity</div>
+            <div class="field">
+              <label>Store Name</label>
+              <div style="position:relative;">
+                <input class="input" value="Pinoy Sari-Sari Store" placeholder="Store Name">
+                <div class="field-ic"><svg viewBox="0 0 24 24" style="fill:var(--text-3);"><path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zM14 13h2v-2h-2v2zm0 4h2v-2h-2v2z"/></svg></div>
+              </div>
+              <div class="helper">Shown to customers on the GCash payment screen.</div>
+            </div>
+            <div class="field">
+              <label>GCash Mobile Number</label>
+              <div style="position:relative;">
+                <input class="input" value="0917 123 4567" placeholder="Mobile number">
+                <div class="field-ic"><svg viewBox="0 0 24 24" style="fill:var(--text-3);"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg></div>
+              </div>
+              <div class="helper">The mobile number linked to the GCash account.</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div style="padding:14px 14px 0;">
+              <div class="section-head" style="font-size:17px;">GCash</div>
+            </div>
+
+            <div class="toggle-row" onclick="toggleRowSwitch(this)">
+              <div class="grow">
+                <div class="name">Enable GCash payments</div>
+              </div>
+              <div class="toggle-switch"><span class="toggle-knob"></span></div>
+            </div>
+
+            <div class="toggle-row" onclick="toggleRowSwitch(this)">
+              <div class="grow">
+                <div class="name">Reference number required</div>
+                <div class="sub">Cashiers must enter the GCash reference number.</div>
+              </div>
+              <div class="toggle-switch off"><span class="toggle-knob"></span></div>
+            </div>
+
+            <div class="select-row">
+              <div class="grow">
+                <div class="name">Customer name</div>
+                <div class="sub">Required</div>
+              </div>
+              <select>
+                <option>Off</option>
+                <option>Optional</option>
+                <option selected>Required</option>
+              </select>
+            </div>
+
+            <div class="select-row">
+              <div class="grow">
+                <div class="name">Payment proof</div>
+                <div class="sub">Required</div>
+              </div>
+              <select>
+                <option>Off</option>
+                <option>Optional</option>
+                <option selected>Required</option>
+              </select>
+            </div>
+
+            <div class="toggle-row" onclick="toggleRowSwitch(this)">
+              <div class="grow">
+                <div class="name">Verify staff GCash sales</div>
+                <div class="sub">Staff GCash payments must be approved by Owner.</div>
+              </div>
+              <div class="toggle-switch"><span class="toggle-knob"></span></div>
+            </div>
+
+            <div class="select-row">
+              <div class="grow">
+                <div class="name">Minimum reference length</div>
+                <div class="sub">10 characters</div>
+              </div>
+              <input type="number" value="10" style="width:70px;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:6px 8px;color:var(--text);font-weight:700;text-align:center;">
+            </div>
+
+            <div style="padding:14px;">
+              <div class="name" style="margin-bottom:8px;">Merchant QR Code</div>
+              <div class="qr-frame" style="height:200px;margin-bottom:12px;" onclick="showToast('QR viewer would open', 'info')">
+                <div class="qr-placeholder">
+                  <svg viewBox="0 0 24 24"><path d="M3 11h18v2H3zm0-4h18v2H3zm0 8h18v2H3zM15 3h2v4h-2zM7 3h2v4H7z"/></svg>
+                  <div>No GCash QR image uploaded</div>
+                </div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <button class="btn btn-primary" onclick="showToast('Upload QR image', 'info')">Upload QR</button>
+                <button class="btn btn-outlined" onclick="showToast('Remove QR image', 'warning')" disabled>Remove</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card surface-soft" style="padding:14px;display:flex;gap:12px;align-items:flex-start;">
+            <svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:var(--text-3);flex-shrink:0;margin-top:2px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+            <div class="sub">GCash sales tendered by Staff must be approved by the Owner before the sale is completed. Owner sales are always confirmed immediately.</div>
+          </div>
+
+          <button class="btn btn-primary" style="margin-bottom:10px;" onclick="showToast('Payment settings saved', 'success')">Save Payment Settings</button>
+
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes">
+      <b>Payment Settings:</b> Owner-only business setting. Merchant identity, GCash toggles, customer name / proof requirements, reference length and QR upload. Invalid user sees the Access Denied state.
+    </div>
+  </div>
+</div>
+
+<script src="mockup.js"></script>
+</body>
+</html>

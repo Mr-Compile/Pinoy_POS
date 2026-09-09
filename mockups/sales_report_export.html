@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinoy POS — Sales Report Export (PDF &amp; Excel)</title>
+<link rel="stylesheet" href="mockup.css">
+<style>
+  /* Print-friendly PDF page shown inside the phone preview */
+  .pdf-page {
+    background: #fff;
+    color: #172033;
+    border-radius: 8px;
+    padding: 18px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.18);
+    font-family: 'Segoe UI', 'Inter', system-ui, sans-serif;
+  }
+  .pdf-page .pdf-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid #1B4CAF;
+    margin-bottom: 16px;
+  }
+  .pdf-page .pdf-logo {
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #2563C7, #1B4CAF);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: 800;
+  }
+  .pdf-page .pdf-store { font-size: 18px; font-weight: 800; color: #172033; }
+  .pdf-page .pdf-meta { font-size: 12px; color: #52627A; margin-top: 2px; }
+  .pdf-page .pdf-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .pdf-page .pdf-title { font-size: 22px; font-weight: 800; color: #1B4CAF; }
+  .pdf-page .pdf-period { font-size: 12px; color: #52627A; text-align: right; }
+
+  .pdf-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .pdf-metric {
+    background: #F5F8FC;
+    border: 1px solid #D7E0EE;
+    border-radius: 12px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .pdf-metric .num { font-size: 17px; font-weight: 800; color: #172033; }
+  .pdf-metric .lbl { font-size: 10.5px; font-weight: 700; color: #8A9AB3; text-transform: uppercase; letter-spacing: .4px; }
+  .pdf-metric.primary { background: #EEF4FF; border-color: #4B82E9; }
+  .pdf-metric.primary .num { color: #1B4CAF; }
+
+  .pdf-section-title {
+    font-size: 13px;
+    font-weight: 800;
+    color: #1B4CAF;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    margin: 16px 0 8px;
+  }
+
+  .pdf-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .pdf-table th {
+    background: #1B4CAF;
+    color: #fff;
+    text-align: left;
+    padding: 8px 10px;
+    font-weight: 700;
+  }
+  .pdf-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #E7ECF4;
+    color: #172033;
+  }
+  .pdf-table tr:last-child td { border-bottom: none; }
+  .pdf-table .right { text-align: right; }
+  .pdf-table .total-row td {
+    background: #DCFCE7;
+    color: #14532D;
+    font-weight: 800;
+    border-bottom: none;
+  }
+  .pdf-method {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 10.5px;
+    font-weight: 700;
+  }
+  .pdf-method.cash { background: rgba(75,130,233,.16); color: #1B4CAF; }
+  .pdf-method.gcash { background: rgba(22,163,74,.16); color: #16A34A; }
+  .pdf-method.card { background: rgba(75,130,233,.16); color: #2563C7; }
+  .pdf-method.other { background: rgba(140,154,184,.18); color: #52627A; }
+
+  /* Excel / spreadsheet preview */
+  .excel-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .excel-tabs {
+    display: flex;
+    gap: 2px;
+    padding: 8px 8px 0;
+    background: var(--surface-elev);
+    border-bottom: 1px solid var(--border);
+  }
+  .excel-tab {
+    padding: 8px 14px;
+    border-radius: 6px 6px 0 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-3);
+    background: transparent;
+    cursor: pointer;
+  }
+  .excel-tab.on {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-bottom-color: var(--surface);
+  }
+  .excel-body { padding: 10px; overflow-x: auto; }
+
+  .spreadsheet {
+    border-collapse: collapse;
+    font-size: 12px;
+    min-width: 100%;
+  }
+  .spreadsheet th,
+  .spreadsheet td {
+    border: 1px solid var(--border);
+    padding: 7px 10px;
+    min-width: 70px;
+    text-align: left;
+    white-space: nowrap;
+  }
+  .spreadsheet th {
+    background: #1B4CAF;
+    color: #fff;
+    font-weight: 700;
+  }
+  .spreadsheet td { color: var(--text); background: var(--surface); }
+  .spreadsheet .right { text-align: right; }
+  .spreadsheet .total td {
+    background: rgba(22,163,74,.16);
+    color: var(--success);
+    font-weight: 800;
+  }
+  .spreadsheet .method-cash { background: rgba(75,130,233,.16); color: var(--info); }
+  .spreadsheet .method-gcash { background: rgba(22,163,74,.16); color: var(--success); }
+
+  .spreadsheet .col-head,
+  .spreadsheet .row-head {
+    background: var(--surface-elev);
+    color: var(--text-3);
+    font-weight: 700;
+    text-align: center;
+    min-width: 30px;
+  }
+
+  .pdf-mini-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    height: 70px;
+    margin-top: 10px;
+    padding: 12px;
+    background: #F5F8FC;
+    border-radius: 12px;
+    border: 1px solid #D7E0EE;
+  }
+  .pdf-bar {
+    flex: 1;
+    background: linear-gradient(to top, #1B4CAF, #4B82E9);
+    border-radius: 4px 4px 0 0;
+    min-height: 8px;
+    position: relative;
+  }
+  .pdf-bar span {
+    position: absolute;
+    bottom: -18px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    color: #52627A;
+    white-space: nowrap;
+  }
+
+  .phone .pdf-page { margin: 0 -4px; }
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <div>
+    <h1>Sales Report Export Mockup</h1>
+    <p>PDF and Excel output for the Sales Summary report. Modern layout, clear hierarchy, and data-driven styling.</p>
+  </div>
+  <button class="theme-toggle" onclick="toggleTheme()">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
+    <span id="themeLabel">Light mode</span>
+  </button>
+</div>
+
+<div class="frames">
+  <!-- PDF Report -->
+  <div class="frame-wrap">
+    <div class="frame-label">PDF Report</div>
+    <div class="phone">
+      <div class="statusbar">
+        <span>9:41</span>
+        <span class="icons">
+          <svg viewBox="0 0 24 24"><path d="M12 21l3.5-4.5c-.97-.74-2.18-1.16-3.5-1.16s-2.53.42-3.5 1.16L12 21zM12 3C7.31 3 3.07 4.69 0 7.55l1.93 2.43C4.48 7.9 8.01 6.4 12 6.4s7.52 1.5 10.07 3.58L24 7.55C20.93 4.69 16.69 3 12 3z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>
+        </span>
+      </div>
+      <div class="appbar">
+        <div class="back"><svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></div>
+        <div class="title"><h2>Sales Report</h2><div class="sub">PDF Preview</div></div>
+        <div class="act" title="Export" onclick="showToast('PDF exported', 'success')"><svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></div>
+      </div>
+      <div class="screen">
+        <div class="screen-body" style="padding:10px;background:var(--surface-elev);">
+          <div class="pdf-page">
+            <div class="pdf-header">
+              <div class="pdf-logo">JP</div>
+              <div>
+                <div class="pdf-store">Juan's Pinoy Carinderia</div>
+                <div class="pdf-meta">123 Mabini St, Quezon City · Contact: 0917-123-4567</div>
+              </div>
+            </div>
+
+            <div class="pdf-title-row">
+              <div>
+                <div class="pdf-title">Sales Summary</div>
+                <div class="pdf-meta">Generated: Sep 10, 2026 10:30 AM</div>
+              </div>
+              <div class="pdf-period">Period<br>Sep 1 - Sep 9, 2026</div>
+            </div>
+
+            <div class="pdf-summary-grid">
+              <div class="pdf-metric primary">
+                <div class="num">₱25,450.00</div>
+                <div class="lbl">Total Sales</div>
+              </div>
+              <div class="pdf-metric">
+                <div class="num">142</div>
+                <div class="lbl">Transactions</div>
+              </div>
+              <div class="pdf-metric">
+                <div class="num">₱179.23</div>
+                <div class="lbl">Avg Transaction</div>
+              </div>
+              <div class="pdf-metric">
+                <div class="num">386</div>
+                <div class="lbl">Items Sold</div>
+              </div>
+            </div>
+
+            <div class="pdf-section-title">Sales Trend</div>
+            <div class="pdf-mini-chart">
+              <div class="pdf-bar" style="height:30%"><span>Sep 1</span></div>
+              <div class="pdf-bar" style="height:55%"><span>Sep 2</span></div>
+              <div class="pdf-bar" style="height:45%"><span>Sep 3</span></div>
+              <div class="pdf-bar" style="height:70%"><span>Sep 4</span></div>
+              <div class="pdf-bar" style="height:60%"><span>Sep 5</span></div>
+              <div class="pdf-bar" style="height:85%"><span>Sep 6</span></div>
+              <div class="pdf-bar" style="height:75%"><span>Sep 7</span></div>
+              <div class="pdf-bar" style="height:90%"><span>Sep 8</span></div>
+              <div class="pdf-bar" style="height:100%"><span>Sep 9</span></div>
+            </div>
+
+            <div class="pdf-section-title">Payment Breakdown</div>
+            <table class="pdf-table">
+              <thead><tr><th>Method</th><th class="right">Count</th><th class="right">Total</th></tr></thead>
+              <tbody>
+                <tr><td><span class="pdf-method cash">Cash</span></td><td class="right">87</td><td class="right">₱15,780.00</td></tr>
+                <tr><td><span class="pdf-method gcash">GCash</span></td><td class="right">55</td><td class="right">₱9,670.00</td></tr>
+                <tr class="total-row"><td>Total</td><td class="right">142</td><td class="right">₱25,450.00</td></tr>
+              </tbody>
+            </table>
+
+            <div class="pdf-section-title">Top Products</div>
+            <table class="pdf-table">
+              <thead><tr><th>Product</th><th class="right">Qty</th><th class="right">Revenue</th></tr></thead>
+              <tbody>
+                <tr><td>Chicken Adobo Rice</td><td class="right">68</td><td class="right">₱5,440.00</td></tr>
+                <tr><td>Pastil</td><td class="right">120</td><td class="right">₱1,200.00</td></tr>
+                <tr><td>Iced Tea</td><td class="right">95</td><td class="right">₱2,375.00</td></tr>
+              </tbody>
+            </table>
+
+            <div class="pdf-section-title">Transactions</div>
+            <table class="pdf-table">
+              <thead><tr><th>Receipt</th><th>Date/Time</th><th>Customer</th><th class="right">Items</th><th class="right">Total</th></tr></thead>
+              <tbody>
+                <tr><td>20260909-0156</td><td>Sep 9, 9:45 AM</td><td>Maria Santos</td><td class="right">3</td><td class="right">₱120.00</td></tr>
+                <tr><td>20260909-0155</td><td>Sep 9, 9:30 AM</td><td>Juan Cruz</td><td class="right">5</td><td class="right">₱450.00</td></tr>
+                <tr><td>20260909-0154</td><td>Sep 9, 9:12 AM</td><td>Ana Reyes</td><td class="right">2</td><td class="right">₱80.00</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes">
+      <b>PDF:</b> A single printable page with a branded header, bold summary cards, a visual sales trend, and compact data tables. Payment methods use semantic badges.
+    </div>
+  </div>
+
+  <!-- Excel Report -->
+  <div class="frame-wrap">
+    <div class="frame-label">Excel Report</div>
+    <div class="phone">
+      <div class="statusbar">
+        <span>9:41</span>
+        <span class="icons">
+          <svg viewBox="0 0 24 24"><path d="M12 21l3.5-4.5c-.97-.74-2.18-1.16-3.5-1.16s-2.53.42-3.5 1.16L12 21zM12 3C7.31 3 3.07 4.69 0 7.55l1.93 2.43C4.48 7.9 8.01 6.4 12 6.4s7.52 1.5 10.07 3.58L24 7.55C20.93 4.69 16.69 3 12 3z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>
+        </span>
+      </div>
+      <div class="appbar">
+        <div class="back"><svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></div>
+        <div class="title"><h2>Sales Report</h2><div class="sub">Excel Preview</div></div>
+        <div class="act" title="Export" onclick="showToast('Excel exported', 'success')"><svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></div>
+      </div>
+      <div class="screen">
+        <div class="screen-body" style="padding:10px;">
+
+          <div class="card pad" style="padding:14px;">
+            <div class="section-head" style="font-size:16px;">Report Details</div>
+            <div class="value-row"><span class="label">Store</span><span class="name">Juan's Pinoy Carinderia</span></div>
+            <div class="value-row"><span class="label">Period</span><span>Sep 1 - Sep 9, 2026</span></div>
+            <div class="value-row"><span class="label">Generated</span><span>Sep 10, 2026 10:30 AM</span></div>
+          </div>
+
+          <div class="excel-card">
+            <div class="excel-tabs">
+              <div class="excel-tab on">Summary</div>
+              <div class="excel-tab">Sales</div>
+              <div class="excel-tab">Line Items</div>
+            </div>
+            <div class="excel-body">
+              <table class="spreadsheet">
+                <tr>
+                  <th class="row-head">1</th>
+                  <th colspan="2" class="col-head" style="background:#1B4CAF;color:#fff;">Juan's Pinoy Carinderia - Sales Report</th>
+                </tr>
+                <tr>
+                  <td class="row-head">3</td>
+                  <td><b>Total Sales</b></td>
+                  <td class="right">₱25,450.00</td>
+                </tr>
+                <tr>
+                  <td class="row-head">4</td>
+                  <td><b>Transaction Count</b></td>
+                  <td class="right">142</td>
+                </tr>
+                <tr>
+                  <td class="row-head">5</td>
+                  <td><b>Average Transaction</b></td>
+                  <td class="right">₱179.23</td>
+                </tr>
+                <tr>
+                  <td class="row-head">6</td>
+                  <td><b>Items Sold</b></td>
+                  <td class="right">386</td>
+                </tr>
+                <tr>
+                  <td class="row-head">8</td>
+                  <th>Payment Method</th>
+                  <th class="right">Total</th>
+                </tr>
+                <tr>
+                  <td class="row-head">9</td>
+                  <td class="method-cash">Cash</td>
+                  <td class="right">₱15,780.00</td>
+                </tr>
+                <tr>
+                  <td class="row-head">10</td>
+                  <td class="method-gcash">GCash</td>
+                  <td class="right">₱9,670.00</td>
+                </tr>
+                <tr class="total">
+                  <td class="row-head">11</td>
+                  <td><b>Grand Total</b></td>
+                  <td class="right">₱25,450.00</td>
+                </tr>
+                <tr>
+                  <td class="row-head">13</td>
+                  <th>Product</th>
+                  <th class="right">Revenue</th>
+                </tr>
+                <tr>
+                  <td class="row-head">14</td>
+                  <td>Chicken Adobo Rice</td>
+                  <td class="right">₱5,440.00</td>
+                </tr>
+                <tr>
+                  <td class="row-head">15</td>
+                  <td>Iced Tea</td>
+                  <td class="right">₱2,375.00</td>
+                </tr>
+                <tr class="total">
+                  <td class="row-head">16</td>
+                  <td><b>Grand Total</b></td>
+                  <td class="right">₱25,450.00</td>
+                </tr>
+              </table>
+            </div>
+          </div>
+
+          <div class="excel-card" style="margin-top:12px;">
+            <div class="excel-tabs">
+              <div class="excel-tab">Summary</div>
+              <div class="excel-tab on">Sales</div>
+              <div class="excel-tab">Line Items</div>
+            </div>
+            <div class="excel-body">
+              <table class="spreadsheet">
+                <tr>
+                  <th class="col-head">A</th>
+                  <th>Receipt #</th>
+                  <th>Date/Time</th>
+                  <th>Cashier</th>
+                  <th>Customer</th>
+                  <th>Method</th>
+                  <th class="right">Items</th>
+                  <th class="right">Total</th>
+                </tr>
+                <tr>
+                  <td class="row-head">1</td>
+                  <td>20260909-0156</td>
+                  <td>Sep 9, 9:45 AM</td>
+                  <td>Maria Santos</td>
+                  <td>Juan Cruz</td>
+                  <td class="method-cash">Cash</td>
+                  <td class="right">3</td>
+                  <td class="right">₱120.00</td>
+                </tr>
+                <tr>
+                  <td class="row-head">2</td>
+                  <td>20260909-0155</td>
+                  <td>Sep 9, 9:30 AM</td>
+                  <td>Maria Santos</td>
+                  <td>Ana Reyes</td>
+                  <td class="method-gcash">GCash</td>
+                  <td class="right">5</td>
+                  <td class="right">₱450.00</td>
+                </tr>
+                <tr>
+                  <td class="row-head">3</td>
+                  <td>20260909-0154</td>
+                  <td>Sep 9, 9:12 AM</td>
+                  <td>Juan Cruz</td>
+                  <td>Maria Santos</td>
+                  <td class="method-cash">Cash</td>
+                  <td class="right">2</td>
+                  <td class="right">₱80.00</td>
+                </tr>
+                <tr class="total">
+                  <td class="row-head">4</td>
+                  <td colspan="6"><b>Grand Total</b></td>
+                  <td class="right">₱650.00</td>
+                </tr>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes">
+      <b>Excel:</b> Multiple sheets (Summary, Sales, Line Items) with a pinned blue header row, semantic colored payment-method cells, right-aligned currency/number columns, and green grand-total rows.
+    </div>
+  </div>
+</div>
+
+<script src="mockup.js"></script>
+</body>
+</html>

@@ -19,7 +19,6 @@ import 'package:pinoy_pos/data/repositories/sale_repository.dart';
 import 'package:pinoy_pos/data/repositories/user_repository.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
 import 'package:pinoy_pos/services/category_service.dart';
-import 'package:pinoy_pos/services/payment_verification_service.dart';
 import 'package:pinoy_pos/services/product_service.dart';
 import 'package:pinoy_pos/services/receipt_service.dart';
 import 'package:pinoy_pos/services/sales_service.dart';
@@ -28,10 +27,10 @@ import 'package:pinoy_pos/services/settings_service.dart';
 /// Integration tests for the GCash payment flow.
 ///
 /// - Owner creates a product and category, logs in, and sets payment rules.
-/// - Staff creates a GCash sale (requires an authorized verifier when the
-///   verification policy is enabled; the Owner's own sales never require
-///   verification).
-/// - Owner/Admin confirms or rejects legacy pending GCash payments.
+/// - Staff creates a GCash sale and it is held as `pending` when the
+///   verification policy is enabled; the Owner's own sales are confirmed
+///   immediately.
+/// - Owner confirms or rejects pending GCash payments from the sales screen.
 /// - Duplicate references and validation rules are rejected.
 void main() {
   setUpAll(() {
@@ -263,15 +262,16 @@ void main() {
       expect(success, isTrue);
 
       final sale = (await salesService.getSales()).first;
-      // The Owner is the operator: no verification, no pending state.
+      // The Owner is the operator: confirmed immediately and verified by self.
       expect(sale.paymentStatus, 'confirmed');
-      expect(sale.verifiedBy, isNull);
+      expect(sale.verifiedBy, owner.id);
+      expect(sale.verifiedAt, isNotNull);
       expect(sale.userId, owner.id);
       expect(await salesService.getPendingPayments(), isEmpty);
     });
 
-    test('staff GCash sale requires an authorized verifier when '
-        'verification is enabled', () async {
+    test('staff GCash sale is held as pending when verification is enabled',
+        () async {
       await login('owner', 'owner123');
       final productService = ProductService();
       final categoryService = CategoryService();
@@ -288,7 +288,7 @@ void main() {
           (await productService.getProductById(productId))!;
 
       SessionManager.resetForTest();
-      await login('staff', 'staff123');
+      final staff = await login('staff', 'staff123');
 
       final items = [
         SaleItem(
@@ -299,27 +299,27 @@ void main() {
         ),
       ];
 
-      // No verifier was supplied: the sale must not be created.
-      expect(
-        () => salesService.createSale(
-          items: items,
-          totalAmount: 50.0,
-          paymentMethod: 'GCash',
-          referenceNumber: 'GCASH-STAFF-NOVERIFIER',
-        ),
-        throwsA(isA<PaymentValidationException>()),
+      final success = await salesService.createSale(
+        items: items,
+        totalAmount: 50.0,
+        paymentMethod: 'GCash',
+        referenceNumber: 'GCASH-STAFF-PENDING',
       );
 
-      // No sale, no stock movement.
-      expect(await salesService.getSales(), isEmpty);
-      expect(
-        (await productService.getProductById(productId))!.stock,
-        productBefore.stock,
-      );
+      expect(success, isTrue);
+
+      final sale = (await salesService.getSales()).first;
+      expect(sale.paymentStatus, 'pending');
+      expect(sale.verifiedBy, isNull);
+      expect(sale.verifiedAt, isNull);
+      expect(sale.userId, staff.id);
+
+      final productAfter =
+          (await productService.getProductById(productId))!;
+      expect(productAfter.stock, productBefore.stock - 1);
     });
 
-    test('staff GCash sale is confirmed when an authorized verifier '
-        'approves', () async {
+    test('staff GCash pending sale can be confirmed later by owner', () async {
       final owner = await login('owner', 'owner123');
       final productService = ProductService();
       final categoryService = CategoryService();
@@ -351,195 +351,37 @@ void main() {
         items: items,
         totalAmount: 100.0,
         paymentMethod: 'GCash',
-        referenceNumber: 'GCASH-STAFF-VERIFIED',
-        verifiedByUserId: owner.id,
+        referenceNumber: 'GCASH-STAFF-PENDING-CONFIRM',
       );
 
       expect(success, isTrue);
 
-      final sale = (await salesService.getSales()).first;
-      expect(sale.paymentStatus, 'confirmed');
-      expect(sale.verifiedBy, owner.id);
-      expect(sale.verifiedAt, isNotNull);
-      expect(sale.userId, staff.id);
+      final pendingSale = (await salesService.getSales()).first;
+      expect(pendingSale.paymentStatus, 'pending');
+      expect(pendingSale.userId, staff.id);
 
-      final productAfter =
+      // Stock was deducted at the till.
+      final productAfterCreate =
           (await productService.getProductById(productId))!;
-      expect(productAfter.stock, productBefore.stock - 2);
-    });
+      expect(productAfterCreate.stock, productBefore.stock - 2);
 
-    test('staff GCash sale is rejected when the verifier is not authorized',
-        () async {
-      await login('owner', 'owner123');
-      final productService = ProductService();
-      final categoryService = CategoryService();
-      final salesService = SalesService();
-      final settingsService = SettingsService();
-
-      final currentSettings = await settingsService.getSettings();
-      await settingsService.updateSettings(
-        currentSettings.copyWith(gcashVerificationMode: 'owner_admin'),
-      );
-
-      final productId = await createProduct(productService, categoryService);
-      final staffUser =
-          (await UserRepository().getByUsername('staff'))!;
-
+      // Owner confirms from the sales screen.
       SessionManager.resetForTest();
-      await login('staff', 'staff123');
-
-      final items = [
-        SaleItem(
-          productId: productId,
-          quantity: 1,
-          unitPrice: 50.0,
-          totalPrice: 50.0,
-        ),
-      ];
-
-      // A Staff account is not an authorized verifier.
-      expect(
-        () => salesService.createSale(
-          items: items,
-          totalAmount: 50.0,
-          paymentMethod: 'GCash',
-          referenceNumber: 'GCASH-STAFF-BADVERIFIER',
-          verifiedByUserId: staffUser.id,
-        ),
-        throwsA(isA<PaymentValidationException>()),
-      );
-
-      expect(await salesService.getSales(), isEmpty);
-    });
-
-    test('admin cannot verify a staff GCash sale even when legacy mode is set',
-        () async {
       await login('owner', 'owner123');
-      final productService = ProductService();
-      final categoryService = CategoryService();
-      final salesService = SalesService();
-      final settingsService = SettingsService();
 
-      final currentSettings = await settingsService.getSettings();
-      await settingsService.updateSettings(
-        currentSettings.copyWith(gcashVerificationMode: 'owner_admin'),
-      );
+      final confirmed = await salesService.confirmGcashPayment(pendingSale.id!);
+      expect(confirmed, isTrue);
 
-      final productId = await createProduct(productService, categoryService);
-      final adminUser =
-          (await UserRepository().getByUsername('admin'))!;
+      final confirmedSale =
+          await salesService.getSaleById(pendingSale.id!);
+      expect(confirmedSale!.paymentStatus, 'confirmed');
+      expect(confirmedSale.verifiedBy, owner.id);
+      expect(confirmedSale.verifiedAt, isNotNull);
 
-      SessionManager.resetForTest();
-      await login('staff', 'staff123');
-
-      expect(
-        () => salesService.createSale(
-          items: [
-            SaleItem(
-              productId: productId,
-              quantity: 1,
-              unitPrice: 50.0,
-              totalPrice: 50.0,
-            ),
-          ],
-          totalAmount: 50.0,
-          paymentMethod: 'GCash',
-          referenceNumber: 'GCASH-ADMIN-VERIFIED',
-          verifiedByUserId: adminUser.id,
-        ),
-        throwsA(isA<PaymentValidationException>()),
-      );
-      expect(await salesService.getSales(), isEmpty);
-    });
-
-    test('admin cannot verify when the policy is Owner only', () async {
-      await login('owner', 'owner123');
-      final productService = ProductService();
-      final categoryService = CategoryService();
-      final salesService = SalesService();
-      final settingsService = SettingsService();
-
-      final currentSettings = await settingsService.getSettings();
-      await settingsService.updateSettings(
-        currentSettings.copyWith(gcashVerificationMode: 'owner'),
-      );
-
-      final productId = await createProduct(productService, categoryService);
-      final adminUser =
-          (await UserRepository().getByUsername('admin'))!;
-
-      SessionManager.resetForTest();
-      await login('staff', 'staff123');
-
-      expect(
-        () => salesService.createSale(
-          items: [
-            SaleItem(
-              productId: productId,
-              quantity: 1,
-              unitPrice: 50.0,
-              totalPrice: 50.0,
-            ),
-          ],
-          totalAmount: 50.0,
-          paymentMethod: 'GCash',
-          referenceNumber: 'GCASH-ADMIN-OWNERONLY',
-          verifiedByUserId: adminUser.id,
-        ),
-        throwsA(isA<PaymentValidationException>()),
-      );
-    });
-
-    test('authenticateVerifier accepts an authorized verifier and rejects '
-        'others', () async {
-      await login('owner', 'owner123');
-      final settingsService = SettingsService();
-      final verificationService = PaymentVerificationService();
-
-      final currentSettings = await settingsService.getSettings();
-      await settingsService.updateSettings(
-        currentSettings.copyWith(gcashVerificationMode: 'owner_admin'),
-      );
-      final paymentSettings =
-          await settingsService.getPaymentSettings();
-
-      // The operator is Staff; verifiers approve the staff sale at the till.
-      SessionManager.resetForTest();
-      await login('staff', 'staff123');
-
-      // Owner credentials authenticate as a verifier.
-      final ownerResult = await verificationService.authenticateVerifier(
-        username: 'owner',
-        password: 'owner123',
-        settings: paymentSettings,
-      );
-      expect(ownerResult.isSuccess, isTrue);
-
-      // Admin credentials are never valid for verification, regardless of
-      // the configured verification mode.
-      final adminResult = await verificationService.authenticateVerifier(
-        username: 'admin',
-        password: 'admin123',
-        settings: paymentSettings,
-      );
-      expect(adminResult.isSuccess, isFalse);
-
-      // Wrong password is rejected without revealing which part failed.
-      final badPassword = await verificationService.authenticateVerifier(
-        username: 'owner',
-        password: 'wrong-password',
-        settings: paymentSettings,
-      );
-      expect(badPassword.isSuccess, isFalse);
-
-      // Staff credentials are valid login credentials but not a verifier —
-      // and the operator can never verify their own sale.
-      final staffResult = await verificationService.authenticateVerifier(
-        username: 'staff',
-        password: 'staff123',
-        settings: paymentSettings,
-      );
-      expect(staffResult.isSuccess, isFalse);
+      // Confirmation must not deduct stock again.
+      final productAfterConfirm =
+          (await productService.getProductById(productId))!;
+      expect(productAfterConfirm.stock, productBefore.stock - 2);
     });
 
     test('owner can confirm a pending GCash sale', () async {

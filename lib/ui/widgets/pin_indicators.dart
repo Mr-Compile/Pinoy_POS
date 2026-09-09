@@ -40,15 +40,11 @@ class PinIndicators extends StatelessWidget {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             curve: Curves.easeOut,
-            width: 16,
-            height: 16,
+            width: 14,
+            height: 14,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: isFilled ? filledColor : Colors.transparent,
-              border: Border.all(
-                color: isFilled ? filledColor : emptyColor,
-                width: 2,
-              ),
+              color: isFilled ? filledColor : emptyColor,
             ),
           ),
         );

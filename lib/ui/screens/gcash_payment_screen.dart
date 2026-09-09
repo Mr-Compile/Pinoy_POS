@@ -8,13 +8,13 @@ import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/payment_validation_exception.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/core/spacing.dart';
+import 'package:pinoy_pos/data/models/decoded_payment_qr.dart';
 import 'package:pinoy_pos/data/models/payment_settings.dart';
 import 'package:pinoy_pos/providers/cart_provider.dart';
 import 'package:pinoy_pos/providers/catalog_provider.dart';
 import 'package:pinoy_pos/providers/payment_settings_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/services/image_service.dart';
-import 'package:pinoy_pos/ui/dialogs/gcash_verification_dialog.dart';
 import 'package:pinoy_pos/ui/screens/payment_settings_page.dart';
 import 'package:pinoy_pos/ui/screens/payment_success_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
@@ -161,38 +161,6 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
 
     setState(() => _isProcessing = true);
 
-    // Enforce the verification policy before any sale is written. When the
-    // operator (e.g. Staff) requires verification, an authorized verifier
-    // must approve the payment at the till. The Owner's own sales are
-    // exempt. Cancelling the dialog leaves the cart intact and creates no
-    // sale.
-    int? verifiedByUserId;
-    final verificationService = ref.read(paymentVerificationServiceProvider);
-    final operator = SessionManager().currentUser;
-    final needsVerification = verificationService.requiresVerificationFor(
-      operatorRole: operator?.role,
-      paymentMethod: 'GCash',
-      settings: settings,
-    );
-
-    if (needsVerification) {
-      final result = await showGcashVerificationDialog(
-        context,
-        total: widget.total,
-        operatorName: operator?.fullName ?? 'Staff',
-        settings: settings,
-      );
-
-      if (!mounted) return;
-      if (result == null || !result.isSaved || result.value == null) {
-        // Verification was cancelled — abort the sale. The cart, form and
-        // attached proof remain untouched so the operator can retry.
-        setState(() => _isProcessing = false);
-        return;
-      }
-      verifiedByUserId = result.value!.id;
-    }
-
     try {
       final items = ref.read(cartProvider.notifier).toSaleItems();
       final success = await ref
@@ -207,7 +175,6 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
             paymentProofPath: _paymentProofPath,
             paymentProofType: _paymentProofType,
             notes: null,
-            verifiedByUserId: verifiedByUserId,
           );
 
       if (!mounted) return;
@@ -355,15 +322,18 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
   /// Portrait phone layout: one vertical column following the payment
   /// hierarchy exactly.
   ///
-  /// Header → Amount → Scan to Pay / QR → Instructions → Customer / Reference
-  /// → Proof (if enabled) → Order Summary → Review Payment.
+  /// Header → Amount → Scan to Pay / QR → Instructions → QR/merchant details
+  /// → Customer / Reference → Proof (if enabled) → Order Summary
+  /// → Review Payment.
   Widget _buildCompactDetailsBody(PaymentSettings settings, ColorScheme cs) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _buildTotalCard(cs),
         const SizedBox(height: Spacing.lg),
-        _buildMerchantQrSection(settings, cs),
+        _buildQrCard(settings, cs),
+        _buildConfigureQrButton(settings, cs),
+        _buildQrDetailsCard(settings, cs),
         const SizedBox(height: Spacing.xl),
         _buildCustomerInfoSection(settings, cs),
         const SizedBox(height: Spacing.xl),
@@ -382,9 +352,9 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
     );
   }
 
-  /// Tablet / desktop layout: payment context on the left, required inputs and
-  /// confirmation on the right. The hierarchy is preserved; the columns only
-  /// make better use of available width.
+  /// Tablet / desktop layout: the QR dominates the left column while the
+  /// right column carries amount, decoded payment details, required inputs,
+  /// order summary and the primary action.
   Widget _buildWideDetailsBody(PaymentSettings settings, ColorScheme cs) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -393,9 +363,8 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildTotalCard(cs),
-              const SizedBox(height: Spacing.lg),
-              _buildMerchantQrSection(settings, cs),
+              _buildQrCard(settings, cs),
+              _buildConfigureQrButton(settings, cs),
             ],
           ),
         ),
@@ -404,6 +373,9 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              _buildTotalCard(cs),
+              _buildQrDetailsCard(settings, cs),
+              const SizedBox(height: Spacing.xl),
               _buildCustomerInfoSection(settings, cs),
               const SizedBox(height: Spacing.xl),
               _buildOrderSummary(cs, maxVisibleItems: 5, compact: false),
@@ -486,126 +458,233 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
     );
   }
 
-  /// QR code section: merchant QR, scan instructions, and merchant identity
-  /// grouped into a single card so the amount → QR → instructions flow reads
-  /// as one payment context.
+  /// QR code card: header, live decode status, the merchant QR itself and
+  /// the scan instruction.
   ///
-  /// The QR is displayed as a single, clearly bounded, tappable square. It is
-  /// the merchant's static QR from Payment Settings; it is *not* regenerated
-  /// with customer name or amount data.
-  Widget _buildMerchantQrSection(PaymentSettings settings, ColorScheme cs) {
+  /// The QR is displayed as a single, clearly bounded, tappable square sized
+  /// from the available width so it stays the dominant element on phones
+  /// without being stretched or cropped. It is the merchant's static QR from
+  /// Payment Settings; it is *not* regenerated with customer or amount data.
+  Widget _buildQrCard(PaymentSettings settings, ColorScheme cs) {
     final qrPath = settings.gcashQrImagePath;
     final previewPath = settings.gcashQrPreviewPath;
     final displayPath = previewPath?.isNotEmpty == true ? previewPath : qrPath;
     final hasImage = displayPath != null && displayPath.isNotEmpty;
     final canConfigure = SessionManager().canEditBusinessSettings();
+    final decodeAsync = qrPath != null && qrPath.isNotEmpty
+        ? ref.watch(paymentQrDecodeProvider(qrPath))
+        : null;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        AppCard(
-          child: Padding(
-            padding: const EdgeInsets.all(Spacing.lg),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+    return AppCard(
+      child: Padding(
+        padding: const EdgeInsets.all(Spacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
               children: [
-                Row(
-                  children: [
-                    Icon(Icons.qr_code_scanner, color: cs.primary, size: 20),
-                    const SizedBox(width: Spacing.sm),
-                    Expanded(
-                      child: Text(
-                        'Scan to Pay',
-                        style: AppTypography.titleSmallBold(context),
-                      ),
-                    ),
-                    _buildQrBadge(cs),
-                  ],
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: cs.primaryContainer,
+                    borderRadius: BorderRadius.circular(AppRadius.control),
+                  ),
+                  child: Icon(
+                    Icons.qr_code_scanner,
+                    color: cs.primary,
+                    size: 18,
+                  ),
                 ),
-                const SizedBox(height: Spacing.md),
-                if (hasImage) ...[
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      final isCompact =
-                          layoutClassFor(constraints.maxWidth).isCompact;
-                      final maxDimension = isCompact ? 220.0 : 280.0;
-                      final qrSize =
-                          (constraints.maxWidth * (isCompact ? 0.55 : 0.5))
-                              .clamp(180.0, maxDimension);
-
-                      return Center(
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(maxWidth: qrSize),
-                          child: AppPaymentQrPreview(
-                            imagePath: displayPath,
-                            onTap: () => _openQrViewer(displayPath),
-                            maxHeight: qrSize,
-                            embedded: true,
-                          ),
-                        ),
-                      );
-                    },
+                const SizedBox(width: Spacing.sm),
+                Expanded(
+                  child: Text(
+                    'Scan to Pay',
+                    style: AppTypography.titleSmallBold(context),
                   ),
-                  const SizedBox(height: Spacing.sm),
-                  Text(
-                    'Open GCash and scan this QR code.',
-                    style: AppTypography.bodySmall(
-                      context,
-                    ).copyWith(color: cs.onSurfaceVariant),
-                    textAlign: TextAlign.center,
-                  ),
-                  _buildMerchantInfoRow(settings, cs),
-                ] else ...[
-                  _buildMissingQrState(cs, canConfigure),
-                ],
+                ),
+                if (hasImage) _buildQrStatusChip(cs, decodeAsync),
               ],
             ),
-          ),
+            const SizedBox(height: Spacing.md),
+            if (hasImage) ...[
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  // Fill most of the available width while keeping generous
+                  // quiet-zone margins. 220–300 px covers small and large
+                  // phones; the 320 px cap keeps tablet/desktop columns sane.
+                  final qrSize =
+                      (constraints.maxWidth * 0.78).clamp(220.0, 320.0);
+
+                  return Center(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: qrSize),
+                      child: AppPaymentQrPreview(
+                        imagePath: displayPath,
+                        onTap: () => _openQrViewer(displayPath),
+                        maxHeight: qrSize,
+                        embedded: true,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: Spacing.sm),
+              Text(
+                'Open GCash and scan this QR code to complete the payment.',
+                style: AppTypography.bodySmall(
+                  context,
+                ).copyWith(color: cs.onSurfaceVariant),
+                textAlign: TextAlign.center,
+              ),
+            ] else ...[
+              _buildMissingQrState(cs, canConfigure),
+            ],
+          ],
         ),
-        if (!hasImage && canConfigure) ...[
-          const SizedBox(height: Spacing.md),
-          AppButton.outlined(
-            fullWidth: true,
-            icon: Icons.settings_outlined,
-            label: 'Configure GCash QR',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const PaymentSettingsPage(),
-                ),
-              );
-            },
-          ),
-        ],
-      ],
+      ),
     );
   }
 
-  /// Small "QR Payment" badge shown on the right of the Scan to Pay header,
-  /// matching the payment-method badge used by modern payment sheets.
-  Widget _buildQrBadge(ColorScheme cs) {
+  /// Owner-only shortcut that appears when no QR is configured.
+  Widget _buildConfigureQrButton(PaymentSettings settings, ColorScheme cs) {
+    final qrPath = settings.gcashQrImagePath;
+    final previewPath = settings.gcashQrPreviewPath;
+    final hasImage = (previewPath?.isNotEmpty == true) ||
+        (qrPath != null && qrPath.isNotEmpty);
+    if (hasImage || !SessionManager().canEditBusinessSettings()) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: Spacing.md),
+      child: AppButton.outlined(
+        fullWidth: true,
+        icon: Icons.settings_outlined,
+        label: 'Configure GCash QR',
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const PaymentSettingsPage(),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// Live decode-status chip shown next to the Scan to Pay header.
+  ///
+  /// Reports exactly what happened to the QR image: decoding in progress,
+  /// recognized payment QR, decoded-but-unidentified payload, or an
+  /// unreadable image. Colors come from the semantic palette so the states
+  /// read correctly in both light and dark mode.
+  Widget _buildQrStatusChip(
+    ColorScheme cs,
+    AsyncValue<DecodedPaymentQr>? decodeAsync,
+  ) {
+    final brightness = Theme.of(context).brightness;
+
+    if (decodeAsync == null || decodeAsync.isLoading) {
+      return _statusChip(
+        cs,
+        icon: null,
+        label: 'Reading QR…',
+        background: cs.surfaceContainerHighest,
+        foreground: cs.onSurfaceVariant,
+        showSpinner: true,
+      );
+    }
+
+    final decoded = decodeAsync.value;
+    final status = decoded?.status ?? PaymentQrDecodeStatus.unreadable;
+    final hasDetails = decoded?.hasAnyDetails ?? false;
+
+    return switch (status) {
+      PaymentQrDecodeStatus.recognized when hasDetails => _statusChip(
+          cs,
+          icon: Icons.verified_outlined,
+          label: 'Merchant details detected',
+          background: AppSemanticColors.resolve(
+            AppSemanticColors.successContainer,
+            brightness,
+          ),
+          foreground: AppSemanticColors.resolve(
+            AppSemanticColors.onSuccessContainer,
+            brightness,
+          ),
+        ),
+      PaymentQrDecodeStatus.recognized => _statusChip(
+          cs,
+          icon: Icons.check_circle_outline,
+          label: 'Payment QR recognized',
+          background: AppSemanticColors.resolve(
+            AppSemanticColors.successContainer,
+            brightness,
+          ),
+          foreground: AppSemanticColors.resolve(
+            AppSemanticColors.onSuccessContainer,
+            brightness,
+          ),
+        ),
+      PaymentQrDecodeStatus.decodedUnparsed => _statusChip(
+          cs,
+          icon: Icons.qr_code,
+          label: 'QR detected — details unavailable',
+          background: cs.surfaceContainerHighest,
+          foreground: cs.onSurfaceVariant,
+        ),
+      _ => _statusChip(
+          cs,
+          icon: Icons.warning_amber_rounded,
+          label: 'Unable to read QR code',
+          background: AppSemanticColors.resolve(
+            AppSemanticColors.warningContainer,
+            brightness,
+          ),
+          foreground: AppSemanticColors.resolve(
+            AppSemanticColors.onWarningContainer,
+            brightness,
+          ),
+        ),
+    };
+  }
+
+  Widget _statusChip(
+    ColorScheme cs, {
+    required IconData? icon,
+    required String label,
+    required Color background,
+    required Color foreground,
+    bool showSpinner = false,
+  }) {
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: Spacing.sm,
         vertical: Spacing.xs,
       ),
       decoration: BoxDecoration(
-        color: cs.secondaryContainer,
+        color: background,
         borderRadius: BorderRadius.circular(AppRadius.chip),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.verified_outlined,
-            size: 14,
-            color: cs.onSecondaryContainer,
-          ),
+          if (showSpinner)
+            SizedBox(
+              width: 12,
+              height: 12,
+              child: CircularProgressIndicator(
+                strokeWidth: 1.5,
+                color: foreground,
+              ),
+            )
+          else if (icon != null)
+            Icon(icon, size: 14, color: foreground),
           const SizedBox(width: Spacing.xs),
           Text(
-            'QR Payment',
+            label,
             style: AppTypography.labelSmall(context).copyWith(
-              color: cs.onSecondaryContainer,
+              color: foreground,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -653,49 +732,195 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
     );
   }
 
-  /// Compact merchant identity shown under the QR, separated by a divider.
+  /// Payment details decoded from the QR payload (merchant name, mobile,
+  /// network, encoded amount), with the configured store identity as a
+  /// fallback when the QR does not encode merchant data.
   ///
-  /// This keeps the merchant visible without consuming the vertical space of
-  /// a standalone card and without duplicating information elsewhere.
-  Widget _buildMerchantInfoRow(PaymentSettings settings, ColorScheme cs) {
-    final storeName = settings.storeName;
-    final storePhone = settings.storePhone;
+  /// Only fields that actually exist are rendered — nothing is fabricated.
+  /// QR-decoded values are marked "Detected from QR" so the cashier can tell
+  /// them apart from configured store data and manually entered input.
+  Widget _buildQrDetailsCard(PaymentSettings settings, ColorScheme cs) {
+    final qrPath = settings.gcashQrImagePath;
+    if (qrPath == null || qrPath.isEmpty) return const SizedBox.shrink();
 
-    if (storeName.isEmpty && storePhone.isEmpty) {
-      return const SizedBox.shrink();
-    }
+    final decodeAsync = ref.watch(paymentQrDecodeProvider(qrPath));
+    // While decoding, the "Reading QR…" chip on the QR card already
+    // communicates progress; keep the rest of the layout stable.
+    if (decodeAsync.isLoading) return const SizedBox.shrink();
 
-    final label = [
-      if (storeName.isNotEmpty) storeName,
-      if (storePhone.isNotEmpty) storePhone,
-    ].join(' · ');
+    final decoded = decodeAsync.value;
+    final fromQr =
+        decoded?.detectionSource == PaymentQrDetectionSource.qrPayload;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const SizedBox(height: Spacing.md),
-        Divider(height: 1, color: cs.outlineVariant),
-        const SizedBox(height: Spacing.md),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+    final merchantName =
+        fromQr ? decoded!.merchantName : null;
+    final mobile = fromQr ? decoded!.mobileNumber : null;
+    final account = fromQr ? decoded!.accountIdentifier : null;
+    final network = fromQr ? decoded!.paymentNetwork : null;
+    final qrAmount = fromQr ? decoded!.amount : null;
+    final qrCurrency = fromQr ? decoded!.currencyCode : null;
+    final qrReference = fromQr ? decoded!.qrReference : null;
+
+    // Configured store identity is real data, not fabricated QR data — it
+    // fills in only when the payload provides nothing for that field.
+    final merchant = merchantName ??
+        (settings.storeName.isNotEmpty ? settings.storeName : null);
+    final phone =
+        mobile ?? (settings.storePhone.isNotEmpty ? settings.storePhone : null);
+    final showAccount = account != null && mobile == null;
+
+    final amountMismatch = qrAmount != null &&
+        (qrAmount - widget.total).abs() > 0.005;
+
+    final hasAnyRow = merchant != null ||
+        phone != null ||
+        showAccount ||
+        network != null ||
+        qrAmount != null ||
+        qrReference != null;
+    if (!hasAnyRow && !amountMismatch) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: Spacing.lg),
+      child: AppCard(
+        variant: AppCardVariant.filled,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(
-              Icons.storefront_outlined,
-              color: cs.primary,
-              size: 18,
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: cs.primaryContainer,
+                    borderRadius: BorderRadius.circular(AppRadius.control),
+                  ),
+                  child: Icon(
+                    Icons.storefront_outlined,
+                    color: cs.primary,
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: Spacing.sm),
+                Expanded(
+                  child: Text(
+                    'Payment Details',
+                    style: AppTypography.titleSmallBold(context),
+                  ),
+                ),
+                if (fromQr && decoded!.hasMerchantInfo)
+                  Text(
+                    'Detected from QR',
+                    style: AppTypography.labelSmall(context).copyWith(
+                      color: cs.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+              ],
             ),
-            const SizedBox(width: Spacing.xs),
-            Flexible(
-              child: Text(
-                label,
-                style: AppTypography.bodySmallSemibold(context),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
+            const SizedBox(height: Spacing.sm),
+            if (merchant != null)
+              _buildDetailRow(cs, label: 'Merchant', value: merchant),
+            if (phone != null)
+              _buildDetailRow(cs, label: 'Mobile', value: phone),
+            if (showAccount)
+              _buildDetailRow(cs, label: 'Account', value: account),
+            if (network != null)
+              _buildDetailRow(cs, label: 'Network', value: network),
+            if (qrAmount != null)
+              _buildDetailRow(
+                cs,
+                label: 'Amount in QR',
+                value: CurrencyUtils.format(
+                  qrAmount,
+                  currency: qrCurrency,
+                ),
               ),
-            ),
+            if (qrReference != null)
+              _buildDetailRow(cs, label: 'QR Reference', value: qrReference),
+            if (amountMismatch) ...[
+              const SizedBox(height: Spacing.sm),
+              _buildAmountMismatchNote(cs, qrAmount, qrCurrency),
+            ],
           ],
         ),
-      ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(
+    ColorScheme cs, {
+    required String label,
+    required String value,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: Spacing.xs),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: AppTypography.bodySmall(
+                context,
+              ).copyWith(color: cs.onSurfaceVariant),
+            ),
+          ),
+          const SizedBox(width: Spacing.md),
+          Expanded(
+            flex: 2,
+            child: Text(
+              value,
+              style: AppTypography.bodySmallSemibold(context),
+              textAlign: TextAlign.right,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Warning shown when the amount encoded in a fixed-amount QR does not
+  /// match the POS transaction total. The POS total stays authoritative.
+  Widget _buildAmountMismatchNote(
+    ColorScheme cs,
+    double qrAmount,
+    String? currency,
+  ) {
+    final brightness = Theme.of(context).brightness;
+    final background = AppSemanticColors.resolve(
+      AppSemanticColors.warningContainer,
+      brightness,
+    );
+    final foreground = AppSemanticColors.resolve(
+      AppSemanticColors.onWarningContainer,
+      brightness,
+    );
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(Spacing.md),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(AppRadius.control),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.warning_amber_rounded, size: 18, color: foreground),
+          const SizedBox(width: Spacing.sm),
+          Expanded(
+            child: Text(
+              'This QR requests ${CurrencyUtils.format(qrAmount, currency: currency)} '
+              'but the sale total is ${CurrencyUtils.format(widget.total)}. '
+              'Ask the customer to pay the total shown above.',
+              style: AppTypography.bodySmall(context).copyWith(
+                color: foreground,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -713,45 +938,77 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
 
   /// Customer / payment information: customer name, reference number, and
   /// optional payment proof. Validation is driven by Payment Settings.
+  ///
+  /// The decoded QR data is intentionally NOT copied into these fields: the
+  /// merchant QR identifies the payee (the store), never the customer. See
+  /// [_buildQrDetailsCard] for the auto-detected merchant details.
   Widget _buildCustomerInfoSection(PaymentSettings settings, ColorScheme cs) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'Customer / Payment Information',
-          style: AppTypography.titleSmallBold(context),
-        ),
-        const SizedBox(height: Spacing.md),
-        if (settings.customerNameVisible) ...[
-          AppTextFormField(
-            controller: _customerController,
-            label: _customerNameLabel(settings),
-            prefixIcon: Icons.person_outline,
-            helperText: settings.customerNameRequired
-                ? 'A customer name is required to complete this payment.'
-                : 'Optional customer name for this transaction.',
-            textCapitalization: TextCapitalization.words,
-            textInputAction: TextInputAction.next,
-            validator: (value) => _validateCustomer(settings, value),
+        AppCard(
+          variant: AppCardVariant.filled,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: cs.primaryContainer,
+                      borderRadius: BorderRadius.circular(AppRadius.control),
+                    ),
+                    child: Icon(
+                      Icons.person_outline,
+                      color: cs.primary,
+                      size: 18,
+                    ),
+                  ),
+                  const SizedBox(width: Spacing.sm),
+                  Text(
+                    'Customer / Payment Information',
+                    style: AppTypography.titleSmallBold(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: Spacing.md),
+              if (settings.customerNameVisible) ...[
+                AppTextFormField(
+                  controller: _customerController,
+                  label: _customerNameLabel(settings),
+                  prefixIcon: Icons.person_outline,
+                  helperText: settings.customerNameRequired
+                      ? 'A customer name is required to complete this payment.'
+                      : 'Optional customer name for this transaction.',
+                  textCapitalization: TextCapitalization.words,
+                  textInputAction: TextInputAction.next,
+                  validator: (value) => _validateCustomer(settings, value),
+                ),
+                const SizedBox(height: Spacing.lg),
+              ],
+              AppTextFormField(
+                controller: _referenceController,
+                label: settings.gcashReferenceRequired
+                    ? 'GCash Reference Number *'
+                    : 'GCash Reference Number',
+                prefixIcon: Icons.numbers,
+                helperText:
+                    'Enter the reference number shown after completing the GCash payment.',
+                textCapitalization: TextCapitalization.characters,
+                textInputAction: TextInputAction.done,
+                validator: (value) => _validateReference(settings, value),
+                onFieldSubmitted: (_) => _goToReview(settings),
+              ),
+            ],
           ),
-          const SizedBox(height: Spacing.lg),
-        ],
-        AppTextFormField(
-          controller: _referenceController,
-          label: settings.gcashReferenceRequired
-              ? 'GCash Reference Number *'
-              : 'GCash Reference Number',
-          prefixIcon: Icons.numbers,
-          helperText:
-              'Enter the reference number shown after completing the GCash payment.',
-          textCapitalization: TextCapitalization.characters,
-          textInputAction: TextInputAction.done,
-          validator: (value) => _validateReference(settings, value),
-          onFieldSubmitted: (_) => _goToReview(settings),
         ),
         if (settings.paymentProofVisible) ...[
-          const SizedBox(height: Spacing.lg),
-          _buildProofPicker(settings, cs),
+          const SizedBox(height: Spacing.xl),
+          AppCard(
+            variant: AppCardVariant.filled,
+            child: _buildProofPicker(settings, cs),
+          ),
         ],
       ],
     );
@@ -784,9 +1041,26 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Order Summary',
-                  style: AppTypography.titleSmallBold(context),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: cs.primaryContainer,
+                        borderRadius: BorderRadius.circular(AppRadius.control),
+                      ),
+                      child: Icon(
+                        Icons.receipt_long_outlined,
+                        color: cs.primary,
+                        size: 18,
+                      ),
+                    ),
+                    const SizedBox(width: Spacing.sm),
+                    Text(
+                      'Order Summary',
+                      style: AppTypography.titleSmallBold(context),
+                    ),
+                  ],
                 ),
                 Text(
                   '${cart.itemCount} item${cart.itemCount == 1 ? '' : 's'}',
@@ -841,13 +1115,37 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
 
   Widget _buildProofPicker(PaymentSettings settings, ColorScheme cs) {
     final proofPath = _paymentProofPath;
+    final brightness = Theme.of(context).brightness;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Payment Proof',
-          style: AppTypography.titleSmallBold(context),
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppSemanticColors.resolve(
+                  AppSemanticColors.infoContainer,
+                  brightness,
+                ),
+                borderRadius: BorderRadius.circular(AppRadius.control),
+              ),
+              child: Icon(
+                Icons.photo_camera_outlined,
+                color: AppSemanticColors.resolve(
+                  AppSemanticColors.info,
+                  brightness,
+                ),
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: Spacing.sm),
+            Text(
+              'Payment Proof',
+              style: AppTypography.titleSmallBold(context),
+            ),
+          ],
         ),
         const SizedBox(height: Spacing.sm),
         Text(
@@ -1085,9 +1383,26 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Payment Details',
-              style: AppTypography.titleSmallBold(context),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: cs.primaryContainer,
+                    borderRadius: BorderRadius.circular(AppRadius.control),
+                  ),
+                  child: Icon(
+                    Icons.receipt_long_outlined,
+                    color: cs.primary,
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: Spacing.sm),
+                Text(
+                  'Payment Details',
+                  style: AppTypography.titleSmallBold(context),
+                ),
+              ],
             ),
             const SizedBox(height: Spacing.md),
             _buildReviewRow(

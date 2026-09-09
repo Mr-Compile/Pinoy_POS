@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinoy POS — Interactive CRUD Dialog Mockups</title>
+<style>
+  :root[data-theme="dark"] {
+    --bg: #070D19;
+    --surface: #121C31;
+    --surface-elev: #152348;
+    --border: #263A63;
+    --divider: #1A2445;
+    --text: #F1F4F7;
+    --text-2: #B8C5E0;
+    --text-3: #8C9AB8;
+    --primary: #4B82E9;
+    --primary-strong: #2C68D7;
+    --page-bg: #0B1220;
+    --appbar: #1B4CAF;
+  }
+  :root[data-theme="light"] {
+    --bg: #F5F8FC;
+    --surface: #FFFFFF;
+    --surface-elev: #EEF4FF;
+    --border: #D7E0EE;
+    --divider: #E7ECF4;
+    --text: #172033;
+    --text-2: #52627A;
+    --text-3: #8A9AB3;
+    --primary: #2563C7;
+    --primary-strong: #1B4CAF;
+    --page-bg: #E8EDF5;
+    --appbar: #2563C7;
+  }
+  :root {
+    --success: #16A34A;
+    --warning: #D97706;
+    --error: #DC2626;
+    --info: #4B82E9;
+    --purple: #8B5CF6;
+    --pink: #EC4899;
+    --teal: #06B6D4;
+    --amber: #F59E0B;
+    --radius-card: 18px;
+    --radius-icon: 11px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', 'Inter', system-ui, sans-serif; }
+  body { background: var(--page-bg); min-height: 100vh; padding: 32px 16px 64px; transition: background .3s; }
+
+  .page-head { max-width: 900px; margin: 0 auto 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .page-head h1 { color: var(--text); font-size: 22px; font-weight: 700; }
+  .page-head p { color: var(--text-3); font-size: 13px; margin-top: 4px; }
+  .theme-toggle { background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 24px; padding: 10px 20px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+  .theme-toggle:hover { border-color: var(--primary); }
+
+  .hint { max-width: 900px; margin: 0 auto 20px; color: var(--text-3); font-size: 13px; line-height: 1.5; }
+
+  .wrap { display: flex; justify-content: center; }
+
+  /* Module selector */
+  .module-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; max-width: 900px; width: 100%; margin: 0 auto 28px; }
+  .module-tile { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 14px 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; cursor: pointer; transition: transform .08s, border-color .15s; }
+  .module-tile:hover { border-color: var(--primary); transform: translateY(-1px); }
+  .module-tile.on { border-color: var(--primary); background: var(--surface-elev); }
+  .module-tile .title { font-size: 12.5px; font-weight: 700; color: var(--text); text-align: center; }
+
+  /* Phone frame */
+  .phone { width: 380px; background: var(--bg); border-radius: 36px; border: 1px solid var(--border); overflow: hidden; box-shadow: 0 24px 64px rgba(0,0,0,.35); display: flex; flex-direction: column; position: relative; height: 680px; }
+  .statusbar { height: 30px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; color: var(--text-2); font-size: 12px; font-weight: 600; flex-shrink: 0; }
+  .statusbar .icons { display: flex; gap: 5px; align-items: center; }
+  .statusbar .icons svg { width: 13px; height: 13px; fill: var(--text-2); }
+
+  .appbar { background: var(--appbar); padding: 14px 16px 16px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .appbar .back { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .appbar .back svg { width: 21px; height: 21px; fill: #fff; }
+  .appbar .title { flex: 1; }
+  .appbar .title h2 { color: #fff; font-size: 20px; font-weight: 700; letter-spacing: .1px; }
+  .appbar .act { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .appbar .act svg { width: 19px; height: 19px; fill: #fff; }
+  .appbar .avatar { width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,.22); border: 1.5px solid rgba(255,255,255,.55); color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+
+  .screen-body { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 12px 10px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+  .stat .num { font-size: 19px; font-weight: 800; color: var(--text); line-height: 1; }
+  .stat .lbl { font-size: 10.5px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: .4px; }
+
+  .toolbar { display: flex; gap: 8px; }
+  .search { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; display: flex; align-items: center; gap: 8px; color: var(--text-3); font-size: 13px; }
+  .search svg { width: 16px; height: 16px; fill: var(--text-3); }
+  .filterbtn { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 0 12px; display: flex; align-items: center; gap: 6px; color: var(--text-2); font-size: 12.5px; font-weight: 600; }
+  .filterbtn svg { width: 15px; height: 15px; fill: var(--text-2); }
+
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { padding: 7px 14px; border-radius: 20px; font-size: 12.5px; font-weight: 600; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); cursor: pointer; }
+  .chip.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 14px; }
+  .card-head { display: flex; align-items: center; gap: 9px; margin-bottom: 4px; }
+  .card-head h3 { flex: 1; font-size: 14.5px; font-weight: 700; color: var(--text); }
+
+  .pill { font-size: 10.5px; font-weight: 700; padding: 4px 10px; border-radius: 20px; white-space: nowrap; }
+  .pill-blue   { background: rgba(75,130,233,.16); color: var(--info); }
+  .pill-green  { background: rgba(22,163,74,.16);  color: var(--success); }
+  .pill-amber  { background: rgba(217,119,6,.16);  color: var(--warning); }
+  .pill-red    { background: rgba(220,38,38,.16);  color: var(--error); }
+  .pill-grey   { background: rgba(140,154,184,.18); color: var(--text-3); }
+  .pill-solid-green { background: var(--success); color: #fff; }
+  .pill-solid-amber { background: var(--warning); color: #fff; }
+  .pill-solid-blue  { background: var(--info);    color: #fff; }
+
+  .row { display: flex; align-items: center; gap: 12px; padding: 12px 0; }
+  .row + .row { border-top: 1px solid var(--divider); }
+  .row .grow { flex: 1; min-width: 0; }
+  .row .name { font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .sub { font-size: 12px; color: var(--text-3); margin-top: 3px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .row .price { font-size: 15px; font-weight: 800; color: var(--primary); white-space: nowrap; }
+  .row .rowactions { display: flex; gap: 4px; }
+  .row .rowactions .aicon { width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .row .rowactions svg { width: 15px; height: 15px; fill: var(--text-3); }
+  .row .rowactions .aicon.del svg { fill: var(--error); }
+  .row .rowactions .aicon:hover { background: var(--surface-elev); }
+
+  .thumb { width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 24px; border: 1px solid var(--border); background: var(--surface-elev); }
+  .thumb.letter { color: var(--text); font-size: 16px; font-weight: 800; }
+
+  .icircle { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .icircle svg { width: 20px; height: 20px; }
+  .icircle.sm { width: 30px; height: 30px; }
+  .icircle.sm svg { width: 14px; height: 14px; }
+  .isquare { width: 38px; height: 38px; border-radius: var(--radius-icon); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .isquare svg { width: 19px; height: 19px; }
+  .isquare.lg { width: 46px; height: 46px; border-radius: 13px; }
+  .isquare.lg svg { width: 23px; height: 23px; }
+
+  .c-blue    { background: rgba(75,130,233,.16); } .c-blue svg    { fill: var(--info); }
+  .c-green   { background: rgba(22,163,74,.16); }  .c-green svg   { fill: var(--success); }
+  .c-amber   { background: rgba(217,119,6,.16); }  .c-amber svg   { fill: var(--warning); }
+  .c-red     { background: rgba(220,38,38,.16); }  .c-red svg     { fill: var(--error); }
+  .c-purple  { background: rgba(139,92,246,.16); } .c-purple svg  { fill: var(--purple); }
+  .c-pink    { background: rgba(236,72,153,.16); } .c-pink svg    { fill: var(--pink); }
+  .c-teal    { background: rgba(6,182,212,.16); }  .c-teal svg    { fill: var(--teal); }
+  .c-orange  { background: rgba(245,158,11,.16); } .c-orange svg  { fill: var(--amber); }
+  .c-grey    { background: rgba(140,154,184,.18); } .c-grey svg   { fill: var(--text-3); }
+
+  .solid-blue   { background: var(--primary); }
+  .solid-green  { background: var(--success); }
+  .solid-amber  { background: var(--warning); }
+  .solid-red    { background: var(--error); }
+  .solid-purple { background: var(--purple); }
+  .solid-pink   { background: var(--pink); }
+  .solid-teal   { background: var(--teal); }
+  .solid-orange { background: var(--amber); }
+  .solid-grey   { background: #64748B; }
+
+  .fabzone { display: flex; justify-content: flex-end; padding-right: 4px; margin-top: auto; }
+  .fab { display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #2C68D7, #2563C7); color: #fff; font-size: 13.5px; font-weight: 700; padding: 13px 20px; border-radius: 16px; box-shadow: 0 8px 20px rgba(44,104,215,.4); cursor: pointer; }
+  .fab.danger { background: var(--surface); border: 1px solid rgba(220,38,38,.5); color: var(--error); box-shadow: none; }
+  .fab svg { width: 16px; height: 16px; fill: #fff; }
+  .fab.danger svg { fill: var(--error); }
+
+  .btn { padding: 12px; border-radius: 12px; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; border: none; }
+  .btn svg { width: 16px; height: 16px; }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-outlined { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+  .btn-warn { background: var(--surface); border: 1px solid rgba(217,119,6,.5); color: var(--warning); }
+  .btn-error { background: var(--surface); border: 1px solid rgba(220,38,38,.5); color: var(--error); }
+
+  /* Forms */
+  .field { display: flex; flex-direction: column; gap: 6px; position: relative; }
+  .field + .field { margin-top: 14px; }
+  .field label { font-size: 12px; font-weight: 700; color: var(--text-2); }
+  .field-icon { position: absolute; left: 12px; width: 18px; height: 18px; fill: var(--text-3); pointer-events: none; }
+  .field-icon.input-icon { bottom: 12px; }
+  .field-icon.textarea-icon { top: 36px; }
+  .field.has-icon .input, .field.has-icon .select, .field.has-icon .textarea { padding-left: 38px; }
+  .input, .select, .textarea { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 11px 12px; color: var(--text); font-size: 13px; outline: none; }
+  .input::placeholder, .textarea::placeholder { color: var(--text-3); }
+  .select { cursor: pointer; }
+  .textarea { min-height: 80px; resize: vertical; font-family: inherit; }
+  .toggle { display: flex; align-items: center; gap: 10px; }
+  .toggle-switch { width: 44px; height: 24px; border-radius: 12px; background: var(--success); position: relative; cursor: pointer; }
+  .toggle-switch.off { background: var(--border); }
+  .toggle-switch::after { content: ''; position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+  .toggle-switch.off::after { right: auto; left: 2px; }
+
+  /* Dialog */
+  .dialog-overlay { position: absolute; inset: 0; top: 30px; background: rgba(0,0,0,.55); z-index: 50; display: none; align-items: center; justify-content: center; padding: 16px; }
+  .dialog-overlay.open { display: flex; }
+  .dialog { background: var(--surface); border: 1px solid var(--border); border-radius: 22px; width: 100%; max-width: 320px; max-height: 520px; overflow-y: auto; box-shadow: 0 24px 64px rgba(0,0,0,.45); display: flex; flex-direction: column; }
+  .dialog-header { padding: 20px 20px 12px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .dialog-header h3 { font-size: 18px; font-weight: 800; color: var(--text); }
+  .dialog-header p { font-size: 13px; color: var(--text-3); line-height: 1.4; }
+  .dialog-body { padding: 0 20px; }
+  .dialog-actions { padding: 16px 20px 20px; display: flex; gap: 10px; }
+  .dialog-actions .btn { flex: 1; }
+  .dialog-spinner { width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--border); border-top-color: var(--primary); animation: spin 0.9s linear infinite; }
+  .tile-spinner { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--border); border-top-color: var(--primary); animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M12 21l3.5-4.5c-.97-.74-2.18-1.16-3.5-1.16s-2.53.42-3.5 1.16L12 21zM12 3C7.31 3 3.07 4.69 0 7.55l1.93 2.43C4.48 7.9 8.01 6.4 12 6.4s7.52 1.5 10.07 3.58L24 7.55C20.93 4.69 16.69 3 12 3z"/></symbol>
+  <symbol id="i-batt" viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24"><path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></symbol>
+  <symbol id="i-delete" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></symbol>
+  <symbol id="i-restore" viewBox="0 0 24 24"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.78-4.95-2.05L6.95 17.3C8.55 18.9 10.62 19.9 13 19.9c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.25 2.55.75-1.23-3.5-2.07V8h-1.5z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 5.99 19.53 19H4.47L12 5.99M12 2 1 21h22L12 2zm1 14h-2v2h2v-2zm0-6h-2v4h2v-4z"/></symbol>
+  <symbol id="i-err" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="M20 2H4c-1 0-2 .9-2 2v3.01c0 .72.43 1.34 1 1.69V20c0 1.1 1.1 2 2 2h14c.9 0 2-.9 2-2V8.7c.57-.35 1-.97 1-1.69V4c0-1.1-1-2-2-2zm-5 12H9v-2h6v2zm5-7H4V4h16v3z"/></symbol>
+  <symbol id="i-tag" viewBox="0 0 24 24"><path d="m21.41 11.58-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58s1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41s-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/></symbol>
+  <symbol id="i-people" viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></symbol>
+  <symbol id="i-campaign" viewBox="0 0 24 24"><path d="M18 2H6c-1.1 0-2 .9-2 2v4c0 1.1.9 2 2 2h1v8c0 1.1.9 2 2 2h2c1.1 0 2-.9 2-2V10h5c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM4 11h2v2H4v-2z"/></symbol>
+  <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 13l-5-4H10l-5 4V5h14v11z"/></symbol>
+  <symbol id="i-ai" viewBox="0 0 24 24"><path d="M21 11h-2.5c-.55 0-1-.45-1-1s.45-1 1-1H21c.55 0 1 .45 1 1s-.45 1-1 1zM17.5 14.5c0-.55-.45-1-1-1s-1 .45-1 1 .45 1 1 1 1-.45 1-1zM14.5 7c0-.55-.45-1-1-1s-1 .45-1 1 .45 1 1 1 1-.45 1-1zM20.5 17.5c0-.55-.45-1-1-1s-1 .45-1 1 .45 1 1 1 1-.45 1-1zM12 13c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3zm0 4c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zM5.5 17.5c0-.55-.45-1-1-1s-1 .45-1 1 .45 1 1 1 1-.45 1-1zM9.5 7c0-.55-.45-1-1-1s-1 .45-1 1 .45 1 1 1 1-.45 1-1zM6.5 11H4c-.55 0-1 .45-1 1s.45 1 1 1h2.5c.55 0 1-.45 1-1s-.45-1-1-1zM13 2c0 .55.45 1 1 1s1-.45 1-1-.45-1-1-1-1 .45-1 1z"/></symbol>
+  <symbol id="i-food" viewBox="0 0 24 24"><path d="M18.06 22.99h1.66c.84 0 1.53-.64 1.63-1.46L23 5.05h-5V1h-1.97v4.05h-4.97l.3 2.34c1.71.47 3.31 1.32 4.27 2.26 1.44 1.42 2.43 2.89 2.43 5.79v7.55zM1 21.99V21h15.03v.99c0 .55-.45 1-1.01 1H2.01c-.56 0-1.01-.45-1.01-1zm15.03-7c0-8-15.03-8-15.03 0h15.03zM1.02 17h15v2h-15z"/></symbol>
+  <symbol id="i-drink" viewBox="0 0 24 24"><path d="M3 2l2.01 18.23C5.13 21.23 5.97 22 7 22h10c1.03 0 1.87-.77 1.99-1.77L21 2H3zm9 17c-1.66 0-3-1.34-3-3 0-2 3-5.4 3-5.4s3 3.4 3 5.4c0 1.66-1.34 3-3 3z"/></symbol>
+  <symbol id="i-coffee" viewBox="0 0 24 24"><path d="M20 3H4v10c0 2.21 1.79 4 4 4h6c2.21 0 4-1.79 4-4v-3h2c1.11 0 2-.89 2-2V5c0-1.11-.89-2-2-2zm0 5h-2V5h2v3zM2 21h18v-2H2v2z"/></symbol>
+  <symbol id="i-cake" viewBox="0 0 24 24"><path d="M12 6c1.11 0 2-.9 2-2 0-.38-.1-.73-.29-1.03L12 0l-1.71 2.97c-.19.3-.29.65-.29 1.03 0 1.1.9 2 2 2zm4.6 9.99-1.07-1.07-1.08 1.07c-1.3 1.3-3.58 1.31-4.89 0l-1.07-1.07-1.09 1.07C6.75 16.64 5.88 17 4.96 17c-.73 0-1.4-.23-1.96-.61V21c0 .55.45 1 1 1h16c.55 0 1-.45 1-1v-4.61c-.56.38-1.23.61-1.96.61-.92 0-1.79-.36-2.44-1.01zM18 9h-5V7h-2v2H6c-1.66 0-3 1.34-3 3v1.54c0 1.08.88 1.96 1.96 1.96.52 0 1.02-.2 1.38-.57l2.14-2.13 2.13 2.13c.74.74 2.03.74 2.77 0l2.14-2.13 2.13 2.13c.37.36.87.57 1.39.57 1.08 0 1.96-.88 1.96-1.96V12C21 10.34 19.66 9 18 9z"/></symbol>
+  <symbol id="i-person" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></symbol>
+  <symbol id="i-cash" viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.89 2.4 1.88H17c.05-1.98-1.52-3.31-3.9-3.49V4h-3v2.18C8.14 6.54 6.5 7.73 6.5 9.64c0 2.26 2.02 3.19 4.5 3.82 2.61.68 3 .98 3 1.79 0 .77-.7 1.49-2.55 1.49-1.69 0-2.73-.65-2.73-1.65H6c.05 2.03 1.66 3.41 4.05 3.56V21h3v-2.15c2.28-.24 3.77-1.48 3.77-3.1 0-2.36-2.05-3.35-4.02-3.92z"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><path d="M11 7h2v2h-2V7zm0 4h2v6h-2v-6zm-1-8c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9-4.03-9-9-9z"/></symbol>
+  <symbol id="i-offline" viewBox="0 0 24 24"><path d="M23.64 7c-.45-.34-4.93-4-11.64-4-1.32 0-2.55.14-3.69.38L18.43 13.5 23.64 7zM3.89 4.21L2.43 5.67l2.63 2.63C2.94 9.84 1.15 11.5.14 12.42c.45.34 4.93 4 11.64 4 1.27 0 2.47-.12 3.58-.33l2.86 2.86 1.46-1.46L3.89 4.21zM6.26 12.54l6.9 6.9L12 22c-3.14-2.22-4.8-4.62-6.74-7.46z"/></symbol>
+  <symbol id="i-payment" viewBox="0 0 24 24"><path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 13H4V8h16v9zm-7-2h5v2h-5v-2zm-4-4h4v1.5H9V11z"/></symbol>
+  <symbol id="i-logout" viewBox="0 0 24 24"><path d="m17 8-1.41 1.41L17.17 11H9v2h8.17l-1.58 1.59L17 16l4-4-4-4zM5 5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h7v-2H5V5z"/></symbol>
+</svg>
+
+<div class="page-head">
+  <div>
+    <h1>Pinoy POS — Interactive CRUD Dialog Mockups</h1>
+    <p>Click a module below, then click any Add, Edit, Delete, Restore, or Save action inside the phone to preview the dialog.</p>
+  </div>
+  <button class="theme-toggle" onclick="toggleTheme()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
+    <span id="themeLabel">Light mode</span>
+  </button>
+</div>
+
+<div class="hint">
+  <b>CRUD modules in the mockups:</b> Products, Categories, Stock, Staff, Announcements, Trash, AI Configuration, and Submitted Reports. Select one to see the list, then tap an action to open its dialog.
+</div>
+
+<div class="module-grid" id="moduleGrid"></div>
+
+<div class="hint" style="margin-top:-12px">
+  <b>Other app dialogs:</b> success, error, warning, info, restriction, offline, loading, validation, payment, and logout. Tap a tile to preview it.
+</div>
+
+<div class="module-grid" id="dialogStatesGrid"></div>
+
+<div class="wrap">
+  <div class="phone" id="phone">
+    <div class="statusbar">
+      <span>10:14</span>
+      <div class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></div>
+    </div>
+
+    <div class="appbar">
+      <div class="back" onclick="alert('Back navigation placeholder')" aria-label="Back"><svg><use href="#i-back"/></svg></div>
+      <div class="title"><h2 id="screenTitle">Products</h2></div>
+      <div class="act"><svg><use href="#i-bell"/></svg></div>
+      <div class="act avatar">JO</div>
+    </div>
+
+    <div class="screen-body" id="screenBody">
+      <div class="stats" id="statsRow"></div>
+
+      <div class="toolbar">
+        <div class="search"><svg><use href="#i-search"/></svg><span>Search...</span></div>
+        <div class="filterbtn"><svg><use href="#i-filter"/></svg>All</div>
+      </div>
+
+      <div class="chips" id="chipsRow"></div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="isquare c-blue" id="cardIcon"><svg id="cardIconSvg"><use href="#i-box"/></svg></div>
+          <h3 id="cardTitle">All Products</h3>
+          <span class="pill pill-blue" id="cardPill">4 items</span>
+        </div>
+        <div id="listRows"></div>
+      </div>
+
+      <div class="fabzone" id="fabZone"></div>
+    </div>
+
+    <!-- Dialog overlay -->
+    <div class="dialog-overlay" id="dialogOverlay" onclick="closeDialog()">
+      <div class="dialog" onclick="event.stopPropagation()">
+        <div class="dialog-header">
+          <div class="icircle" id="dialogIconCircle"><svg id="dialogIconSvg" width="20" height="20"><use href="#i-plus"/></svg></div>
+          <h3 id="dialogTitle">Add Product</h3>
+          <p id="dialogMessage" style="display:none"></p>
+        </div>
+        <div class="dialog-body" id="dialogBody"></div>
+        <div class="dialog-actions" id="dialogActions"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const modules = {
+  products: {
+    label: 'Products',
+    icon: '#i-box',
+    color: 'c-blue',
+    addLabel: 'Add Product',
+    fabType: 'add',
+    stats: [
+      {icon:'#i-box', color:'solid-blue', num:'24', lbl:'Products'},
+      {icon:'#i-warn', color:'solid-amber', num:'3', lbl:'Low stock'},
+      {icon:'#i-err', color:'solid-red', num:'1', lbl:'Out of stock'}
+    ],
+    chips: ['All','Low stock','Out of stock'],
+    rows: [
+      {id:1, name:'Pastil', sub:'Snacks · Stock: 45', price:'₱10.00', pill:'', pillClass:'', icon:'#i-food', iconColor:'c-orange'},
+      {id:2, name:'Chicken Adobo Rice', sub:'Meals · Stock: 4', price:'₱80.00', pill:'Low stock', pillClass:'pill-amber', icon:'#i-food', iconColor:'c-orange'},
+      {id:3, name:'Iced Tea', sub:'Drinks · Stock: 32', price:'₱25.00', pill:'', pillClass:'', icon:'#i-drink', iconColor:'c-teal'},
+      {id:4, name:'Banana Cue', sub:'Snacks · Stock: 0', price:'₱15.00', pill:'Out of stock', pillClass:'pill-red', icon:'#i-cake', iconColor:'c-pink'}
+    ],
+    fields: [
+      {id:'name', label:'Product name', type:'text', placeholder:'e.g. Pastil', value:''},
+      {id:'category', label:'Category', type:'select', options:['Meals','Drinks','Snacks','Coffee'], value:'Snacks'},
+      {id:'price', label:'Price', type:'text', placeholder:'0.00', value:''},
+      {id:'stock', label:'Stock quantity', type:'number', placeholder:'0', value:''},
+      {id:'status', label:'Status', type:'select', options:['Active','Inactive'], value:'Active'}
+    ],
+    deleteTitle: 'Delete product',
+    deleteMsg: item => `Move <b>${item.name}</b> to Trash? You can restore it later.`,
+    dialogIconColor: 'var(--info)'
+  },
+  categories: {
+    label: 'Categories',
+    icon: '#i-tag',
+    color: 'c-purple',
+    addLabel: 'Add Category',
+    fabType: 'add',
+    stats: [
+      {icon:'#i-tag', color:'solid-blue', num:'8', lbl:'Total'},
+      {icon:'#i-check', color:'solid-green', num:'6', lbl:'Active'},
+      {icon:'#i-warn', color:'solid-grey', num:'2', lbl:'Inactive'}
+    ],
+    chips: ['All','Active','Inactive'],
+    rows: [
+      {id:1, name:'Meals', sub:'12 products', price:'', pill:'Active', pillClass:'pill-green', icon:'#i-food', iconColor:'c-orange'},
+      {id:2, name:'Drinks', sub:'6 products', price:'', pill:'Active', pillClass:'pill-green', icon:'#i-drink', iconColor:'c-teal'},
+      {id:3, name:'Snacks', sub:'4 products', price:'', pill:'Active', pillClass:'pill-green', icon:'#i-cake', iconColor:'c-pink'},
+      {id:4, name:'Coffee', sub:'2 products', price:'', pill:'Inactive', pillClass:'pill-grey', icon:'#i-coffee', iconColor:'c-amber'}
+    ],
+    fields: [
+      {id:'name', label:'Category name', type:'text', placeholder:'e.g. Desserts', value:''},
+      {id:'description', label:'Description', type:'text', placeholder:'Optional', value:''},
+      {id:'status', label:'Status', type:'select', options:['Active','Inactive'], value:'Active'}
+    ],
+    deleteTitle: 'Delete category',
+    deleteMsg: item => `Delete <b>${item.name}</b>? Products in this category will become uncategorized.`,
+    dialogIconColor: 'var(--purple)'
+  },
+  stock: {
+    label: 'Stock',
+    icon: '#i-box',
+    color: 'c-amber',
+    addLabel: 'Add Stock',
+    fabType: 'add',
+    stats: [
+      {icon:'#i-box', color:'solid-blue', num:'24', lbl:'Items'},
+      {icon:'#i-warn', color:'solid-amber', num:'2', lbl:'Low'},
+      {icon:'#i-err', color:'solid-red', num:'1', lbl:'Out'}
+    ],
+    chips: ['All','Low','Out'],
+    rows: [
+      {id:1, name:'Spicy Pork Sisig', sub:'Meals · Min 10', price:'24 left', pill:'', pillClass:'pill-green', icon:'#i-food', iconColor:'c-orange'},
+      {id:2, name:'Iced Coffee', sub:'Drinks · Min 15', price:'18 left', pill:'', pillClass:'pill-green', icon:'#i-coffee', iconColor:'c-teal'},
+      {id:3, name:'Chicharon', sub:'Snacks · Min 20', price:'7 left', pill:'Low', pillClass:'pill-amber', icon:'#i-cake', iconColor:'c-pink'},
+      {id:4, name:'Halo-Halo', sub:'Dessert · Min 8', price:'0 left', pill:'Out', pillClass:'pill-red', icon:'#i-drink', iconColor:'c-blue'}
+    ],
+    fields: [
+      {id:'product', label:'Product', type:'select', options:['Pastil','Chicken Adobo Rice','Iced Tea','Banana Cue'], value:'Pastil'},
+      {id:'quantity', label:'Quantity to add', type:'number', placeholder:'0', value:''},
+      {id:'reason', label:'Reason', type:'text', placeholder:'Restock / Adjustment', value:''}
+    ],
+    deleteTitle: 'Deduct stock',
+    deleteMsg: item => `Record a stock deduction for <b>${item.name}</b>?`,
+    dialogIconColor: 'var(--warning)'
+  },
+  staff: {
+    label: 'Staff',
+    icon: '#i-people',
+    color: 'c-green',
+    addLabel: 'Add Staff',
+    fabType: 'add',
+    stats: [
+      {icon:'#i-people', color:'solid-blue', num:'4', lbl:'Total'},
+      {icon:'#i-check', color:'solid-green', num:'3', lbl:'Active'},
+      {icon:'#i-warn', color:'solid-grey', num:'1', lbl:'Inactive'}
+    ],
+    chips: ['All','Active','Inactive'],
+    rows: [
+      {id:1, name:'Maria Santos', sub:'maria.s', price:'', pill:'Active', pillClass:'pill-green', icon:'#i-person', iconColor:'c-purple'},
+      {id:2, name:'Juan Cruz', sub:'juan.c', price:'', pill:'Active', pillClass:'pill-green', icon:'#i-person', iconColor:'c-teal'},
+      {id:3, name:'Ana Reyes', sub:'ana.r', price:'', pill:'Inactive', pillClass:'pill-amber', icon:'#i-person', iconColor:'c-amber'}
+    ],
+    fields: [
+      {id:'name', label:'Full name', type:'text', placeholder:'Juan Dela Cruz', value:''},
+      {id:'username', label:'Username', type:'text', placeholder:'juan.c', value:''},
+      {id:'role', label:'Role', type:'select', options:['Staff','Admin','Owner'], value:'Staff'},
+      {id:'status', label:'Status', type:'select', options:['Active','Inactive'], value:'Active'}
+    ],
+    deleteTitle: 'Delete staff',
+    deleteMsg: item => `Remove <b>${item.name}</b> from the team? This cannot be undone.`,
+    dialogIconColor: 'var(--success)'
+  },
+  announcements: {
+    label: 'Announcements',
+    icon: '#i-campaign',
+    color: 'c-orange',
+    addLabel: 'New Announcement',
+    fabType: 'add',
+    stats: [
+      {icon:'#i-campaign', color:'solid-amber', num:'3', lbl:'Pinned'},
+      {icon:'#i-check', color:'solid-green', num:'6', lbl:'Active'},
+      {icon:'#i-box', color:'solid-blue', num:'9', lbl:'Total'}
+    ],
+    chips: ['All','Pinned','Active'],
+    rows: [
+      {id:1, name:'New menu items launching Sept 15', sub:'Pinned · Sep 7, 9:00 AM', price:'', pill:'Pinned', pillClass:'pill-solid-amber', icon:'#i-campaign', iconColor:'c-orange'},
+      {id:2, name:'GCash payment reminders', sub:'Sep 5, 2:30 PM', price:'', pill:'', pillClass:'', icon:'#i-campaign', iconColor:'c-blue'},
+      {id:3, name:'Staff meeting moved to 4 PM', sub:'Sep 4, 10:00 AM', price:'', pill:'', pillClass:'', icon:'#i-campaign', iconColor:'c-green'}
+    ],
+    fields: [
+      {id:'title', label:'Title', type:'text', placeholder:'Announcement title', value:''},
+      {id:'body', label:'Message', type:'textarea', placeholder:'Write the announcement here...', value:''},
+      {id:'pinned', label:'Pin to top', type:'toggle', value:true}
+    ],
+    deleteTitle: 'Delete announcement',
+    deleteMsg: item => `Remove the announcement <b>${item.name}</b>?`,
+    dialogIconColor: 'var(--warning)'
+  },
+  trash: {
+    label: 'Trash',
+    icon: '#i-delete',
+    color: 'c-red',
+    addLabel: 'Empty Trash',
+    fabType: 'empty',
+    stats: [
+      {icon:'#i-box', color:'solid-blue', num:'12', lbl:'Products'},
+      {icon:'#i-tag', color:'solid-purple', num:'3', lbl:'Categories'},
+      {icon:'#i-person', color:'solid-grey', num:'2', lbl:'Users'}
+    ],
+    chips: ['Products','Categories','Users'],
+    rows: [
+      {id:1, name:'Chicharon', sub:'Snacks · Deleted by Maria Santos · 1 day ago', price:'', pill:'', pillClass:'', icon:'#i-food', iconColor:'c-orange'},
+      {id:2, name:'Pancit Bilao', sub:'Meals · Deleted by Juan Cruz · 3 days ago', price:'', pill:'', pillClass:'', icon:'#i-food', iconColor:'c-teal'},
+      {id:3, name:'Grilled Fish', sub:'Meals · Deleted by Maria Santos · 5 days ago', price:'', pill:'', pillClass:'', icon:'#i-food', iconColor:'c-blue'}
+    ],
+    fields: [],
+    deleteTitle: 'Empty trash',
+    deleteMsg: item => item ? `Permanently delete <b>${item.name}</b>? This cannot be undone.` : 'Permanently delete all items in Trash? This cannot be undone.',
+    dialogIconColor: 'var(--error)'
+  },
+  ai: {
+    label: 'AI Configuration',
+    icon: '#i-ai',
+    color: 'c-blue',
+    addLabel: 'Save Configuration',
+    fabType: 'save',
+    stats: [
+      {icon:'#i-ai', color:'solid-purple', num:'24', lbl:'Queries today'},
+      {icon:'#i-check', color:'solid-green', num:'100', lbl:'Quota'},
+      {icon:'#i-warn', color:'solid-amber', num:'24%', lbl:'Used'}
+    ],
+    chips: [],
+    rows: [
+      {id:1, name:'Groq API Key', sub:'gsk_••••••••••••••••••', price:'', pill:'', pillClass:'', icon:'#i-ai', iconColor:'c-purple'},
+      {id:2, name:'AI Advisor', sub:'Enabled', price:'', pill:'Active', pillClass:'pill-green', icon:'#i-check', iconColor:'c-green'},
+      {id:3, name:'Model', sub:'llama-3.1-70b-versatile', price:'', pill:'', pillClass:'', icon:'#i-box', iconColor:'c-blue'}
+    ],
+    fields: [
+      {id:'apikey', label:'Groq API Key', type:'text', placeholder:'gsk_...', value:'gsk_••••••••••••••••••'},
+      {id:'enabled', label:'AI Advisor enabled', type:'toggle', value:true},
+      {id:'model', label:'Model', type:'select', options:['llama-3.1-70b-versatile','mixtral-8x7b-32768'], value:'llama-3.1-70b-versatile'}
+    ],
+    deleteTitle: 'Reset AI configuration',
+    deleteMsg: () => 'Clear the API key and reset AI settings?',
+    dialogIconColor: 'var(--purple)'
+  },
+  reports: {
+    label: 'Submitted Reports',
+    icon: '#i-inbox',
+    color: 'c-teal',
+    addLabel: 'Import Report',
+    fabType: 'import',
+    stats: [
+      {icon:'#i-inbox', color:'solid-blue', num:'3', lbl:'Submitted'},
+      {icon:'#i-check', color:'solid-green', num:'1', lbl:'Imported'},
+      {icon:'#i-warn', color:'solid-amber', num:'2', lbl:'Pending'}
+    ],
+    chips: ['All','Pending','Viewed','Imported'],
+    rows: [
+      {id:1, name:'Daily Sales Sept 8', sub:'by Maria Santos · 2.1 MB', price:'', pill:'Submitted', pillClass:'pill-amber', icon:'#i-inbox', iconColor:'c-blue'},
+      {id:2, name:'Weekly Summary 37', sub:'by Juan Cruz · 1.4 MB', price:'', pill:'Viewed', pillClass:'pill-blue', icon:'#i-inbox', iconColor:'c-blue'},
+      {id:3, name:'Inventory Audit', sub:'by Maria Santos · 856 KB', price:'', pill:'Imported', pillClass:'pill-green', icon:'#i-inbox', iconColor:'c-blue'}
+    ],
+    fields: [
+      {id:'file', label:'Report file', type:'text', placeholder:'Tap to choose PDF / Excel / CSV', value:''},
+      {id:'note', label:'Note', type:'text', placeholder:'Optional note', value:''}
+    ],
+    deleteTitle: 'Archive report',
+    deleteMsg: item => `Archive <b>${item.name}</b>? It will no longer appear in the active list.`,
+    dialogIconColor: 'var(--info)'
+  }
+};
+
+const dialogStates = {
+  success: { title: 'Saved', message: 'The product was saved successfully.', color: 'c-green', icon: '#i-check', actions: [['OK','btn-primary']] },
+  error: { title: 'Something went wrong', message: 'We could not connect to the server. Please try again.', color: 'c-red', icon: '#i-err', actions: [['Cancel','btn-outlined'], ['Try again','btn-primary']] },
+  warning: { title: 'Unsaved changes', message: 'You have unsaved changes. Discard them?', color: 'c-amber', icon: '#i-warn', actions: [['Cancel','btn-outlined'], ['Discard','btn-warn']] },
+  info: { title: 'New feature available', message: 'AI Advisor is now enabled for owners.', color: 'c-blue', icon: '#i-info', actions: [['Got it','btn-primary']] },
+  restriction: { title: 'Access restricted', message: 'You do not have permission to delete this item.', color: 'c-grey', icon: '#i-lock', actions: [['OK','btn-primary']] },
+  offline: { title: 'No internet connection', message: 'Check your connection and try again.', color: 'c-amber', icon: '#i-offline', actions: [['Cancel','btn-outlined'], ['Retry','btn-primary']] },
+  loading: { title: 'Processing', message: 'Please wait while we save your changes...', color: 'c-blue', spinner: true, actions: [] },
+  validation: { title: 'Validation error', message: 'Please fill in all required fields.', color: 'c-red', icon: '#i-err', actions: [['Fix it','btn-warn']] },
+  payment: { title: 'Payment', message: 'Customer will pay <b>₱250.00</b> with GCash.', color: 'c-blue', icon: '#i-payment', actions: [['Cancel','btn-outlined'], ['Pay','btn-primary']] },
+  logout: { title: 'Log out', message: 'Are you sure you want to log out?', color: 'c-red', icon: '#i-logout', actions: [['Cancel','btn-outlined'], ['Log out','btn-error']] }
+};
+
+let currentModule = 'products';
+
+function init() {
+  renderModuleGrid();
+  renderDialogStatesGrid();
+  selectModule('products');
+}
+
+function renderModuleGrid() {
+  const grid = document.getElementById('moduleGrid');
+  grid.innerHTML = Object.keys(modules).map(key => {
+    const m = modules[key];
+    return `<div class="module-tile ${key === currentModule ? 'on' : ''}" data-key="${key}" onclick="selectModule('${key}')">
+      <div class="icircle ${m.color}"><svg><use href="${m.icon}"/></svg></div>
+      <span class="title">${m.label}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderDialogStatesGrid() {
+  const grid = document.getElementById('dialogStatesGrid');
+  grid.innerHTML = Object.keys(dialogStates).map(key => {
+    const d = dialogStates[key];
+    const icon = d.spinner ? `<div class="tile-spinner"></div>` : `<svg><use href="${d.icon}"/></svg>`;
+    return `<div class="module-tile" data-key="${key}" onclick="openSemanticDialog('${key}')">
+      <div class="icircle ${d.color}">${icon}</div>
+      <span class="title" style="text-transform:capitalize">${key}</span>
+    </div>`;
+  }).join('');
+}
+
+function openSemanticDialog(key) {
+  const d = dialogStates[key];
+  const overlay = document.getElementById('dialogOverlay');
+  const iconCircle = document.getElementById('dialogIconCircle');
+  const title = document.getElementById('dialogTitle');
+  const message = document.getElementById('dialogMessage');
+  const body = document.getElementById('dialogBody');
+  const actions = document.getElementById('dialogActions');
+
+  iconCircle.className = 'icircle ' + d.color;
+  iconCircle.innerHTML = d.spinner
+    ? '<div class="dialog-spinner"></div>'
+    : '<svg width="20" height="20"><use href="' + d.icon + '"/></svg>';
+
+  title.textContent = d.title;
+  message.innerHTML = d.message;
+  message.style.display = 'block';
+  body.innerHTML = '';
+
+  if (d.actions.length) {
+    actions.style.display = 'flex';
+    actions.innerHTML = d.actions.map(a => `<button class="btn ${a[1]}" onclick="closeDialog()">${a[0]}</button>`).join('');
+  } else {
+    actions.style.display = 'none';
+    actions.innerHTML = '';
+  }
+
+  overlay.classList.add('open');
+}
+
+function selectModule(key) {
+  currentModule = key;
+  const m = modules[key];
+  document.getElementById('screenTitle').textContent = m.label;
+  document.getElementById('cardIcon').className = `isquare ${m.color}`;
+  document.getElementById('cardIconSvg').querySelector('use').setAttribute('href', m.icon);
+  document.getElementById('cardTitle').textContent = m.label;
+  document.getElementById('cardPill').textContent = `${m.rows.length} items`;
+
+  const statsRow = document.getElementById('statsRow');
+  statsRow.innerHTML = m.stats.slice(0,3).map(s => `
+    <div class="stat">
+      <div class="icircle ${s.color}"><svg><use href="${s.icon}"/></svg></div>
+      <div class="num">${s.num}</div><div class="lbl">${s.lbl}</div>
+    </div>
+  `).join('');
+
+  const chipsRow = document.getElementById('chipsRow');
+  chipsRow.innerHTML = m.chips.length
+    ? m.chips.map((c,i) => `<span class="chip ${i===0 ? 'on' : ''}">${c}</span>`).join('')
+    : '';
+
+  renderRows(m);
+  renderFab(m);
+  renderModuleGrid();
+}
+
+function renderRows(m) {
+  const list = document.getElementById('listRows');
+  list.innerHTML = m.rows.map(item => {
+    const price = item.price ? `<div class="price">${item.price}</div>` : '';
+    const pill = item.pill ? `<span class="pill ${item.pillClass}">${item.pill}</span>` : '';
+
+    let actionIcons;
+    if (currentModule === 'trash') {
+      actionIcons = `<div class="rowactions">
+           <div class="aicon" onclick="openDialog('restore', ${item.id})" title="Restore"><svg><use href="#i-restore"/></svg></div>
+           <div class="aicon del" onclick="openDialog('permanent', ${item.id})" title="Delete forever"><svg><use href="#i-delete"/></svg></div>
+         </div>`;
+    } else if (currentModule === 'reports') {
+      actionIcons = `<div class="rowactions">
+           <div class="aicon" onclick="openDialog('archive', ${item.id})" title="Archive"><svg><use href="#i-delete"/></svg></div>
+         </div>`;
+    } else {
+      const deleteType = currentModule === 'stock' ? 'delete' : 'delete';
+      actionIcons = `<div class="rowactions">
+           <div class="aicon" onclick="openDialog('edit', ${item.id})" title="Edit"><svg><use href="#i-edit"/></svg></div>
+           <div class="aicon del" onclick="openDialog('${deleteType}', ${item.id})" title="Delete"><svg><use href="#i-delete"/></svg></div>
+         </div>`;
+    }
+
+    const thumb = (currentModule === 'staff')
+      ? `<div class="thumb letter" style="background:${getInitialsBg(item.name)}; color:#fff">${getInitials(item.name)}</div>`
+      : `<div class="isquare lg ${item.iconColor}"><svg><use href="${item.icon}"/></svg></div>`;
+    return `<div class="row">
+      ${thumb}
+      <div class="grow">
+        <div class="name">${item.name}</div>
+        <div class="sub">${item.sub}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+        ${price}
+        ${pill}
+      </div>
+      ${actionIcons}
+    </div>`;
+  }).join('');
+}
+
+function renderFab(m) {
+  const zone = document.getElementById('fabZone');
+  const danger = (m.fabType === 'empty' || m.fabType === 'delete');
+  zone.innerHTML = `<div class="fab ${danger ? 'danger' : ''}" id="fabAction" onclick="handleFab()">
+    <svg><use href="#i-plus"/></svg>${m.addLabel}
+  </div>`;
+}
+
+function handleFab() {
+  const m = modules[currentModule];
+  if (m.fabType === 'save') {
+    openDialog('save');
+  } else if (m.fabType === 'import') {
+    openDialog('import');
+  } else if (m.fabType === 'empty') {
+    openDialog('empty');
+  } else {
+    openDialog('add');
+  }
+}
+
+function getInitials(name) {
+  return name.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
+}
+
+function getInitialsBg(name) {
+  const colors = ['var(--primary)','var(--success)','var(--warning)','var(--purple)','var(--teal)','var(--pink)'];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return colors[Math.abs(hash) % colors.length];
+}
+
+function findItem(id) {
+  return modules[currentModule].rows.find(r => r.id === id);
+}
+
+function fieldIcon(f) {
+  const map = {
+    products: { name:'#i-box', category:'#i-tag', price:'#i-cash', stock:'#i-box', status:'#i-check' },
+    categories: { name:'#i-tag', description:'#i-edit', status:'#i-check' },
+    stock: { product:'#i-box', quantity:'#i-plus', reason:'#i-edit' },
+    staff: { name:'#i-person', username:'#i-person', role:'#i-people', status:'#i-check' },
+    announcements: { title:'#i-campaign', body:'#i-edit', pinned:'#i-check' },
+    ai: { apikey:'#i-lock', model:'#i-box' },
+    reports: { file:'#i-inbox', note:'#i-edit' }
+  };
+  return map[currentModule]?.[f.id] || null;
+}
+
+function openDialog(type, id) {
+  const m = modules[currentModule];
+  const item = id ? findItem(id) : null;
+  const overlay = document.getElementById('dialogOverlay');
+  const iconCircle = document.getElementById('dialogIconCircle');
+  const iconSvg = document.getElementById('dialogIconSvg');
+  const title = document.getElementById('dialogTitle');
+  const message = document.getElementById('dialogMessage');
+  const body = document.getElementById('dialogBody');
+  const actions = document.getElementById('dialogActions');
+
+  let titleText = '';
+  let bodyHtml = '';
+  let actionsHtml = '';
+  message.style.display = 'none';
+
+  if (type === 'add' || type === 'edit' || type === 'save' || type === 'import') {
+    const isAdd = type === 'add';
+    const isEdit = type === 'edit';
+    const isSave = type === 'save';
+    const isImport = type === 'import';
+    titleText = isAdd ? m.addLabel
+              : isSave ? 'Save Configuration'
+              : isImport ? 'Import Report'
+              : 'Edit ' + (item ? item.name : m.label);
+
+    const formHint = isAdd ? 'Enter the details and tap Save.'
+                     : isEdit ? `Update the details and tap Save.`
+                     : isImport ? 'Choose a report file and tap Import.'
+                     : 'Review the configuration and tap Save.';
+    message.innerHTML = formHint;
+    message.style.display = 'block';
+
+    bodyHtml = m.fields.map(f => {
+      let val = isAdd ? (f.value || '') : (item ? (['name','title'].includes(f.id) ? item.name : f.value) : f.value);
+      const icon = fieldIcon(f);
+      const iconHtml = icon ? `<svg class="field-icon ${f.type === 'textarea' ? 'textarea-icon' : 'input-icon'}"><use href="${icon}"/></svg>` : '';
+      const hasIcon = icon ? 'has-icon' : '';
+
+      if (f.type === 'select') {
+        return `<div class="field ${hasIcon}">
+          <label>${f.label}</label>
+          ${iconHtml}<select class="select" id="field_${f.id}">
+            ${f.options.map(opt => `<option ${opt === val ? 'selected' : ''}>${opt}</option>`).join('')}
+          </select>
+        </div>`;
+      }
+      if (f.type === 'toggle') {
+        const on = val ? '' : 'off';
+        return `<div class="field">
+          <label>${f.label}</label>
+          <div class="toggle" onclick="this.querySelector('.toggle-switch').classList.toggle('off')">
+            <div class="toggle-switch ${on}" id="field_${f.id}"></div>
+            <span style="font-size:14px;font-weight:600;color:var(--text)">${val ? 'On' : 'Off'}</span>
+          </div>
+        </div>`;
+      }
+      if (f.type === 'textarea') {
+        return `<div class="field ${hasIcon}">
+          <label>${f.label}</label>
+          ${iconHtml}<textarea class="textarea" id="field_${f.id}" placeholder="${f.placeholder}">${val}</textarea>
+        </div>`;
+      }
+      return `<div class="field ${hasIcon}">
+        <label>${f.label}</label>
+        ${iconHtml}<input class="input" type="${f.type}" id="field_${f.id}" placeholder="${f.placeholder}" value="${val}">
+      </div>`;
+    }).join('');
+
+    actionsHtml = `
+      <button class="btn btn-outlined" onclick="closeDialog()">Cancel</button>
+      <button class="btn btn-primary" onclick="closeDialog()">${isImport ? 'Import' : 'Save'}</button>
+    `;
+  } else if (['delete','permanent','empty','restore','archive'].includes(type)) {
+    const isRestore = type === 'restore';
+    const isPermanent = type === 'permanent' || type === 'empty';
+    const isArchive = type === 'archive';
+    titleText = isRestore ? 'Restore item' : isPermanent ? 'Permanently delete' : isArchive ? 'Archive report' : 'Delete item';
+
+    let msg = '';
+    if (isRestore && item) msg = `Restore <b>${item.name}</b> to its original list?`;
+    else if (type === 'empty') msg = m.deleteMsg();
+    else if (item) msg = m.deleteMsg(item);
+    else msg = 'Are you sure?';
+
+    bodyHtml = '';
+    message.innerHTML = msg;
+    message.style.display = 'block';
+
+    const btnClass = isRestore ? 'btn-primary' : isArchive ? 'btn-warn' : 'btn-error';
+    const btnLabel = isRestore ? 'Restore' : isArchive ? 'Archive' : isPermanent ? 'Delete forever' : 'Delete';
+    actionsHtml = `
+      <button class="btn btn-outlined" onclick="closeDialog()">Cancel</button>
+      <button class="btn ${btnClass}" onclick="closeDialog()">${btnLabel}</button>
+    `;
+  }
+
+  title.textContent = titleText;
+
+  let iconClass = m.color;
+  let iconHref = '#i-plus';
+  if (type === 'edit') { iconHref = '#i-edit'; }
+  else if (type === 'save' || type === 'import') { iconHref = '#i-check'; }
+  else if (type === 'restore') { iconHref = '#i-restore'; iconClass = 'c-green'; }
+  else if (['delete','permanent','empty'].includes(type)) { iconHref = '#i-delete'; iconClass = 'c-red'; }
+  else if (type === 'archive') { iconHref = '#i-delete'; iconClass = 'c-amber'; }
+
+  iconCircle.className = 'icircle ' + iconClass;
+  iconCircle.innerHTML = '<svg width="20" height="20"><use href="' + iconHref + '"/></svg>';
+
+  body.innerHTML = bodyHtml;
+  actions.innerHTML = actionsHtml;
+  actions.style.display = 'flex';
+  overlay.classList.add('open');
+}
+
+function closeDialog() {
+  document.getElementById('dialogOverlay').classList.remove('open');
+  document.getElementById('dialogMessage').style.display = 'none';
+}
+
+function toggleTheme() {
+  const root = document.documentElement;
+  const isDark = root.getAttribute('data-theme') === 'dark';
+  root.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  document.getElementById('themeLabel').textContent = isDark ? 'Dark mode' : 'Light mode';
+}
+
+init();
+</script>
+
+</body>
+</html>

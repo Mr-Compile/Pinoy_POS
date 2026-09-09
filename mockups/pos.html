@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinoy POS — POS UI Mockup</title>
+<style>
+  :root[data-theme="dark"] {
+    --bg: #070D19;
+    --surface: #121C31;
+    --surface-elev: #152348;
+    --border: #263A63;
+    --divider: #1A2445;
+    --text: #F1F4F7;
+    --text-2: #B8C5E0;
+    --text-3: #8C9AB8;
+    --primary: #4B82E9;
+    --primary-strong: #2C68D7;
+    --page-bg: #0B1220;
+    --appbar: #1B4CAF;
+  }
+  :root[data-theme="light"] {
+    --bg: #F5F8FC;
+    --surface: #FFFFFF;
+    --surface-elev: #EEF4FF;
+    --border: #D7E0EE;
+    --divider: #E7ECF4;
+    --text: #172033;
+    --text-2: #52627A;
+    --text-3: #8A9AB3;
+    --primary: #2563C7;
+    --primary-strong: #1B4CAF;
+    --page-bg: #E8EDF5;
+    --appbar: #2563C7;
+  }
+  :root {
+    --success: #16A34A;
+    --warning: #D97706;
+    --error: #DC2626;
+    --info: #4B82E9;
+    --purple: #8B5CF6;
+    --radius-card: 18px;
+    --radius-icon: 11px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', 'Inter', system-ui, sans-serif; }
+  body { background: var(--page-bg); min-height: 100vh; padding: 32px 16px 64px; transition: background .3s; }
+
+  .page-head { max-width: 1100px; margin: 0 auto 28px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .page-head h1 { color: var(--text); font-size: 22px; font-weight: 700; }
+  .page-head p { color: var(--text-3); font-size: 13px; margin-top: 4px; }
+  .theme-toggle { background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 24px; padding: 10px 20px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+  .theme-toggle:hover { border-color: var(--primary); }
+
+  .frames { display: flex; gap: 40px; justify-content: center; flex-wrap: wrap; }
+  .frame-wrap { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  .frame-label { color: var(--text); font-size: 16px; font-weight: 700; }
+  .frame-notes { max-width: 420px; color: var(--text-3); font-size: 12.5px; line-height: 1.6; }
+  .frame-notes b { color: var(--text-2); }
+
+  .phone { width: 380px; background: var(--bg); border-radius: 36px; border: 1px solid var(--border); overflow: hidden; box-shadow: 0 24px 64px rgba(0,0,0,.35); display: flex; flex-direction: column; }
+  .statusbar { height: 30px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; color: var(--text-2); font-size: 12px; font-weight: 600; }
+  .statusbar .icons { display: flex; gap: 5px; align-items: center; }
+  .statusbar .icons svg { width: 13px; height: 13px; fill: var(--text-2); }
+
+  .appbar { background: var(--appbar); padding: 14px 16px 16px; display: flex; align-items: center; gap: 10px; }
+  .appbar .title { flex: 1; }
+  .appbar .title h2 { color: #fff; font-size: 20px; font-weight: 700; letter-spacing: .1px; }
+  .appbar .title .sub { color: rgba(255,255,255,.75); font-size: 12px; margin-top: 2px; }
+  .appbar .act { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; }
+  .appbar .act svg { width: 19px; height: 19px; fill: #fff; }
+  .appbar .avatar { width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,.22); border: 1.5px solid rgba(255,255,255,.55); color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  :root[data-theme="dark"] .appbar .ic-sun { display: none; }
+  :root[data-theme="light"] .appbar .ic-moon { display: none; }
+
+  .screen { padding: 14px 14px 20px; display: flex; flex-direction: column; gap: 12px; min-height: 640px; }
+  .screen.grow { flex: 1; }
+
+  .search { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; display: flex; align-items: center; gap: 8px; color: var(--text-3); font-size: 13px; }
+  .search svg { width: 16px; height: 16px; fill: var(--text-3); flex-shrink: 0; }
+
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { padding: 7px 14px; border-radius: 20px; font-size: 12.5px; font-weight: 600; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); }
+  .chip.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+  .product-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .product-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+  .product-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+
+  .product-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); overflow: hidden; display: flex; flex-direction: column; cursor: pointer; position: relative; }
+  .product-card.disabled { opacity: .75; cursor: not-allowed; }
+  .product-img { height: 96px; background: var(--surface-elev); display: flex; align-items: center; justify-content: center; position: relative; }
+  .product-img svg { width: 36px; height: 36px; fill: var(--text-3); }
+  .product-img .overlay { position: absolute; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 12px; font-weight: 700; }
+  :root[data-theme="light"] .product-img .overlay { background: rgba(255,255,255,.65); color: var(--error); }
+  .product-info { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 6px; }
+  .product-name { font-size: 13.5px; font-weight: 700; color: var(--text); line-height: 1.25; min-height: 36px; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .product-price { font-size: 16px; font-weight: 800; color: var(--primary); }
+  .stock-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 700; padding: 3px 8px; border-radius: 12px; background: rgba(22,163,74,.14); color: var(--success); width: fit-content; }
+  .stock-chip.warn { background: rgba(217,119,6,.14); color: var(--warning); }
+  .stock-chip.err { background: rgba(220,38,38,.14); color: var(--error); }
+  .stock-chip svg { width: 11px; height: 11px; fill: currentColor; }
+  .qty-badge { position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; border-radius: 50%; background: var(--primary); color: #fff; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,.25); }
+
+  .cart-bar { background: var(--surface); border-top: 1px solid var(--border); margin: auto -14px 0; padding: 12px 16px; display: flex; align-items: center; gap: 12px; }
+  .cart-bar .summary { flex: 1; min-width: 0; }
+  .cart-bar .items { font-size: 12px; color: var(--text-3); }
+  .cart-bar .total { font-size: 20px; font-weight: 800; color: var(--primary); }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 11px 18px; border-radius: 12px; font-size: 13.5px; font-weight: 700; border: none; cursor: pointer; }
+  .btn svg { width: 17px; height: 17px; fill: currentColor; }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:disabled { opacity: .55; cursor: not-allowed; }
+  .btn-ghost { background: transparent; color: var(--text-2); }
+  .btn-ghost.del { color: var(--error); }
+
+  .cart-sheet { background: var(--bg); display: flex; flex-direction: column; min-height: 640px; }
+  .cart-header { padding: 18px 16px 8px; display: flex; align-items: center; justify-content: space-between; }
+  .cart-header h3 { font-size: 18px; font-weight: 800; color: var(--text); }
+  .cart-list { flex: 1; overflow-y: auto; padding: 0 14px; display: flex; flex-direction: column; gap: 10px; }
+  .cart-item { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 12px; display: flex; gap: 12px; }
+  .cart-thumb { width: 48px; height: 48px; border-radius: 12px; background: var(--surface-elev); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .cart-thumb svg { width: 22px; height: 22px; fill: var(--text-3); }
+  .cart-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+  .cart-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+  .cart-name { font-size: 14px; font-weight: 700; color: var(--text); line-height: 1.25; }
+  .cart-unit { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+  .cart-controls { display: flex; align-items: center; justify-content: space-between; }
+  .stepper { display: inline-flex; align-items: center; background: var(--surface-elev); border: 1px solid var(--border); border-radius: 10px; padding: 2px; }
+  .stepper button { width: 28px; height: 28px; border-radius: 8px; border: none; background: transparent; color: var(--text-2); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .stepper button svg { width: 15px; height: 15px; fill: currentColor; }
+  .stepper .qty { min-width: 32px; text-align: center; font-size: 14px; font-weight: 700; color: var(--text); }
+  .cart-line { font-size: 15px; font-weight: 800; color: var(--text); }
+  .cart-totals { background: var(--surface); border-top: 1px solid var(--border); padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+  .tot-row { display: flex; justify-content: space-between; font-size: 14px; color: var(--text-2); }
+  .tot-row.total { font-size: 18px; font-weight: 800; color: var(--text); }
+  .tot-row.total .amt { color: var(--primary); }
+  .cart-actions { padding: 0 16px 16px; display: flex; flex-direction: column; gap: 10px; }
+
+  .bottomnav { background: var(--surface); border-top: 1px solid var(--border); display: flex; padding: 10px 4px 16px; }
+  .navitem { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .navicon { width: 56px; height: 28px; border-radius: 14px; display: flex; align-items: center; justify-content: center; }
+  .navicon svg { width: 19px; height: 19px; fill: var(--text-3); }
+  .navitem.sel .navicon { background: rgba(75,130,233,.22); }
+  :root[data-theme="light"] .navitem.sel .navicon { background: rgba(37,99,199,.14); }
+  .navitem.sel .navicon svg { fill: var(--primary); }
+  .navlbl { font-size: 10.5px; font-weight: 600; color: var(--text-3); }
+  .navitem.sel .navlbl { color: var(--text); }
+
+  .desktop { width: 860px; background: var(--bg); border-radius: 28px; border: 1px solid var(--border); overflow: hidden; box-shadow: 0 24px 64px rgba(0,0,0,.35); display: flex; flex-direction: column; }
+  .desktop .appbar { padding: 14px 20px 16px; }
+  .desktop-body { flex: 1; display: flex; min-height: 520px; }
+  .catalog-pane { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .cart-pane { width: 340px; border-left: 1px solid var(--border); display: flex; flex-direction: column; background: var(--surface); }
+  .cart-pane .cart-header { padding: 18px 16px 10px; }
+  .cart-pane .cart-list { padding: 0 14px; }
+  .cart-pane .cart-totals { border-top-color: var(--border); }
+  .catalog-scroll { flex: 1; overflow-y: auto; padding: 0 16px 16px; }
+  .catalog-head { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+
+  .icircle { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .icircle svg { width: 17px; height: 17px; fill: #fff; }
+  .isquare { width: 38px; height: 38px; border-radius: var(--radius-icon); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .isquare svg { width: 19px; height: 19px; }
+
+  .c-blue    { background: rgba(75,130,233,.16); } .c-blue svg    { fill: var(--info); }
+  .c-green   { background: rgba(22,163,74,.16); }  .c-green svg   { fill: var(--success); }
+  .c-amber   { background: rgba(217,119,6,.16); }  .c-amber svg   { fill: var(--warning); }
+  .c-red     { background: rgba(220,38,38,.16); }  .c-red svg     { fill: var(--error); }
+
+  .pill { font-size: 10.5px; font-weight: 700; padding: 4px 10px; border-radius: 20px; white-space: nowrap; }
+  .pill-green  { background: rgba(22,163,74,.16);  color: var(--success); }
+  .pill-amber  { background: rgba(217,119,6,.16);  color: var(--warning); }
+  .pill-red    { background: rgba(220,38,38,.16);  color: var(--error); }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-search" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24"><path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41l1.06 1.06zM7.05 18.36c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41l1.06-1.06z"/></symbol>
+  <symbol id="i-dash" viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></symbol>
+  <symbol id="i-cart" viewBox="0 0 24 24"><path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.13.12-.27.12-.42 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="M20 2H4c-1 0-2 .9-2 2v3.01c0 .72.43 1.34 1 1.69V20c0 1.1 1.1 2 2 2h14c.9 0 2-.9 2-2V8.7c.57-.35 1-.97 1-1.69V4c0-1.1-1-2-2-2zm-5 12H9v-2h6v2zm5-7H4V4h16v3z"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></symbol>
+  <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M19.5 3.5 18 2l-1.5 1.5L15 2l-1.5 1.5L12 2l-1.5 1.5L9 2 7.5 3.5 6 2 4.5 3.5 3 2v20l1.5-1.5L6 22l1.5-1.5L9 22l1.5-1.5L12 22l1.5-1.5L15 22l1.5-1.5L18 22l1.5-1.5L21 22V2l-1.5 1.5zM19 19.09H5V4.91h14v14.18zM6 15h12v2H6zm0-4h12v2H6zm0-4h12v2H6z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 5.99 19.53 19H4.47L12 5.99M12 2 1 21h22L12 2zm1 14h-2v2h2v-2zm0-6h-2v4h2v-4z"/></symbol>
+  <symbol id="i-err" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M12 21l3.5-4.5c-.97-.74-2.18-1.16-3.5-1.16s-2.53.42-3.5 1.16L12 21zM12 3C7.31 3 3.07 4.69 0 7.55l1.93 2.43C4.48 7.9 8.01 6.4 12 6.4s7.52 1.5 10.07 3.58L24 7.55C20.93 4.69 16.69 3 12 3z"/></symbol>
+  <symbol id="i-batt" viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M19 13H5v-2h14v2z"/></symbol>
+  <symbol id="i-del" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></symbol>
+  <symbol id="i-food" viewBox="0 0 24 24"><path d="M18.06 22.99h1.66c.84 0 1.53-.64 1.63-1.46L23 5.05h-5V1h-1.97v4.05h-4.97l.3 2.34c1.71.47 3.31 1.32 4.27 2.26 1.44 1.42 2.43 2.89 2.43 5.79v7.55zM1 21.99V21h15.03v.99c0 .55-.45 1-1.01 1H2.01c-.56 0-1.01-.45-1.01-1zm15.03-7c0-8-15.03-8-15.03 0h15.03zM1.02 17h15v2h-15z"/></symbol>
+  <symbol id="i-drink" viewBox="0 0 24 24"><path d="M3 2l2.01 18.23C5.13 21.23 5.97 22 7 22h10c1.03 0 1.87-.77 1.99-1.77L21 2H3zm9 17c-1.66 0-3-1.34-3-3 0-2 3-5.4 3-5.4s3 3.4 3 5.4c0 1.66-1.34 3-3 3z"/></symbol>
+  <symbol id="i-coffee" viewBox="0 0 24 24"><path d="M20 3H4v10c0 2.21 1.79 4 4 4h6c2.21 0 4-1.79 4-4v-3h2c1.11 0 2-.89 2-2V5c0-1.11-.89-2-2-2zm0 5h-2V5h2v3zM2 21h18v-2H2v2z"/></symbol>
+  <symbol id="i-cake" viewBox="0 0 24 24"><path d="M12 6c1.11 0 2-.9 2-2 0-.38-.1-.73-.29-1.03L12 0l-1.71 2.97c-.19.3-.29.65-.29 1.03 0 1.1.9 2 2 2zm4.6 9.99-1.07-1.07-1.08 1.07c-1.3 1.3-3.58 1.31-4.89 0l-1.07-1.07-1.09 1.07C6.75 16.64 5.88 17 4.96 17c-.73 0-1.4-.23-1.96-.61V21c0 .55.45 1 1 1h16c.55 0 1-.45 1-1v-4.61c-.56.38-1.23.61-1.96.61-.92 0-1.79-.36-2.44-1.01zM18 9h-5V7h-2v2H6c-1.66 0-3 1.34-3 3v1.54c0 1.08.88 1.96 1.96 1.96.52 0 1.02-.2 1.38-.57l2.14-2.13 2.13 2.13c.74.74 2.03.74 2.77 0l2.14-2.13 2.13 2.13c.37.36.87.57 1.39.57 1.08 0 1.96-.88 1.96-1.96V12C21 10.34 19.66 9 18 9z"/></symbol>
+</svg>
+
+<div class="page-head">
+  <div>
+    <h1>POS — UI Mockup</h1>
+    <p>Mobile-first product catalog, sticky cart, and two-pane checkout for Staff and Owner.</p>
+  </div>
+  <button class="theme-toggle" onclick="toggleTheme()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
+    <span id="themeLabel">Light mode</span>
+  </button>
+</div>
+
+<div class="frames">
+
+  <!-- Phone portrait -->
+  <div class="frame-wrap">
+    <div class="frame-label">Phone — Portrait</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span>
+        <span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span>
+      </div>
+      <div class="appbar">
+        <div class="title"><h2>POS</h2></div>
+        <div class="act"><svg class="ic-moon"><use href="#i-moon"/></svg><svg class="ic-sun"><use href="#i-sun"/></svg></div>
+        <div class="act"><svg><use href="#i-bell"/></svg></div>
+        <div class="avatar">JD</div>
+      </div>
+      <div class="screen" style="padding-bottom:0">
+
+        <div class="search"><svg><use href="#i-search"/></svg>Search products...</div>
+
+        <div class="chips" style="flex-wrap:nowrap;overflow-x:auto">
+          <span class="chip on">All</span><span class="chip">Rice Meals</span><span class="chip">Snacks</span><span class="chip">Drinks</span><span class="chip">Desserts</span>
+        </div>
+
+        <div class="product-grid">
+          <div class="product-card">
+            <div class="product-img"><svg><use href="#i-food"/></svg><div class="qty-badge">1</div></div>
+            <div class="product-info">
+              <div class="product-name">Pastil</div>
+              <div class="product-price">₱10.00</div>
+              <div class="stock-chip"><svg><use href="#i-check"/></svg>12 available</div>
+            </div>
+          </div>
+          <div class="product-card">
+            <div class="product-img"><svg><use href="#i-coffee"/></svg></div>
+            <div class="product-info">
+              <div class="product-name">Iced Coffee</div>
+              <div class="product-price">₱45.00</div>
+              <div class="stock-chip"><svg><use href="#i-check"/></svg>15 available</div>
+            </div>
+          </div>
+          <div class="product-card">
+            <div class="product-img"><svg><use href="#i-food"/></svg></div>
+            <div class="product-info">
+              <div class="product-name">Lumpia</div>
+              <div class="product-price">₱25.00</div>
+              <div class="stock-chip warn"><svg><use href="#i-warn"/></svg>Low stock: 3</div>
+            </div>
+          </div>
+          <div class="product-card disabled">
+            <div class="product-img"><svg><use href="#i-cake"/></svg><div class="overlay">Out of Stock</div></div>
+            <div class="product-info">
+              <div class="product-name">Halo-Halo</div>
+              <div class="product-price">₱80.00</div>
+              <div class="stock-chip err"><svg><use href="#i-err"/></svg>0 available</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="cart-bar">
+          <div class="summary">
+            <div class="items">3 items · tap to review</div>
+            <div class="total">₱80.00</div>
+          </div>
+          <button class="btn btn-primary"><svg><use href="#i-receipt"/></svg>Checkout</button>
+        </div>
+
+      </div>
+      <div class="bottomnav">
+        <div class="navitem"><span class="navicon"><svg><use href="#i-dash"/></svg></span><span class="navlbl">Dashboard</span></div>
+        <div class="navitem sel"><span class="navicon"><svg><use href="#i-cart"/></svg></span><span class="navlbl">POS</span></div>
+        <div class="navitem"><span class="navicon"><svg><use href="#i-box"/></svg></span><span class="navlbl">Products</span></div>
+        <div class="navitem"><span class="navicon"><svg><use href="#i-receipt"/></svg></span><span class="navlbl">Sales</span></div>
+        <div class="navitem"><span class="navicon"><svg><use href="#i-more"/></svg></span><span class="navlbl">More</span></div>
+      </div>
+    </div>
+    <div class="frame-notes">
+      <b>Changes:</b> search at top · horizontally scrollable category chips · mobile-first product grid (2 columns) with image placeholder, price, and semantic stock chip · quantity badge on in-cart items · sticky cart bar at the bottom with item count, total, and checkout · bottom nav with POS selected.
+    </div>
+  </div>
+
+  <!-- Phone cart sheet -->
+  <div class="frame-wrap">
+    <div class="frame-label">Phone — Cart Sheet</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span>
+        <span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span>
+      </div>
+      <div class="cart-sheet">
+        <div class="cart-header">
+          <h3>Cart</h3>
+          <button class="btn btn-ghost del"><svg><use href="#i-del"/></svg>Clear</button>
+        </div>
+        <div class="cart-list" style="flex:1;min-height:0">
+          <div class="cart-item">
+            <div class="cart-thumb"><svg><use href="#i-food"/></svg></div>
+            <div class="cart-body">
+              <div class="cart-top">
+                <div>
+                  <div class="cart-name">Pastil</div>
+                  <div class="cart-unit">₱10.00 each</div>
+                </div>
+                <svg width="20" height="20" style="fill:var(--error);flex-shrink:0"><use href="#i-del"/></svg>
+              </div>
+              <div class="cart-controls">
+                <div class="stepper">
+                  <button><svg><use href="#i-minus"/></svg></button>
+                  <div class="qty">1</div>
+                  <button><svg><use href="#i-plus"/></svg></button>
+                </div>
+                <div class="cart-line">₱10.00</div>
+              </div>
+            </div>
+          </div>
+          <div class="cart-item">
+            <div class="cart-thumb"><svg><use href="#i-coffee"/></svg></div>
+            <div class="cart-body">
+              <div class="cart-top">
+                <div>
+                  <div class="cart-name">Iced Coffee</div>
+                  <div class="cart-unit">₱45.00 each</div>
+                </div>
+                <svg width="20" height="20" style="fill:var(--error);flex-shrink:0"><use href="#i-del"/></svg>
+              </div>
+              <div class="cart-controls">
+                <div class="stepper">
+                  <button><svg><use href="#i-minus"/></svg></button>
+                  <div class="qty">1</div>
+                  <button><svg><use href="#i-plus"/></svg></button>
+                </div>
+                <div class="cart-line">₱45.00</div>
+              </div>
+            </div>
+          </div>
+          <div class="cart-item">
+            <div class="cart-thumb"><svg><use href="#i-food"/></svg></div>
+            <div class="cart-body">
+              <div class="cart-top">
+                <div>
+                  <div class="cart-name">Lumpia</div>
+                  <div class="cart-unit">₱25.00 each</div>
+                </div>
+                <svg width="20" height="20" style="fill:var(--error);flex-shrink:0"><use href="#i-del"/></svg>
+              </div>
+              <div class="cart-controls">
+                <div class="stepper">
+                  <button><svg><use href="#i-minus"/></svg></button>
+                  <div class="qty">1</div>
+                  <button><svg><use href="#i-plus"/></svg></button>
+                </div>
+                <div class="cart-line">₱25.00</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="cart-totals">
+          <div class="tot-row"><span>Subtotal</span><span>₱80.00</span></div>
+          <div class="tot-row total"><span>Total</span><span class="amt">₱80.00</span></div>
+        </div>
+        <div class="cart-actions">
+          <button class="btn btn-primary" style="width:100%"><svg><use href="#i-receipt"/></svg>Complete Sale</button>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes">
+      <b>Changes:</b> cart opens as a modal sheet on mobile · cart items show thumbnail, name, unit price, quantity stepper, and line total · remove action on each row · subtotal and total separated · primary <b>Complete Sale</b> button at the bottom.
+    </div>
+  </div>
+
+  <!-- Desktop / tablet two-pane -->
+  <div class="frame-wrap" style="width:100%;max-width:1100px">
+    <div class="frame-label">Tablet / Desktop — Two Pane</div>
+    <div class="desktop">
+      <div class="statusbar"><span>9:41</span>
+        <span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span>
+      </div>
+      <div class="appbar">
+        <div class="title"><h2>POS</h2></div>
+        <div class="act"><svg class="ic-moon"><use href="#i-moon"/></svg><svg class="ic-sun"><use href="#i-sun"/></svg></div>
+        <div class="act"><svg><use href="#i-bell"/></svg></div>
+        <div class="avatar">JD</div>
+      </div>
+      <div class="desktop-body">
+        <div class="catalog-pane">
+          <div class="catalog-head">
+            <div class="search"><svg><use href="#i-search"/></svg>Search products...</div>
+            <div class="chips">
+              <span class="chip on">All</span><span class="chip">Rice Meals</span><span class="chip">Snacks</span><span class="chip">Drinks</span><span class="chip">Desserts</span>
+            </div>
+          </div>
+          <div class="catalog-scroll">
+            <div class="product-grid cols-3">
+              <div class="product-card">
+                <div class="product-img"><svg><use href="#i-food"/></svg><div class="qty-badge">1</div></div>
+                <div class="product-info">
+                  <div class="product-name">Pastil</div>
+                  <div class="product-price">₱10.00</div>
+                  <div class="stock-chip"><svg><use href="#i-check"/></svg>12</div>
+                </div>
+              </div>
+              <div class="product-card">
+                <div class="product-img"><svg><use href="#i-coffee"/></svg></div>
+                <div class="product-info">
+                  <div class="product-name">Iced Coffee</div>
+                  <div class="product-price">₱45.00</div>
+                  <div class="stock-chip"><svg><use href="#i-check"/></svg>15</div>
+                </div>
+              </div>
+              <div class="product-card">
+                <div class="product-img"><svg><use href="#i-food"/></svg></div>
+                <div class="product-info">
+                  <div class="product-name">Lumpia</div>
+                  <div class="product-price">₱25.00</div>
+                  <div class="stock-chip warn"><svg><use href="#i-warn"/></svg>3</div>
+                </div>
+              </div>
+              <div class="product-card disabled">
+                <div class="product-img"><svg><use href="#i-cake"/></svg><div class="overlay">Out of Stock</div></div>
+                <div class="product-info">
+                  <div class="product-name">Halo-Halo</div>
+                  <div class="product-price">₱80.00</div>
+                  <div class="stock-chip err"><svg><use href="#i-err"/></svg>0</div>
+                </div>
+              </div>
+              <div class="product-card">
+                <div class="product-img"><svg><use href="#i-food"/></svg></div>
+                <div class="product-info">
+                  <div class="product-name">Adobo Rice</div>
+                  <div class="product-price">₱95.00</div>
+                  <div class="stock-chip"><svg><use href="#i-check"/></svg>8</div>
+                </div>
+              </div>
+              <div class="product-card">
+                <div class="product-img"><svg><use href="#i-food"/></svg></div>
+                <div class="product-info">
+                  <div class="product-name">Siopao</div>
+                  <div class="product-price">₱35.00</div>
+                  <div class="stock-chip"><svg><use href="#i-check"/></svg>20</div>
+                </div>
+              </div>
+              <div class="product-card">
+                <div class="product-img"><svg><use href="#i-drink"/></svg></div>
+                <div class="product-info">
+                  <div class="product-name">Gulaman</div>
+                  <div class="product-price">₱30.00</div>
+                  <div class="stock-chip"><svg><use href="#i-check"/></svg>18</div>
+                </div>
+              </div>
+              <div class="product-card">
+                <div class="product-img"><svg><use href="#i-food"/></svg></div>
+                <div class="product-info">
+                  <div class="product-name">Turon</div>
+                  <div class="product-price">₱20.00</div>
+                  <div class="stock-chip"><svg><use href="#i-check"/></svg>10</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="cart-pane">
+          <div class="cart-header">
+            <h3>Cart</h3>
+            <button class="btn btn-ghost del"><svg><use href="#i-del"/></svg>Clear</button>
+          </div>
+          <div class="cart-list" style="flex:1;min-height:0">
+            <div class="cart-item">
+              <div class="cart-thumb"><svg><use href="#i-food"/></svg></div>
+              <div class="cart-body">
+                <div class="cart-top">
+                  <div>
+                    <div class="cart-name">Pastil</div>
+                    <div class="cart-unit">₱10.00 each</div>
+                  </div>
+                  <svg width="20" height="20" style="fill:var(--error);flex-shrink:0"><use href="#i-del"/></svg>
+                </div>
+                <div class="cart-controls">
+                  <div class="stepper">
+                    <button><svg><use href="#i-minus"/></svg></button>
+                    <div class="qty">1</div>
+                    <button><svg><use href="#i-plus"/></svg></button>
+                  </div>
+                  <div class="cart-line">₱10.00</div>
+                </div>
+              </div>
+            </div>
+            <div class="cart-item">
+              <div class="cart-thumb"><svg><use href="#i-coffee"/></svg></div>
+              <div class="cart-body">
+                <div class="cart-top">
+                  <div>
+                    <div class="cart-name">Iced Coffee</div>
+                    <div class="cart-unit">₱45.00 each</div>
+                  </div>
+                  <svg width="20" height="20" style="fill:var(--error);flex-shrink:0"><use href="#i-del"/></svg>
+                </div>
+                <div class="cart-controls">
+                  <div class="stepper">
+                    <button><svg><use href="#i-minus"/></svg></button>
+                    <div class="qty">1</div>
+                    <button><svg><use href="#i-plus"/></svg></button>
+                  </div>
+                  <div class="cart-line">₱45.00</div>
+                </div>
+              </div>
+            </div>
+            <div class="cart-item">
+              <div class="cart-thumb"><svg><use href="#i-food"/></svg></div>
+              <div class="cart-body">
+                <div class="cart-top">
+                  <div>
+                    <div class="cart-name">Lumpia</div>
+                    <div class="cart-unit">₱25.00 each</div>
+                  </div>
+                  <svg width="20" height="20" style="fill:var(--error);flex-shrink:0"><use href="#i-del"/></svg>
+                </div>
+                <div class="cart-controls">
+                  <div class="stepper">
+                    <button><svg><use href="#i-minus"/></svg></button>
+                    <div class="qty">1</div>
+                    <button><svg><use href="#i-plus"/></svg></button>
+                  </div>
+                  <div class="cart-line">₱25.00</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="cart-totals">
+            <div class="tot-row"><span>Subtotal</span><span>₱80.00</span></div>
+            <div class="tot-row total"><span>Total</span><span class="amt">₱80.00</span></div>
+          </div>
+          <div class="cart-actions">
+            <button class="btn btn-primary" style="width:100%"><svg><use href="#i-receipt"/></svg>Complete Sale</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes">
+      <b>Changes:</b> at ≥720 px the layout splits into a product catalog on the left and a fixed-width cart panel on the right · product grid uses 4 columns within the catalog · cart stays visible while the cashier scrolls the catalog · checkout is always one tap away.
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function toggleTheme() {
+    const root = document.documentElement;
+    const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
+    root.dataset.theme = next;
+    document.getElementById('themeLabel').textContent = next === 'dark' ? 'Light mode' : 'Dark mode';
+  }
+</script>
+</body>
+</html>

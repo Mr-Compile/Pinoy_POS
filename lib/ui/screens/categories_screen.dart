@@ -1,6 +1,7 @@
 ﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
@@ -14,6 +15,7 @@ import 'package:pinoy_pos/ui/widgets/app_list_item.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/responsive_create_action.dart';
+import 'package:pinoy_pos/ui/widgets/summary_stat_card.dart';
 
 class CategoriesScreen extends ConsumerStatefulWidget {
   const CategoriesScreen({super.key});
@@ -26,6 +28,7 @@ enum CategoryFilter { all, active, inactive }
 
 class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
   List<Category> _categories = [];
+  Map<int, int> _productCounts = {};
   bool _isLoading = true;
 
   final _searchController = TextEditingController();
@@ -62,11 +65,14 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
     });
 
     final categoryService = ref.read(categoryServiceProvider);
+    final productService = ref.read(productServiceProvider);
     final categories = await categoryService.getAllCategories();
+    final productCounts = await productService.getProductCountsByCategory();
 
     if (mounted) {
       setState(() {
         _categories = categories.where((c) => !c.isDeleted).toList();
+        _productCounts = productCounts;
         _isLoading = false;
       });
     }
@@ -212,42 +218,199 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
       );
     }
 
-    final appBarAction = createAction?.appBarAction(context);
+    final toolbarAction = createAction?.contentAction(context);
     final createFab = createAction?.fab(context);
+    final bottomClearance =
+        createAction?.contentBottomClearance(context) ?? 0;
 
     return Scaffold(
       appBar: AppHeader(
         title: 'Categories',
         showBackButton: true,
         actions: [
-          ?appBarAction,
           IconButton(
             icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh',
             onPressed: _loadCategories,
           ),
         ],
       ),
       floatingActionButton: createFab,
-      body: _categories.isEmpty
-          ? EmptyState(
-              icon: Icons.category,
-              title: 'No Categories Yet',
-              message: 'Create a category to organize your products.',
-            )
-          : Column(
-              children: [
-                _buildSearchAndFilters(),
-                Expanded(
-                  child: _filteredCategories.isEmpty
-                      ? _buildEmptyFilterState()
-                      : _buildCategoryList(
-                          canEdit,
-                          canDelete,
-                          canToggleStatus,
-                        ),
-                ),
-              ],
+      body: Column(
+        children: [
+          if (_categories.isNotEmpty) ...[
+            _buildStatsStrip(),
+            _buildToolbar(toolbarAction),
+          ] else if (toolbarAction != null)
+            // Keep the single create action reachable on layouts where it
+            // lives in the content toolbar even when the list is empty.
+            CrudToolbar(primaryAction: toolbarAction),
+          Expanded(
+            child: _categories.isEmpty
+                ? EmptyState(
+                    icon: Icons.category,
+                    title: 'No Categories Yet',
+                    message: 'Create a category to organize your products.',
+                  )
+                : _filteredCategories.isEmpty
+                    ? _buildEmptyFilterState()
+                    : _buildCategoryList(
+                        canEdit,
+                        canDelete,
+                        canToggleStatus,
+                        bottomClearance,
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Summary strip mirroring the All/Active/Inactive filter chips.
+  /// Tapping a tile applies the same filter.
+  Widget _buildStatsStrip() {
+    final cs = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
+    final activeCount = _categories.where((c) => c.isActive).length;
+    final successColor = AppSemanticColors.resolve(
+      AppSemanticColors.success,
+      brightness,
+    );
+    final neutralColor = cs.outline;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        Spacing.lg,
+        Spacing.md,
+        Spacing.lg,
+        0,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: SummaryStatCard(
+              icon: Icons.label_outline,
+              color: cs.primary,
+              value: '${_categories.length}',
+              label: 'Total',
+              selected: _categoryFilter == CategoryFilter.all,
+              onTap: () =>
+                  setState(() => _categoryFilter = CategoryFilter.all),
             ),
+          ),
+          const SizedBox(width: Spacing.sm),
+          Expanded(
+            child: SummaryStatCard(
+              icon: Icons.check_circle_outline,
+              color: successColor,
+              value: '$activeCount',
+              label: 'Active',
+              selected: _categoryFilter == CategoryFilter.active,
+              onTap: () =>
+                  setState(() => _categoryFilter = CategoryFilter.active),
+            ),
+          ),
+          const SizedBox(width: Spacing.sm),
+          Expanded(
+            child: SummaryStatCard(
+              icon: Icons.pause_circle_outline,
+              color: neutralColor,
+              value: '${_categories.length - activeCount}',
+              label: 'Inactive',
+              selected: _categoryFilter == CategoryFilter.inactive,
+              onTap: () =>
+                  setState(() => _categoryFilter = CategoryFilter.inactive),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Semantic category badge color that matches the mockup's icon badge
+  /// palette. Drinks are teal, desserts/baked goods are violet, snacks are
+  /// pink-red, meals/coffee are amber/orange, and generic categories are
+  /// blue.
+  Color _categoryBadgeColor(Category category, Brightness brightness) {
+    final n = category.name.toLowerCase();
+    if (n.contains('coffee')) {
+      return AppSemanticColors.resolve(AppSemanticColors.warning, brightness);
+    }
+    if (n.contains('drink') ||
+        n.contains('beverage') ||
+        n.contains('juice') ||
+        n.contains('tea')) {
+      return AppSemanticColors.resolve(AppSemanticColors.teal, brightness);
+    }
+    if (n.contains('dessert') ||
+        n.contains('sweet') ||
+        n.contains('cake') ||
+        n.contains('bread') ||
+        n.contains('baker')) {
+      return AppSemanticColors.resolve(AppSemanticColors.violet, brightness);
+    }
+    if (n.contains('snack') || n.contains('merienda')) {
+      return AppSemanticColors.resolve(AppSemanticColors.error, brightness);
+    }
+    if (n.contains('meal') ||
+        n.contains('rice') ||
+        n.contains('food') ||
+        n.contains('ulam')) {
+      return AppSemanticColors.resolve(AppSemanticColors.warning, brightness);
+    }
+    return AppSemanticColors.resolve(AppSemanticColors.info, brightness);
+  }
+
+  /// Best-guess icon for common category names; falls back to a label.
+  IconData _categoryIcon(Category category) {
+    final n = category.name.toLowerCase();
+    if (n.contains('coffee')) return Icons.coffee_outlined;
+    if (n.contains('drink') ||
+        n.contains('beverage') ||
+        n.contains('juice') ||
+        n.contains('tea')) {
+      return Icons.local_drink_outlined;
+    }
+    if (n.contains('dessert') ||
+        n.contains('sweet') ||
+        n.contains('cake')) {
+      return Icons.cake_outlined;
+    }
+    if (n.contains('bread') || n.contains('baker')) {
+      return Icons.bakery_dining_outlined;
+    }
+    if (n.contains('snack') || n.contains('merienda')) {
+      return Icons.fastfood_outlined;
+    }
+    if (n.contains('meal') ||
+        n.contains('rice') ||
+        n.contains('food') ||
+        n.contains('ulam')) {
+      return Icons.restaurant_outlined;
+    }
+    return Icons.label_outline;
+  }
+
+  Widget _buildToolbar(Widget? primaryAction) {
+    return CrudToolbar(
+      padding: const EdgeInsets.fromLTRB(
+        Spacing.lg,
+        Spacing.md,
+        Spacing.lg,
+        Spacing.sm,
+      ),
+      search: AppSearchField(
+        controller: _searchController,
+        hint: 'Search categories...',
+        onChanged: _onSearchChanged,
+        onClear: _clearSearch,
+      ),
+      controls: [
+        _buildFilterChip(CategoryFilter.all, 'All'),
+        _buildFilterChip(CategoryFilter.active, 'Active'),
+        _buildFilterChip(CategoryFilter.inactive, 'Inactive'),
+      ],
+      primaryAction: primaryAction,
     );
   }
 
@@ -255,9 +418,15 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
     bool canEdit,
     bool canDelete,
     bool canToggleStatus,
+    double bottomClearance,
   ) {
     return ListView.builder(
-      padding: const EdgeInsets.all(Spacing.lg),
+      padding: EdgeInsets.fromLTRB(
+        Spacing.lg,
+        Spacing.lg,
+        Spacing.lg,
+        Spacing.lg + bottomClearance,
+      ),
       itemCount: _filteredCategories.length,
       itemBuilder: (context, index) {
         final category = _filteredCategories[index];
@@ -303,11 +472,27 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
         ),
     ];
 
+    final badgeColor = _categoryBadgeColor(category, Theme.of(context).brightness);
+    final count = _productCounts[category.id] ?? 0;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: Spacing.md),
       child: AppListItem(
+        leading: Container(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            color: badgeColor.withValues(alpha: 0.16),
+            borderRadius: BorderRadius.circular(AppRadius.md),
+          ),
+          child: Icon(
+            _categoryIcon(category),
+            color: badgeColor,
+            size: 24,
+          ),
+        ),
         title: category.name,
-        subtitle: 'Category',
+        subtitle: '$count product${count == 1 ? '' : 's'}',
         statusLabel: category.isActive ? 'Active' : 'Inactive',
         statusColor: statusColor,
         actions: actions.isNotEmpty ? actions : null,
@@ -316,47 +501,17 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
     );
   }
 
-  Widget _buildSearchAndFilters() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(Spacing.lg, Spacing.md, Spacing.lg, Spacing.sm),
-      child: Column(
-        children: [
-          AppSearchField(
-            controller: _searchController,
-            hint: 'Search categories...',
-            onChanged: _onSearchChanged,
-            onClear: _clearSearch,
-          ),
-          const SizedBox(height: Spacing.sm),
-          SizedBox(
-            height: 40,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: [
-                _buildFilterChip(CategoryFilter.all, 'All'),
-                _buildFilterChip(CategoryFilter.active, 'Active'),
-                _buildFilterChip(CategoryFilter.inactive, 'Inactive'),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildFilterChip(CategoryFilter filter, String label) {
     final isSelected = _categoryFilter == filter;
-    return Padding(
-      padding: const EdgeInsets.only(right: Spacing.sm),
-      child: FilterChip(
-        label: Text(label),
-        selected: isSelected,
-        onSelected: (_) {
-          setState(() {
-            _categoryFilter = filter;
-          });
-        },
-      ),
+    return FilterChip(
+      label: Text(label),
+      showCheckmark: false,
+      selected: isSelected,
+      onSelected: (_) {
+        setState(() {
+          _categoryFilter = filter;
+        });
+      },
     );
   }
 

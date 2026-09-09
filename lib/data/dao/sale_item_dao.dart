@@ -57,7 +57,8 @@ class SaleItemDao extends BaseDao<SaleItem> {
   /// - [sortByRevenue]: when true, order by revenue desc; otherwise by qty.
   ///
   /// Returns a list of maps with keys:
-  ///   `product_id`, `product_name`, `total_quantity`, `revenue`.
+  ///   `product_id`, `product_name`, `total_quantity`, `revenue`,
+  ///   `category_name`.
   Future<List<Map<String, dynamic>>> getTopProducts({
     int limit = 5,
     DateTime? since,
@@ -94,10 +95,12 @@ class SaleItemDao extends BaseDao<SaleItem> {
       SELECT si.product_id AS product_id,
              COALESCE(si.product_name, p.name, 'Product #' || si.product_id) AS product_name,
              SUM(si.quantity) AS total_quantity,
-             COALESCE(SUM(si.total_price), 0) AS revenue
+             COALESCE(SUM(si.total_price), 0) AS revenue,
+             c.name AS category_name
       FROM sale_items si
       INNER JOIN sales s ON si.sale_id = s.id
       LEFT JOIN products p ON si.product_id = p.id
+      LEFT JOIN categories c ON p.category_id = c.id
       WHERE ${conditions.join(' AND ')}
       GROUP BY si.product_id, COALESCE(si.product_name, p.name, 'Product #' || si.product_id)
       ORDER BY $orderBy

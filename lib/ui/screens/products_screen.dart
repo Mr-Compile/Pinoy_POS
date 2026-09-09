@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
-import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/product.dart';
@@ -17,9 +16,11 @@ import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
 import 'package:pinoy_pos/ui/widgets/app_list_item.dart';
+import 'package:pinoy_pos/ui/widgets/app_status_chip.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/responsive_create_action.dart';
+import 'package:pinoy_pos/ui/widgets/summary_stat_card.dart';
 
 class ProductsScreen extends ConsumerStatefulWidget {
   const ProductsScreen({super.key});
@@ -27,6 +28,9 @@ class ProductsScreen extends ConsumerStatefulWidget {
   @override
   ConsumerState<ProductsScreen> createState() => _ProductsScreenState();
 }
+
+/// Stock-status filter driven by the summary stat strip.
+enum _ProductStockFilter { all, lowStock, outOfStock }
 
 class _ProductsScreenState extends ConsumerState<ProductsScreen> {
   List<Product> _products = [];
@@ -40,6 +44,12 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
   int? _selectedCategoryId;
+  _ProductStockFilter _stockFilter = _ProductStockFilter.all;
+
+  // Catalog-wide counts for the stat strip. Kept separate from _products
+  // so they reflect the whole inventory, not the current search results.
+  ({int total, int lowStock, int outOfStock}) _stockSummary =
+      (total: 0, lowStock: 0, outOfStock: 0);
 
   // Kept alive inside the app shell's PageView: reload whenever catalog
   // data changes elsewhere (POS sale, stock adjustment, trash restore).
@@ -72,6 +82,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
       final productService = ref.read(productServiceProvider);
       final categoryService = ref.read(categoryServiceProvider);
       final categories = await categoryService.getActiveCategories();
+      final stockSummary = await productService.getStockSummary();
 
       // When a search query is active, run the search at the DAO level;
       // otherwise load all active products.
@@ -83,6 +94,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
         setState(() {
           _products = products;
           _categories = categories;
+          _stockSummary = stockSummary;
           _isLoading = false;
         });
       }
@@ -95,12 +107,25 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     }
   }
 
-  /// Products after applying the optional category filter. The category
-  /// filter is applied to the already-authorized product list, so it never
-  /// bypasses the service-layer read permission.
+  /// Products after applying the optional category and stock-status
+  /// filters. Both are applied to the already-authorized product list, so
+  /// they never bypass the service-layer read permission.
   List<Product> get _filteredProducts {
-    if (_selectedCategoryId == null) return _products;
-    return _products.where((p) => p.categoryId == _selectedCategoryId).toList();
+    var result = _products;
+    if (_selectedCategoryId != null) {
+      result =
+          result.where((p) => p.categoryId == _selectedCategoryId).toList();
+    }
+    switch (_stockFilter) {
+      case _ProductStockFilter.lowStock:
+        result =
+            result.where((p) => p.stock > 0 && p.isLowStock).toList();
+      case _ProductStockFilter.outOfStock:
+        result = result.where((p) => p.stock <= 0).toList();
+      case _ProductStockFilter.all:
+        break;
+    }
+    return result;
   }
 
   void _onSearchChanged(String value) {
@@ -159,99 +184,124 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
       );
     }
 
-    final appBarAction = createAction?.appBarAction(context);
+    final toolbarAction = createAction?.contentAction(context);
     final createFab = createAction?.fab(context);
+    final bottomClearance =
+        createAction?.contentBottomClearance(context) ?? 0;
 
     return Scaffold(
-      appBar: AppHeader(
-        title: 'Products',
-        actions: appBarAction != null ? [appBarAction] : null,
-      ),
+      appBar: const AppHeader(title: 'Products'),
       floatingActionButton: createFab,
       body: Column(
         children: [
-          Padding(
+          if (_stockSummary.total > 0) _buildStatsStrip(),
+          CrudToolbar(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final isCompact =
-                    layoutClassFor(constraints.maxWidth) == LayoutClass.compact;
-
-                if (isCompact) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      AppSearchField(
-                        controller: _searchController,
-                        hint: 'Search products',
-                        onChanged: _onSearchChanged,
-                      ),
-                      const SizedBox(height: 12),
-                      AppDropdownField<int?>(
-                        initialValue: _selectedCategoryId,
-                        label: 'Category',
-                        isDense: true,
-                        items: [
-                          const DropdownMenuItem<int?>(
-                            value: null,
-                            child: Text('All'),
-                          ),
-                          ..._categories.map((category) => DropdownMenuItem<int?>(
-                                value: category.id,
-                                child: Text(category.name),
-                              )),
-                        ],
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedCategoryId = value;
-                          });
-                        },
-                      ),
-                    ],
-                  );
-                }
-
-                return Row(
-                  children: [
-                    Expanded(
-                      child: AppSearchField(
-                        controller: _searchController,
-                        hint: 'Search products',
-                        onChanged: _onSearchChanged,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: AppDropdownField<int?>(
-                        initialValue: _selectedCategoryId,
-                        label: 'Category',
-                        isDense: true,
-                        items: [
-                          const DropdownMenuItem<int?>(
-                            value: null,
-                            child: Text('All'),
-                          ),
-                          ..._categories.map((category) => DropdownMenuItem<int?>(
-                                value: category.id,
-                                child: Text(category.name),
-                              )),
-                        ],
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedCategoryId = value;
-                          });
-                        },
-                      ),
-                    ),
-                  ],
-                );
-              },
+            search: AppSearchField(
+              controller: _searchController,
+              hint: 'Search products',
+              onChanged: _onSearchChanged,
             ),
+            controls: [
+              SizedBox(
+                width: 220,
+                child: AppDropdownField<int?>(
+                  initialValue: _selectedCategoryId,
+                  label: 'Category',
+                  isDense: true,
+                  items: [
+                    const DropdownMenuItem<int?>(
+                      value: null,
+                      child: Text('All'),
+                    ),
+                    ..._categories.map((category) => DropdownMenuItem<int?>(
+                          value: category.id,
+                          child: Text(category.name),
+                        )),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedCategoryId = value;
+                    });
+                  },
+                ),
+              ),
+            ],
+            primaryAction: toolbarAction,
           ),
           Expanded(
             child: _filteredProducts.isEmpty
                 ? _buildEmptyState()
-                : _buildProductList(canEdit, canDelete),
+                : _buildProductList(canEdit, canDelete, bottomClearance),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Summary strip doubling as a stock-status filter. Tapping Low or Out
+  /// of Stock toggles that filter; tapping it again (or Products) resets
+  /// to the full list.
+  Widget _buildStatsStrip() {
+    final cs = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
+    final warningColor = AppSemanticColors.resolve(
+      AppSemanticColors.warning,
+      brightness,
+    );
+    final errorColor = AppSemanticColors.resolve(
+      AppSemanticColors.error,
+      brightness,
+    );
+
+    void select(_ProductStockFilter filter) {
+      setState(() {
+        _stockFilter = _stockFilter == filter
+            ? _ProductStockFilter.all
+            : filter;
+      });
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        Spacing.lg,
+        Spacing.md,
+        Spacing.lg,
+        0,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: SummaryStatCard(
+              icon: Icons.inventory_2_outlined,
+              color: cs.primary,
+              value: '${_stockSummary.total}',
+              label: 'Products',
+              selected: _stockFilter == _ProductStockFilter.all,
+              onTap: () => select(_ProductStockFilter.all),
+            ),
+          ),
+          const SizedBox(width: Spacing.sm),
+          Expanded(
+            child: SummaryStatCard(
+              icon: Icons.warning_amber,
+              color: warningColor,
+              value: '${_stockSummary.lowStock}',
+              label: 'Low stock',
+              selected: _stockFilter == _ProductStockFilter.lowStock,
+              onTap: () => select(_ProductStockFilter.lowStock),
+            ),
+          ),
+          const SizedBox(width: Spacing.sm),
+          Expanded(
+            child: SummaryStatCard(
+              icon: Icons.error_outline,
+              color: errorColor,
+              value: '${_stockSummary.outOfStock}',
+              label: 'Out of stock',
+              selected: _stockFilter == _ProductStockFilter.outOfStock,
+              onTap: () => select(_ProductStockFilter.outOfStock),
+            ),
           ),
         ],
       ),
@@ -261,6 +311,9 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
   Widget _buildEmptyState() {
     final authNotifier = ref.read(authStateProvider.notifier);
     final canEditCategories = authNotifier.hasPermission('edit_categories');
+    final hasFilters = _searchQuery.isNotEmpty ||
+        _selectedCategoryId != null ||
+        _stockFilter != _ProductStockFilter.all;
 
     if (_products.isEmpty && _categories.isEmpty) {
       return EmptyState(
@@ -281,17 +334,43 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     }
 
     return EmptyState(
-      icon: Icons.inventory_2,
+      icon: _products.isEmpty ? Icons.inventory_2 : Icons.search_off,
       title: _products.isEmpty ? 'No Products Yet' : 'No Products Found',
       message: _products.isEmpty
           ? 'Add your first product to start building your inventory.'
-          : 'No products match your search.',
+          : _searchQuery.isNotEmpty
+              ? 'No products match your search.'
+              : 'No products match the selected filters.',
+      action: hasFilters && _products.isNotEmpty
+          ? TextButton.icon(
+              icon: const Icon(Icons.filter_alt_off),
+              label: const Text('Clear Filters'),
+              onPressed: () {
+                _searchController.clear();
+                setState(() {
+                  _searchQuery = '';
+                  _selectedCategoryId = null;
+                  _stockFilter = _ProductStockFilter.all;
+                });
+                _loadData();
+              },
+            )
+          : null,
     );
   }
 
-  Widget _buildProductList(bool canEdit, bool canDelete) {
+  Widget _buildProductList(
+    bool canEdit,
+    bool canDelete,
+    double bottomClearance,
+  ) {
     return ListView.builder(
-      padding: const EdgeInsets.all(Spacing.lg),
+      padding: EdgeInsets.fromLTRB(
+        Spacing.lg,
+        Spacing.lg,
+        Spacing.lg,
+        Spacing.lg + bottomClearance,
+      ),
       itemCount: _filteredProducts.length,
       itemBuilder: (context, index) {
         final product = _filteredProducts[index];
@@ -368,12 +447,20 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
           ),
         ),
         title: product.name,
-        subtitle: '${category.name} • Stock: ${product.stock}',
+        subtitle: 'Stock: ${product.stock}',
         trailing: Text(
           CurrencyUtils.format(product.price),
           style: AppTypography.titleMediumBold(context)
               .copyWith(color: cs.primary),
         ),
+        chips: [
+          AppStatusChip(
+            label: category.name,
+            color: cs.primary,
+            icon: Icons.label_outline,
+            filled: false,
+          ),
+        ],
         statusLabel: statusLabel,
         statusColor: statusColor,
         statusIcon: statusIcon,

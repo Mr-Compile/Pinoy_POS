@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinoy POS — Dialogs &amp; Settings Mockups</title>
+<link rel="stylesheet" href="mockup.css">
+<style>
+  /* Frame page tweaks */
+  .frames { gap: 48px; padding: 0 24px; }
+  .frame-notes { text-align: center; }
+
+  /* In-phone dialog overlay */
+  .phone-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 10;
+  }
+  .phone-dialog {
+    width: 100%;
+    max-width: 320px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 22px;
+    box-shadow: 0 20px 50px rgba(0,0,0,.4);
+  }
+  .phone-dialog .dialog-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 14px;
+  }
+  .phone-dialog .dialog-icon svg { width: 28px; height: 28px; }
+  .phone-dialog h3 {
+    color: var(--text);
+    font-size: 18px;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 8px;
+  }
+  .phone-dialog p {
+    color: var(--text-3);
+    font-size: 13px;
+    line-height: 1.5;
+    text-align: center;
+    margin-bottom: 18px;
+  }
+  .phone-dialog .actions { display: flex; gap: 10px; }
+  .phone-dialog .actions .btn { flex: 1; }
+
+  /* Summary rows inside dialog */
+  .summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--divider);
+  }
+  .summary-row:last-child { border-bottom: none; }
+  .summary-row .label { font-size: 12px; color: var(--text-3); }
+  .summary-row .value { font-size: 13px; font-weight: 700; color: var(--text); }
+
+  /* Countdown ring */
+  .countdown-ring {
+    width: 100px;
+    height: 100px;
+    margin: 0 auto 18px;
+    position: relative;
+  }
+  .countdown-ring svg {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+  }
+  .countdown-ring .track {
+    fill: none;
+    stroke: var(--border);
+    stroke-width: 6;
+  }
+  .countdown-ring .progress {
+    fill: none;
+    stroke: var(--warning);
+    stroke-width: 6;
+    stroke-linecap: round;
+    stroke-dasharray: 283;
+    stroke-dashoffset: 70;
+  }
+  .countdown-ring .time {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    color: var(--text);
+  }
+  .countdown-ring .time .num { font-size: 32px; font-weight: 700; }
+  .countdown-ring .time .unit { font-size: 11px; color: var(--text-3); }
+
+  /* Dimmed screen behind modals */
+  .fake-screen { opacity: .35; filter: blur(1px); }
+
+  /* Theme option row */
+  .theme-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
+  .theme-row + .theme-row { border-top: 1px solid var(--divider); }
+  .theme-row .grow { flex: 1; min-width: 0; }
+  .theme-row .trailing svg { width: 22px; height: 22px; }
+</style>
+</head>
+<body>
+
+<div class="page-head" style="max-width: 1300px;">
+  <div>
+    <h1>Dialogs &amp; Settings</h1>
+    <p>GCash confirmation · Session expiring · Appearance settings</p>
+  </div>
+  <button class="theme-toggle" onclick="toggleTheme()">
+    <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; fill: currentColor;">
+      <path d="M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z"/><path d="M12 2v2M12 20v2M4.22 4.22l1.41 1.41M18.36 18.36l1.41 1.41M2 12h2M20 12h2M4.22 19.78l1.41-1.41M18.36 5.64l1.41-1.41" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
+    </svg>
+    <span id="themeLabel">Light mode</span>
+  </button>
+</div>
+
+<div class="hint" style="max-width: 1300px; margin: 0 auto 24px; color: var(--text-3); font-size: 13px; line-height: 1.5;">
+  Live references: <b>sale_detail_screen.dart</b>, <b>session_expiring_dialog.dart</b>, <b>appearance_settings_page.dart</b>.
+  The three phone frames share the same theme, spacing, and component language.
+</div>
+
+<div class="frames">
+
+  <!-- GCash Confirmation Dialog -->
+  <div class="frame-wrap">
+    <div class="phone">
+      <div class="statusbar">
+        <span>9:41</span>
+        <span class="icons">
+          <svg viewBox="0 0 24 24"><path d="M12 3C7.5 3 4 6.5 4 11v8h2v-8c0-3.5 2.5-6.5 6-6.5s6 3 6 6.5v8h2v-8c0-4.5-3.5-8-8-8z" fill="currentColor"/></svg>
+        </span>
+      </div>
+      <div class="appbar">
+        <div class="back">
+          <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" fill="#fff"/></svg>
+        </div>
+        <div class="title"><h2>Sale Detail</h2></div>
+      </div>
+      <div class="screen fake-screen">
+        <div class="screen-body">
+          <div class="card pad">
+            <div class="row" style="justify-content: space-between; align-items: flex-start;">
+              <div class="grow">
+                <div class="name">Receipt 20260908-0005</div>
+                <div class="sub">Staff: Juan · 9:38 AM</div>
+              </div>
+              <div class="pill pill-amber" style="font-size: 10.5px;">Pending</div>
+            </div>
+            <div class="row" style="padding: 10px 0; border-top: 1px solid var(--divider); border-bottom: 1px solid var(--divider); margin-top: 8px;">
+              <div class="grow"><div class="name">Pork Sisig Rice Meal</div><div class="sub">2 × ₱ 180.00</div></div>
+              <div class="val">₱ 360.00</div>
+            </div>
+            <div class="row" style="padding: 10px 0; border-bottom: 1px solid var(--divider);">
+              <div class="grow"><div class="name">Iced Tea</div><div class="sub">1 × ₱ 45.00</div></div>
+              <div class="val">₱ 45.00</div>
+            </div>
+            <div class="row" style="padding: 10px 0;">
+              <div class="grow"><div class="name">Total</div></div>
+              <div class="val" style="font-size: 16px; color: var(--text);">₱ 1,250.00</div>
+            </div>
+            <div class="row" style="padding: 6px 0 0;">
+              <div class="grow"><div class="sub">Reference</div></div>
+              <div class="sub">GCASH-1234-REF</div>
+            </div>
+          </div>
+          <div class="row" style="gap: 12px; padding: 0;">
+            <button class="btn btn-error" style="flex: 1;">Reject</button>
+            <button class="btn btn-primary" style="flex: 1;">Confirm</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="phone-overlay">
+        <div class="phone-dialog">
+          <div class="dialog-icon solid-blue">
+            <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 19c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2c1.66 0 3 1.34 3 3 0 1.66-1.34 3-3 3h-1v2h2c2.76 0 5-2.24 5-5s-2.24-5-5-5h-2c-2.76 0-5 2.24-5 5h2c0-1.66 1.34-3 3-3z" fill="#fff"/></svg>
+          </div>
+          <h3>Confirm GCash Payment</h3>
+          <p>Are you sure you want to confirm this pending GCash payment?</p>
+
+          <div class="card pad" style="margin-bottom: 16px;">
+            <div class="summary-row"><span class="label">Amount</span><span class="value">₱ 1,250.00</span></div>
+            <div class="summary-row"><span class="label">Reference</span><span class="value">GCASH-1234-REF</span></div>
+            <div class="summary-row">
+              <span class="label">Payment Method</span>
+              <span class="pill pill-green" style="font-size: 10.5px;">GCash</span>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="btn btn-outlined">Cancel</button>
+            <button class="btn btn-primary">Confirm</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="frame-label">GCash Confirmation</div>
+    <div class="frame-notes">Owner confirms a pending staff GCash sale with a basic one-tap dialog. No username or password required.</div>
+  </div>
+
+  <!-- Session Expiring Dialog -->
+  <div class="frame-wrap">
+    <div class="phone">
+      <div class="statusbar">
+        <span>9:41</span>
+        <span class="icons">
+          <svg viewBox="0 0 24 24"><path d="M12 3C7.5 3 4 6.5 4 11v8h2v-8c0-3.5 2.5-6.5 6-6.5s6 3 6 6.5v8h2v-8c0-4.5-3.5-8-8-8z" fill="currentColor"/></svg>
+        </span>
+      </div>
+      <div class="screen fake-screen">
+        <div class="screen-body">
+          <div class="section-head">Dashboard</div>
+          <div class="card pad" style="display: flex; gap: 14px; flex-wrap: wrap;">
+            <div class="card pad primary-soft" style="flex: 1; min-width: 120px;">
+              <div class="sub">Total Sales</div>
+              <div class="name" style="font-size: 19px; margin-top: 6px;">₱ 12,450.00</div>
+            </div>
+            <div class="card pad surface-soft" style="flex: 1; min-width: 120px;">
+              <div class="sub">Transactions</div>
+              <div class="name" style="font-size: 19px; margin-top: 6px;">86</div>
+            </div>
+          </div>
+          <div class="card pad" style="height: 140px; background: var(--surface-elev);"></div>
+        </div>
+      </div>
+
+      <div class="phone-overlay">
+        <div class="phone-dialog">
+          <div class="dialog-icon solid-amber">
+            <svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" fill="#fff"/></svg>
+          </div>
+          <h3>Session Expiring</h3>
+          <p>Are you still there?</p>
+
+          <div class="countdown-ring">
+            <svg viewBox="0 0 100 100">
+              <circle class="track" cx="50" cy="50" r="45"/>
+              <circle class="progress" cx="50" cy="50" r="45"/>
+            </svg>
+            <div class="time">
+              <div class="num">47</div>
+              <div class="unit">seconds</div>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="btn btn-error">Log Out</button>
+            <button class="btn btn-primary" style="background: var(--success); border-color: var(--success);">Continue Session</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="frame-label">Session Expiring</div>
+    <div class="frame-notes">Warning-style dialog with a 100 px countdown ring, larger number, 12 dp spacing, and a clean logout/continue action pair.</div>
+  </div>
+
+  <!-- Appearance Settings Page -->
+  <div class="frame-wrap">
+    <div class="phone">
+      <div class="statusbar">
+        <span>9:41</span>
+        <span class="icons">
+          <svg viewBox="0 0 24 24"><path d="M12 3C7.5 3 4 6.5 4 11v8h2v-8c0-3.5 2.5-6.5 6-6.5s6 3 6 6.5v8h2v-8c0-4.5-3.5-8-8-8z" fill="currentColor"/></svg>
+        </span>
+      </div>
+      <div class="appbar">
+        <div class="back">
+          <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" fill="#fff"/></svg>
+        </div>
+        <div class="title"><h2>Appearance</h2></div>
+      </div>
+      <div class="screen">
+        <div class="screen-body">
+          <div class="section-head">Theme</div>
+          <div class="section-desc">Choose how the app looks.</div>
+
+          <div class="card">
+            <div class="theme-row">
+              <div class="isquare c-amber" style="width: 36px; height: 36px; border-radius: 11px;">
+                <svg viewBox="0 0 24 24" style="width: 19px; height: 19px;">
+                  <circle cx="12" cy="12" r="5" fill="currentColor"/>
+                  <circle cx="12" cy="3" r="1.5" fill="currentColor"/>
+                  <circle cx="12" cy="21" r="1.5" fill="currentColor"/>
+                  <circle cx="3" cy="12" r="1.5" fill="currentColor"/>
+                  <circle cx="21" cy="12" r="1.5" fill="currentColor"/>
+                  <circle cx="5.64" cy="5.64" r="1.5" fill="currentColor"/>
+                  <circle cx="18.36" cy="18.36" r="1.5" fill="currentColor"/>
+                  <circle cx="5.64" cy="18.36" r="1.5" fill="currentColor"/>
+                  <circle cx="18.36" cy="5.64" r="1.5" fill="currentColor"/>
+                </svg>
+              </div>
+              <div class="grow">
+                <div class="name">Light</div>
+                <div class="sub">Always light theme</div>
+              </div>
+              <div class="trailing">
+                <svg viewBox="0 0 24 24" style="width: 22px; height: 22px; fill: var(--warning);"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+              </div>
+            </div>
+            <div class="theme-row">
+              <div class="isquare c-blue" style="width: 36px; height: 36px; border-radius: 11px;">
+                <svg viewBox="0 0 24 24" style="width: 19px; height: 19px;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" fill="currentColor"/></svg>
+              </div>
+              <div class="grow">
+                <div class="name">Dark</div>
+                <div class="sub">Always dark theme</div>
+              </div>
+              <div class="trailing">
+                <svg viewBox="0 0 24 24" style="width: 22px; height: 22px; fill: var(--info);"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="frame-label">Appearance Settings</div>
+    <div class="frame-notes">Theme options now use filled icons inside rounded, alpha-tinted color badges — amber for light and blue for dark — with a selected check in the same accent.</div>
+  </div>
+
+</div>
+
+<script src="mockup.js"></script>
+</body>
+</html>

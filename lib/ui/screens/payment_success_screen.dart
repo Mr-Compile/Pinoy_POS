@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/currency_utils.dart';
+import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/ui/screens/receipt_screen.dart';
 import 'package:pinoy_pos/ui/screens/sale_detail_screen.dart';
+import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 
@@ -17,7 +19,12 @@ class PaymentSuccessScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
+    final successColor =
+        AppSemanticColors.resolve(AppSemanticColors.success, brightness);
+    final onSuccessColor =
+        AppSemanticColors.resolve(AppSemanticColors.onSuccess, brightness);
+    final onSuccessMuted = onSuccessColor.withValues(alpha: 0.85);
 
     return Scaffold(
       appBar: const AppHeader(
@@ -26,7 +33,7 @@ class PaymentSuccessScreen extends StatelessWidget {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(Spacing.lg),
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 520),
@@ -34,51 +41,120 @@ class PaymentSuccessScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   AppCard(
-                    color: cs.primaryContainer,
+                    color: successColor,
                     child: Padding(
-                      padding: const EdgeInsets.all(24),
+                      padding: const EdgeInsets.all(Spacing.xl),
                       child: Column(
                         children: [
-                          Icon(Icons.check_circle, size: 64, color: cs.primary),
-                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.all(Spacing.md),
+                            decoration: BoxDecoration(
+                              color: onSuccessColor.withValues(alpha: 0.2),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.check_circle,
+                              size: 48,
+                              color: onSuccessColor,
+                            ),
+                          ),
+                          const SizedBox(height: Spacing.lg),
                           Text(
                             'Payment Successful',
                             style: AppTypography.headlineSmallSemibold(
                               context,
-                            ).copyWith(color: cs.onPrimaryContainer),
+                            ).copyWith(color: onSuccessColor),
+                            textAlign: TextAlign.center,
                           ),
-                          const SizedBox(height: 24),
-                          _buildRow(
-                            'Amount',
-                            CurrencyUtils.format(sale.totalAmount),
-                          ),
-                          if (sale.change > 0)
-                            _buildRow(
-                              'Change',
-                              CurrencyUtils.format(sale.change),
+                          const SizedBox(height: Spacing.sm),
+                          Text(
+                            '${sale.paymentMethod} transaction saved successfully.',
+                            style: AppTypography.bodyLarge(context).copyWith(
+                              color: onSuccessMuted,
                             ),
-                          _buildRow('Method', sale.paymentMethod),
-                          if (sale.referenceNumber != null &&
-                              sale.referenceNumber!.isNotEmpty)
-                            _buildRow('Reference', sale.referenceNumber!),
-                          if (sale.customerName != null &&
-                              sale.customerName!.isNotEmpty)
-                            _buildRow('Customer', sale.customerName!),
-                          _buildRow(
-                            'Status',
-                            sale.paymentStatus[0].toUpperCase() +
-                                sale.paymentStatus.substring(1),
+                            textAlign: TextAlign.center,
                           ),
-                          _buildRow(
-                            'Receipt #',
-                            sale.receiptNumber ?? sale.id?.toString() ?? '—',
+                          const SizedBox(height: Spacing.xl),
+                          Container(
+                            padding: const EdgeInsets.all(Spacing.lg),
+                            decoration: BoxDecoration(
+                              color: onSuccessColor.withValues(alpha: 0.15),
+                              borderRadius:
+                                  BorderRadius.circular(AppRadius.control),
+                            ),
+                            child: Column(
+                              children: [
+                                _buildSummaryRow(
+                                  context,
+                                  'Total',
+                                  CurrencyUtils.format(sale.totalAmount),
+                                  onSuccessColor,
+                                  isBold: true,
+                                ),
+                                if (sale.change > 0)
+                                  _buildSummaryRow(
+                                    context,
+                                    'Change',
+                                    CurrencyUtils.format(sale.change),
+                                    onSuccessColor,
+                                  ),
+                                _buildSummaryRow(
+                                  context,
+                                  'Method',
+                                  sale.paymentMethod,
+                                  onSuccessColor,
+                                ),
+                                if (sale.referenceNumber != null &&
+                                    sale.referenceNumber!.isNotEmpty)
+                                  _buildSummaryRow(
+                                    context,
+                                    'Reference',
+                                    sale.referenceNumber!,
+                                    onSuccessColor,
+                                  ),
+                                if (sale.customerName != null &&
+                                    sale.customerName!.isNotEmpty)
+                                  _buildSummaryRow(
+                                    context,
+                                    'Customer',
+                                    sale.customerName!,
+                                    onSuccessColor,
+                                  ),
+                                _buildSummaryRow(
+                                  context,
+                                  'Receipt #',
+                                  sale.receiptNumber ??
+                                      sale.id?.toString() ??
+                                      '—',
+                                  onSuccessColor,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: Spacing.xl),
+                          FilledButton.icon(
+                            onPressed: () {
+                              // Pop back to the POS tab (root of the navigation stack).
+                              Navigator.of(context)
+                                  .popUntil((route) => route.isFirst);
+                            },
+                            style: FilledButton.styleFrom(
+                              backgroundColor: onSuccessColor,
+                              foregroundColor: successColor,
+                              minimumSize: const Size.fromHeight(48),
+                            ),
+                            icon: const Icon(Icons.add_shopping_cart_outlined),
+                            label: const Text('New Sale'),
                           ),
                         ],
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  FilledButton.icon(
+                  const SizedBox(height: Spacing.md),
+                  AppButton.outlined(
+                    fullWidth: true,
+                    icon: Icons.receipt_long_outlined,
+                    label: 'View Sale Details',
                     onPressed: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
@@ -86,15 +162,12 @@ class PaymentSuccessScreen extends StatelessWidget {
                         ),
                       );
                     },
-                    icon: const Icon(Icons.receipt_long_outlined),
-                    label: const Text('View Sale Details'),
                   ),
-                  const SizedBox(height: 12),
-                  FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: cs.secondaryContainer,
-                      foregroundColor: cs.onSecondaryContainer,
-                    ),
+                  const SizedBox(height: Spacing.md),
+                  AppButton.outlined(
+                    fullWidth: true,
+                    icon: Icons.print_outlined,
+                    label: 'View / Download Receipt',
                     onPressed: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
@@ -102,16 +175,6 @@ class PaymentSuccessScreen extends StatelessWidget {
                         ),
                       );
                     },
-                    icon: const Icon(Icons.print_outlined),
-                    label: const Text('View / Download Receipt'),
-                  ),
-                  const SizedBox(height: 12),
-                  OutlinedButton(
-                    onPressed: () {
-                      // Pop back to the POS tab (root of the navigation stack).
-                      Navigator.of(context).popUntil((route) => route.isFirst);
-                    },
-                    child: const Text('New Sale'),
                   ),
                 ],
               ),
@@ -122,20 +185,29 @@ class PaymentSuccessScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildRow(String label, String value) {
+  Widget _buildSummaryRow(
+    BuildContext context,
+    String label,
+    String value,
+    Color color, {
+    bool isBold = false,
+  }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: Spacing.xs),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-              textAlign: TextAlign.end,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+          Text(
+            label,
+            style: AppTypography.bodyMedium(context).copyWith(
+              color: color.withValues(alpha: 0.9),
+            ),
+          ),
+          Text(
+            value,
+            style: AppTypography.bodyMediumSemibold(context).copyWith(
+              color: color,
+              fontWeight: isBold ? FontWeight.w800 : FontWeight.w600,
             ),
           ),
         ],

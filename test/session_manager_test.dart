@@ -13,7 +13,7 @@ void main() {
     SessionManager.resetForTest();
   });
 
-  test('Owner has full AI permissions', () {
+  test('Owner has full AI permissions but no system management', () {
     SessionManager().setCurrentUser(User(
       username: 'owner',
       passwordHash: '',
@@ -27,9 +27,11 @@ void main() {
     expect(SessionManager().hasPermission('view_ai_advisor'), isTrue);
     expect(SessionManager().hasPermission('use_ai_advisor'), isTrue);
     expect(SessionManager().hasPermission('manage_ai_config'), isFalse);
+    expect(SessionManager().hasPermission('manage_ai_quota'), isFalse);
+    expect(SessionManager().hasPermission('backup_restore'), isFalse);
   });
 
-  test('Admin has view and use AI advisor plus manage_ai_config', () {
+  test('Admin has AI and system management permissions', () {
     SessionManager().setCurrentUser(User(
       username: 'admin',
       passwordHash: '',
@@ -43,9 +45,46 @@ void main() {
     expect(SessionManager().hasPermission('view_ai_advisor'), isTrue);
     expect(SessionManager().hasPermission('use_ai_advisor'), isTrue);
     expect(SessionManager().hasPermission('manage_ai_config'), isTrue);
+    expect(SessionManager().hasPermission('manage_ai_quota'), isTrue);
+    expect(SessionManager().hasPermission('backup_restore'), isTrue);
     expect(SessionManager().hasPermission('view_pos'), isFalse);
     expect(SessionManager().hasPermission('view_reports'), isFalse);
     expect(SessionManager().hasPermission('view_staff_performance'), isFalse);
+  });
+
+  test('Only Admin can manage global session settings', () {
+    SessionManager().setCurrentUser(User(
+      username: 'admin',
+      passwordHash: '',
+      fullName: 'Admin',
+      role: UserRole.admin,
+      mustChangePassword: false,
+      isActive: true,
+      createdAt: DateTime.now(),
+    ));
+    expect(SessionManager().hasPermission('manage_session_settings'), isTrue);
+
+    SessionManager().setCurrentUser(User(
+      username: 'owner',
+      passwordHash: '',
+      fullName: 'Owner',
+      role: UserRole.owner,
+      mustChangePassword: false,
+      isActive: true,
+      createdAt: DateTime.now(),
+    ));
+    expect(SessionManager().hasPermission('manage_session_settings'), isFalse);
+
+    SessionManager().setCurrentUser(User(
+      username: 'staff',
+      passwordHash: '',
+      fullName: 'Staff',
+      role: UserRole.staff,
+      mustChangePassword: false,
+      isActive: true,
+      createdAt: DateTime.now(),
+    ));
+    expect(SessionManager().hasPermission('manage_session_settings'), isFalse);
   });
 
   test('Staff has view and use AI advisor but not manage_ai_config', () {

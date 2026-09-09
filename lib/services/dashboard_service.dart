@@ -11,6 +11,7 @@ import 'package:pinoy_pos/data/repositories/activity_log_repository.dart';
 import 'package:pinoy_pos/data/repositories/ai_quota_repository.dart';
 import 'package:pinoy_pos/data/repositories/announcement_repository.dart';
 import 'package:pinoy_pos/data/repositories/backup_history_repository.dart';
+import 'package:pinoy_pos/data/repositories/category_repository.dart';
 import 'package:pinoy_pos/data/repositories/export_history_repository.dart';
 import 'package:pinoy_pos/data/repositories/product_repository.dart';
 import 'package:pinoy_pos/data/repositories/trash_repository.dart';
@@ -85,6 +86,9 @@ class OwnerDashboardData extends DashboardData {
   final List<Announcement> announcements;
   final List<Product> lowStockProducts;
 
+  /// category_id → category name, used to label product rows.
+  final Map<int, String> categoryNames;
+
   const OwnerDashboardData({
     required this.analytics,
     required this.lowStockCount,
@@ -94,6 +98,7 @@ class OwnerDashboardData extends DashboardData {
     required this.recentActivities,
     required this.announcements,
     required this.lowStockProducts,
+    this.categoryNames = const {},
   });
 }
 
@@ -140,6 +145,9 @@ class StaffDashboardData extends DashboardData {
   final List<ActivityLog> recentActivities;
   final List<Product> lowStockProducts;
 
+  /// category_id → category name, used to label product rows.
+  final Map<int, String> categoryNames;
+
   const StaffDashboardData({
     required this.analytics,
     required this.lowStockCount,
@@ -147,6 +155,7 @@ class StaffDashboardData extends DashboardData {
     required this.inventoryStatus,
     required this.recentActivities,
     required this.lowStockProducts,
+    this.categoryNames = const {},
   });
 }
 
@@ -170,6 +179,7 @@ class DashboardService {
   final ActivityLogRepository _activityLogRepository = ActivityLogRepository();
   final AnnouncementRepository _announcementRepository = AnnouncementRepository();
   final BackupHistoryRepository _backupHistoryRepository = BackupHistoryRepository();
+  final CategoryRepository _categoryRepository = CategoryRepository();
   final ExportHistoryRepository _exportHistoryRepository = ExportHistoryRepository();
   final AIQuotaRepository _aiQuotaRepository = AIQuotaRepository();
   final TrashRepository _trashRepository = TrashRepository();
@@ -228,6 +238,8 @@ class DashboardService {
     // Active announcements, pinned first.
     final announcements = await _loadAnnouncements();
 
+    final categoryNames = await _loadCategoryNames();
+
     return OwnerDashboardData(
       analytics: analytics,
       lowStockCount: inventory.lowStock,
@@ -237,6 +249,7 @@ class DashboardService {
       recentActivities: recentActivities,
       announcements: announcements,
       lowStockProducts: lowStockProducts,
+      categoryNames: categoryNames,
     );
   }
 
@@ -375,6 +388,7 @@ class DashboardService {
       inventoryStatus: inventory,
       recentActivities: recentActivities,
       lowStockProducts: lowStockProducts,
+      categoryNames: await _loadCategoryNames(),
     );
   }
 
@@ -398,6 +412,12 @@ class DashboardService {
       }
     }
     return InventoryStatus(normal: normal, lowStock: low, outOfStock: out);
+  }
+
+  /// Loads a category_id → name map for labelling product rows.
+  Future<Map<int, String>> _loadCategoryNames() async {
+    final categories = await _categoryRepository.getAll();
+    return {for (final c in categories) if (c.id != null) c.id!: c.name};
   }
 
   /// Loads active announcements sorted pinned-first, then by created_at desc.

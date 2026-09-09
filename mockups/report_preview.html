@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinoy POS — Report Preview Mockup</title>
+<link rel="stylesheet" href="mockup.css">
+</head>
+<body>
+
+<div class="page-head">
+  <div>
+    <h1>Report Preview</h1>
+    <p>PDF or spreadsheet preview with export and share actions.</p>
+  </div>
+  <button class="theme-toggle" onclick="toggleTheme()">
+    <svg viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
+    <span id="themeLabel">Light mode</span>
+  </button>
+</div>
+
+<div class="frames">
+  <div class="frame-wrap">
+    <div class="frame-label">Excel Report</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span>
+        <span class="icons">
+          <svg viewBox="0 0 24 24"><path d="M12 21l3.5-4.5c-.97-.74-2.18-1.16-3.5-1.16s-2.53.42-3.5 1.16L12 21zM12 3C7.31 3 3.07 4.69 0 7.55l1.93 2.43C4.48 7.9 8.01 6.4 12 6.4s7.52 1.5 10.07 3.58L24 7.55C20.93 4.69 16.69 3 12 3z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>
+        </span>
+      </div>
+      <div class="appbar">
+        <div class="back"><svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></div>
+        <div class="title"><h2>Report Preview</h2><div class="sub">Sales Report · Excel</div></div>
+        <div class="act" onclick="showToast('Report refreshed', 'success')" title="Refresh"><svg viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg></div>
+      </div>
+      <div class="screen">
+        <div class="screen-body">
+
+          <div class="card pad" style="padding:14px;">
+            <div class="section-head" style="font-size:17px;">Report Details</div>
+            <div class="value-row"><span class="label">Report #</span><span>RPT-20260909-001</span></div>
+            <div class="value-row"><span class="label">Format</span><span class="pill pill-green">EXCEL</span></div>
+            <div class="value-row"><span class="label">Period</span><span>Sep 1 - Sep 9, 2026</span></div>
+            <div class="value-row"><span class="label">Date</span><span>Sep 9, 2026 10:30 AM</span></div>
+            <div class="value-row"><span class="label">Size</span><span>42.5 KB</span></div>
+          </div>
+
+          <div class="card pad" style="padding:0;overflow-x:auto;">
+            <table class="data-table">
+              <thead>
+                <tr><th>Date</th><th>Product</th><th>Qty</th><th>Total</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Sep 9</td><td>Pastil</td><td>12</td><td>₱120</td></tr>
+                <tr><td>Sep 9</td><td>Chicken Adobo Rice</td><td>5</td><td>₱400</td></tr>
+                <tr><td>Sep 8</td><td>Iced Tea</td><td>8</td><td>₱200</td></tr>
+                <tr><td>Sep 8</td><td>Sisig Rice Meal</td><td>3</td><td>₱285</td></tr>
+                <tr><td>Sep 7</td><td>Banana Cue</td><td>10</td><td>₱150</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+        <div style="padding:14px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:10px;">
+          <button class="btn btn-primary" onclick="showToast('Report exported', 'success')">
+            <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg> Export
+          </button>
+          <button class="btn btn-outlined" onclick="showToast('Share sheet would open', 'info')">
+            <svg viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.91 9.81C8.37 9.31 7.66 9 6.87 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.04 4.12c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg> Share
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes">
+      <b>Report Preview:</b> Shows report metadata, a scrollable data table for Excel/CSV, and a document viewer for PDF. Export and Share actions are anchored at the bottom.
+    </div>
+  </div>
+
+  <div class="frame-wrap">
+    <div class="frame-label">PDF Report</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span>
+        <span class="icons">
+          <svg viewBox="0 0 24 24"><path d="M12 21l3.5-4.5c-.97-.74-2.18-1.16-3.5-1.16s-2.53.42-3.5 1.16L12 21zM12 3C7.31 3 3.07 4.69 0 7.55l1.93 2.43C4.48 7.9 8.01 6.4 12 6.4s7.52 1.5 10.07 3.58L24 7.55C20.93 4.69 16.69 3 12 3z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>
+        </span>
+      </div>
+      <div class="appbar">
+        <div class="back"><svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></div>
+        <div class="title"><h2>Report Preview</h2><div class="sub">Sales Report · PDF</div></div>
+        <div class="act" onclick="showToast('Report refreshed', 'success')"><svg viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg></div>
+      </div>
+      <div class="screen">
+        <div class="screen-body" style="gap:0;padding:0;">
+          <div style="flex:1;background:var(--surface-elev);display:flex;align-items:center;justify-content:center;padding:14px;">
+            <div style="text-align:center;color:var(--text-3);">
+              <svg viewBox="0 0 24 24" style="width:64px;height:64px;fill:var(--text-3);margin-bottom:12px;"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+              <div style="font-size:14px;font-weight:600;color:var(--text);">Sales Report</div>
+              <div class="sub">PDF page rendered by PdfPreview</div>
+            </div>
+          </div>
+        </div>
+        <div style="padding:14px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:10px;">
+          <button class="btn btn-primary" onclick="showToast('PDF exported', 'success')">
+            <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg> Export
+          </button>
+          <button class="btn btn-outlined" onclick="showToast('Share sheet would open', 'info')">
+            <svg viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.91 9.81C8.37 9.31 7.66 9 6.87 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.04 4.12c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg> Share
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes">
+      <b>PDF Preview:</b> Uses a document viewer. Page navigation, zoom and scroll are part of the live PdfPreview widget.
+    </div>
+  </div>
+</div>
+
+<script src="mockup.js"></script>
+</body>
+</html>

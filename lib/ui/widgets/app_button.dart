@@ -70,7 +70,7 @@ class AppButton extends StatelessWidget {
     this.icon,
     this.isLoading = false,
     this.fullWidth = false,
-    this.color = AppButtonColor.primary,
+    this.color = AppButtonColor.neutral,
   }) : variant = AppButtonVariant.outlined;
 
   const AppButton.text({
@@ -122,7 +122,7 @@ class AppButton extends StatelessWidget {
     this.isLoading = false,
     this.fullWidth = false,
   })  : color = AppButtonColor.error,
-        variant = AppButtonVariant.destructive;
+        variant = AppButtonVariant.outlined;
 
   const AppButton.success({
     super.key,
@@ -326,11 +326,14 @@ class AppButton extends StatelessWidget {
     AppButtonColor color,
     AppButtonVariant variant,
   ) {
-    final isSolid = variant == AppButtonVariant.filled ||
-        variant == AppButtonVariant.destructive;
+    final isSolid = variant == AppButtonVariant.filled;
 
     if (isSolid) {
       return _resolveSurfaceColors(brightness, color);
+    }
+
+    if (color == AppButtonColor.primary) {
+      return (cs.primary, cs.onPrimary);
     }
 
     return _resolveAccentColors(cs, brightness, color);
@@ -493,11 +496,17 @@ class AppButton extends StatelessWidget {
     Widget child,
     Color mainColor,
   ) {
+    final cs = Theme.of(context).colorScheme;
+    final isNeutral = color == AppButtonColor.neutral ||
+        color == AppButtonColor.primary;
+    final foreground = isNeutral ? cs.onSurface : mainColor;
+    final borderColor = isNeutral ? cs.outline : mainColor.withValues(alpha: 0.7);
+
     return OutlinedButton(
       onPressed: isLoading ? null : onPressed,
       style: OutlinedButton.styleFrom(
-        foregroundColor: mainColor,
-        side: BorderSide(color: mainColor.withValues(alpha: 0.7)),
+        foregroundColor: foreground,
+        side: BorderSide(color: borderColor),
         shape: shape,
         padding: padding,
         minimumSize: const Size(48, 48),
@@ -531,11 +540,9 @@ class AppButton extends StatelessWidget {
       0,
     );
 
-    // The gradient below is always the brand blue pair
-    // (primary -> primaryDark), which is dark in both light and dark
-    // themes. The label therefore uses the fixed light "on-primary"
-    // token; resolving it per-brightness would produce a dark label on
-    // the still-dark gradient.
+    // The gradient resolves to the theme-aware brand blue pair
+    // (primary -> primaryDark) so it remains legible in both light and
+    // dark mode.
     const labelColor = AppSemanticColors.onPrimary;
     final labelShadow = Shadow(
       color: cs.surface.withValues(alpha: isDark ? 0.35 : 0.25),
@@ -599,8 +606,8 @@ class AppButton extends StatelessWidget {
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
           colors: [
-            AppSemanticColors.primary,
-            AppSemanticColors.primaryDark,
+            AppSemanticColors.resolve(AppSemanticColors.primary, brightness),
+            AppSemanticColors.resolve(AppSemanticColors.primaryDark, brightness),
           ],
         ),
         borderRadius: borderRadius,

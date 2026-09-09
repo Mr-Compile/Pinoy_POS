@@ -99,10 +99,10 @@ class AppTextFormField extends StatelessWidget {
         helperText: helperText,
         isDense: isDense,
         prefixIcon: prefix ??
-            (prefixIcon != null ? Icon(prefixIcon) : null),
+            (prefixIcon != null ? _FieldIcon(icon: prefixIcon) : null),
         prefixText: prefixText,
         suffixIcon: suffix ??
-            (suffixIcon != null ? Icon(suffixIcon) : null),
+            (suffixIcon != null ? _FieldIcon(icon: suffixIcon) : null),
         suffixText: suffixText,
       ),
       keyboardType: keyboardType,
@@ -191,12 +191,13 @@ class _AppPasswordFieldState extends State<AppPasswordField> {
         hintText: widget.hint,
         isDense: widget.isDense,
         prefixIcon: widget.prefix ??
-            (widget.prefixIcon != null ? Icon(widget.prefixIcon) : null),
+            (widget.prefixIcon != null ? _FieldIcon(icon: widget.prefixIcon) : null),
         suffixIcon: IconButton(
           icon: Icon(
             _obscure
                 ? Icons.visibility_off_outlined
                 : Icons.visibility_outlined,
+            size: 20,
           ),
           color: cs.onSurfaceVariant,
           tooltip: _obscure ? 'Show password' : 'Hide password',
@@ -260,7 +261,7 @@ class AppDropdownField<T> extends StatelessWidget {
         hintText: hint,
         isDense: isDense,
         prefixIcon: prefix ??
-            (prefixIcon != null ? Icon(prefixIcon) : null),
+            (prefixIcon != null ? Icon(prefixIcon, size: 20) : null),
       ),
       isExpanded: true,
       borderRadius: BorderRadius.circular(AppRadius.input),
@@ -308,7 +309,8 @@ class AppDropdown<T> extends StatelessWidget {
         isDense: isDense,
         border: const OutlineInputBorder(),
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        prefixIcon: prefix ?? (prefixIcon != null ? Icon(prefixIcon) : null),
+        prefixIcon: prefix ??
+            (prefixIcon != null ? Icon(prefixIcon, size: 20) : null),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<T>(
@@ -365,7 +367,7 @@ class AppSearchField extends StatelessWidget {
           vertical: 12,
         ),
         constraints: const BoxConstraints(minHeight: 44),
-        prefixIcon: const Icon(Icons.search),
+        prefixIcon: const Icon(Icons.search, size: 18),
         suffixIcon: onClear != null &&
                 (controller == null || controller!.text.isNotEmpty)
             ? IconButton(
@@ -378,6 +380,35 @@ class AppSearchField extends StatelessWidget {
       textInputAction: TextInputAction.search,
       onChanged: onChanged,
       onSubmitted: onSubmitted,
+    );
+  }
+}
+
+/// A small rounded square icon used inside text fields.
+///
+/// Matches the `.field-ic` style from the mockups: a 32x32 container with
+/// a subtle surface color and a rounded 9px radius.
+class _FieldIcon extends StatelessWidget {
+  final IconData? icon;
+
+  const _FieldIcon({this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    if (icon == null) return const SizedBox.shrink();
+    return Center(
+      child: Container(
+        width: 32,
+        height: 32,
+        margin: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(AppRadius.icon),
+        ),
+        alignment: Alignment.center,
+        child: Icon(icon, size: 18, color: cs.onSurfaceVariant),
+      ),
     );
   }
 }

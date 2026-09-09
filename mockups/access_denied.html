@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinoy POS — Access Denied Mockup</title>
+<link rel="stylesheet" href="mockup.css">
+</head>
+<body>
+
+<div class="page-head">
+  <div>
+    <h1>Access Denied</h1>
+    <p>Permission blocker shown when a user lacks required access.</p>
+  </div>
+  <button class="theme-toggle" onclick="toggleTheme()">
+    <svg viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
+    <span id="themeLabel">Light mode</span>
+  </button>
+</div>
+
+<div class="frames">
+  <div class="frame-wrap">
+    <div class="frame-label">Access Denied</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span>
+        <span class="icons">
+          <svg viewBox="0 0 24 24"><path d="M12 21l3.5-4.5c-.97-.74-2.18-1.16-3.5-1.16s-2.53.42-3.5 1.16L12 21zM12 3C7.31 3 3.07 4.69 0 7.55l1.93 2.43C4.48 7.9 8.01 6.4 12 6.4s7.52 1.5 10.07 3.58L24 7.55C20.93 4.69 16.69 3 12 3z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>
+        </span>
+      </div>
+      <div class="appbar">
+        <div class="back"><svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></div>
+        <div class="title"><h2>Access Denied</h2></div>
+      </div>
+      <div class="screen">
+        <div class="center-screen">
+          <div class="icon-lg red">
+            <svg viewBox="0 0 24 24" style="fill:var(--error);"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+          </div>
+          <div class="title">Access Denied</div>
+          <div class="msg">You do not have permission to access this page.</div>
+          <button class="btn btn-primary" style="max-width:240px;" onclick="showToast('Navigated back', 'info')">
+            <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg> Go Back
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes">
+      <b>Access Denied:</b> Full-screen blocker with a large lock icon, permission message and a primary Go Back action. Used by RBAC-gated screens and <code>AppDialogService.accessDenied()</code>.
+    </div>
+  </div>
+</div>
+
+<script src="mockup.js"></script>
+</body>
+</html>

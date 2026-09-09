@@ -1,5 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/ui/screens/activity_logs_screen.dart';
@@ -21,17 +22,22 @@ import 'package:pinoy_pos/ui/widgets/app_header.dart';
 ///
 /// Role-based visibility:
 ///   - Profile:        all roles
-///   - Security:       all roles
+///   - Security:       all roles (password); session management is Admin-only
 ///   - PIN:            all roles
 ///   - Appearance:     all roles
-///   - Store Info:     Owner only (edit_settings without backup_restore)
+///   - Store Info:     Owner only (business settings)
+///   - Payment:        Owner only (business settings)
 ///   - Backup & Restore: Admin only (backup_restore)
 ///   - AI Config:      Admin only (manage_ai_config)
+///   - AI Quota:       Admin only (manage_ai_quota)
 ///   - Activity Logs:  all roles with view_activity_logs permission
 ///     (Owner sees authorized scope, Admin sees system scope,
 ///      Staff sees own logs only — enforced at DAO level)
 ///   - Trash Bin:      roles with view_trash permission
 ///     (Owner and Admin)
+///
+/// Role split: Owner runs business operations; System Admin manages
+/// application, user accounts, backups, AI, and global session settings.
 ///
 /// This screen does NOT contain any settings logic itself — each
 /// sub-page owns its own state and persistence.
@@ -43,12 +49,13 @@ class SettingsScreen extends ConsumerWidget {
     final authNotifier = ref.read(authStateProvider.notifier);
 
     // Role checks
-    // Business settings (store info, payment config) are Owner-only.
+    // Owner = business operations (store info, payment config).
+    // Admin = system management (backups, AI config/quota, session timeout).
     final canEditBusiness =
         SessionManager().canEditBusinessSettings();
     final canBackup = authNotifier.hasPermission('backup_restore');
     final canManageAi = authNotifier.hasPermission('manage_ai_config');
-    final canManageAiQuota = authNotifier.hasPermission('manage_users') && authNotifier.hasPermission('edit_settings');
+    final canManageAiQuota = authNotifier.hasPermission('manage_ai_quota');
     final canViewActivityLogs = authNotifier.hasPermission('view_activity_logs');
     final canViewTrash = authNotifier.hasPermission('view_trash');
 
@@ -124,12 +131,7 @@ class SettingsScreen extends ConsumerWidget {
         title: 'AI Quota Management',
         subtitle: 'Manage default and per-user AI query quotas',
         onTap: (context) async {
-          final verified = await showDialog<bool>(
-            context: context,
-            useRootNavigator: true,
-            barrierDismissible: false,
-            builder: (context) => const SuperAdminVerificationDialog(),
-          );
+          final verified = await showSuperAdminVerificationDialog(context);
           if (verified == true && context.mounted) {
             Navigator.push(
               context,
@@ -242,8 +244,11 @@ class _SettingsTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    final iconColor = _iconColor(brightness);
+
     return ListTile(
-      leading: Icon(entry.icon, color: Theme.of(context).colorScheme.primary),
+      leading: _IconBadge(icon: entry.icon, color: iconColor),
       title: Text(entry.title),
       subtitle: Text(
         entry.subtitle,
@@ -262,6 +267,44 @@ class _SettingsTile extends StatelessWidget {
           );
         }
       },
+    );
+  }
+
+  Color _iconColor(Brightness brightness) {
+    final role = switch (entry.title) {
+      'Profile' => AppSemanticColors.info,
+      'Security' => AppSemanticColors.success,
+      'PIN' => AppSemanticColors.purple,
+      'Appearance' => AppSemanticColors.teal,
+      'Store Information' => AppSemanticColors.warning,
+      'Payment Settings' => AppSemanticColors.info,
+      'Backup & Restore' => AppSemanticColors.purple,
+      'AI Configuration' => AppSemanticColors.teal,
+      'AI Quota Management' => AppSemanticColors.neutral,
+      'Activity Logs' => AppSemanticColors.info,
+      'Trash Bin' => AppSemanticColors.error,
+      _ => AppSemanticColors.info,
+    };
+    return AppSemanticColors.resolve(role, brightness);
+  }
+}
+
+class _IconBadge extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+
+  const _IconBadge({required this.icon, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 38,
+      height: 38,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: Icon(icon, size: 19, color: color),
     );
   }
 }

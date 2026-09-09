@@ -97,10 +97,13 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           if (hasUnread)
             IconButton(
               icon: _isProcessing
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 20,
                       height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Theme.of(context).appBarTheme.foregroundColor,
+                      ),
                     )
                   : const Icon(Icons.done_all),
               tooltip: 'Mark all as read',
@@ -131,7 +134,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                     trailing: notification.isRead
                         ? null
                         : Icon(Icons.circle,
-                            color: Theme.of(context).colorScheme.primary, size: 8),
+                            color: Theme.of(context).colorScheme.error, size: 8),
                     onTap: notification.isRead ? null : () => _markAsRead(notification),
                   ),
                 );

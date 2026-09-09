@@ -92,7 +92,7 @@ class _ProductDialogState extends ConsumerState<_ProductDialog> {
   @override
   Widget build(BuildContext context) {
     return AppDialogForm<ModalResult<void>>(
-      type: AppDialogType.info,
+      type: widget.product == null ? AppDialogType.add : AppDialogType.edit,
       title: widget.product == null ? 'Add Product' : 'Edit Product',
       canPop: true,
       childBuilder: (context, state) => FutureBuilder<_CategoryList>(

@@ -813,72 +813,77 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
       AppSemanticColors.purple,
       theme.brightness,
     );
+    final statusColor = model.active
+        ? AppSemanticColors.resolve(AppSemanticColors.success, theme.brightness)
+        : cs.error;
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      clipBehavior: Clip.antiAlias,
-      child: ListTile(
-        selected: isSelected,
-        selectedTileColor: aiColor.withValues(alpha: 0.1),
-        leading: Icon(
-          isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
-          color: isSelected ? aiColor : cs.onSurfaceVariant,
-          size: 22,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: isSelected ? aiColor.withValues(alpha: 0.1) : cs.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          side: BorderSide(
+            color: isSelected ? aiColor : cs.outline,
+          ),
         ),
-        title: Text(
-          model.id,
-          style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              ),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('by ${model.ownedBy}',
-                style: theme.textTheme.bodySmall),
-            if (model.contextWindow != null)
-              Text('Context: ${_formatContext(model.contextWindow!)} tokens',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                        color: cs.onSurfaceVariant,
-                      )),
-            Row(
+        child: InkWell(
+          onTap: () => setState(() => _selectedModel = model.id),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
               children: [
+                Icon(
+                  isSelected
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_off,
+                  color: isSelected ? aiColor : cs.onSurfaceVariant,
+                  size: 22,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        model.id,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight:
+                              isSelected ? FontWeight.bold : FontWeight.w500,
+                          color: cs.onSurface,
+                        ),
+                      ),
+                      if (model.contextWindow != null)
+                        Text(
+                          'by ${model.ownedBy} · Context: ${_formatContext(model.contextWindow!)} tokens',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 6, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: model.active
-                        ? AppSemanticColors.resolve(
-                                AppSemanticColors.success, theme.brightness)
-                            .withValues(alpha: 0.1)
-                        : cs.error.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(AppRadius.xs),
+                    color: statusColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(AppRadius.chip),
                   ),
                   child: Text(
                     model.active ? 'Active' : 'Inactive',
                     style: theme.textTheme.labelSmall?.copyWith(
-                      color: model.active
-                          ? AppSemanticColors.resolve(
-                              AppSemanticColors.success, theme.brightness)
-                          : cs.error,
+                      color: statusColor,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
               ],
             ),
-          ],
+          ),
         ),
-        trailing: isSelected
-            ? Icon(Icons.check, color: aiColor)
-            : TextButton(
-                onPressed: () {
-                  setState(() => _selectedModel = model.id);
-                },
-                child: const Text('Select'),
-              ),
-        onTap: () {
-          setState(() => _selectedModel = model.id);
-        },
       ),
     );
   }

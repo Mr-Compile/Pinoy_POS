@@ -89,9 +89,14 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
             const SizedBox(height: Spacing.md),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
-              child: _buildProfileCard(context, staff),
+              child: _buildStatusBanner(context, staff),
             ),
-            const SizedBox(height: Spacing.sm),
+            const SizedBox(height: Spacing.md),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
+              child: _buildOverviewCard(context, staff),
+            ),
+            const SizedBox(height: Spacing.md),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
               child: _buildActionBar(context, staff),
@@ -190,111 +195,285 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
   }
 
   Widget _buildActionBar(BuildContext context, User staff) {
-    return Wrap(
-      spacing: Spacing.sm,
-      runSpacing: Spacing.sm,
-      children: [
-        AppButton.outlined(
-          size: AppButtonSize.small,
-          icon: Icons.edit,
-          label: 'Edit',
-          onPressed: () => _showEditStaffDialog(staff),
-        ),
-        AppButton.outlined(
-          size: AppButtonSize.small,
-          icon: Icons.lock_reset,
-          label: 'Reset Password',
-          onPressed: () => _resetStaffPassword(staff),
-        ),
-        if (staff.isActive)
-          AppButton.outlined(
-            size: AppButtonSize.small,
+    final deactivateButton = staff.isActive
+        ? AppButton.outlined(
             icon: Icons.person_off,
             label: 'Deactivate',
             color: AppButtonColor.warning,
+            fullWidth: true,
             onPressed: () => _deactivateStaff(staff),
           )
-        else
-          AppButton.outlined(
-            size: AppButtonSize.small,
+        : AppButton.outlined(
             icon: Icons.person,
             label: 'Activate',
             color: AppButtonColor.success,
+            fullWidth: true,
             onPressed: () => _activateStaff(staff),
-          ),
-        AppButton.outlined(
-          size: AppButtonSize.small,
-          icon: Icons.delete,
-          label: 'Delete',
-          color: AppButtonColor.error,
-          onPressed: () => _deleteStaff(staff),
+          );
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: AppButton.filled(
+                icon: Icons.edit,
+                label: 'Edit',
+                fullWidth: true,
+                onPressed: () => _showEditStaffDialog(staff),
+              ),
+            ),
+            const SizedBox(width: Spacing.sm),
+            Expanded(
+              child: AppButton.outlined(
+                icon: Icons.lock_reset,
+                label: 'Reset Password',
+                fullWidth: true,
+                onPressed: () => _resetStaffPassword(staff),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: Spacing.sm),
+        Row(
+          children: [
+            Expanded(child: deactivateButton),
+            const SizedBox(width: Spacing.sm),
+            Expanded(
+              child: AppButton.outlined(
+                icon: Icons.delete,
+                label: 'Delete',
+                color: AppButtonColor.error,
+                fullWidth: true,
+                onPressed: () => _deleteStaff(staff),
+              ),
+            ),
+          ],
         ),
       ],
     );
   }
 
-  Widget _buildProfileCard(BuildContext context, User staff) {
+  // ── Status banner ───────────────────────────────────────────
+
+  Widget _buildStatusBanner(BuildContext context, User staff) {
     final cs = Theme.of(context).colorScheme;
     final brightness = Theme.of(context).brightness;
-    final statusColor = staff.isActive
+    final isActive = staff.isActive;
+    final statusColor = isActive
         ? AppSemanticColors.resolve(AppSemanticColors.success, brightness)
         : AppSemanticColors.resolve(AppSemanticColors.neutral, brightness);
+    final onStatusColor = AppSemanticColors.contrastFor(statusColor, brightness);
 
     return AppCard(
+      color: statusColor.withValues(alpha: 0.08),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          AppAvatar(
-            imagePath: staff.profileImagePath,
-            initials: staff.fullName.isNotEmpty
-                ? staff.fullName[0].toUpperCase()
-                : '?',
-            radius: 36,
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: statusColor,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              isActive ? Icons.check : Icons.cancel,
+              color: onStatusColor,
+              size: 20,
+            ),
           ),
           const SizedBox(width: Spacing.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  staff.fullName,
-                  style: AppTypography.headlineSmallSemibold(context),
+                  isActive ? 'Active' : 'Inactive',
+                  style: AppTypography.titleMediumBold(context).copyWith(
+                    color: statusColor,
+                  ),
                 ),
-                const SizedBox(height: Spacing.xs),
+                const SizedBox(height: 2),
                 Text(
-                  '@${staff.username}',
-                  style: AppTypography.bodyMedium(
-                    context,
-                  ).copyWith(color: cs.onSurfaceVariant),
-                ),
-                const SizedBox(height: Spacing.sm),
-                Wrap(
-                  spacing: Spacing.sm,
-                  children: [
-                    AppStatusChip(
-                      label: staff.isActive ? 'Active' : 'Inactive',
-                      color: statusColor,
-                      icon: staff.isActive ? Icons.check_circle : Icons.cancel,
-                    ),
-                    AppStatusChip(
-                      label: 'Staff',
-                      color: cs.primary,
-                      filled: false,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: Spacing.sm),
-                Text(
-                  'Created on ${DateFormat.yMd().format(staff.createdAt)}',
-                  style: AppTypography.bodySmall(
-                    context,
-                  ).copyWith(color: cs.onSurfaceVariant),
+                  _lastLoginText(staff),
+                  style: AppTypography.bodySmall(context).copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ),
+          const SizedBox(width: Spacing.sm),
+          AppStatusChip(
+            label: staff.role.displayName,
+            color: cs.primary,
+            icon: Icons.badge_outlined,
+          ),
         ],
       ),
+    );
+  }
+
+  String _lastLoginText(User staff) {
+    final lastLogin = staff.lastLogin;
+    if (lastLogin == null) {
+      return 'Never logged in';
+    }
+    return 'Last login: ${DateFormat.yMd().add_jm().format(lastLogin)}';
+  }
+
+  // ── Overview card (avatar + 4 icon tiles) ──────────────────
+
+  Widget _buildOverviewCard(BuildContext context, User staff) {
+    final cs = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppAvatar(
+                imagePath: staff.profileImagePath,
+                initials: staff.fullName.isNotEmpty
+                  ? staff.fullName[0].toUpperCase()
+                  : '?',
+                radius: 40,
+              ),
+              const SizedBox(width: Spacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      staff.fullName,
+                      style: AppTypography.headlineSmallSemibold(context),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '@${staff.username}',
+                      style: AppTypography.bodyMedium(
+                        context,
+                      ).copyWith(color: cs.onSurfaceVariant),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: Spacing.md),
+          const Divider(height: 1),
+          const SizedBox(height: Spacing.md),
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: Spacing.md,
+            crossAxisSpacing: Spacing.md,
+            childAspectRatio: 2.2,
+            children: [
+              _buildOverviewTile(
+                icon: Icons.person_outline,
+                color: cs.primary,
+                label: 'Role',
+                value: staff.role.displayName,
+              ),
+              _buildOverviewTile(
+                icon: Icons.alternate_email,
+                color: AppSemanticColors.resolve(
+                  AppSemanticColors.purple,
+                  brightness,
+                ),
+                label: 'Username',
+                value: '@${staff.username}',
+              ),
+              _buildOverviewTile(
+                icon: Icons.calendar_today_outlined,
+                color: AppSemanticColors.resolve(
+                  AppSemanticColors.warning,
+                  brightness,
+                ),
+                label: 'Joined',
+                value: DateFormat.yMd().format(staff.createdAt),
+              ),
+              _buildOverviewTile(
+                icon: Icons.history,
+                color: AppSemanticColors.resolve(
+                  AppSemanticColors.success,
+                  brightness,
+                ),
+                label: 'Last login',
+                value: staff.lastLogin == null
+                    ? 'Never'
+                    : DateFormat.yMd().add_jm().format(staff.lastLogin!),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOverviewTile({
+    required IconData icon,
+    required Color color,
+    required String label,
+    required String value,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.16),
+            borderRadius: BorderRadius.circular(AppRadius.md),
+          ),
+          child: Icon(icon, color: color, size: 20),
+        ),
+        const SizedBox(width: Spacing.sm),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: AppTypography.labelSmall(context).copyWith(
+                  color: cs.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: AppTypography.bodyMediumSemibold(context).copyWith(
+                  color: cs.onSurface,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -433,7 +612,7 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
       context: context,
       useRootNavigator: true,
       builder: (dialogContext) => AppDialogForm<ModalResult<void>>(
-        type: AppDialogType.info,
+        type: AppDialogType.edit,
         title: 'Edit Staff',
         childBuilder: (context, state) {
           final usernameController = state.textController(
@@ -464,6 +643,7 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
                 AppTextFormField(
                   controller: usernameController,
                   label: 'Username',
+                  prefixIcon: Icons.person_outline,
                   textInputAction: TextInputAction.next,
                   onChanged: (_) => state.markChanged(),
                   onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
@@ -473,6 +653,7 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
                 AppTextFormField(
                   controller: fullNameController,
                   label: 'Full Name',
+                  prefixIcon: Icons.person,
                   textInputAction: TextInputAction.next,
                   onChanged: (_) => state.markChanged(),
                   onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
@@ -482,6 +663,7 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
                 AppTextFormField(
                   controller: pinController,
                   label: 'PIN (optional)',
+                  prefixIcon: Icons.lock_outline,
                   hint: staff.hasPin
                       ? 'Enter new PIN to replace (${staff.configuredPinLength} digits)'
                       : '4-6 digits',

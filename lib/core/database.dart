@@ -14,6 +14,13 @@ class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
   static Database? _database;
 
+  /// Test-only override for the database filename. When set, [database]
+  /// opens (and re-opens) this filename instead of the production
+  /// [AppConstants.databaseName]. This avoids Windows file-lock races between
+  /// consecutive tests that share the same [DatabaseHelper] singleton.
+  static String? _testDbName;
+  static int _testRun = 0;
+
   factory DatabaseHelper() => _instance;
 
   DatabaseHelper._internal();
@@ -24,9 +31,11 @@ class DatabaseHelper {
     return _database!;
   }
 
+  String get _dbName => _testDbName ?? AppConstants.databaseName;
+
   Future<Database> _initDatabase() async {
     final databasePath = await getDatabasesPath();
-    final path = join(databasePath, AppConstants.databaseName);
+    final path = join(databasePath, _dbName);
 
     return await openDatabase(
       path,
@@ -984,21 +993,39 @@ class DatabaseHelper {
   /// Returns the filesystem path of the Pinoy POS database without opening it.
   Future<String> get databasePath async {
     final databasePath = await getDatabasesPath();
-    return join(databasePath, AppConstants.databaseName);
+    return join(databasePath, _dbName);
   }
 
-  /// Resets the singleton state for testing.  Closes any open database
-  /// and clears the cached instance so the next access re-creates it.
+  /// Resets the singleton state for testing.  Closes any open database,
+  /// clears the cached instance, and assigns a unique database filename for
+  /// the next test.  It also deletes the previous test database file so test
+  /// runs do not accumulate temp files.
   ///
-  /// The close is awaited so that the underlying file handle is fully
-  /// released before a test deletes the database file.  Without awaiting,
-  /// Windows keeps the file locked and the deletion fails, which previously
-  /// left a stale database on disk and caused _onCreate to re-run against
-  /// an already-initialized file (throwing "index already exists").
+  /// The unique filename avoids the Windows file-lock race that occurs when
+  /// the same database file is closed and immediately reopened by the next
+  /// test in the same test file.
   @visibleForTesting
   static Future<void> resetForTest() async {
+    final previousName = _testDbName;
+
     await _database?.close();
     _database = null;
+
+    if (previousName != null) {
+      try {
+        final databasePath = await getDatabasesPath();
+        final previousPath = join(databasePath, previousName);
+        final file = File(previousPath);
+        if (await file.exists()) {
+          await file.delete();
+        }
+      } catch (_) {
+        // Ignore deletion failures caused by a still-locked handle; the
+        // unique filename means a stale file cannot affect the next test.
+      }
+    }
+
+    _testDbName = 'pinoy_pos_test_${_testRun++}.db';
   }
 
   /// Drops every known table and recreates the full schema + indexes on the

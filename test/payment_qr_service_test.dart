@@ -5,6 +5,7 @@ import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart'
     show PathProviderPlatform;
+import 'package:pinoy_pos/data/models/decoded_payment_qr.dart';
 import 'package:pinoy_pos/services/payment_qr_service.dart';
 import 'package:qr/qr.dart';
 
@@ -206,6 +207,69 @@ void main() {
 
       final originalFile = File(p.join(appDir.path, originalPath));
       expect(await originalFile.exists(), isTrue);
+    });
+
+    test('decodes an EMVCo payment QR payload from an uploaded image',
+        () async {
+      // GCash-style QR Ph P2M payload with a real CRC-16 checksum.
+      const payload =
+          '00020101021126470011ph.ppmi.p2m01126399524112340212GcashXchange'
+          '5204541153036085802PH5911Mi**** L T.6006Manila'
+          '622802126399524112340508BILL-00163046186';
+      final source = _generateQrImage(
+        size: 700,
+        qrSize: 500,
+        offsetX: 100,
+        offsetY: 100,
+        data: payload,
+      );
+      final originalPath = await writePng('gcash_qr', 'emv.png', source);
+
+      final decoded = await service.decodePaymentQr(originalPath);
+
+      expect(decoded.status, PaymentQrDecodeStatus.recognized);
+      expect(decoded.merchantName, 'Mi**** L T.');
+      expect(decoded.mobileNumber, '+63 995 241 1234');
+      expect(decoded.paymentNetwork, 'QR Ph');
+      expect(decoded.currencyCode, 'PHP');
+    });
+
+    test('reports a non-payment QR payload as decoded but unrecognized',
+        () async {
+      final source = _generateQrImage(
+        size: 400,
+        qrSize: 300,
+        offsetX: 50,
+        offsetY: 50,
+        data: 'https://example.com/not-a-payment',
+      );
+      final originalPath = await writePng('gcash_qr', 'url.png', source);
+
+      final decoded = await service.decodePaymentQr(originalPath);
+
+      expect(decoded.status, PaymentQrDecodeStatus.decodedUnparsed);
+      expect(decoded.merchantName, isNull);
+      expect(decoded.mobileNumber, isNull);
+    });
+
+    test('reports notDetected when the image contains no QR', () async {
+      final image = img.Image(
+        width: 200,
+        height: 200,
+        numChannels: 4,
+      );
+      img.fill(image, color: img.ColorRgba8(255, 255, 255, 255));
+      final originalPath = await writePng('gcash_qr', 'blank.png', image);
+
+      final decoded = await service.decodePaymentQr(originalPath);
+
+      expect(decoded.status, PaymentQrDecodeStatus.notDetected);
+      expect(decoded.hasAnyDetails, isFalse);
+    });
+
+    test('reports notDetected for a missing QR path', () async {
+      final decoded = await service.decodePaymentQr(null);
+      expect(decoded.status, PaymentQrDecodeStatus.notDetected);
     });
 
     test('replaces an old preview when a new original is uploaded', () async {

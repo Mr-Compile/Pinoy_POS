@@ -21,17 +21,8 @@ class AppTypography {
         color: color,
       );
 
-  static TextStyle displayLarge(BuildContext context) =>
-      Theme.of(context).textTheme.displayLarge ?? _fallback(fontSize: 57);
-
   static TextStyle displayMedium(BuildContext context) =>
       Theme.of(context).textTheme.displayMedium ?? _fallback(fontSize: 45);
-
-  static TextStyle displaySmall(BuildContext context) =>
-      Theme.of(context).textTheme.displaySmall ?? _fallback(fontSize: 36);
-
-  static TextStyle headlineLarge(BuildContext context) =>
-      Theme.of(context).textTheme.headlineLarge ?? _fallback(fontSize: 32);
 
   static TextStyle headlineMedium(BuildContext context) =>
       Theme.of(context).textTheme.headlineMedium ?? _fallback(fontSize: 28);
@@ -81,20 +72,11 @@ class AppTypography {
   static TextStyle bodySmall(BuildContext context) =>
       Theme.of(context).textTheme.bodySmall ?? _fallback(fontSize: 12);
 
-  static TextStyle labelLarge(BuildContext context) =>
-      Theme.of(context).textTheme.labelLarge ?? _fallback(fontSize: 14);
-
   static TextStyle labelMedium(BuildContext context) =>
       Theme.of(context).textTheme.labelMedium ?? _fallback(fontSize: 12);
 
   static TextStyle labelSmall(BuildContext context) =>
       Theme.of(context).textTheme.labelSmall ?? _fallback(fontSize: 11);
-
-  /// A utility that applies the Inter font family to a [TextStyle] while
-  /// keeping its other properties. Use when you need a one-off variant.
-  static TextStyle withInter(TextStyle style) => style.copyWith(
-        fontFamily: _fontFamily,
-      );
 
   /// The preferred body style for emphasized, medium-weight text.
   static TextStyle bodyMediumSemibold(BuildContext context) =>

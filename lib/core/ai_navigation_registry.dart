@@ -298,8 +298,8 @@ class AINavigationRegistry {
       id: 'ai_quota',
       displayName: 'AI Quota Management',
       description: 'Manage daily AI query quotas for users.',
-      requiredPermission: 'edit_settings',
-      allowedRoles: [UserRole.owner, UserRole.admin],
+      requiredPermission: 'manage_ai_quota',
+      allowedRoles: [UserRole.admin],
       builder: _aiQuotaBuilder,
       howToSteps: [
         'Open Settings and select AI Quota Management.',

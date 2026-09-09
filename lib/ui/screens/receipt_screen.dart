@@ -8,11 +8,12 @@ import 'package:pinoy_pos/providers/receipt_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/screens/payment_proof_viewer_screen.dart';
 import 'package:pinoy_pos/ui/screens/sale_detail_screen.dart';
+import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
+import 'package:pinoy_pos/ui/widgets/app_status_chip.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
-import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 
@@ -249,7 +250,8 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
 
   Widget _buildStoreHeader(ReceiptViewData receipt, ColorScheme cs) {
     return AppCard(
-      color: cs.primaryContainer,
+      variant: AppCardVariant.soft,
+      color: cs.primary,
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -258,7 +260,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
             Text(
               receipt.storeName,
               style: AppTypography.titleMediumBold(context)
-                  .copyWith(color: cs.onPrimaryContainer),
+                  .copyWith(color: cs.onSurface),
               textAlign: TextAlign.center,
             ),
             if (receipt.storeAddress.isNotEmpty) ...[
@@ -266,7 +268,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
               Text(
                 receipt.storeAddress,
                 style: AppTypography.bodySmall(context)
-                    .copyWith(color: cs.onPrimaryContainer),
+                    .copyWith(color: cs.onSurfaceVariant),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -275,7 +277,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
               Text(
                 'Contact: ${receipt.storePhone}',
                 style: AppTypography.bodySmall(context)
-                    .copyWith(color: cs.onPrimaryContainer),
+                    .copyWith(color: cs.onSurfaceVariant),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -294,21 +296,33 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
           children: [
             Text(
               'OFFICIAL RECEIPT',
-              style: AppTypography.titleSmallBold(context).copyWith(color: cs.primary),
+              style: AppTypography.titleSmall(context).copyWith(
+                fontWeight: FontWeight.w700,
+                color: cs.primary,
+                letterSpacing: 1,
+                fontSize: 13,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Receipt #${receipt.receiptNumber}',
-              style: AppTypography.titleMediumBold(context),
+              receipt.receiptNumber,
+              style: AppTypography.titleMediumBold(context).copyWith(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+              ),
             ),
             const SizedBox(height: 4),
             Text(
               receipt.date.toLocal().toString().split('.')[0],
-              style: Theme.of(context).textTheme.bodyMedium,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
             ),
             Text(
               'Cashier: ${receipt.cashierName}',
-              style: Theme.of(context).textTheme.bodyMedium,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
             ),
           ],
         ),
@@ -317,6 +331,8 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
   }
 
   Widget _buildItemsCard(ReceiptViewData receipt) {
+    final cs = Theme.of(context).colorScheme;
+
     return AppCard(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -331,37 +347,41 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
               ],
             ),
             const Divider(),
-            ...receipt.items.map((item) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              item.productName,
-                              style: AppTypography.titleSmall(context),
-                            ),
+            for (var i = 0; i < receipt.items.length; i++) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            receipt.items[i].productName,
+                            style: AppTypography.titleSmall(context),
                           ),
-                          const SizedBox(width: 12),
-                          Text(
-                            item.formattedTotal(receipt.currency),
-                            style: AppTypography.titleSmallBold(context),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${item.quantity} x ${item.formattedUnitPrice(receipt.currency)}',
-                        style: AppTypography.bodySmall(context).copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
+                        const SizedBox(width: 12),
+                        Text(
+                          receipt.items[i].formattedTotal(receipt.currency),
+                          style: AppTypography.titleSmallBold(context),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${receipt.items[i].quantity} x ${receipt.items[i].formattedUnitPrice(receipt.currency)}',
+                      style: AppTypography.bodySmall(context).copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
-                    ],
-                  ),
-                )),
+                    ),
+                  ],
+                ),
+              ),
+              if (i < receipt.items.length - 1)
+                Divider(color: cs.outline, height: 1),
+            ],
           ],
         ),
       ),
@@ -386,6 +406,8 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
   }
 
   Widget _buildPaymentCard(ReceiptViewData receipt) {
+    final brightness = Theme.of(context).brightness;
+
     return AppCard(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -402,7 +424,17 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
             if (receipt.customerName != null &&
                 receipt.customerName!.isNotEmpty)
               _buildValueRow('Customer', receipt.customerName!),
-            _buildValueRow('Status', receipt.statusLabel),
+            _buildValueRow(
+              'Status',
+              null,
+              trailing: AppStatusChip(
+                label: receipt.statusLabel,
+                color: AppSemanticColors.resolve(
+                  AppSemanticColors.success,
+                  brightness,
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -426,8 +458,11 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
   }
 
   Widget _buildFooterCard(ReceiptViewData receipt, ColorScheme cs) {
+    final brightness = Theme.of(context).brightness;
+
     return AppCard(
-      color: cs.secondaryContainer,
+      variant: AppCardVariant.soft,
+      color: AppSemanticColors.resolve(AppSemanticColors.success, brightness),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -437,7 +472,10 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                 receipt.receiptFooter!.isNotEmpty)
               Text(
                 receipt.receiptFooter!,
-                style: TextStyle(color: cs.onSecondaryContainer),
+                style: TextStyle(
+                  color: cs.onSurface,
+                  fontSize: 13,
+                ),
                 textAlign: TextAlign.center,
               ),
             if (receipt.receiptFooter != null &&
@@ -446,8 +484,9 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
             Text(
               'Thank you!',
               style: TextStyle(
-                color: cs.onSecondaryContainer,
+                color: cs.onSurface,
                 fontWeight: FontWeight.bold,
+                fontSize: 13,
               ),
             ),
           ],
@@ -456,12 +495,17 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
     );
   }
 
-  Widget _buildValueRow(String label, String value, {bool isTotal = false}) {
+  Widget _buildValueRow(
+    String label,
+    String? value, {
+    bool isTotal = false,
+    Widget? trailing,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Expanded(
             child: Text(
@@ -472,12 +516,15 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
             ),
           ),
           const SizedBox(width: 12),
-          Text(
-            value,
-            style: isTotal
-                ? AppTypography.titleMediumBold(context)
-                : Theme.of(context).textTheme.bodyMedium,
-          ),
+          if (trailing != null)
+            trailing
+          else
+            Text(
+              value ?? '',
+              style: isTotal
+                  ? AppTypography.titleMediumBold(context)
+                  : Theme.of(context).textTheme.bodyMedium,
+            ),
         ],
       ),
     );
@@ -491,25 +538,27 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
       if (canViewEvidence &&
           receipt.paymentProofPath != null &&
           receipt.paymentProofPath!.isNotEmpty) ...[
-        OutlinedButton.icon(
+        AppButton.outlined(
           onPressed: () => _viewPaymentProof(receipt),
-          icon: const Icon(Icons.image_outlined),
-          label: const Text('View Image'),
+          icon: Icons.image_outlined,
+          label: 'View Image',
         ),
-        LoadingButton(
+        AppButton.outlined(
           isLoading: _isExportingProof,
           onPressed: _isExportingProof
               ? null
               : () => _downloadGcashProofImage(receipt),
+          icon: Icons.download,
           label: 'Download Image',
         ),
       ],
-      LoadingButton(
+      AppButton.filled(
         isLoading: _isExporting,
         onPressed: _isExporting ? null : () => _downloadPdf(receipt),
+        icon: Icons.download,
         label: 'Download as PDF',
       ),
-      OutlinedButton(
+      AppButton.outlined(
         onPressed: () {
           Navigator.of(context).push(
             MaterialPageRoute(
@@ -517,7 +566,8 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
             ),
           );
         },
-        child: const Text('View Sale Details'),
+        icon: Icons.arrow_forward,
+        label: 'View Sale Details',
       ),
     ];
 

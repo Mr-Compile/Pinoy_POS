@@ -7,56 +7,119 @@ import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 void main() {
   group('AppDialogType semantic mapping', () {
     test('icons map to the expected Material icons', () {
-      expect(AppDialogType.success.icon, Icons.check_circle);
-      expect(AppDialogType.error.icon, Icons.cancel);
-      expect(AppDialogType.warning.icon, Icons.warning_amber_rounded);
-      expect(AppDialogType.info.icon, Icons.info);
+      expect(AppDialogType.success.icon, Icons.check_circle_outline);
+      expect(AppDialogType.error.icon, Icons.cancel_outlined);
+      expect(AppDialogType.validation.icon, Icons.cancel_outlined);
+      expect(AppDialogType.warning.icon, Icons.warning_amber_outlined);
+      expect(AppDialogType.info.icon, Icons.info_outline);
       expect(AppDialogType.delete.icon, Icons.delete_outline);
-      expect(AppDialogType.permanentDelete.icon, Icons.warning_amber_rounded);
+      expect(AppDialogType.permanentDelete.icon, Icons.delete_forever);
       expect(AppDialogType.restore.icon, Icons.restore);
       expect(AppDialogType.ai.icon, Icons.auto_awesome);
       expect(AppDialogType.logout.icon, Icons.logout);
       expect(AppDialogType.offline.icon, Icons.wifi_off);
+      expect(AppDialogType.confirmation.icon, Icons.help_outline);
+      expect(AppDialogType.payment.icon, Icons.account_balance_wallet_outlined);
       expect(AppDialogType.loading.icon, isNull);
     });
 
-    test('icon container colours use the canonical semantic colours', () {
+    test('icon container colours use the semantic container colours', () {
       const light = Brightness.light;
       const dark = Brightness.dark;
 
-      expect(AppDialogType.success.iconBgColor(light), AppSemanticColors.success);
-      expect(AppDialogType.error.iconBgColor(light), AppSemanticColors.error);
-      expect(AppDialogType.warning.iconBgColor(light), AppSemanticColors.warning);
-      expect(AppDialogType.info.iconBgColor(light), AppSemanticColors.info);
-      expect(AppDialogType.delete.iconBgColor(light), AppSemanticColors.error);
-      expect(AppDialogType.restore.iconBgColor(light), AppSemanticColors.success);
-      expect(AppDialogType.ai.iconBgColor(light), AppSemanticColors.purple);
-      expect(AppDialogType.logout.iconBgColor(light), AppSemanticColors.error);
-      expect(AppDialogType.restriction.iconBgColor(light), AppSemanticColors.neutral);
+      // Light mode: subtle tinted container surfaces.
+      expect(
+        AppDialogType.success.iconBgColor(light),
+        AppSemanticColors.resolve(AppSemanticColors.successContainer, light),
+      );
+      expect(
+        AppDialogType.error.iconBgColor(light),
+        AppSemanticColors.resolve(AppSemanticColors.errorContainer, light),
+      );
+      expect(
+        AppDialogType.warning.iconBgColor(light),
+        AppSemanticColors.resolve(AppSemanticColors.warningContainer, light),
+      );
+      expect(
+        AppDialogType.info.iconBgColor(light),
+        AppSemanticColors.resolve(AppSemanticColors.infoContainer, light),
+      );
+      expect(
+        AppDialogType.delete.iconBgColor(light),
+        AppSemanticColors.resolve(AppSemanticColors.errorContainer, light),
+      );
+      expect(
+        AppDialogType.restore.iconBgColor(light),
+        AppSemanticColors.resolve(AppSemanticColors.successContainer, light),
+      );
+      expect(
+        AppDialogType.ai.iconBgColor(light),
+        AppSemanticColors.resolve(AppSemanticColors.purpleContainer, light),
+      );
+      expect(
+        AppDialogType.logout.iconBgColor(light),
+        AppSemanticColors.resolve(AppSemanticColors.errorContainer, light),
+      );
+      expect(
+        AppDialogType.restriction.iconBgColor(light),
+        AppSemanticColors.resolve(AppSemanticColors.neutralContainer, light),
+      );
 
-      // Dark mode uses the same saturated canonical colours.
-      expect(AppDialogType.success.iconBgColor(dark), AppSemanticColors.success);
-      expect(AppDialogType.error.iconBgColor(dark), AppSemanticColors.error);
+      // Dark mode: dark tinted container surfaces.
+      expect(
+        AppDialogType.success.iconBgColor(dark),
+        AppSemanticColors.resolve(AppSemanticColors.successContainer, dark),
+      );
+      expect(
+        AppDialogType.error.iconBgColor(dark),
+        AppSemanticColors.resolve(AppSemanticColors.errorContainer, dark),
+      );
 
-      // The icon symbol is always a light/white colour for contrast.
-      for (final type in AppDialogType.values) {
-        expect(type.iconColor(light), AppColorTokens.onPrimaryBlue);
-        expect(type.iconColor(dark), AppColorTokens.onPrimaryBlue);
-      }
+      // The icon symbol uses the semantic colour itself (e.g. green on a
+      // green-tinted surface, red on a red-tinted surface).
+      expect(
+        AppDialogType.success.iconColor(light),
+        AppSemanticColors.resolve(AppSemanticColors.success, light),
+      );
+      expect(
+        AppDialogType.error.iconColor(light),
+        AppSemanticColors.resolve(AppSemanticColors.error, light),
+      );
+      expect(
+        AppDialogType.warning.iconColor(light),
+        AppSemanticColors.resolve(AppSemanticColors.warning, light),
+      );
+      expect(
+        AppDialogType.info.iconColor(light),
+        AppSemanticColors.resolve(AppSemanticColors.info, light),
+      );
+      expect(
+        AppDialogType.delete.iconColor(light),
+        AppSemanticColors.resolve(AppSemanticColors.error, light),
+      );
+      expect(
+        AppDialogType.ai.iconColor(light),
+        AppSemanticColors.resolve(AppSemanticColors.purple, light),
+      );
     });
 
     test('primary button colours follow the design language', () {
-      expect(AppDialogType.success.primaryButtonColor, AppButtonColor.success);
-      expect(AppDialogType.error.primaryButtonColor, AppButtonColor.error);
+      expect(AppDialogType.success.primaryButtonColor, AppButtonColor.primary);
+      expect(AppDialogType.error.primaryButtonColor, AppButtonColor.primary);
+      expect(AppDialogType.validation.primaryButtonColor, AppButtonColor.warning);
       expect(AppDialogType.warning.primaryButtonColor, AppButtonColor.warning);
       expect(AppDialogType.info.primaryButtonColor, AppButtonColor.primary);
       expect(AppDialogType.delete.primaryButtonColor, AppButtonColor.error);
       expect(AppDialogType.permanentDelete.primaryButtonColor, AppButtonColor.error);
-      expect(AppDialogType.restore.primaryButtonColor, AppButtonColor.success);
-      expect(AppDialogType.ai.primaryButtonColor, AppButtonColor.purple);
+      expect(AppDialogType.restore.primaryButtonColor, AppButtonColor.primary);
+      expect(AppDialogType.ai.primaryButtonColor, AppButtonColor.primary);
       expect(AppDialogType.logout.primaryButtonColor, AppButtonColor.error);
-      expect(AppDialogType.restriction.primaryButtonColor, AppButtonColor.neutral);
+      expect(AppDialogType.restriction.primaryButtonColor, AppButtonColor.primary);
       expect(AppDialogType.offline.primaryButtonColor, AppButtonColor.primary);
+      expect(AppDialogType.confirmation.primaryButtonColor, AppButtonColor.primary);
+      expect(AppDialogType.payment.primaryButtonColor, AppButtonColor.primary);
+      expect(AppDialogType.add.primaryButtonColor, AppButtonColor.primary);
+      expect(AppDialogType.edit.primaryButtonColor, AppButtonColor.primary);
     });
   });
 
@@ -132,38 +195,44 @@ void main() {
         ),
       );
 
-      final container = tester.widget<Container>(findIconContainer(Icons.check_circle));
-      expect((container.decoration as BoxDecoration).color, AppSemanticColors.success);
+      final container = tester.widget<Container>(findIconContainer(Icons.check_circle_outline));
+      expect(
+        (container.decoration as BoxDecoration).color,
+        AppSemanticColors.resolve(AppSemanticColors.successContainer, Brightness.light),
+      );
 
       final bg = filledBackgroundColor('Done', Brightness.light, tester);
       expect(bg, AppSemanticColors.resolveSurface(
-        AppSemanticColors.successSurface,
+        AppSemanticColors.primarySurface,
         Brightness.light,
       ));
     });
 
-    testWidgets('error dialog shows a red x icon and red button', (tester) async {
+    testWidgets('error dialog shows a red x icon and primary action button', (tester) async {
       await pumpDialog(
         tester,
         AppDialog(
           type: AppDialogType.error,
           title: 'Failed',
           message: 'Request failed.',
-          actions: const [AppDialogAction(label: 'OK', isPrimary: true)],
+          actions: const [AppDialogAction(label: 'Close', isPrimary: true)],
         ),
       );
 
-      final container = tester.widget<Container>(findIconContainer(Icons.cancel));
-      expect((container.decoration as BoxDecoration).color, AppSemanticColors.error);
+      final container = tester.widget<Container>(findIconContainer(Icons.cancel_outlined));
+      expect(
+        (container.decoration as BoxDecoration).color,
+        AppSemanticColors.resolve(AppSemanticColors.errorContainer, Brightness.light),
+      );
 
-      final bg = filledBackgroundColor('OK', Brightness.light, tester);
+      final bg = filledBackgroundColor('Close', Brightness.light, tester);
       expect(bg, AppSemanticColors.resolveSurface(
-        AppSemanticColors.errorSurface,
+        AppSemanticColors.primarySurface,
         Brightness.light,
       ));
     });
 
-    testWidgets('delete dialog shows a trash icon and destructive red button', (tester) async {
+    testWidgets('delete dialog shows a trash icon and outlined red primary button', (tester) async {
       await pumpDialog(
         tester,
         AppDialog(
@@ -171,6 +240,7 @@ void main() {
           title: 'Delete?',
           message: 'Delete this item?',
           actions: const [
+            AppDialogAction(label: 'Cancel'),
             AppDialogAction(
               label: 'Delete',
               isPrimary: true,
@@ -182,11 +252,17 @@ void main() {
 
       expect(findIconContainer(Icons.delete_outline), findsOneWidget);
 
-      final bg = filledBackgroundColor('Delete', Brightness.light, tester);
-      expect(bg, AppSemanticColors.resolveSurface(
-        AppSemanticColors.errorSurface,
-        Brightness.light,
-      ));
+      final button = tester.widget<OutlinedButton>(
+        find.descendant(
+          of: find.byType(AppDialog),
+          matching: find.ancestor(
+            of: find.text('Delete'),
+            matching: find.byType(OutlinedButton),
+          ),
+        ),
+      );
+      final fg = button.style!.foregroundColor!.resolve({});
+      expect(fg, AppSemanticColors.resolve(AppSemanticColors.error, Brightness.light));
     });
 
     testWidgets('restore dialog shows a restore icon and green button', (tester) async {
@@ -201,11 +277,14 @@ void main() {
       );
 
       final container = tester.widget<Container>(findIconContainer(Icons.restore));
-      expect((container.decoration as BoxDecoration).color, AppSemanticColors.success);
+      expect(
+        (container.decoration as BoxDecoration).color,
+        AppSemanticColors.resolve(AppSemanticColors.successContainer, Brightness.light),
+      );
 
       final bg = filledBackgroundColor('Restore', Brightness.light, tester);
       expect(bg, AppSemanticColors.resolveSurface(
-        AppSemanticColors.successSurface,
+        AppSemanticColors.primarySurface,
         Brightness.light,
       ));
     });
@@ -271,7 +350,7 @@ void main() {
       ));
     });
 
-    testWidgets('narrow dialog stacks buttons vertically', (tester) async {
+    testWidgets('narrow dialog with more than two actions stacks buttons vertically', (tester) async {
       await pumpDialog(
         tester,
         AppDialog(
@@ -280,6 +359,7 @@ void main() {
           message: 'Proceed?',
           actions: const [
             AppDialogAction(label: 'Cancel'),
+            AppDialogAction(label: 'Keep'),
             AppDialogAction(label: 'OK', isPrimary: true),
           ],
         ),

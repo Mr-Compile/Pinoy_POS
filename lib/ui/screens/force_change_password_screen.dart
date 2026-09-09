@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/auth_navigation.dart';
 import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/services/password_strength_service.dart';
+import 'package:pinoy_pos/ui/widgets/app_button.dart';
+import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
+import 'package:pinoy_pos/ui/widgets/app_icon_circle.dart';
 import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/password_strength_meter.dart';
 import 'package:pinoy_pos/ui/widgets/password_requirements_checklist.dart';
@@ -153,10 +155,12 @@ class _ForceChangePasswordScreenState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Icon(
-                        Icons.lock_person_outlined,
-                        size: 64,
-                        color: colorScheme.primary,
+                      AppIconCircle.large(
+                        icon: Icons.lock_person_outlined,
+                        backgroundColor: colorScheme.surfaceContainerHigh,
+                        borderColor: colorScheme.outline,
+                        borderWidth: 2,
+                        iconColor: colorScheme.primary,
                       ),
                       const SizedBox(height: 16),
                       Text(
@@ -201,9 +205,6 @@ class _ForceChangePasswordScreenState
                         },
                       ),
                       const SizedBox(height: 12),
-                      if (password.isNotEmpty)
-                        PasswordStrengthMeter(result: strengthResult),
-                      const SizedBox(height: 16),
                       AppPasswordField(
                         controller: _confirmPasswordController,
                         label: 'Confirm New Password',
@@ -227,39 +228,33 @@ class _ForceChangePasswordScreenState
                         onFieldSubmitted: (_) => _handleSubmit(),
                       ),
                       const SizedBox(height: 20),
-                      PasswordRequirementsChecklist(result: strengthResult),
-                      const SizedBox(height: 28),
-                      FilledButton(
-                        onPressed: _isSubmitting ? null : _handleSubmit,
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size(double.infinity, 56),
-                        ),
-                        child: _isSubmitting
-                            ? SizedBox(
-                                height: 24,
-                                width: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.5,
-                                  color: colorScheme.onPrimary,
-                                ),
-                              )
-                            : Text(
-                                'Continue',
-                                style: AppTypography.titleMedium(context).copyWith(
-                                  color: colorScheme.onPrimary,
-                                ),
-                              ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextButton(
-                        onPressed: _isSubmitting ? null : _handleSignOut,
-                        style: TextButton.styleFrom(
-                          foregroundColor: AppSemanticColors.resolve(
-                            AppSemanticColors.error,
-                            Theme.of(context).brightness,
+                      if (password.isNotEmpty)
+                        AppCard(
+                          variant: AppCardVariant.soft,
+                          color: colorScheme.primary,
+                          padding: const EdgeInsets.all(14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              PasswordStrengthMeter(result: strengthResult),
+                              const SizedBox(height: 12),
+                              PasswordRequirementsChecklist(
+                                  result: strengthResult),
+                            ],
                           ),
                         ),
-                        child: const Text('Sign Out'),
+                      const SizedBox(height: 28),
+                      AppButton.filled(
+                        onPressed: _isSubmitting ? null : _handleSubmit,
+                        label: 'Continue',
+                        isLoading: _isSubmitting,
+                        fullWidth: true,
+                      ),
+                      const SizedBox(height: 12),
+                      AppButton.destructive(
+                        onPressed: _isSubmitting ? null : _handleSignOut,
+                        label: 'Sign Out',
+                        fullWidth: true,
                       ),
                     ],
                   ),

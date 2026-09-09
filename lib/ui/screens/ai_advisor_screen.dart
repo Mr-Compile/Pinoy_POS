@@ -8,6 +8,7 @@ import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/providers/ai_advisor_provider.dart';
 import 'package:pinoy_pos/ui/widgets/ai_assistant_message.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
+import 'package:pinoy_pos/ui/widgets/app_icon_circle.dart';
 
 /// Role-aware AI Advisor screen.
 class AIAdvisorScreen extends ConsumerStatefulWidget {
@@ -140,11 +141,33 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Center(
-        child: Chip(
-          avatar: Icon(Icons.circle, size: 10, color: color),
-          label: Text(label, style: AppTypography.labelMedium(context)),
-          visualDensity: VisualDensity.compact,
-          padding: EdgeInsets.zero,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: cs.onPrimary.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: AppTypography.labelSmall(context).copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: cs.onPrimary,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -333,9 +356,22 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
 
   Widget _buildSuggestionChip(ColorScheme cs, String label, Color aiColor) {
     return ActionChip(
-      label: Text(label, maxLines: 2, overflow: TextOverflow.ellipsis),
+      label: Text(
+        label,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: AppTypography.labelMedium(context).copyWith(
+          color: cs.onSurface,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
       avatar: Icon(Icons.lightbulb_outline, size: 16, color: aiColor),
       onPressed: () => _sendSuggestion(label),
+      backgroundColor: cs.surface,
+      shape: StadiumBorder(
+        side: BorderSide(color: cs.outline),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
     );
   }
 
@@ -379,10 +415,10 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!isUser) ...[
-            CircleAvatar(
-              radius: 14,
+            AppIconCircle.small(
+              icon: Icons.auto_awesome,
               backgroundColor: aiColor,
-              child: Icon(Icons.auto_awesome, color: onAiColor, size: 16),
+              iconColor: onAiColor,
             ),
             const SizedBox(width: Spacing.xs),
           ],
@@ -425,10 +461,10 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
       padding: const EdgeInsets.only(bottom: Spacing.sm),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 14,
+          AppIconCircle.small(
+            icon: Icons.auto_awesome,
             backgroundColor: aiColor,
-            child: Icon(Icons.auto_awesome, color: onAiColor, size: 16),
+            iconColor: onAiColor,
           ),
           const SizedBox(width: Spacing.xs),
           Container(

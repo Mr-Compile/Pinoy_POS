@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:pinoy_pos/core/modal_result.dart';
 import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog_form.dart';
 import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/app_messages.dart';
 
@@ -81,10 +83,10 @@ class AppDialogService {
     required String title,
     String? message,
     String? details,
-    String primaryLabel = 'OK',
+    String primaryLabel = 'Close',
     AppButtonColor? primaryColor,
     void Function(BuildContext)? onPrimary,
-    String secondaryLabel = 'Close',
+    String? secondaryLabel,
     void Function(BuildContext)? onSecondary,
   }) {
     return _show(
@@ -94,7 +96,11 @@ class AppDialogService {
       message: message,
       details: details,
       actions: [
-        AppDialogAction(label: secondaryLabel, onPressed: onSecondary ?? (context) => Navigator.of(context, rootNavigator: true).pop()),
+        if (secondaryLabel != null)
+          AppDialogAction(
+            label: secondaryLabel,
+            onPressed: onSecondary ?? (context) => Navigator.of(context, rootNavigator: true).pop(),
+          ),
         AppDialogAction(
           label: primaryLabel,
           isPrimary: true,
@@ -356,7 +362,7 @@ class AppDialogService {
         AppDialogAction(
           label: 'Discard',
           isPrimary: true,
-          isDestructive: true,
+          color: AppButtonColor.warning,
           onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(true),
         ),
       ],
@@ -373,6 +379,7 @@ class AppDialogService {
         AppDialogAction(
           label: 'OK',
           isPrimary: true,
+          color: AppButtonColor.primary,
           onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(true),
         ),
       ],
@@ -382,12 +389,55 @@ class AppDialogService {
   // ── Void Sale ────────────────────────────────────────────────────────
 
   static Future<String?> voidSaleConfirm(BuildContext context) {
-    return showDialog<String>(
+    return showDialog<ModalResult<String>>(
       context: context,
       useRootNavigator: true,
       useSafeArea: true,
-      builder: (context) => const _VoidSaleDialog(),
-    );
+      builder: (context) => AppDialogForm<ModalResult<String>>(
+        type: AppDialogType.warning,
+        title: 'Void Sale?',
+        message:
+            'Voiding a sale reverses the transaction. This action cannot be undone.',
+        childBuilder: (context, state) {
+          final controller = state.textController('reason');
+
+          return Form(
+            key: state.formKey,
+            child: AppTextFormField(
+              controller: controller,
+              label: 'Reason',
+              prefixIcon: Icons.notes,
+              maxLines: 2,
+              validator: (value) =>
+                  (value?.trim().isNotEmpty ?? false) ? null : 'Reason is required',
+              onChanged: (_) => state.markChanged(),
+            ),
+          );
+        },
+        actionsBuilder: (context, state) => [
+          AppDialogAction(
+            label: 'Cancel',
+            onPressed: state.isSaving
+                ? null
+                : (context) => state.pop(const ModalResult<String>.cancelled()),
+          ),
+          AppDialogAction(
+            label: 'Void Sale',
+            isPrimary: true,
+            isDestructive: true,
+            isLoading: state.isSaving,
+            onPressed: state.isSaving
+                ? null
+                : (context) {
+                    if (state.formKey.currentState!.validate()) {
+                      final reason = state.textController('reason').text.trim();
+                      state.pop(ModalResult<String>.saved(reason));
+                    }
+                  },
+          ),
+        ],
+      ),
+    ).then((result) => result?.value);
   }
 
   // ── Session Expired ──────────────────────────────────────────────────
@@ -489,6 +539,7 @@ class AppDialogService {
       message: message,
       primaryLabel: 'Try Again',
       primaryColor: AppButtonColor.primary,
+      secondaryLabel: 'Close',
       onPrimary: onRetry == null
           ? null
           : (context) {
@@ -1000,56 +1051,5 @@ class AppDialogService {
         ),
       ],
     ).then((v) => v ?? false);
-  }
-}
-
-class _VoidSaleDialog extends StatefulWidget {
-  const _VoidSaleDialog();
-
-  @override
-  State<_VoidSaleDialog> createState() => _VoidSaleDialogState();
-}
-
-class _VoidSaleDialogState extends State<_VoidSaleDialog> {
-  final _reasonController = TextEditingController();
-
-  @override
-  void dispose() {
-    _reasonController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final reason = _reasonController.text.trim();
-    final voidEnabled = reason.isNotEmpty;
-
-    return AppDialog(
-      type: AppDialogType.warning,
-      title: 'Void Sale?',
-      message:
-          'Voiding a sale reverses the transaction. This action cannot be undone.',
-      actions: [
-        AppDialogAction(
-          label: 'Cancel',
-          onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(),
-        ),
-        AppDialogAction(
-          label: 'Void Sale',
-          isPrimary: true,
-          isDestructive: true,
-          onPressed: voidEnabled
-              ? (context) => Navigator.of(context, rootNavigator: true)
-                  .pop(_reasonController.text.trim())
-              : null,
-        ),
-      ],
-      child: AppTextFormField(
-        controller: _reasonController,
-        label: 'Reason',
-        maxLines: 2,
-        onChanged: (_) => setState(() {}),
-      ),
-    );
   }
 }

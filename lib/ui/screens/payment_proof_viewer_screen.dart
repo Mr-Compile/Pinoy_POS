@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/breakpoints.dart';
 
 import 'package:pinoy_pos/data/models/sale.dart';
@@ -10,8 +11,11 @@ import 'package:pinoy_pos/providers/payment_proof_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/services/image_service.dart';
 import 'package:pinoy_pos/services/payment_proof_service.dart';
+import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
+import 'package:pinoy_pos/ui/widgets/error_state.dart';
+import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 
 /// Full-screen GCash payment evidence viewer. Requires `view_payment_evidence`.
@@ -205,18 +209,23 @@ class _PaymentProofViewerScreenState
         .hasPermission('verify_payments');
     final isOwn = ref.read(authStateProvider).user?.id == _sale.userId;
 
+    final replaceAction = (canVerify || isOwn) && !_isLoading && _error == null
+        ? IconButton(
+            onPressed: _isReplacing ? null : _replaceProof,
+            icon: const Icon(Icons.camera_alt),
+            tooltip: 'Replace proof',
+          )
+        : null;
+
     return Scaffold(
-      appBar: const AppHeader(
+      appBar: AppHeader(
         title: 'Payment Proof',
         showBackButton: true,
+        showThemeToggle: false,
+        showNotificationBell: false,
+        showProfileMenu: false,
+        actions: replaceAction != null ? [replaceAction] : null,
       ),
-      floatingActionButton: (canVerify || isOwn) && !_isLoading && _error == null
-          ? FloatingActionButton.extended(
-              onPressed: _isReplacing ? null : _replaceProof,
-              icon: const Icon(Icons.camera_alt),
-              label: const Text('Replace'),
-            )
-          : null,
       body: _buildBody(),
     );
   }
@@ -227,21 +236,20 @@ class _PaymentProofViewerScreenState
     }
 
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            _error!,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-        ),
+      return ErrorState(
+        title: 'Unable to Load Proof',
+        message: _error!,
+        onRetry: _loadFile,
       );
     }
 
     final info = _info;
     if (info == null) {
-      return const Center(child: Text('Payment proof not found.'));
+      return EmptyState(
+        icon: Icons.image_not_supported,
+        title: 'Payment proof not found.',
+        message: 'There is no evidence attached to this sale.',
+      );
     }
 
     return LayoutBuilder(
@@ -282,53 +290,42 @@ class _PaymentProofViewerScreenState
     final cs = Theme.of(context).colorScheme;
 
     if (info.isImage) {
-      return InteractiveViewer(
-        minScale: 0.5,
-        maxScale: 4,
+      return Container(
+        color: cs.surfaceContainerHigh,
+        padding: const EdgeInsets.all(20),
         child: Center(
-          child: Image.file(
-            info.file,
-            fit: BoxFit.contain,
-            errorBuilder: (context, error, stackTrace) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.broken_image, size: 64, color: cs.outline),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Unable to display this image.',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
+          child: InteractiveViewer(
+            minScale: 0.5,
+            maxScale: 4,
+            child: Container(
+              constraints: const BoxConstraints(maxHeight: 360),
+              decoration: BoxDecoration(
+                color: cs.surface,
+                border: Border.all(color: cs.outline),
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Image.file(
+                info.file,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  return EmptyState(
+                    icon: Icons.broken_image,
+                    title: 'Unable to display this image.',
+                    message: 'The proof file may be missing or unsupported.',
+                  );
+                },
+              ),
+            ),
           ),
         ),
       );
     }
 
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.broken_image, size: 64, color: cs.outline),
-            const SizedBox(height: 16),
-            Text(
-              'Unable to open the payment proof.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-          ],
-        ),
-      ),
+    return EmptyState(
+      icon: Icons.broken_image,
+      title: 'Unable to open the payment proof.',
+      message: 'The file is not a supported image.',
     );
   }
 
@@ -368,19 +365,12 @@ class _PaymentProofViewerScreenState
               ),
             ),
             const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: _isExporting ? null : _downloadImage,
-                icon: _isExporting
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.download),
-                label: const Text('Download Image'),
-              ),
+            AppButton.filled(
+              isLoading: _isExporting,
+              onPressed: _isExporting ? null : _downloadImage,
+              icon: Icons.download,
+              label: 'Download Image',
+              fullWidth: true,
             ),
           ],
         ),

@@ -21,6 +21,7 @@ import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog_form.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_icon_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
@@ -208,7 +209,7 @@ class _POSScreenState extends ConsumerState<POSScreen> {
     ref.invalidate(paymentSettingsProvider);
 
     final total = cart.total;
-    final result = await showDialog<_PaymentResult>(
+    final result = await showDialog<_PaymentResult?>(
       context: context,
       builder: (context) => _PaymentDialog(total: total),
     );
@@ -422,6 +423,7 @@ class _POSScreenState extends ConsumerState<POSScreen> {
       padding: const EdgeInsets.only(right: Spacing.sm),
       child: FilterChip(
         label: Text(label),
+        showCheckmark: false,
         selected: isSelected,
         onSelected: (_) {
           setState(() {
@@ -461,6 +463,7 @@ class _POSScreenState extends ConsumerState<POSScreen> {
 
     return AppCard(
       onTap: isOutOfStock ? null : () => _addToCart(product),
+      variant: AppCardVariant.outlined,
       padding: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -494,7 +497,17 @@ class _POSScreenState extends ConsumerState<POSScreen> {
                         'Out of Stock',
                         style: AppTypography.titleSmallBold(
                           context,
-                        ).copyWith(color: cs.error),
+                        ).copyWith(
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? cs.onSurface
+                              : cs.error,
+                          shadows: const [
+                            Shadow(
+                              color: Color(0x99000000),
+                              blurRadius: 4,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -681,6 +694,7 @@ class _POSScreenState extends ConsumerState<POSScreen> {
         // Right: cart + checkout
         Container(
           width: cartWidth,
+          color: Theme.of(context).colorScheme.surface,
           decoration: BoxDecoration(
             border: Border(
               left: BorderSide(
@@ -961,7 +975,7 @@ class _CartItemRow extends ConsumerWidget {
     // element reachable on narrow phones — long product names ellipsize
     // instead of pushing the buttons off screen.
     return AppCard(
-      variant: AppCardVariant.filled,
+      variant: AppCardVariant.outlined,
       margin: const EdgeInsets.only(bottom: Spacing.sm),
       padding: const EdgeInsets.all(Spacing.md),
       child: Row(
@@ -1077,50 +1091,301 @@ class _PaymentResult {
   });
 }
 
-class _PaymentDialog extends ConsumerStatefulWidget {
+class _PaymentDialog extends ConsumerWidget {
   final double total;
 
   const _PaymentDialog({required this.total});
 
   @override
-  ConsumerState<_PaymentDialog> createState() => _PaymentDialogState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final paymentSettingsAsync = ref.watch(paymentSettingsProvider);
 
-class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
-  final _formKey = GlobalKey<FormState>();
-  final _cashController = TextEditingController();
-  final _notesController = TextEditingController();
-  final _referenceController = TextEditingController();
-  final _customerNameController = TextEditingController();
-
-  String _paymentMethod = 'Cash';
-
-  @override
-  void dispose() {
-    _cashController.dispose();
-    _notesController.dispose();
-    _referenceController.dispose();
-    _customerNameController.dispose();
-    super.dispose();
+    return paymentSettingsAsync.when(
+      loading: () => AppDialog(
+        type: AppDialogType.loading,
+        title: 'Payment',
+        actions: [
+          AppDialogAction(
+            label: 'Cancel',
+            onPressed: (context) =>
+                Navigator.of(context, rootNavigator: true).pop(),
+          ),
+        ],
+        child: Center(
+          child: CircularProgressIndicator(
+            color: AppSemanticColors.resolve(
+              AppSemanticColors.primary,
+              Theme.of(context).brightness,
+            ),
+          ),
+        ),
+      ),
+      error: (error, stackTrace) => AppDialog(
+        type: AppDialogType.error,
+        title: 'Payment',
+        message: 'Failed to load payment settings: $error',
+        actions: [
+          AppDialogAction(
+            label: 'Close',
+            onPressed: (context) =>
+                Navigator.of(context, rootNavigator: true).pop(),
+          ),
+        ],
+      ),
+      data: (settings) => AppDialogForm<_PaymentResult?>(
+        type: AppDialogType.payment,
+        title: 'Payment',
+        showClose: false,
+        childBuilder: (context, state) => _buildForm(context, state, settings),
+        actionsBuilder: (context, state) =>
+            _buildActions(context, state, settings),
+      ),
+    );
   }
 
-  double _parseCash() {
-    return double.tryParse(_cashController.text.trim()) ?? 0.0;
+  Widget _buildForm(
+    BuildContext context,
+    AppDialogFormState<_PaymentResult?> state,
+    PaymentSettings settings,
+  ) {
+    final cs = Theme.of(context).colorScheme;
+    final methods = _availableMethods(settings.gcashEnabled);
+    final currentMethod = _currentMethod(state, settings);
+    final cash = _currentCash(state);
+    final change = cash - total;
+
+    return Form(
+      key: state.formKey,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Total display
+          Container(
+            padding: const EdgeInsets.all(Spacing.md),
+            decoration: BoxDecoration(
+              color: cs.primary,
+              borderRadius: BorderRadius.circular(AppRadius.control),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                'Total Due',
+                style: TextStyle(color: cs.onPrimary.withValues(alpha: 0.9)),
+              ),
+                Text(
+                  CurrencyUtils.format(total),
+                  style: AppTypography.titleLargeBold(
+                    context,
+                  ).copyWith(color: cs.onPrimary),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: Spacing.lg),
+          // Payment method — large tappable tiles instead of a
+          // dropdown so the choices are visible at a glance and easy
+          // to hit on a phone. Two columns on compact widths, one row
+          // when there is room for every method side by side.
+          Text(
+            'Payment Method',
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+          const SizedBox(height: Spacing.sm),
+          LayoutBuilder(
+            key: const ValueKey('pos_payment_method'),
+            builder: (context, constraints) {
+              final columns =
+                  layoutClassFor(constraints.maxWidth).isAtLeastMedium
+                      ? methods.length
+                      : 2;
+              final tileWidth =
+                  (constraints.maxWidth - Spacing.sm * (columns - 1)) /
+                  columns;
+              return Wrap(
+                spacing: Spacing.sm,
+                runSpacing: Spacing.sm,
+                children: [
+                  for (final method in methods)
+                    SizedBox(
+                      width: tileWidth,
+                      child: _PaymentMethodTile(
+                        label: method,
+                        icon: _paymentMethodIcon(method),
+                        selected: method == currentMethod,
+                        onTap: () => state.setValue<String>('method', method),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: Spacing.lg),
+          // Cash received (Cash only)
+          if (currentMethod == 'Cash') ...[
+            AppTextFormField(
+              controller: state.textController('cash', text: ''),
+              label: 'Cash Received',
+              prefixText: CurrencyUtils.symbol(),
+              prefixIcon: Icons.payments,
+              keyboardType: TextInputType.number,
+              validator: (value) {
+                final cash = double.tryParse(value?.trim() ?? '');
+                if (cash == null) {
+                  return 'Enter a valid amount';
+                }
+                if (cash < total) {
+                  return 'Insufficient cash received';
+                }
+                return null;
+              },
+              onChanged: (value) {
+                final parsed = double.tryParse(value.trim()) ?? 0.0;
+                state.setValue<double>('cash', parsed);
+              },
+            ),
+            const SizedBox(height: Spacing.md),
+            // Change display
+            if (cash >= total)
+              Container(
+                padding: const EdgeInsets.all(Spacing.md),
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(AppRadius.control),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Change',
+                      style: TextStyle(color: cs.onSurfaceVariant),
+                    ),
+                    Text(
+                      CurrencyUtils.format(change),
+                      style: AppTypography.titleLargeBold(
+                        context,
+                      ).copyWith(color: cs.primary),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: Spacing.md),
+            // Quick cash buttons
+            Wrap(
+              spacing: Spacing.sm,
+              children: [
+                _buildQuickCashButton(state, total),
+                _buildQuickCashButton(state, _roundUp(total, 50)),
+                _buildQuickCashButton(state, _roundUp(total, 100)),
+                _buildQuickCashButton(state, _roundUp(total, 500)),
+              ],
+            ),
+            const SizedBox(height: Spacing.md),
+          ],
+
+          // Customer name for non-GCash methods, driven by Payment Settings.
+          if (currentMethod != 'GCash' && settings.customerNameVisible) ...[
+            AppTextFormField(
+              controller: state.textController('customerName', text: ''),
+              label: _customerNameLabel(settings),
+              prefixIcon: Icons.person,
+              textCapitalization: TextCapitalization.words,
+              validator: (value) => _validateCustomerName(settings, value),
+            ),
+            const SizedBox(height: Spacing.md),
+          ],
+          // Notes
+          AppTextFormField(
+            controller: state.textController('notes', text: ''),
+            label: 'Notes (optional)',
+            prefixIcon: Icons.note,
+            maxLines: 2,
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<AppDialogAction> _buildActions(
+    BuildContext context,
+    AppDialogFormState<_PaymentResult?> state,
+    PaymentSettings settings,
+  ) {
+    final currentMethod = _currentMethod(state, settings);
+    final primaryLabel = currentMethod == 'GCash'
+        ? 'Continue with GCash'
+        : 'Complete Sale';
+
+    return [
+      AppDialogAction(
+        label: 'Cancel',
+        onPressed: (_) => state.pop(null),
+      ),
+      AppDialogAction(
+        label: primaryLabel,
+        isPrimary: true,
+        onPressed: (_) {
+          if (currentMethod == 'GCash') {
+            state.pop(
+              _PaymentResult(
+                cashReceived: 0.0,
+                paymentMethod: 'GCash',
+              ),
+            );
+            return;
+          }
+
+          if (!state.formKey.currentState!.validate()) return;
+
+          state.pop(
+            _PaymentResult(
+              cashReceived: currentMethod == 'Cash'
+                  ? (state.value<double>('cash') ?? 0.0)
+                  : total,
+              paymentMethod: currentMethod,
+              notes: state.textController('notes').text.trim().isEmpty
+                  ? null
+                  : state.textController('notes').text.trim(),
+              referenceNumber: null,
+              customerName:
+                  settings.customerNameVisible &&
+                          state.textController('customerName').text.trim().isNotEmpty
+                      ? state.textController('customerName').text.trim()
+                      : null,
+            ),
+          );
+        },
+      ),
+    ];
   }
 
   List<String> _availableMethods(bool gcashEnabled) {
     if (gcashEnabled) {
-      return const ['Cash', 'GCash', 'Card', 'Other'];
+      return const ['Cash', 'GCash'];
     }
-    return const ['Cash', 'Card', 'Other'];
+    return const ['Cash'];
   }
+
+  String _currentMethod(
+    AppDialogFormState<_PaymentResult?> state,
+    PaymentSettings settings,
+  ) {
+    final methods = _availableMethods(settings.gcashEnabled);
+    final method = state.value<String>('method', 'Cash') ?? 'Cash';
+    return methods.contains(method) ? method : 'Cash';
+  }
+
+  double _currentCash(AppDialogFormState<_PaymentResult?> state) =>
+      state.value<double>('cash') ?? 0.0;
 
   IconData _paymentMethodIcon(String method) {
     return switch (method) {
       'Cash' => Icons.payments_outlined,
       'GCash' => Icons.qr_code_2,
-      'Card' => Icons.credit_card_outlined,
-      _ => Icons.more_horiz,
+      _ => Icons.payments_outlined,
     };
   }
 
@@ -1138,284 +1403,19 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
     return null;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final paymentSettingsAsync = ref.watch(paymentSettingsProvider);
-
-    return paymentSettingsAsync.when(
-      loading: () => AppDialog(
-        type: AppDialogType.loading,
-        title: 'Payment',
-        showIcon: false,
-        actions: [
-          AppDialogAction(
-            label: 'Cancel',
-            onPressed: (context) =>
-                Navigator.of(context, rootNavigator: true).pop(),
-          ),
-        ],
-        child: Center(
-          child: CircularProgressIndicator(
-            color: AppSemanticColors.resolve(
-              AppSemanticColors.info,
-              Theme.of(context).brightness,
-            ),
-          ),
-        ),
-      ),
-      error: (error, stackTrace) => AppDialog(
-        type: AppDialogType.error,
-        title: 'Payment',
-        message: 'Failed to load payment settings: $error',
-        actions: [
-          AppDialogAction(
-            label: 'Cancel',
-            onPressed: (context) =>
-                Navigator.of(context, rootNavigator: true).pop(),
-          ),
-        ],
-      ),
-      data: (settings) => _buildContent(context, settings),
-    );
-  }
-
-  Widget _buildContent(BuildContext context, PaymentSettings settings) {
-    final cs = Theme.of(context).colorScheme;
-    final methods = _availableMethods(settings.gcashEnabled);
-    final currentMethod = methods.contains(_paymentMethod)
-        ? _paymentMethod
-        : 'Cash';
-    final cash = currentMethod == 'Cash' ? _parseCash() : widget.total;
-    final change = cash - widget.total;
-
-    if (currentMethod != _paymentMethod) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() => _paymentMethod = currentMethod);
-      });
-    }
-
-    final primaryLabel = currentMethod == 'GCash'
-        ? 'Continue with GCash'
-        : 'Complete Sale';
-
-    void completePayment(BuildContext context) {
-      if (currentMethod == 'GCash') {
-        Navigator.of(
-          context,
-          rootNavigator: true,
-        ).pop(_PaymentResult(cashReceived: 0.0, paymentMethod: 'GCash'));
-        return;
-      }
-
-      if (!_formKey.currentState!.validate()) return;
-      Navigator.of(context, rootNavigator: true).pop(
-        _PaymentResult(
-          cashReceived: currentMethod == 'Cash' ? _parseCash() : widget.total,
-          paymentMethod: currentMethod,
-          notes: _notesController.text.trim().isEmpty
-              ? null
-              : _notesController.text.trim(),
-          referenceNumber:
-              (currentMethod == 'Card' || currentMethod == 'Other') &&
-                  _referenceController.text.trim().isNotEmpty
-              ? _referenceController.text.trim()
-              : null,
-          customerName:
-              settings.customerNameVisible &&
-                  _customerNameController.text.trim().isNotEmpty
-              ? _customerNameController.text.trim()
-              : null,
-        ),
-      );
-    }
-
-    return AppDialog(
-      type: AppDialogType.confirmation,
-      title: 'Payment',
-      showIcon: false,
-      actions: [
-        AppDialogAction(
-          label: 'Cancel',
-          onPressed: (context) =>
-              Navigator.of(context, rootNavigator: true).pop(),
-        ),
-        AppDialogAction(
-          label: primaryLabel,
-          isPrimary: true,
-          onPressed: (context) => completePayment(context),
-        ),
-      ],
-      child: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Total display
-            Container(
-              padding: const EdgeInsets.all(Spacing.md),
-              decoration: BoxDecoration(
-                color: cs.primaryContainer,
-                borderRadius: BorderRadius.circular(AppRadius.control),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Total Due',
-                    style: TextStyle(color: cs.onPrimaryContainer),
-                  ),
-                  Text(
-                    CurrencyUtils.format(widget.total),
-                    style: AppTypography.titleLargeBold(
-                      context,
-                    ).copyWith(color: cs.onPrimaryContainer),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: Spacing.lg),
-            // Payment method — large tappable tiles instead of a
-            // dropdown so the choices are visible at a glance and easy
-            // to hit on a phone. Two columns on compact widths, one row
-            // when there is room for every method side by side.
-            Text(
-              'Payment Method',
-              style: Theme.of(
-                context,
-              ).textTheme.titleSmall?.copyWith(color: cs.onSurfaceVariant),
-            ),
-            const SizedBox(height: Spacing.sm),
-            LayoutBuilder(
-              key: const ValueKey('pos_payment_method'),
-              builder: (context, constraints) {
-                final columns =
-                    layoutClassFor(constraints.maxWidth).isAtLeastMedium
-                        ? methods.length
-                        : 2;
-                final tileWidth =
-                    (constraints.maxWidth - Spacing.sm * (columns - 1)) /
-                    columns;
-                return Wrap(
-                  spacing: Spacing.sm,
-                  runSpacing: Spacing.sm,
-                  children: [
-                    for (final method in methods)
-                      SizedBox(
-                        width: tileWidth,
-                        child: _PaymentMethodTile(
-                          label: method,
-                          icon: _paymentMethodIcon(method),
-                          selected: method == currentMethod,
-                          onTap: () => setState(() => _paymentMethod = method),
-                        ),
-                      ),
-                  ],
-                );
-              },
-            ),
-            const SizedBox(height: Spacing.lg),
-            // Cash received (Cash only)
-            if (currentMethod == 'Cash') ...[
-              AppTextFormField(
-                controller: _cashController,
-                label: 'Cash Received',
-                prefixText: CurrencyUtils.symbol(),
-                prefixIcon: Icons.payments,
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  final cash = double.tryParse(value?.trim() ?? '');
-                  if (cash == null) {
-                    return 'Enter a valid amount';
-                  }
-                  if (cash < widget.total) {
-                    return 'Insufficient cash received';
-                  }
-                  return null;
-                },
-                onChanged: (_) => setState(() {}),
-              ),
-              const SizedBox(height: Spacing.md),
-              // Change display
-              if (cash >= widget.total)
-                Container(
-                  padding: const EdgeInsets.all(Spacing.md),
-                  decoration: BoxDecoration(
-                    color: cs.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(AppRadius.control),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Change',
-                        style: TextStyle(color: cs.onSurfaceVariant),
-                      ),
-                      Text(
-                        CurrencyUtils.format(change),
-                        style: AppTypography.titleLargeBold(
-                          context,
-                        ).copyWith(color: cs.primary),
-                      ),
-                    ],
-                  ),
-                ),
-              const SizedBox(height: Spacing.md),
-              // Quick cash buttons
-              Wrap(
-                spacing: Spacing.sm,
-                children: [
-                  _buildQuickCashButton(widget.total),
-                  _buildQuickCashButton(_roundUp(widget.total, 50)),
-                  _buildQuickCashButton(_roundUp(widget.total, 100)),
-                  _buildQuickCashButton(_roundUp(widget.total, 500)),
-                ],
-              ),
-              const SizedBox(height: Spacing.md),
-            ],
-            // Reference (Card/Other only)
-            if (currentMethod == 'Card' || currentMethod == 'Other') ...[
-              AppTextFormField(
-                controller: _referenceController,
-                label: 'Reference Number (optional)',
-                prefixIcon: Icons.confirmation_number,
-              ),
-              const SizedBox(height: Spacing.md),
-            ],
-            // Customer name for non-GCash methods, driven by Payment Settings.
-            if (currentMethod != 'GCash' && settings.customerNameVisible) ...[
-              AppTextFormField(
-                controller: _customerNameController,
-                label: _customerNameLabel(settings),
-                prefixIcon: Icons.person,
-                textCapitalization: TextCapitalization.words,
-                validator: (value) => _validateCustomerName(settings, value),
-              ),
-              const SizedBox(height: Spacing.md),
-            ],
-            // Notes
-            AppTextFormField(
-              controller: _notesController,
-              label: 'Notes (optional)',
-              prefixIcon: Icons.note,
-              maxLines: 2,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   double _roundUp(double value, double to) {
     return (value / to).ceil() * to;
   }
 
-  Widget _buildQuickCashButton(double amount) {
+  Widget _buildQuickCashButton(
+    AppDialogFormState<_PaymentResult?> state,
+    double amount,
+  ) {
     return ActionChip(
       label: Text(CurrencyUtils.formatWhole(amount)),
       onPressed: () {
-        _cashController.text = amount.toStringAsFixed(2);
-        setState(() {});
+        state.textController('cash').text = amount.toStringAsFixed(2);
+        state.setValue<double>('cash', amount);
       },
     );
   }
@@ -1466,7 +1466,18 @@ class _PaymentMethodTile extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 20, color: selected ? cs.primary : foreground),
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: selected ? cs.primaryContainer : cs.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(AppRadius.control),
+                ),
+                child: Icon(
+                  icon,
+                  size: 18,
+                  color: selected ? cs.primary : foreground,
+                ),
+              ),
               const SizedBox(width: Spacing.sm),
               Flexible(
                 child: Text(

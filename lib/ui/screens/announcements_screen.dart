@@ -4,6 +4,7 @@ import 'package:pinoy_pos/data/models/announcement.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
+import 'package:pinoy_pos/ui/widgets/app_icon_button.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
@@ -127,43 +128,55 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
     final createAction = canManage
         ? ResponsiveCreateAction(
             label: 'Add Announcement',
-            icon: Icons.campaign,
+            icon: Icons.add,
             onPressed: _showAnnouncementDialog,
           )
         : null;
 
-    final appBarAction = createAction?.appBarAction(context);
+    final toolbarAction = createAction?.contentAction(context);
     final createFab = createAction?.fab(context);
+    final bottomClearance =
+        createAction?.contentBottomClearance(context) ?? 0;
 
     return Scaffold(
-      appBar: AppHeader(
+      appBar: const AppHeader(
         title: 'Announcements',
         showBackButton: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadAnnouncements,
-          ),
-          // ignore: use_null_aware_elements
-          if (appBarAction != null) appBarAction,
-        ],
       ),
       floatingActionButton: createFab,
-      body: _announcements.isEmpty
-          ? EmptyState(
-              icon: Icons.campaign,
-              title: 'No Announcements Yet',
-              message: 'Create an announcement to share updates with your team.',
-              // No create button here — the FAB (mobile) / AppBar
-              // action (tablet) is the single primary create action.
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
+      body: Column(
+        children: [
+          CrudToolbar(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            pinnedControls: [
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                tooltip: 'Refresh',
+                onPressed: _loadAnnouncements,
+              ),
+            ],
+            primaryAction: toolbarAction,
+          ),
+          Expanded(
+            child: _announcements.isEmpty
+                ? EmptyState(
+                    icon: Icons.campaign,
+                    title: 'No Announcements Yet',
+                    message:
+                        'Create an announcement to share updates with your team.',
+                    // No create button here — the FAB (mobile portrait) /
+                    // toolbar action (other layouts) is the single primary
+                    // create action.
+                  )
+                : ListView.builder(
+                    padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottomClearance),
               itemCount: _announcements.length,
               itemBuilder: (context, index) {
                 final announcement = _announcements[index];
+                final cs = Theme.of(context).colorScheme;
                 return AppCard(
                   margin: const EdgeInsets.only(bottom: 12),
+                  onTap: () => _showAnnouncementDetails(announcement),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -181,27 +194,40 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
                             ),
                           ),
                           if (canManage) ...[
-                            IconButton(
-                              icon: Icon(
-                                announcement.isPinned
-                                    ? Icons.push_pin
-                                    : Icons.push_pin_outlined,
-                                size: 20,
-                              ),
-                              tooltip: announcement.isPinned ? 'Unpin' : 'Pin',
+                            AppIconButton(
+                              icon: announcement.isPinned
+                                  ? Icons.push_pin
+                                  : Icons.push_pin_outlined,
+                              size: 20,
+                              selected: announcement.isPinned,
+                              tooltip: announcement.isPinned
+                                  ? 'Unpin announcement'
+                                  : 'Pin announcement',
                               onPressed: () => _togglePin(announcement),
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.edit),
-                              tooltip: 'Edit',
-                              onPressed: () => _showAnnouncementDialog(announcement: announcement),
+                            AppIconButton(
+                              icon: Icons.edit_outlined,
+                              size: 20,
+                              tooltip: 'Edit announcement',
+                              onPressed: () => _showAnnouncementDialog(
+                                  announcement: announcement),
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.delete),
-                              tooltip: 'Delete',
-                              onPressed: () => _deleteAnnouncement(announcement),
+                            AppIconButton(
+                              icon: Icons.delete_outline,
+                              size: 20,
+                              color: cs.error,
+                              tooltip: 'Delete announcement',
+                              onPressed: () =>
+                                  _deleteAnnouncement(announcement),
                             ),
                           ],
+                          AppIconButton(
+                            icon: Icons.visibility_outlined,
+                            size: 20,
+                            tooltip: 'View announcement',
+                            onPressed: () =>
+                                _showAnnouncementDetails(announcement),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 8),
@@ -218,6 +244,37 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
                 );
               },
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Read-only detail view for an announcement (the View action).
+  Future<void> _showAnnouncementDetails(Announcement announcement) async {
+    await showDialog<void>(
+      context: context,
+      useRootNavigator: true,
+      builder: (dialogContext) => AppDialog(
+        type: AppDialogType.info,
+        title: announcement.title,
+        message: announcement.content,
+        details: [
+          'Posted: ${announcement.createdAt.toLocal().toString().split('.')[0]}',
+          if (announcement.isPinned) 'Pinned to top',
+          if (announcement.expiresAt != null)
+            'Expires: ${announcement.expiresAt!.toLocal().toString().split(' ')[0]}',
+        ].join('\n'),
+        showClose: true,
+        actions: [
+          AppDialogAction(
+            label: 'Close',
+            isPrimary: true,
+            onPressed: (context) =>
+                Navigator.of(context, rootNavigator: true).pop(),
+          ),
+        ],
+      ),
     );
   }
 
@@ -226,7 +283,7 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
       context: context,
       useRootNavigator: true,
       builder: (dialogContext) => AppDialogForm<ModalResult<void>>(
-        type: AppDialogType.info,
+        type: announcement == null ? AppDialogType.add : AppDialogType.edit,
         title: announcement == null ? 'Add Announcement' : 'Edit Announcement',
         childBuilder: (context, state) {
           final titleController = state.textController(
@@ -249,6 +306,7 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
                 AppTextFormField(
                   controller: titleController,
                   label: 'Title',
+                  prefixIcon: Icons.subject,
                   validator: (value) => Validators.required(value, 'Title'),
                   onChanged: (_) => state.markChanged(),
                 ),
@@ -256,6 +314,7 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
                 AppTextFormField(
                   controller: contentController,
                   label: 'Content',
+                  prefixIcon: Icons.message_outlined,
                   maxLines: 4,
                   validator: (value) => Validators.required(value, 'Content'),
                   onChanged: (_) => state.markChanged(),

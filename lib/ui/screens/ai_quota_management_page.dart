@@ -9,8 +9,10 @@ import 'package:pinoy_pos/services/user_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_form.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
+import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
+import 'package:pinoy_pos/ui/widgets/responsive_create_action.dart';
 
 /// Admin page for managing per-user AI quotas and the default daily quota.
 ///
@@ -49,12 +51,7 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
   }
 
   Future<void> _verifyOnEntry() async {
-    final result = await showDialog<bool>(
-      context: context,
-      useRootNavigator: true,
-      barrierDismissible: false,
-      builder: (context) => const SuperAdminVerificationDialog(),
-    );
+    final result = await showSuperAdminVerificationDialog(context);
 
     if (result == true) {
       if (mounted) {
@@ -96,7 +93,7 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
       useRootNavigator: true,
       builder: (context) =>
           AppDialogForm<ModalResult<({int value, bool applyToExisting})>>(
-        type: AppDialogType.info,
+        type: AppDialogType.edit,
         title: 'Change Default AI Quota',
         childBuilder: (context, state) {
           final controller =
@@ -114,6 +111,7 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
                   controller: controller,
                   keyboardType: TextInputType.number,
                   label: 'New default daily quota',
+                  prefixIcon: Icons.auto_awesome,
                   helperText: 'Applies to new users unless overridden',
                 ),
                 const SizedBox(height: Spacing.sm),
@@ -191,7 +189,7 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
       context: context,
       useRootNavigator: true,
       builder: (context) => AppDialogForm<ModalResult<int>>(
-        type: AppDialogType.info,
+        type: AppDialogType.edit,
         title: 'Edit Quota for ${user.fullName}',
         childBuilder: (context, state) {
           final controller = state.textController(
@@ -205,6 +203,7 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
               controller: controller,
               keyboardType: TextInputType.number,
               label: 'Daily quota',
+              prefixIcon: Icons.auto_awesome,
             ),
           );
         },
@@ -333,6 +332,16 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
       (sum, q) => sum + (q.dailyQuota - q.dailyUsage).clamp(0, q.dailyQuota),
     );
 
+    // Page-level primary action: FAB on compact portrait, toolbar button
+    // in the content area on every other layout.
+    final resetAction = ResponsiveCreateAction(
+      label: 'Reset All Usage',
+      icon: Icons.restart_alt,
+      onPressed: _isLoading ? null : _resetAllUsage,
+      color: AppButtonColor.warning,
+      tooltip: "Reset all users' usage",
+    );
+
     return Scaffold(
       appBar: const AppHeader(title: 'AI Quota Management'),
       body: _isLoading
@@ -375,10 +384,16 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
                             ],
                           ),
                           const SizedBox(height: 16),
-                          FilledButton.icon(
-                            onPressed: _changeDefaultQuota,
-                            icon: const Icon(Icons.edit),
-                            label: const Text('Change Default Quota'),
+                          Row(
+                            children: [
+                              FilledButton.icon(
+                                onPressed: _changeDefaultQuota,
+                                icon: const Icon(Icons.edit),
+                                label: const Text('Change Default Quota'),
+                              ),
+                              const Spacer(),
+                              ?resetAction.contentAction(context),
+                            ],
                           ),
                           const SizedBox(height: 8),
                           Text(
@@ -437,13 +452,7 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
                 ],
               ),
             ),
-      floatingActionButton: _isLoading
-          ? null
-          : FloatingActionButton.extended(
-              onPressed: _resetAllUsage,
-              icon: const Icon(Icons.restart_alt),
-              label: const Text('Reset All Usage'),
-            ),
+      floatingActionButton: resetAction.fab(context),
     );
   }
 }
@@ -490,74 +499,76 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-class SuperAdminVerificationDialog extends StatefulWidget {
-  const SuperAdminVerificationDialog({super.key});
-
-  @override
-  State<SuperAdminVerificationDialog> createState() =>
-      _SuperAdminVerificationDialogState();
-}
-
-class _SuperAdminVerificationDialogState
-    extends State<SuperAdminVerificationDialog> {
-  final _controller = TextEditingController();
-  bool _obscure = true;
-  String? _errorText;
-
-  void _verify(BuildContext context) {
-    final password = _controller.text;
-    final isValid = SuperAdminVerificationService()
-        .verifySuperAdminPassword(password);
-
-    if (isValid) {
-      Navigator.of(context, rootNavigator: true).pop(true);
-    } else {
-      setState(() => _errorText = 'Incorrect SuperAdmin password');
-    }
-  }
-
-  void _clearError() {
-    if (_errorText != null) setState(() => _errorText = null);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AppDialog(
+Future<bool> showSuperAdminVerificationDialog(BuildContext context) {
+  return showDialog<bool>(
+    context: context,
+    useRootNavigator: true,
+    barrierDismissible: false,
+    builder: (context) => AppDialogForm<bool>(
       type: AppDialogType.confirmation,
       title: 'SuperAdmin Verification',
-      actions: [
+      message: 'Enter the SuperAdmin password to continue.',
+      canPop: false,
+      childBuilder: (context, state) {
+        final cs = Theme.of(context).colorScheme;
+        final error = state.value<String?>('error');
+
+        return Form(
+          key: state.formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AppPasswordField(
+                controller: state.textController('password'),
+                label: 'Password',
+                onChanged: (_) {
+                  state.setValue<String?>('error', null);
+                  state.markChanged();
+                },
+                onFieldSubmitted: (_) => _verifySuperAdmin(state),
+                textInputAction: TextInputAction.done,
+              ),
+              if (error != null) ...[
+                const SizedBox(height: Spacing.xs),
+                Text(
+                  error,
+                  style: TextStyle(
+                    color: cs.error,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+      actionsBuilder: (context, state) => [
         AppDialogAction(
           label: 'Cancel',
-          onPressed: (context) =>
-              Navigator.of(context, rootNavigator: true).pop(false),
+          onPressed: state.isSaving
+              ? null
+              : (context) => state.pop(false),
         ),
         AppDialogAction(
           label: 'Verify',
           isPrimary: true,
-          onPressed: (context) => _verify(context),
+          isLoading: state.isSaving,
+          onPressed: state.isSaving ? null : (context) => _verifySuperAdmin(state),
         ),
       ],
-      child: TextField(
-        controller: _controller,
-        obscureText: _obscure,
-        textInputAction: TextInputAction.done,
-        onSubmitted: (_) => _verify(context),
-        onChanged: (_) => _clearError(),
-        decoration: InputDecoration(
-          labelText: 'Password',
-          errorText: _errorText,
-          suffixIcon: IconButton(
-            icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
-            onPressed: () => setState(() => _obscure = !_obscure),
-          ),
-        ),
-      ),
-    );
-  }
+    ),
+  ).then((result) => result ?? false);
+}
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
+void _verifySuperAdmin(AppDialogFormState<bool> state) {
+  final password = state.textController('password').text;
+  final isValid = SuperAdminVerificationService()
+      .verifySuperAdminPassword(password);
+
+  if (isValid) {
+    state.pop(true);
+  } else {
+    state.setValue<String?>('error', 'Incorrect SuperAdmin password');
   }
 }

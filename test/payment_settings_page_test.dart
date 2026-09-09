@@ -9,7 +9,7 @@ import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/services/image_service.dart';
 import 'package:pinoy_pos/services/settings_service.dart';
 import 'package:pinoy_pos/ui/screens/payment_settings_page.dart';
-import 'package:pinoy_pos/ui/widgets/loading_button.dart';
+import 'package:pinoy_pos/ui/widgets/app_button.dart';
 
 class _FakeSettingsService extends SettingsService {
   Settings _settings;
@@ -120,13 +120,17 @@ void main() {
     await pumpWithOwner(tester, fakeService);
 
     // Toggle verification on.
-    await tester.ensureVisible(find.text('Verify staff GCash sales'));
-    await tester.tap(find.text('Verify staff GCash sales'));
+    final verifySwitchFinder = find.descendant(
+      of: find.widgetWithText(ListTile, 'Verify staff GCash sales'),
+      matching: find.byType(Switch),
+    );
+    await tester.ensureVisible(verifySwitchFinder);
+    await tester.tap(verifySwitchFinder);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
 
     // Save.
-    final saveFinder = find.widgetWithText(LoadingButton, 'Save Payment Settings');
+    final saveFinder = find.widgetWithText(AppButton, 'Save Payment Settings');
     await tester.ensureVisible(saveFinder);
     await tester.pump(const Duration(milliseconds: 200));
     await tester.tap(saveFinder);

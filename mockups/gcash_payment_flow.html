@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinoy POS — GCash Payment Flow</title>
+<style>
+  :root[data-theme="dark"] {
+    --bg: #070D19;
+    --surface: #121C31;
+    --surface-elev: #152348;
+    --border: #263A63;
+    --divider: #1A2445;
+    --text: #F1F4F7;
+    --text-2: #B8C5E0;
+    --text-3: #8C9AB8;
+    --primary: #4B82E9;
+    --primary-strong: #2C68D7;
+    --page-bg: #0B1220;
+    --appbar: #1B4CAF;
+  }
+  :root[data-theme="light"] {
+    --bg: #F5F8FC;
+    --surface: #FFFFFF;
+    --surface-elev: #EEF4FF;
+    --border: #D7E0EE;
+    --divider: #E7ECF4;
+    --text: #172033;
+    --text-2: #52627A;
+    --text-3: #8A9AB3;
+    --primary: #2563C7;
+    --primary-strong: #1B4CAF;
+    --page-bg: #E8EDF5;
+    --appbar: #2563C7;
+  }
+  :root {
+    --success: #16A34A;
+    --warning: #D97706;
+    --error: #DC2626;
+    --info: #4B82E9;
+    --purple: #8B5CF6;
+    --teal: #06B6D4;
+    --amber: #F59E0B;
+    --radius-card: 18px;
+    --radius-icon: 11px;
+    --radius-control: 12px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', 'Inter', system-ui, sans-serif; }
+  body { background: var(--page-bg); min-height: 100vh; padding: 32px 16px 64px; transition: background .3s; }
+
+  .page-head { max-width: 1200px; margin: 0 auto 28px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .page-head h1 { color: var(--text); font-size: 22px; font-weight: 700; }
+  .page-head p { color: var(--text-3); font-size: 13px; margin-top: 4px; }
+  .theme-toggle { background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 24px; padding: 10px 20px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+  .theme-toggle:hover { border-color: var(--primary); }
+
+  .flow { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; align-items: flex-start; }
+  .step { display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: 360px; }
+  .step-label { color: var(--text); font-size: 14px; font-weight: 700; }
+  .step-arrow { display: none; }
+
+  .phone { width: 360px; background: var(--bg); border-radius: 36px; border: 1px solid var(--border); overflow: hidden; box-shadow: 0 24px 64px rgba(0,0,0,.35); display: flex; flex-direction: column; }
+  .statusbar { height: 30px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; color: var(--text-2); font-size: 12px; font-weight: 600; flex-shrink: 0; }
+  .statusbar .icons { display: flex; gap: 5px; align-items: center; }
+  .statusbar .icons svg { width: 13px; height: 13px; fill: var(--text-2); }
+
+  .appbar { background: var(--appbar); padding: 14px 16px 16px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .appbar .back { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; }
+  .appbar .back svg { width: 21px; height: 21px; fill: #fff; }
+  .appbar .title { flex: 1; min-width: 0; }
+  .appbar .title h2 { color: #fff; font-size: 19px; font-weight: 700; letter-spacing: .1px; }
+  .appbar .title .sub { color: rgba(255,255,255,.75); font-size: 12px; margin-top: 2px; }
+
+  .screen { padding: 14px; display: flex; flex-direction: column; gap: 14px; min-height: 660px; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 14px; }
+  .card.primary { background: var(--primary); color: #fff; }
+  .card.success { background: var(--success); color: #fff; }
+  .card.filled { background: var(--surface-elev); border-color: var(--surface-elev); }
+
+  .section-title { font-size: 12.5px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: .4px; }
+  .page-title { font-size: 13.5px; color: var(--text-3); margin-bottom: 2px; }
+  .amount { font-size: 36px; font-weight: 800; color: var(--text); line-height: 1.1; }
+  .amount.sm { font-size: 28px; }
+  .primary .amount, .primary .page-title, .success .amount, .success .page-title { color: #fff; }
+
+  .row { display: flex; align-items: center; gap: 12px; }
+  .row + .row { margin-top: 10px; }
+  .row .grow { flex: 1; min-width: 0; }
+  .row .name { font-size: 14px; font-weight: 600; color: var(--text); }
+  .row .sub { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+
+  .isquare { width: 38px; height: 38px; border-radius: var(--radius-icon); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .isquare svg { width: 19px; height: 19px; }
+  .icircle { width: 52px; height: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+  .icircle svg { width: 28px; height: 28px; }
+
+  .c-blue    { background: rgba(75,130,233,.16); } .c-blue svg    { fill: var(--info); }
+  .c-green   { background: rgba(22,163,74,.16); }  .c-green svg   { fill: var(--success); }
+  .c-amber   { background: rgba(217,119,6,.16); }  .c-amber svg   { fill: var(--warning); }
+  .c-red     { background: rgba(220,38,38,.16); }  .c-red svg     { fill: var(--error); }
+  .c-purple  { background: rgba(139,92,246,.16); } .c-purple svg  { fill: var(--purple); }
+  .c-teal    { background: rgba(6,182,212,.16); }  .c-teal svg    { fill: var(--teal); }
+  .c-grey    { background: rgba(140,154,184,.18); } .c-grey svg    { fill: var(--text-3); }
+
+  .method-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .method-tile { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px; display: flex; align-items: center; gap: 10px; cursor: pointer; }
+  .method-tile.selected { border-color: var(--primary); background: var(--surface-elev); }
+  .method-tile .lbl { font-size: 13.5px; font-weight: 700; color: var(--text); }
+  .method-tile.selected .lbl { color: var(--primary); }
+
+  .input { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-control); padding: 12px 12px; color: var(--text); font-size: 13px; display: flex; align-items: center; gap: 8px; }
+  .input svg { width: 16px; height: 16px; fill: var(--text-3); }
+  .input .ph { color: var(--text-3); font-size: 13px; }
+
+  .btn { width: 100%; padding: 13px; border-radius: 14px; font-size: 13.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; border: none; }
+  .btn svg { width: 16px; height: 16px; }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-outlined { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+  .btn-success { background: var(--success); color: #fff; }
+  .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .qr-wrap { width: 100%; max-width: 220px; aspect-ratio: 1; background: #fff; border-radius: 16px; margin: 8px auto; display: flex; align-items: center; justify-content: center; position: relative; }
+  .qr-wrap svg { width: 80px; height: 80px; fill: #172033; }
+  .qr-text { text-align: center; font-size: 12px; color: var(--text-3); line-height: 1.5; }
+
+  .chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+  .chip-success { background: rgba(22,163,74,.16); color: var(--success); }
+  .chip-amber { background: rgba(217,119,6,.16); color: var(--warning); }
+
+  .status-note { background: var(--surface-elev); border-radius: var(--radius-control); padding: 12px; display: flex; gap: 10px; align-items: flex-start; }
+  .status-note svg { width: 18px; height: 18px; fill: var(--text-2); flex-shrink: 0; }
+
+  .success-wrap { text-align: center; padding: 30px 10px; }
+  .success-wrap h2 { font-size: 22px; font-weight: 800; color: #fff; margin-top: 16px; }
+  .success-wrap p { color: rgba(255,255,255,.85); font-size: 13px; margin-top: 6px; }
+  .receipt { background: rgba(255,255,255,.15); border-radius: 12px; padding: 14px; margin-top: 20px; text-align: left; }
+  .receipt .line { display: flex; justify-content: space-between; font-size: 12.5px; color: rgba(255,255,255,.9); margin: 6px 0; }
+
+  .order-item { display: flex; justify-content: space-between; font-size: 13px; color: var(--text); padding: 5px 0; }
+  .order-item + .order-item { border-top: 1px solid var(--divider); }
+
+  .proof-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .arrow { color: var(--text-3); font-size: 24px; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M12 21l3.5-4.5c-.97-.74-2.18-1.16-3.5-1.16s-2.53.42-3.5 1.16L12 21zM12 3C7.31 3 3.07 4.69 0 7.55l1.93 2.43C4.48 7.9 8.01 6.4 12 6.4s7.52 1.5 10.07 3.58L24 7.55C20.93 4.69 16.69 3 12 3z"/></symbol>
+  <symbol id="i-batt" viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></symbol>
+  <symbol id="i-payments" viewBox="0 0 24 24"><path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V4h16v2zM7 14h3v2H7v-2z"/></symbol>
+  <symbol id="i-qr" viewBox="0 0 24 24"><path d="M3 11h8V3H3v8zm2-6h4v4H5V5zM3 21h8v-8H3v8zm2-6h4v4H5v-4zM13 3v8h8V3h-8zm6 6h-4V5h4v4zM13 13h2v2h-2zM15 15h2v2h-2zM13 17h2v2h-2zM17 13h2v2h-2zM19 15h2v2h-2zM17 17h2v2h-2zM15 19h2v2h-2zM19 19h2v2h-2zM13 21h8v-8h-2v6h-6v2z"/></symbol>
+  <symbol id="i-person" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></symbol>
+  <symbol id="i-numbers" viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V6h16v12zM6 10h2v2H6zm0 4h2v2H6zm4-4h2v2h-2zm0 4h2v2h-2zm4-4h2v2h-2zm0 4h2v2h-2z"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M9.4 10.5l4.77-8.26C13.47 2.09 12.75 2 12 2c-2.4 0-4.6.85-6.32 2.25l3.66 6.21.06-.06zM21.54 9c-.93 0-1.76-.36-2.4-1.02l-3.66-6.21c1.08.75 1.95 1.75 2.57 2.91.36.66.56 1.41.56 2.19 0 .18-.02.35-.05.52l2.98-2.98c-.13-.04-.27-.06-.42-.06-.17 0-.33.02-.49.05L21.54 9zM20.5 12c0 2.16-.9 4.11-2.34 5.5H24v2H0v-2h5.84c-1.44-1.39-2.34-3.34-2.34-5.5 0-4.14 3.36-7.5 7.5-7.5s7.5 3.36 7.5 7.5z"/></symbol>
+  <symbol id="i-photo" viewBox="0 0 24 24"><path d="M22 16V4c0-1.1-.9-2-2-2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2zm-2-6l-2.5-3.2-2.7 3.4c-.2.2-.5.2-.7 0L10.5 9l-2 2.5V6h10v4zM4 22h14v-2H4V6H2v14c0 1.1.9 2 2 2z"/></symbol>
+  <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M19.5 3.5 18 2l-1.5 1.5L15 2l-1.5 1.5L12 2l-1.5 1.5L9 2 7.5 3.5 6 2 4.5 3.5 3 2v20l1.5-1.5L6 22l1.5-1.5L9 22l1.5-1.5L12 22l1.5-1.5L15 22l1.5-1.5L18 22l1.5-1.5L21 22V2l-1.5 1.5zM19 19.09H5V4.91h14v14.18zM6 15h12v2H6zm0-4h12v2H6zm0-4h12v2H6z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41l1.06 1.06zM7.05 18.36c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41l1.06-1.06z"/></symbol>
+</svg>
+
+<div class="page-head">
+  <div>
+    <h1>GCash Payment Flow</h1>
+    <p>Cash and GCash only. POS → GCash details → review → success.</p>
+  </div>
+  <button class="theme-toggle" onclick="toggleTheme()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
+    <span id="themeLabel">Light mode</span>
+  </button>
+</div>
+
+<div class="flow">
+
+  <!-- Step 1: POS Payment dialog -->
+  <div class="step">
+    <div class="step-label">1. Choose GCash</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="appbar"><div class="title"><h2>Payment</h2></div></div>
+      <div class="screen">
+        <div class="card primary">
+          <div class="page-title">Total Due</div>
+          <div class="amount">₱255.00</div>
+        </div>
+        <div class="section-title">Payment Method</div>
+        <div class="method-grid">
+          <div class="method-tile">
+            <div class="isquare c-blue"><svg><use href="#i-payments"/></svg></div>
+            <span class="lbl">Cash</span>
+          </div>
+          <div class="method-tile selected">
+            <div class="isquare c-blue"><svg><use href="#i-qr"/></svg></div>
+            <span class="lbl">GCash</span>
+          </div>
+        </div>
+        <div class="card filled" style="margin-top:auto; display:flex; flex-direction:column; gap:10px;">
+          <div class="btn btn-primary"><svg><use href="#i-qr"/></svg>Continue with GCash</div>
+          <div class="btn btn-outlined">Cancel</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow" style="align-self:center; margin-top:180px;">→</div>
+
+  <!-- Step 2: GCash details -->
+  <div class="step">
+    <div class="step-label">2. Scan &amp; enter details</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="appbar"><div class="back"><svg><use href="#i-moon"/></svg></div><div class="title"><h2>GCash Payment</h2><div class="sub">Scan QR to pay</div></div></div>
+      <div class="screen">
+        <div class="card primary" style="text-align:center;">
+          <div class="page-title">Total Due</div>
+          <div class="amount sm">₱255.00</div>
+        </div>
+        <div class="card" style="text-align:center;">
+          <div class="row" style="justify-content:center; gap:6px;">
+            <svg style="width:18px;height:18px;fill:var(--primary)" viewBox="0 0 24 24"><use href="#i-qr"/></svg>
+            <span style="font-size:14px; font-weight:700; color:var(--text);">Scan to Pay</span>
+          </div>
+          <div class="qr-wrap">
+            <svg viewBox="0 0 24 24"><use href="#i-qr"/></svg>
+          </div>
+          <div class="qr-text">Open GCash and scan this QR code to complete the payment.</div>
+        </div>
+        <div class="card">
+          <div class="section-title" style="margin-bottom:10px;">Customer / Payment Info</div>
+          <div class="input"><svg><use href="#i-person"/></svg><span class="ph">Customer Name (optional)</span></div>
+          <div class="input" style="margin-top:10px;"><svg><use href="#i-numbers"/></svg><span class="ph">GCash Reference Number</span></div>
+        </div>
+        <div class="card">
+          <div class="section-title" style="margin-bottom:10px;">Payment Proof</div>
+          <div class="proof-grid">
+            <div class="btn btn-outlined"><svg><use href="#i-camera"/></svg>Camera</div>
+            <div class="btn btn-outlined"><svg><use href="#i-photo"/></svg>Gallery</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="row"><div class="name">Order Summary</div><div class="sub">3 items</div></div>
+          <div class="order-item"><span>Pork Sisig × 2</span><span>₱180.00</span></div>
+          <div class="order-item"><span>Rice × 1</span><span>₱75.00</span></div>
+        </div>
+        <div class="btn btn-primary"><svg><use href="#i-receipt"/></svg>Review Payment</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow" style="align-self:center; margin-top:180px;">→</div>
+
+  <!-- Step 3: Review -->
+  <div class="step">
+    <div class="step-label">3. Review &amp; confirm</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="appbar"><div class="back"><svg><use href="#i-moon"/></svg></div><div class="title"><h2>Review Payment</h2></div></div>
+      <div class="screen">
+        <div class="card primary" style="text-align:center;">
+          <div class="page-title">Total Due</div>
+          <div class="amount sm">₱255.00</div>
+        </div>
+        <div class="card">
+          <div class="row">
+            <div class="isquare c-blue"><svg><use href="#i-qr"/></svg></div>
+            <div class="grow"><div class="name">GCash</div><div class="sub">Pay via scanned QR</div></div>
+            <svg style="width:22px;height:22px;fill:var(--success)" viewBox="0 0 24 24"><use href="#i-check"/></svg>
+          </div>
+        </div>
+        <div class="card">
+          <div class="section-title" style="margin-bottom:10px;">Payment Details</div>
+          <div class="row"><div class="sub" style="flex:1;">Reference Number</div><div class="name" style="color:var(--primary);">ABC123456</div></div>
+          <div class="row"><div class="sub" style="flex:1;">Customer</div><div class="name">Juan Cruz</div></div>
+          <div class="row"><div class="sub" style="flex:1;">Payment Proof</div><div class="name" style="color:var(--success);"><svg style="width:14px;height:14px;fill:var(--success);vertical-align:middle;margin-right:4px;" viewBox="0 0 24 24"><use href="#i-check"/></svg>Attached</div></div>
+        </div>
+        <div class="card">
+          <div class="row"><div class="name">Order Summary</div><div class="sub">3 items</div></div>
+          <div class="order-item"><span>Pork Sisig × 2</span><span>₱180.00</span></div>
+          <div class="order-item"><span>Rice × 1</span><span>₱75.00</span></div>
+        </div>
+        <div class="status-note">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+          <span class="sub" style="color:var(--text);">This GCash payment must be approved by the Owner before the sale is completed.</span>
+        </div>
+        <div class="btn btn-outlined"><svg><use href="#i-moon"/></svg>Edit Details</div>
+        <div class="btn btn-primary"><svg><use href="#i-check"/></svg>Complete Payment</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow" style="align-self:center; margin-top:180px;">→</div>
+
+  <!-- Step 4: Success -->
+  <div class="step">
+    <div class="step-label">4. Payment success</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="appbar"><div class="title"><h2>Payment Successful</h2></div></div>
+      <div class="screen" style="justify-content:center;">
+        <div class="card success" style="text-align:center;">
+          <div class="icircle" style="background:rgba(255,255,255,.2); margin:0 auto;">
+            <svg style="fill:#fff;" viewBox="0 0 24 24"><use href="#i-check"/></svg>
+          </div>
+          <h2>Payment Successful</h2>
+          <p>GCash transaction saved successfully.</p>
+          <div class="receipt">
+            <div class="line"><span>Total</span><span>₱255.00</span></div>
+            <div class="line"><span>Method</span><span>GCash</span></div>
+            <div class="line"><span>Reference</span><span>ABC123456</span></div>
+            <div class="line"><span>Receipt</span><span>20260909-0001</span></div>
+          </div>
+          <div class="btn" style="background:#fff; color:var(--success); margin-top:20px;">New Sale</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function toggleTheme() {
+    const root = document.documentElement;
+    const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
+    root.dataset.theme = next;
+    document.getElementById('themeLabel').textContent = next === 'dark' ? 'Light mode' : 'Dark mode';
+  }
+</script>
+</body>
+</html>

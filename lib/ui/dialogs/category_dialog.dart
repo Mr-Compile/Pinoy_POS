@@ -36,7 +36,7 @@ class _CategoryDialog extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return AppDialogForm<ModalResult<void>>(
-      type: AppDialogType.info,
+      type: category == null ? AppDialogType.add : AppDialogType.edit,
       title: category == null ? 'Add Category' : 'Edit Category',
       childBuilder: (context, state) {
         final nameController = state.textController(

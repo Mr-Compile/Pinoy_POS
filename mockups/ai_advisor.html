@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinoy POS — AI Advisor Mockup</title>
+<link rel="stylesheet" href="mockup.css">
+</head>
+<body>
+
+<div class="page-head">
+  <div>
+    <h1>AI Advisor</h1>
+    <p>Role-aware business chat with daily query quota.</p>
+  </div>
+  <button class="theme-toggle" onclick="toggleTheme()">
+    <svg viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
+    <span id="themeLabel">Light mode</span>
+  </button>
+</div>
+
+<div class="frames">
+  <div class="frame-wrap">
+    <div class="frame-label">AI Advisor</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span>
+        <span class="icons">
+          <svg viewBox="0 0 24 24"><path d="M12 21l3.5-4.5c-.97-.74-2.18-1.16-3.5-1.16s-2.53.42-3.5 1.16L12 21zM12 3C7.31 3 3.07 4.69 0 7.55l1.93 2.43C4.48 7.9 8.01 6.4 12 6.4s7.52 1.5 10.07 3.58L24 7.55C20.93 4.69 16.69 3 12 3z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>
+        </span>
+      </div>
+      <div class="appbar">
+        <div class="back"><svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></div>
+        <div class="title"><h2>AI Advisor</h2></div>
+        <div class="act" title="Connected" style="display:flex;align-items:center;gap:6px;padding:0 10px;width:auto;border-radius:20px;background:rgba(255,255,255,.15);">
+          <div style="width:8px;height:8px;border-radius:50%;background:var(--success);"></div>
+          <span style="font-size:11px;font-weight:700;color:#fff;">Connected</span>
+        </div>
+      </div>
+      <div class="screen">
+
+        <div class="quota-bar">
+          <span style="font-size:16px;">✦</span>
+          <span class="text">AI Queries Today</span>
+          <div class="track"><div class="fill" style="width:35%;"></div></div>
+          <span class="text">7 / 20 used</span>
+        </div>
+
+        <div class="screen-body" id="chatList" style="padding:12px 14px;gap:10px;justify-content:flex-start;">
+
+          <div class="chat-row">
+            <div class="icircle sm c-purple" style="font-size:12px;color:#fff;">✦</div>
+            <div class="chat-bubble ai">Good afternoon! How can I help your business today?</div>
+          </div>
+
+          <div class="chat-row user">
+            <div class="chat-bubble user">How are my sales today?</div>
+          </div>
+
+          <div class="chat-row">
+            <div class="icircle sm c-purple" style="font-size:12px;color:#fff;">✦</div>
+            <div class="chat-bubble ai">Today you have made 24 sales for a total of ₱3,240.00. Top product is Chicken Adobo Rice with 8 sold.</div>
+          </div>
+
+        </div>
+
+        <div style="padding:16px 14px;">
+          <div style="font-size:12px;font-weight:700;color:var(--text-3);margin-bottom:8px;">Try asking</div>
+          <div class="chips">
+            <span class="chip" style="font-size:12px;" onclick="suggest(this)">How are my sales today?</span>
+            <span class="chip" style="font-size:12px;" onclick="suggest(this)">Give me a summary.</span>
+            <span class="chip" style="font-size:12px;" onclick="suggest(this)">What are my low stock items?</span>
+          </div>
+        </div>
+
+        <div class="input-bar">
+          <input id="aiInput" type="text" placeholder="Ask about your business..." onkeydown="if(event.key==='Enter')sendAi()">
+          <div class="send" onclick="sendAi()"><svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg></div>
+        </div>
+
+      </div>
+    </div>
+    <div class="frame-notes">
+      <b>AI Advisor:</b> Chat interface with role-specific title/welcome, status chip, daily quota bar, message bubbles and suggestion chips. Quota is managed by <code>manage_ai_quota</code> (Admin-only) but daily use is role-aware.
+    </div>
+  </div>
+</div>
+
+<script src="mockup.js"></script>
+</body>
+</html>

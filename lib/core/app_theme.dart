@@ -12,40 +12,49 @@ class AppColorTokens {
 
   // ── Primary blue family ────────────────────────────────────────────────
 
-  static const Color primaryBlue = Color(0xFF1C60DB);
-  static const Color primaryBlueDark = Color(0xFF0C3392);
-  static const Color primaryBlueLight = Color(0xFF2F80ED);
+  /// Light-mode primary brand blue.
+  static const Color lightPrimary = Color(0xFF2563C7);
+
+  /// Dark-mode primary brand blue.
+  static const Color primaryBlue = Color(0xFF2C68D7);
+
+  /// Strong, saturated brand blue (CTA emphasis / app bars / filled buttons).
+  static const Color primaryBlueStrong = Color(0xFF1B4CAF);
+
+  /// Deep brand blue (gradient end, tertiary accents).
+  static const Color primaryBlueDeep = Color(0xFF0C3594);
+
+  /// Lighter brand blue (gradient start, secondary accents).
+  static const Color primaryBlueLight = Color(0xFF4B82E9);
 
   // ── Dark mode foundation ─────────────────────────────────────────────
 
-  static const Color darkBackground = Color(0xFF070B14);
-  static const Color darkSurface = Color(0xFF0F1728);
-  static const Color darkSurfaceElevated = Color(0xFF121D35);
-  static const Color darkSurfaceStrong = Color(0xFF17264A);
-  static const Color darkBorder = Color(0xFF243455);
-  static const Color darkDivider = Color(0xFF1B2942);
+  static const Color darkBackground = Color(0xFF070D19);
+  static const Color darkSurface = Color(0xFF121C31);
+  static const Color darkSurfaceElevated = Color(0xFF152348);
+  static const Color darkSurfaceStrong = Color(0xFF1A2445);
+  static const Color darkBorder = Color(0xFF263A63);
+  static const Color darkDivider = Color(0xFF1A2445);
 
   // ── Dark mode text ───────────────────────────────────────────────────
 
-  static const Color textPrimary = Color(0xFFF5F7FA);
-  static const Color textSecondary = Color(0xFFC2CAD8);
-  static const Color textMuted = Color(0xFF8994A8);
-  static const Color textDisabled = Color(0xFF5D687A);
+  static const Color textPrimary = Color(0xFFF1F4F7);
+  static const Color textSecondary = Color(0xFFB8C5E0);
+  static const Color textMuted = Color(0xFF8C9AB8);
 
   // ── Light mode foundation ────────────────────────────────────────────
 
-  static const Color lightBackground = Color(0xFFF5F7FB);
+  static const Color lightBackground = Color(0xFFF5F8FC);
   static const Color lightSurface = Color(0xFFFFFFFF);
   static const Color lightSurfaceSoft = Color(0xFFEEF4FF);
-  static const Color lightBorder = Color(0xFFD9E1EF);
+  static const Color lightBorder = Color(0xFFD7E0EE);
   static const Color lightDivider = Color(0xFFE7ECF4);
 
   // ── Light mode text ──────────────────────────────────────────────────
 
   static const Color lightTextPrimary = Color(0xFF172033);
-  static const Color lightTextSecondary = Color(0xFF4F5B70);
-  static const Color lightTextMuted = Color(0xFF7B879A);
-  static const Color lightTextDisabled = Color(0xFFA8B1C0);
+  static const Color lightTextSecondary = Color(0xFF52627A);
+  static const Color lightTextMuted = Color(0xFF8A9AB3);
 
   // ── On-color helper ──────────────────────────────────────────────────
 
@@ -64,11 +73,17 @@ class AppRadius {
   static const double xl = 20;
   static const double xxl = 24;
 
+  /// Rounded square icon badges and prefix/suffix icon containers.
+  static const double icon = 11;
+
+  /// Full pill-shaped chips and status badges.
+  static const double pill = 20;
+
   static const double chip = sm;
   static const double control = md;
-  static const double input = lg;
+  static const double input = md;
   static const double card = 18;
-  static const double dialog = xl;
+  static const double dialog = 22;
   static const double fab = lg;
   static const double menu = lg;
 }
@@ -84,9 +99,9 @@ class AppSemanticColors {
 
   // ── Primary color role ───────────────────────────────────────────────
 
-  static const Color primary = AppColorTokens.primaryBlue;
-  static const Color primaryLight = AppColorTokens.primaryBlueLight;
-  static const Color primaryDark = AppColorTokens.primaryBlueDark;
+  static const Color primary = AppColorTokens.lightPrimary;
+  static const Color primaryLight = AppColorTokens.primaryBlue;
+  static const Color primaryDark = AppColorTokens.primaryBlueStrong;
   static const Color onPrimary = AppColorTokens.onPrimaryBlue;
 
   // ── Status and feedback colors (restrained, not oversaturated) ───────
@@ -106,69 +121,74 @@ class AppSemanticColors {
   static const Color errorContainer = Color(0xFFFEE2E2);
   static const Color onErrorContainer = Color(0xFF7F1D1D);
 
-  static const Color info = Color(0xFF0891B2);
+  /// Info uses the primary blue family.
+  static const Color info = AppColorTokens.primaryBlueLight;
   static const Color onInfo = AppColorTokens.onPrimaryBlue;
-  static const Color infoContainer = Color(0xFFCFFAFE);
-  static const Color onInfoContainer = Color(0xFF0E5C6D);
+  static const Color infoContainer = AppColorTokens.lightSurfaceSoft;
 
-  // ── Purple accent for AI / advanced features ─────────────────────────
-
-  static const Color purple = Color(0xFF7C3AED);
+  // ── Legacy "purple" accent for AI / advanced features.
+  ///
+  /// This is now mapped into the deep end of the primary blue family so the
+  /// app keeps one cohesive palette while preserving existing call sites.
+  static const Color purple = AppColorTokens.primaryBlueStrong;
   static const Color onPurple = AppColorTokens.onPrimaryBlue;
-  static const Color purpleContainer = Color(0xFFEDE9FE);
-  static const Color onPurpleContainer = Color(0xFF4C1D95);
+  static const Color purpleContainer = AppColorTokens.lightSurfaceSoft;
+  static const Color onPurpleContainer = AppColorTokens.lightTextPrimary;
 
   /// Neutral grey for non-emphasised actions and secondary icons.
-  static const Color neutral = Color(0xFF64748B);
+  static const Color neutral = AppColorTokens.lightTextSecondary;
   static const Color onNeutral = AppColorTokens.onPrimaryBlue;
-  static const Color neutralContainer = Color(0xFFF1F5F9);
-  static const Color onNeutralContainer = Color(0xFF334155);
+  static const Color neutralContainer = AppColorTokens.lightSurfaceSoft;
 
-  static const Color disabled = Color(0xFFA8B1C0);
+  // ── Dashboard accent colors (from the dashboard mockup palette) ─────
+  //
+  // Used for icon badges, pills, chart accents and role chips where the
+  // primary blue family needs a distinct sibling hue (e.g. GCash rows,
+  // Admin role chips, staff avatars).
+
+  /// Accent colors for dashboards, charts and role badges.
+  static const Color teal = Color(0xFF06B6D4);
+  static const Color violet = Color(0xFF8B5CF6);
 
   // ── Theme-aware resolution: light constant → dark variant ─────────────
 
   static final Map<Color, Color> _darkForLight = {
     // Primary family
     primary: AppColorTokens.primaryBlue,
-    primaryLight: const Color(0xFF60A5FA),
-    primaryDark: AppColorTokens.primaryBlue,
+    primaryLight: AppColorTokens.primaryBlueLight,
+    primaryDark: AppColorTokens.primaryBlueDeep,
 
     // Success family
-    success: const Color(0xFF4ADE80),
+    success: const Color(0xFF22C55E),
     successContainer: const Color(0xFF12351F),
     onSuccessContainer: const Color(0xFF86EFAC),
 
     // Warning family
-    warning: const Color(0xFFFBBF24),
+    warning: const Color(0xFFF59E0B),
     warningContainer: const Color(0xFF3A2A0A),
     onWarningContainer: const Color(0xFFFDE68A),
 
     // Error / danger family
-    error: const Color(0xFFF87171),
+    error: const Color(0xFFEF4444),
     errorContainer: const Color(0xFF3A1518),
     onErrorContainer: const Color(0xFFFECACA),
 
-    // Info family
-    info: const Color(0xFF06B6D4),
-    infoContainer: const Color(0xFF0A3038),
-    onInfoContainer: const Color(0xFF9AF1F7),
+    // Info family (primary blue family)
+    info: AppColorTokens.primaryBlue,
+    infoContainer: AppColorTokens.darkSurfaceStrong,
 
-    // Purple family
-    purple: const Color(0xFF8B5CF6),
-    purpleContainer: const Color(0xFF291A4A),
-    onPurpleContainer: const Color(0xFFD8B4FE),
+    // Purple (now deep blue) family
+    // `purple` equals `primaryDark`, so it resolves through that entry.
 
     // Neutral family
-    neutral: const Color(0xFF94A3B8),
-    neutralContainer: const Color(0xFF1E293B),
-    onNeutralContainer: const Color(0xFFF1F5F9),
+    neutral: AppColorTokens.textSecondary,
+
+    // Dashboard accents
+    teal: const Color(0xFF22D3EE),
+    violet: const Color(0xFFA78BFA),
 
     // On-colors (onSuccess/onError/onNeutral/onPurple/onInfo alias onPrimary)
     onPrimary: AppColorTokens.onPrimaryBlue,
-
-    // Disabled
-    disabled: AppColorTokens.textDisabled,
   };
 
   /// Returns the theme-aware variant of a [light] semantic color.
@@ -185,23 +205,23 @@ class AppSemanticColors {
   // ── Semantic surfaces for filled buttons / quick actions ───────────────
 
   static const Color primarySurface = AppColorTokens.primaryBlue;
-  static const Color secondarySurface = AppColorTokens.primaryBlueLight;
+  static const Color secondarySurface = AppColorTokens.lightPrimary;
   static const Color successSurface = Color(0xFF16A34A);
   static const Color warningSurface = Color(0xFFD97706);
-  static const Color infoSurface = Color(0xFF0891B2);
+  static const Color infoSurface = AppColorTokens.primaryBlueLight;
   static const Color errorSurface = Color(0xFFDC2626);
-  static const Color neutralSurface = Color(0xFF64748B);
-  static const Color purpleSurface = Color(0xFF7C3AED);
+  static const Color neutralSurface = AppColorTokens.lightBorder;
+  static const Color purpleSurface = AppColorTokens.primaryBlueStrong;
 
   static final Map<Color, Color> _darkSurfaceForLight = {
     primarySurface: AppColorTokens.primaryBlue,
-    secondarySurface: AppColorTokens.primaryBlueDark,
+    secondarySurface: AppColorTokens.primaryBlueStrong,
     successSurface: const Color(0xFF12351F),
     warningSurface: const Color(0xFF3A2A0A),
     errorSurface: const Color(0xFF3A1518),
-    neutralSurface: const Color(0xFF1E293B),
-    infoSurface: const Color(0xFF0A3038),
-    purpleSurface: const Color(0xFF291A4A),
+    neutralSurface: AppColorTokens.darkSurfaceElevated,
+    infoSurface: AppColorTokens.darkSurfaceStrong,
+    purpleSurface: AppColorTokens.primaryBlueDeep,
   };
 
   /// Returns the dark-mode surface color for a light-mode semantic [surface].
@@ -254,17 +274,21 @@ class AppColors {
   static ColorScheme _buildColorScheme(Brightness brightness) {
     final isDark = brightness == Brightness.dark;
 
-    final primary = AppColorTokens.primaryBlue;
+    final primary = isDark
+        ? AppColorTokens.primaryBlueLight
+        : AppColorTokens.lightPrimary;
     final onPrimary = AppColorTokens.onPrimaryBlue;
     final primaryContainer = isDark
-        ? AppColorTokens.primaryBlueDark
+        ? AppColorTokens.primaryBlue
         : AppColorTokens.lightSurfaceSoft;
     final onPrimaryContainer = isDark
         ? AppColorTokens.textPrimary
         : AppColorTokens.lightTextPrimary;
 
-    final secondary = AppColorTokens.primaryBlueLight;
-    final onSecondary = isDark ? AppColorTokens.textPrimary : AppColorTokens.onPrimaryBlue;
+    final secondary = isDark
+        ? AppColorTokens.primaryBlue
+        : AppColorTokens.primaryBlue;
+    final onSecondary = AppColorTokens.onPrimaryBlue;
     final secondaryContainer = isDark
         ? AppColorTokens.darkSurfaceElevated
         : AppColorTokens.lightSurface;
@@ -272,10 +296,12 @@ class AppColors {
         ? AppColorTokens.textPrimary
         : AppColorTokens.lightTextPrimary;
 
-    final tertiary = AppColorTokens.primaryBlueDark;
+    final tertiary = isDark
+        ? AppColorTokens.primaryBlueDeep
+        : AppColorTokens.primaryBlueStrong;
     final onTertiary = AppColorTokens.onPrimaryBlue;
     final tertiaryContainer = isDark
-        ? AppColorTokens.primaryBlueDark
+        ? AppColorTokens.primaryBlueStrong
         : AppColorTokens.lightSurfaceSoft;
     final onTertiaryContainer = isDark
         ? AppColorTokens.textPrimary
@@ -319,7 +345,7 @@ class AppColors {
     final onInverseSurface = isDark
         ? AppColorTokens.lightTextPrimary
         : AppColorTokens.textPrimary;
-    final inversePrimary = AppColorTokens.primaryBlueLight;
+    final inversePrimary = AppColorTokens.primaryBlue;
     final surfaceTint = AppColorTokens.primaryBlue;
 
     return ColorScheme(
@@ -380,8 +406,8 @@ class AppColors {
     final isDark = brightness == Brightness.dark;
 
     final appBarBackground = isDark
-        ? AppColorTokens.primaryBlueDark
-        : AppColorTokens.primaryBlue;
+        ? AppColorTokens.primaryBlueStrong
+        : AppColorTokens.lightPrimary;
     final appBarForeground = AppColorTokens.onPrimaryBlue;
 
     return ThemeData(
@@ -403,9 +429,10 @@ class AppColors {
 
       // ── Card theme ───────────────────────────────────────────────
       cardTheme: CardThemeData(
-        elevation: isDark ? 0 : 1,
+        elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.card),
+          side: BorderSide(color: colorScheme.outline),
         ),
         color: colorScheme.surface,
         surfaceTintColor: isDark ? Colors.transparent : null,
@@ -438,7 +465,6 @@ class AppColors {
           ),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           minimumSize: const Size(48, 48),
-          backgroundBuilder: AppColors.elevatedButtonBackgroundBuilder,
         ),
       ),
 
@@ -450,7 +476,6 @@ class AppColors {
           ),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           minimumSize: const Size(48, 48),
-          backgroundBuilder: AppColors.filledButtonBackgroundBuilder,
         ),
       ),
 
@@ -478,7 +503,7 @@ class AppColors {
       // ── Input decoration ─────────────────────────────────────────
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: colorScheme.surface,
+        fillColor: colorScheme.surfaceDim,
         isDense: false,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
@@ -486,10 +511,10 @@ class AppColors {
         ),
         constraints: const BoxConstraints(minHeight: 56),
 
-        border: _inputBorder(colorScheme.outlineVariant, 1.0),
-        enabledBorder: _inputBorder(colorScheme.outlineVariant, 1.0),
+        border: _inputBorder(colorScheme.outline, 1.0),
+        enabledBorder: _inputBorder(colorScheme.outline, 1.0),
         disabledBorder: _inputBorder(
-          colorScheme.outlineVariant.withValues(alpha: 0.5),
+          colorScheme.outline.withValues(alpha: 0.5),
           1.0,
         ),
         focusedBorder: _inputBorder(colorScheme.primary, 1.5),
@@ -630,6 +655,7 @@ class AppColors {
         alignment: Alignment.center,
         backgroundColor: colorScheme.surface,
         surfaceTintColor: isDark ? Colors.transparent : null,
+        elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.dialog),
           side: BorderSide(
@@ -658,10 +684,19 @@ class AppColors {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.chip),
         ),
-        selectedColor: colorScheme.primaryContainer,
+        backgroundColor: colorScheme.surface,
+        selectedColor: colorScheme.primary,
+        checkmarkColor: colorScheme.onPrimary,
+        side: BorderSide(color: colorScheme.outline),
         labelStyle: TextStyle(
           fontFamily: 'Inter',
-          color: colorScheme.onSurface,
+          color: colorScheme.onSurfaceVariant,
+          fontWeight: FontWeight.w600,
+        ),
+        secondaryLabelStyle: TextStyle(
+          fontFamily: 'Inter',
+          color: colorScheme.onPrimary,
+          fontWeight: FontWeight.w600,
         ),
       ),
 
@@ -683,150 +718,6 @@ class AppColors {
     );
   }
 
-  // ── Login / primary gradient ────────────────────────────────────────
-
-  /// Returns the horizontal blue gradient used by the login screen and
-  /// primary gradient buttons. It is the single source of truth for that
-  /// gradient and adapts to both light and dark mode.
-  static LinearGradient loginGradient(Brightness brightness) {
-    return LinearGradient(
-      begin: Alignment.centerLeft,
-      end: Alignment.centerRight,
-      colors: [
-        AppSemanticColors.resolve(AppSemanticColors.primaryLight, brightness),
-        AppSemanticColors.resolve(AppSemanticColors.primaryDark, brightness),
-      ],
-    );
-  }
-
-  /// Background builder used by [FilledButtonThemeData] and
-  /// [ElevatedButtonThemeData] to give primary buttons the same horizontal
-  /// gradient as the login screen. Non-primary colors are rendered as flat
-  /// fills, and disabled buttons receive the standard dimming overlay.
-  static Widget _primaryButtonBackgroundBuilder(
-    BuildContext context,
-    Set<WidgetState> states,
-    Widget? child, {
-    required bool treatNullStyleAsPrimary,
-  }) {
-    final cs = Theme.of(context).colorScheme;
-    final brightness = Theme.of(context).brightness;
-    final style = context.widget is FilledButton
-        ? (context.widget as FilledButton).style
-        : context.widget is ElevatedButton
-            ? (context.widget as ElevatedButton).style
-            : null;
-    final bg = style?.backgroundColor;
-
-    final disabled = states.contains(WidgetState.disabled);
-    const borderRadius = BorderRadius.all(Radius.circular(AppRadius.control));
-
-    final bool isPrimary;
-    if (bg != null) {
-      final enabledStates = <WidgetState>{...states}
-        ..remove(WidgetState.disabled);
-      final enabledBg = bg.resolve(enabledStates);
-      isPrimary = enabledBg == cs.primary;
-    } else {
-      isPrimary = treatNullStyleAsPrimary;
-    }
-
-    if (isPrimary) {
-      return _GradientOverlayBackground(
-        gradient: loginGradient(brightness),
-        borderRadius: borderRadius,
-        disabled: disabled,
-        child: child,
-      );
-    }
-
-    final resolvedBg = bg!.resolve(states);
-    final enabledStates = <WidgetState>{...states}
-      ..remove(WidgetState.disabled);
-    final enabledBg = bg.resolve(enabledStates);
-    final bgColor = resolvedBg ??
-        enabledBg?.withValues(alpha: 0.12) ??
-        cs.onSurface.withValues(alpha: 0.12);
-
-    return Container(
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: borderRadius,
-      ),
-      child: child,
-    );
-  }
-
-  static Widget filledButtonBackgroundBuilder(
-    BuildContext context,
-    Set<WidgetState> states,
-    Widget? child,
-  ) {
-    return _primaryButtonBackgroundBuilder(
-      context,
-      states,
-      child,
-      treatNullStyleAsPrimary: true,
-    );
-  }
-
-  static Widget elevatedButtonBackgroundBuilder(
-    BuildContext context,
-    Set<WidgetState> states,
-    Widget? child,
-  ) {
-    return _primaryButtonBackgroundBuilder(
-      context,
-      states,
-      child,
-      treatNullStyleAsPrimary: false,
-    );
-  }
-}
-
-/// Layer used by [AppColors.filledButtonBackgroundBuilder] and
-/// [AppColors.elevatedButtonBackgroundBuilder] to paint a rounded gradient
-/// and an optional disabled overlay behind a button's child.
-class _GradientOverlayBackground extends StatelessWidget {
-  final LinearGradient gradient;
-  final BorderRadius borderRadius;
-  final bool disabled;
-  final Widget? child;
-
-  const _GradientOverlayBackground({
-    required this.gradient,
-    required this.borderRadius,
-    required this.disabled,
-    this.child,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Stack(
-      fit: StackFit.passthrough,
-      children: [
-        Positioned.fill(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: gradient,
-              borderRadius: borderRadius,
-            ),
-          ),
-        ),
-        if (disabled)
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                color: cs.onSurface.withValues(alpha: 0.12),
-                borderRadius: borderRadius,
-              ),
-            ),
-          ),
-        child ?? const SizedBox.shrink(),
-      ],
-    );
-  }
 }
 
 /// Convenience helpers for converting Flutter [Color]s into the formats that

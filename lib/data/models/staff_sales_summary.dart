@@ -8,12 +8,17 @@ class StaffSalesSummary {
   final double totalSales;
   final int transactionCount;
 
+  /// Total sales for the equivalent previous period, when computed. Used by
+  /// the dashboard to render a per-staff trend pill.
+  final double? previousTotalSales;
+
   const StaffSalesSummary({
     required this.userId,
     required this.fullName,
     this.role,
     required this.totalSales,
     required this.transactionCount,
+    this.previousTotalSales,
   });
 
   double get averageTransaction =>
@@ -31,6 +36,8 @@ class StaffSalesSummary {
           : null,
       totalSales: (map['total_sales'] as num?)?.toDouble() ?? 0.0,
       transactionCount: (map['transaction_count'] as num?)?.toInt() ?? 0,
+      previousTotalSales:
+          (map['previous_total_sales'] as num?)?.toDouble(),
     );
   }
 }

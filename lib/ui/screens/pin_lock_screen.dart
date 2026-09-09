@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/auth_navigation.dart';
 import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
+import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
 import 'package:pinoy_pos/ui/widgets/pin_indicators.dart';
@@ -112,7 +112,10 @@ class _PinLockScreenState extends ConsumerState<PinLockScreen> {
                     AppAvatar(
                       imagePath: user.profileImagePath,
                       initials: user.fullName,
-                      radius: 40,
+                      radius: 28,
+                      backgroundColor: cs.surfaceContainerHigh,
+                      borderColor: cs.outline,
+                      borderWidth: 2,
                       semanticLabel: 'Profile picture of ${user.fullName}',
                     ),
                     const SizedBox(height: 16),
@@ -165,18 +168,13 @@ class _PinLockScreenState extends ConsumerState<PinLockScreen> {
                     const SizedBox(height: 24),
 
                     // ── Back to Login ──
-                    TextButton.icon(
+                    AppButton.destructive(
                       onPressed: _isVerifying
                           ? null
                           : () => _handleBack(context),
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppSemanticColors.resolve(
-                          AppSemanticColors.error,
-                          Theme.of(context).brightness,
-                        ),
-                      ),
-                      icon: const Icon(Icons.logout, size: 20),
-                      label: const Text('Back to Login'),
+                      icon: Icons.logout,
+                      label: 'Back to Login',
+                      fullWidth: true,
                     ),
                   ],
                 ),

@@ -133,21 +133,24 @@ class AppPaymentQrPreview extends StatelessWidget {
   }
 
   Widget _buildEmptyState(ColorScheme cs) {
-    final background = emptyColor ?? cs.errorContainer;
-    final foreground = emptyForegroundColor ?? cs.onErrorContainer;
+    final foreground = emptyForegroundColor ?? cs.onSurfaceVariant;
 
-    return AppCard(
-      color: background,
-      padding: const EdgeInsets.all(16),
+    return Container(
+      decoration: BoxDecoration(
+        color: emptyColor ?? cs.surface,
+        border: Border.all(color: cs.outline, style: BorderStyle.solid),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+      ),
+      padding: const EdgeInsets.all(24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(Icons.qr_code, color: foreground, size: 40),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Text(
             emptyTitle,
             style: TextStyle(
-              color: foreground,
+              color: cs.onSurface,
               fontWeight: FontWeight.w600,
             ),
             textAlign: TextAlign.center,

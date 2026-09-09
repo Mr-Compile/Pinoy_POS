@@ -193,12 +193,13 @@ class _StoreInformationSettingsPageState
     required String label,
     required String initialValue,
     int maxLines = 1,
+    IconData? prefixIcon,
   }) {
     return showDialog<ModalResult<String>>(
       context: context,
       useRootNavigator: true,
       builder: (context) => AppDialogForm<ModalResult<String>>(
-        type: AppDialogType.info,
+        type: AppDialogType.edit,
         title: title,
         childBuilder: (context, state) {
           final controller = state.textController('value', text: initialValue);
@@ -206,6 +207,7 @@ class _StoreInformationSettingsPageState
           return AppTextFormField(
             controller: controller,
             label: label,
+            prefixIcon: prefixIcon,
             maxLines: maxLines,
           );
         },
@@ -235,6 +237,7 @@ class _StoreInformationSettingsPageState
       title: 'Store Name',
       label: 'Store Name',
       initialValue: settings.storeName,
+      prefixIcon: Icons.storefront_outlined,
     );
 
     if (result?.isSaved == true && result!.value!.isNotEmpty && mounted) {
@@ -284,11 +287,19 @@ class _StoreInformationSettingsPageState
         currentValue = '';
     }
 
+    final prefixIcon = switch (fieldKey) {
+      'store_address' => Icons.location_on_outlined,
+      'store_phone' => Icons.phone_outlined,
+      'receipt_footer' => Icons.receipt_long_outlined,
+      _ => null,
+    };
+
     final result = await _showTextEditDialog(
       title: label,
       label: label,
       initialValue: currentValue,
       maxLines: fieldKey == 'receipt_footer' ? 2 : 1,
+      prefixIcon: prefixIcon,
     );
 
     if (result?.isSaved == true && mounted) {
@@ -329,6 +340,7 @@ class _StoreInformationSettingsPageState
       builder: (dialogContext) => AppDialog(
         type: AppDialogType.info,
         title: 'Currency',
+        showIcon: false,
         actions: [
           AppDialogAction(
             label: 'Cancel',

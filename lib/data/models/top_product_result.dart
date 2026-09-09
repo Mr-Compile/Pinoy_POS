@@ -5,11 +5,15 @@ class TopProductResult {
   final int totalQuantity;
   final double revenue;
 
+  /// Display name of the product's category, when it can be resolved.
+  final String? categoryName;
+
   const TopProductResult({
     required this.productId,
     required this.productName,
     required this.totalQuantity,
     this.revenue = 0.0,
+    this.categoryName,
   });
 
   /// Alias for [productName], used by dashboard code that labels the field
@@ -22,6 +26,7 @@ class TopProductResult {
       productName: (map['product_name'] as String?) ?? 'Unknown',
       totalQuantity: (map['total_quantity'] as num?)?.toInt() ?? 0,
       revenue: (map['revenue'] as num?)?.toDouble() ?? 0.0,
+      categoryName: map['category_name'] as String?,
     );
   }
 

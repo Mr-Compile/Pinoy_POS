@@ -66,23 +66,24 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
           )
         : null;
 
-    final appBarAction = createAction?.appBarAction(context);
+    final toolbarAction = createAction?.contentAction(context);
     final createFab = createAction?.fab(context);
+    final bottomClearance =
+        createAction?.contentBottomClearance(context) ?? 0;
 
     return Scaffold(
-      appBar: AppHeader(
+      appBar: const AppHeader(
         title: 'Staff Management',
         showBackButton: true,
-        actions: appBarAction != null ? [appBarAction] : null,
       ),
       floatingActionButton: createFab,
       body: RefreshIndicator(
         onRefresh: () => ref.read(staffControllerProvider.notifier).loadStaff(),
         child: Column(
           children: [
-            _buildControls(context, state),
+            _buildControls(context, state, toolbarAction),
             Expanded(
-              child: _buildBody(context, state),
+              child: _buildBody(context, state, bottomClearance),
             ),
           ],
         ),
@@ -90,14 +91,23 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
     );
   }
 
-  Widget _buildControls(BuildContext context, StaffListState state) {
+  Widget _buildControls(
+    BuildContext context,
+    StaffListState state,
+    Widget? primaryAction,
+  ) {
     final cs = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(Spacing.md, Spacing.md, Spacing.md, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AppSearchField(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CrudToolbar(
+          padding: const EdgeInsets.fromLTRB(
+            Spacing.md,
+            Spacing.md,
+            Spacing.md,
+            0,
+          ),
+          search: AppSearchField(
             controller: _searchController,
             hint: 'Search by name or username',
             onChanged: (value) {
@@ -108,52 +118,43 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
               ref.read(staffControllerProvider.notifier).setSearch('');
             },
           ),
-          const SizedBox(height: Spacing.sm),
-          Row(
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _FilterChip(
-                        label: 'All',
-                        selected: state.filter == StaffFilter.all,
-                        onSelected: () => ref
-                            .read(staffControllerProvider.notifier)
-                            .setFilter(StaffFilter.all),
-                      ),
-                      const SizedBox(width: Spacing.sm),
-                      _FilterChip(
-                        label: 'Active',
-                        selected: state.filter == StaffFilter.active,
-                        onSelected: () => ref
-                            .read(staffControllerProvider.notifier)
-                            .setFilter(StaffFilter.active),
-                      ),
-                      const SizedBox(width: Spacing.sm),
-                      _FilterChip(
-                        label: 'Inactive',
-                        selected: state.filter == StaffFilter.inactive,
-                        onSelected: () => ref
-                            .read(staffControllerProvider.notifier)
-                            .setFilter(StaffFilter.inactive),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              _SortMenu(
-                sortBy: state.sortBy,
-                onSelected: (sort) => ref
-                    .read(staffControllerProvider.notifier)
-                    .setSort(sort),
-              ),
-            ],
-          ),
-          if (state.error != null) ...[
-            const SizedBox(height: Spacing.sm),
-            Container(
+          controls: [
+            _FilterChip(
+              label: 'All',
+              selected: state.filter == StaffFilter.all,
+              onSelected: () => ref
+                  .read(staffControllerProvider.notifier)
+                  .setFilter(StaffFilter.all),
+            ),
+            _FilterChip(
+              label: 'Active',
+              selected: state.filter == StaffFilter.active,
+              onSelected: () => ref
+                  .read(staffControllerProvider.notifier)
+                  .setFilter(StaffFilter.active),
+            ),
+            _FilterChip(
+              label: 'Inactive',
+              selected: state.filter == StaffFilter.inactive,
+              onSelected: () => ref
+                  .read(staffControllerProvider.notifier)
+                  .setFilter(StaffFilter.inactive),
+            ),
+          ],
+          pinnedControls: [
+            _SortMenu(
+              sortBy: state.sortBy,
+              onSelected: (sort) => ref
+                  .read(staffControllerProvider.notifier)
+                  .setSort(sort),
+            ),
+          ],
+          primaryAction: primaryAction,
+        ),
+        if (state.error != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(Spacing.md, Spacing.sm, Spacing.md, 0),
+            child: Container(
               width: double.infinity,
               padding: const EdgeInsets.all(Spacing.sm),
               decoration: BoxDecoration(
@@ -167,13 +168,16 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
                 ),
               ),
             ),
-          ],
-        ],
-      ),
+          ),
+      ],
     );
   }
 
-  Widget _buildBody(BuildContext context, StaffListState state) {
+  Widget _buildBody(
+    BuildContext context,
+    StaffListState state,
+    double bottomClearance,
+  ) {
     if (state.isLoading && state.staff.isEmpty) {
       return const LoadingState(message: 'Loading staff...');
     }
@@ -189,7 +193,12 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(Spacing.md),
+      padding: EdgeInsets.fromLTRB(
+        Spacing.md,
+        Spacing.md,
+        Spacing.md,
+        Spacing.md + bottomClearance,
+      ),
       itemCount: state.staff.length,
       itemBuilder: (context, index) {
         final staff = state.staff[index];
@@ -311,7 +320,7 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
     final result = await showDialog<ModalResult<void>>(
       context: context,
       builder: (context) => AppDialogForm<ModalResult<void>>(
-        type: AppDialogType.info,
+        type: isEdit ? AppDialogType.edit : AppDialogType.add,
         title: isEdit ? 'Edit Staff' : 'Add Staff',
         childBuilder: (context, state) {
           final usernameController =
@@ -366,6 +375,7 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
                 AppTextFormField(
                   controller: usernameController,
                   label: 'Username',
+                  prefixIcon: Icons.person_outline,
                   textInputAction: TextInputAction.next,
                   onChanged: (_) => state.markChanged(),
                   onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
@@ -375,6 +385,7 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
                 AppTextFormField(
                   controller: fullNameController,
                   label: 'Full Name',
+                  prefixIcon: Icons.person,
                   textInputAction: TextInputAction.next,
                   onChanged: (_) => state.markChanged(),
                   onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
@@ -384,6 +395,7 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
                 AppTextFormField(
                   controller: pinController,
                   label: 'PIN (optional)',
+                  prefixIcon: Icons.lock_outline,
                   hint: isEdit && staff.hasPin
                       ? 'Enter new PIN to replace (${staff.configuredPinLength} digits)'
                       : '4-6 digits',

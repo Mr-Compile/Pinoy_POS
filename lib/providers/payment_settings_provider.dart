@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/data/models/decoded_payment_qr.dart';
 import 'package:pinoy_pos/data/models/payment_settings.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 
@@ -10,4 +11,15 @@ import 'package:pinoy_pos/providers/service_providers.dart';
 final paymentSettingsProvider = FutureProvider<PaymentSettings>((ref) async {
   final settingsService = ref.watch(settingsServiceProvider);
   return settingsService.getPaymentSettings();
+});
+
+/// Decoded content of the merchant payment QR stored at the given relative
+/// image path. The result is cached per path so reopening the GCash payment
+/// screen does not decode the image again.
+final paymentQrDecodeProvider =
+    FutureProvider.family<DecodedPaymentQr, String?>((ref, imagePath) async {
+  if (imagePath == null || imagePath.isEmpty) {
+    return const DecodedPaymentQr.notDetected();
+  }
+  return ref.watch(paymentQrServiceProvider).decodePaymentQr(imagePath);
 });

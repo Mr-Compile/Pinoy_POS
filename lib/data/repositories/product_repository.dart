@@ -19,5 +19,8 @@ class ProductRepository {
   Future<List<Product>> getActiveProducts() => _productDao.getActiveProducts();
   Future<List<Product>> getLowStockProducts() => _productDao.getLowStockProducts();
   Future<List<Product>> searchProducts(String query) => _productDao.searchProducts(query);
+  Future<Map<int, int>> getCountsByCategory() => _productDao.getCountsByCategory();
+  Future<({int total, int lowStock, int outOfStock})> getStockSummary() =>
+      _productDao.getStockSummary();
   Future<void> updateStock(int productId, int newStock, {DatabaseExecutor? txn}) => _productDao.updateStock(productId, newStock, txn: txn);
 }

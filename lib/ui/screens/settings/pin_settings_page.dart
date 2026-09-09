@@ -84,7 +84,7 @@ class PinSettingsPage extends ConsumerWidget {
       context: context,
       useRootNavigator: true,
       builder: (dialogContext) => AppDialogForm<ModalResult<void>>(
-        type: AppDialogType.info,
+        type: AppDialogType.add,
         title: 'Set PIN',
         message: 'Enter a 4-6 digit PIN.',
         childBuilder: (context, state) {
@@ -99,6 +99,7 @@ class PinSettingsPage extends ConsumerWidget {
                 AppPasswordField(
                   controller: pinController,
                   label: 'New PIN',
+                  prefixIcon: Icons.lock_outline,
                   keyboardType: TextInputType.number,
                   autofillHints: null,
                   onChanged: (_) => state.markChanged(),
@@ -108,6 +109,7 @@ class PinSettingsPage extends ConsumerWidget {
                 AppPasswordField(
                   controller: confirmPinController,
                   label: 'Confirm PIN',
+                  prefixIcon: Icons.lock_outline,
                   keyboardType: TextInputType.number,
                   autofillHints: null,
                   onChanged: (_) => state.markChanged(),

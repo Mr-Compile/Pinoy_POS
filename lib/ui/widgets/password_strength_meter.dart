@@ -65,23 +65,26 @@ class PasswordStrengthMeter extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 6),
-          // Segmented bar
-          Row(
-            children: List.generate(maxScore + 1, (i) {
-              final isFilled = i <= filledSegments;
-              return Expanded(
+          // Continuous bar
+          Container(
+            height: 6,
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(AppRadius.xs),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadius.xs),
+              child: FractionallySizedBox(
+                alignment: Alignment.centerLeft,
+                widthFactor: (filledSegments / maxScore).clamp(0.0, 1.0),
                 child: Container(
-                  height: 6,
-                  margin: EdgeInsets.only(right: i < maxScore ? 4 : 0),
                   decoration: BoxDecoration(
-                    color: isFilled
-                        ? strengthColor
-                        : colorScheme.surfaceContainerHighest,
+                    color: strengthColor,
                     borderRadius: BorderRadius.circular(AppRadius.xs),
                   ),
                 ),
-              );
-            }),
+              ),
+            ),
           ),
           const SizedBox(height: 6),
           // Guidance text

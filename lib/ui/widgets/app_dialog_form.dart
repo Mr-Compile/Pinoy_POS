@@ -52,7 +52,7 @@ class AppDialogForm<T> extends StatefulWidget {
     this.message,
     this.canPop = true,
     this.onPopInvokedWithResult,
-    this.showIcon = false,
+    this.showIcon = true,
     this.showClose = true,
     required this.childBuilder,
     required this.actionsBuilder,
@@ -72,7 +72,7 @@ class AppDialogForm<T> extends StatefulWidget {
   final AppDialogFormPopCallback<T>? onPopInvokedWithResult;
 
   /// Whether the dialog type icon is shown at the top of the dialog.
-  /// Defaults to `false` for CRUD forms so the title is clean.
+  /// Defaults to `true` so every form has the same visual hierarchy.
   final bool showIcon;
 
   /// Whether a close button is shown in the dialog header. Defaults to `true`.

@@ -21,7 +21,6 @@ import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
-import 'package:pinoy_pos/ui/widgets/app_status_chip.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 
@@ -48,7 +47,6 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
 
   Sale get _sale => widget.sale ?? _loadedSale!;
   int get _saleId => _sale.id!;
-
   @override
   void initState() {
     super.initState();
@@ -80,6 +78,14 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
   }
 
   Future<void> _confirmPayment() async {
+    final confirmed = await AppDialogService.confirmation(
+      context,
+      title: 'Confirm GCash Payment',
+      message: 'Are you sure you want to confirm this pending GCash payment?',
+      confirmLabel: 'Confirm',
+    );
+    if (confirmed != true || !mounted) return;
+
     setState(() => _isProcessing = true);
     try {
       final salesService = ref.read(salesServiceProvider);
@@ -228,37 +234,6 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
     }
   }
 
-  Future<void> _downloadGcashProofImage() async {
-    try {
-      final paymentProofService = ref.read(paymentProofServiceProvider);
-      final saved = await paymentProofService.exportGcashProofAsImage(_sale);
-
-      if (mounted) {
-        if (saved != null) {
-          await AppDialogService.success(
-            context,
-            title: 'Image Saved',
-            message: 'GCash proof image saved to $saved',
-          );
-        } else {
-          AppDialogService.error(
-            context,
-            title: 'Download Cancelled',
-            message: 'No save location selected.',
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        AppDialogService.error(
-          context,
-          title: 'Download Failed',
-          message: 'Unable to save the GCash proof image: $e',
-        );
-      }
-    }
-  }
-
   Future<void> _viewPaymentProof() async {
     if (_sale.paymentProofPath == null) return;
     await Navigator.of(context).push(
@@ -326,9 +301,6 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
     bool canVerify,
     bool canViewEvidence,
   ) {
-    final cs = Theme.of(context).colorScheme;
-    final isCompact = MediaQuery.of(context).size.width < 600;
-
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -349,33 +321,17 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
             Text(
               _formatHeaderDate(receipt.date),
               style: AppTypography.bodySmall(context).copyWith(
-                color: cs.onSurfaceVariant,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
               overflow: TextOverflow.ellipsis,
               maxLines: 1,
             ),
           ],
         ),
-        actions: isCompact
-            ? [
-                _buildPrintAction(receipt),
-                _buildMoreAction(
-                  receipt,
-                  canViewEvidence,
-                  includePrint: true,
-                  includeDownloadPdf: true,
-                ),
-              ]
-            : [
-                _buildPrintAction(receipt),
-                _buildDownloadAction(receipt),
-                _buildMoreAction(
-                  receipt,
-                  canViewEvidence,
-                  includePrint: false,
-                  includeDownloadPdf: false,
-                ),
-              ],
+        actions: [
+          _buildPrintAction(receipt),
+          _buildDownloadAction(receipt),
+        ],
       ),
       body: _buildBody(receipt, canVerify, canViewEvidence),
     );
@@ -403,73 +359,10 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
               height: 20,
               child: CircularProgressIndicator(strokeWidth: 2),
             )
-          : const Icon(Icons.download_outlined),
+          : const Icon(Icons.download),
       tooltip: 'Download PDF',
       onPressed: _isExporting ? null : () => _downloadPdf(receipt),
     );
-  }
-
-  Widget _buildMoreAction(
-    ReceiptViewData receipt,
-    bool canViewEvidence, {
-    bool includePrint = false,
-    bool includeDownloadPdf = false,
-  }) {
-    final hasProof = canViewEvidence &&
-        receipt.paymentProofPath != null &&
-        receipt.paymentProofPath!.isNotEmpty;
-
-    if (!includePrint && !includeDownloadPdf && !hasProof) {
-      return const SizedBox.shrink();
-    }
-
-    return PopupMenuButton<String>(
-      icon: const Icon(Icons.more_vert),
-      tooltip: 'More',
-      onSelected: (value) => _handleMoreAction(value, receipt),
-      itemBuilder: (context) => [
-        if (includePrint)
-          const PopupMenuItem(
-            value: 'print',
-            child: _MenuRow(icon: Icons.print, label: 'Print'),
-          ),
-        if (includeDownloadPdf)
-          const PopupMenuItem(
-            value: 'download_pdf',
-            child: _MenuRow(icon: Icons.download, label: 'Download PDF'),
-          ),
-        if (hasProof) ...[
-          const PopupMenuItem(
-            value: 'view_image',
-            child: _MenuRow(icon: Icons.image_outlined, label: 'View Image'),
-          ),
-          const PopupMenuItem(
-            value: 'download_image',
-            child: _MenuRow(
-              icon: Icons.save_alt,
-              label: 'Download Image',
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  void _handleMoreAction(String value, ReceiptViewData receipt) {
-    switch (value) {
-      case 'print':
-        _printReceipt(receipt);
-        break;
-      case 'download_pdf':
-        _downloadPdf(receipt);
-        break;
-      case 'view_image':
-        _viewPaymentProof();
-        break;
-      case 'download_image':
-        _downloadGcashProofImage();
-        break;
-    }
   }
 
   Widget _buildBody(
@@ -587,8 +480,9 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
 
   Widget _buildStatusBanner(ReceiptViewData receipt, bool canVerify) {
     final cs = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
     final statusColor = _statusColor(receipt.paymentStatus, cs);
-    final statusIcon = _statusIcon(receipt.paymentStatus);
+    final onStatusColor = _statusOnColor(receipt.paymentStatus, brightness);
 
     final (title, subtitle) = switch (receipt.paymentStatus) {
       'confirmed' => ('Completed', 'Payment received successfully'),
@@ -602,7 +496,7 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
       padding: EdgeInsets.zero,
       color: statusColor.withValues(alpha: 0.08),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -610,8 +504,14 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Icon(statusIcon, size: 20, color: statusColor),
-                const SizedBox(width: 8),
+                _buildCircleIcon(
+                  icon: _statusIcon(receipt.paymentStatus),
+                  backgroundColor: statusColor,
+                  iconColor: onStatusColor,
+                  size: 22,
+                  radius: 22,
+                ),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -634,16 +534,16 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
                     ],
                   ),
                 ),
-                Text(
-                  CurrencyUtils.format(receipt.total, currency: receipt.currency),
-                  style: AppTypography.headlineSmallSemibold(context).copyWith(
-                    color: cs.onSurface,
-                  ),
+                const SizedBox(width: 12),
+                _buildPill(
+                  label: CurrencyUtils.format(receipt.total, currency: receipt.currency),
+                  color: statusColor,
+                  onColor: onStatusColor,
                 ),
               ],
             ),
             if (receipt.paymentStatus == 'pending' && canVerify) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               Row(
                 children: [
                   Expanded(
@@ -677,72 +577,52 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
   // ── Transaction overview ────────────────────────────────────────
 
   Widget _buildOverviewCard(ReceiptViewData receipt) {
+    final cs = Theme.of(context).colorScheme;
+    final isWalkIn = receipt.customerName?.isNotEmpty != true;
+    final customerValue = isWalkIn ? 'Walk-in Customer' : receipt.customerName!;
+
+    final tiles = [
+      _buildOverviewTile(
+        icon: Icons.receipt_long_outlined,
+        label: 'Receipt Number',
+        value: receipt.receiptNumber,
+      ),
+      _buildOverviewTile(
+        icon: Icons.calendar_today_outlined,
+        label: 'Date & Time',
+        value: '${_formatDate(receipt.date)}\n${_formatTime(receipt.date)}',
+      ),
+      _buildOverviewTile(
+        icon: Icons.person_outline,
+        label: 'Customer',
+        value: customerValue,
+        chip: isWalkIn
+            ? _buildPill(
+                label: 'Guest',
+                color: cs.primaryContainer,
+                onColor: cs.onPrimaryContainer,
+                small: true,
+              )
+            : null,
+      ),
+    ];
+
     return AppCard(
       padding: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(Spacing.md),
-        child: ResponsiveBuilder(
-          builder: (context, layout) {
-            final tiles = [
-              _buildOverviewTile(
-                icon: Icons.receipt_long_outlined,
-                label: 'Receipt Number',
-                value: receipt.receiptNumber,
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: _intersperse(
+              tiles.map((tile) => Expanded(child: tile)).toList(),
+              VerticalDivider(
+                color: cs.outlineVariant,
+                thickness: 1,
+                width: 1,
               ),
-              _buildOverviewTile(
-                icon: Icons.calendar_today_outlined,
-                label: 'Date & Time',
-                value: '${_formatDate(receipt.date)}\n${_formatTime(receipt.date)}',
-              ),
-              _buildOverviewTile(
-                icon: Icons.person_outline,
-                label: 'Customer',
-                value: receipt.customerName?.isNotEmpty == true
-                    ? receipt.customerName!
-                    : 'Walk-in Customer',
-              ),
-              _buildOverviewTile(
-                icon: Icons.badge_outlined,
-                label: 'Cashier',
-                value: receipt.cashierName,
-              ),
-            ];
-
-            return switch (layout) {
-              LayoutClass.compact => Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: _punctuate(tiles),
-                ),
-              LayoutClass.medium => Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: _expandRow([
-                        tiles[0],
-                        const SizedBox(width: Spacing.md),
-                        tiles[1],
-                      ]),
-                    ),
-                    const SizedBox(height: Spacing.md),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: _expandRow([
-                        tiles[2],
-                        const SizedBox(width: Spacing.md),
-                        tiles[3],
-                      ]),
-                    ),
-                  ],
-                ),
-              LayoutClass.expanded => Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: _expandRow(
-                    _intersperse(tiles, const SizedBox(width: Spacing.md)),
-                  ),
-                ),
-            };
-          },
+            ),
+          ),
         ),
       ),
     );
@@ -752,33 +632,36 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
     required IconData icon,
     required String label,
     required String value,
+    Widget? chip,
   }) {
     final cs = Theme.of(context).colorScheme;
-    return Row(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 20, color: cs.primary),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: AppTypography.labelSmall(context).copyWith(
-                  color: cs.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: AppTypography.bodyMediumSemibold(context),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
+        _buildRoundedSquareIcon(
+          icon: icon,
+          color: cs.primary,
+          size: 18,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: AppTypography.labelSmall(context).copyWith(
+            color: cs.onSurfaceVariant,
           ),
         ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: AppTypography.bodyMediumSemibold(context),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        if (chip != null) ...[
+          const SizedBox(height: 4),
+          chip,
+        ],
       ],
     );
   }
@@ -791,61 +674,82 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
 
     return AppCard(
       padding: EdgeInsets.zero,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        child: Container(
-          decoration: BoxDecoration(
-            border: Border(
-              left: BorderSide(color: cs.primary, width: 4),
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(Spacing.lg),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Total Amount',
-                  style: AppTypography.labelSmall(context).copyWith(
-                    color: cs.onSurfaceVariant,
+      child: Padding(
+        padding: const EdgeInsets.all(Spacing.md),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 5,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildCircleIcon(
+                        icon: Icons.monetization_on,
+                        backgroundColor: cs.primary,
+                        iconColor: cs.onPrimary,
+                        size: 24,
+                        radius: 24,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Total Amount',
+                              style: AppTypography.labelSmall(context).copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              CurrencyUtils.format(
+                                receipt.total,
+                                currency: receipt.currency,
+                              ),
+                              style: AppTypography.headlineSmallBold(context).copyWith(
+                                color: cs.onSurface,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  CurrencyUtils.format(
-                    receipt.total,
-                    currency: receipt.currency,
-                  ),
-                  style: AppTypography.headlineSmallBold(context).copyWith(
-                    color: cs.primary,
-                  ),
+              ),
+              const SizedBox(width: 12),
+              VerticalDivider(
+                color: cs.outlineVariant,
+                thickness: 1,
+                width: 1,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 5,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildMoneyRow('Subtotal', receipt.subtotal, receipt.currency),
+                    _buildMoneyRow('Discount', receipt.discount, receipt.currency),
+                    _buildMoneyRow('Tax', tax, receipt.currency),
+                    const Divider(height: 16),
+                    _buildMoneyRow(
+                      'Total',
+                      receipt.total,
+                      receipt.currency,
+                      isTotal: true,
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                _buildMoneyRow('Subtotal', receipt.subtotal, receipt.currency),
-                _buildMoneyRow('Discount', receipt.discount, receipt.currency),
-                if (tax > 0) _buildMoneyRow('Tax', tax, receipt.currency),
-                if (receipt.cashReceived > 0) ...[
-                  _buildMoneyRow(
-                    'Amount Paid',
-                    receipt.cashReceived,
-                    receipt.currency,
-                  ),
-                  _buildMoneyRow(
-                    'Change',
-                    receipt.change,
-                    receipt.currency,
-                  ),
-                ],
-                const Divider(height: 24),
-                _buildMoneyRow(
-                  'Total',
-                  receipt.total,
-                  receipt.currency,
-                  isTotal: true,
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -871,7 +775,9 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
                   ? AppTypography.bodyMedium(context).copyWith(
                       fontWeight: FontWeight.bold,
                     )
-                  : AppTypography.bodyMedium(context),
+                  : AppTypography.bodyMedium(context).copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
             ),
           ),
           const SizedBox(width: 12),
@@ -880,7 +786,7 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
             style: isTotal
                 ? AppTypography.bodyLarge(context).copyWith(
                     fontWeight: FontWeight.bold,
-                    color: cs.onSurface,
+                    color: cs.primary,
                   )
                 : AppTypography.bodyMedium(context),
             textAlign: TextAlign.end,
@@ -906,7 +812,11 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
           children: [
             Row(
               children: [
-                Icon(Icons.shopping_cart_outlined, size: 20, color: cs.primary),
+                _buildRoundedSquareIcon(
+                  icon: Icons.shopping_cart_outlined,
+                  color: cs.primary,
+                  size: 18,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -916,15 +826,15 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                Text(
-                  '$count item${count == 1 ? '' : 's'}',
-                  style: AppTypography.bodySmall(context).copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
+                _buildPill(
+                  label: '$count item${count == 1 ? '' : 's'}',
+                  color: cs.primaryContainer,
+                  onColor: cs.onPrimaryContainer,
+                  small: true,
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             FutureBuilder<List<Product?>>(
               future: _productsFuture(receipt),
               builder: (context, snapshot) {
@@ -979,12 +889,12 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
           ClipRRect(
             borderRadius: BorderRadius.circular(AppRadius.sm),
             child: SizedBox(
-              width: 40,
-              height: 40,
+              width: 48,
+              height: 48,
               child: AppImage(
                 imagePath: product?.imageUrl,
                 placeholderIcon: Icons.inventory_2,
-                placeholderIconSize: 20,
+                placeholderIconSize: 24,
                 borderRadius: 0,
                 fit: BoxFit.cover,
               ),
@@ -1034,7 +944,18 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
 
   Widget _buildPaymentCard(ReceiptViewData receipt, bool canVerify) {
     final cs = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
     final statusColor = _statusColor(receipt.paymentStatus, cs);
+    final onStatusColor = _statusOnColor(receipt.paymentStatus, brightness);
+
+    final successColor = AppSemanticColors.resolve(
+      AppSemanticColors.success,
+      brightness,
+    );
+    final onSuccessColor = AppSemanticColors.resolveOn(
+      AppSemanticColors.onSuccess,
+      brightness,
+    );
 
     return AppCard(
       padding: EdgeInsets.zero,
@@ -1046,7 +967,11 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
           children: [
             Row(
               children: [
-                Icon(Icons.credit_card_outlined, size: 20, color: cs.primary),
+                _buildRoundedSquareIcon(
+                  icon: Icons.credit_card,
+                  color: cs.primary,
+                  size: 18,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -1058,19 +983,58 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            _buildPaymentRow('Method', receipt.paymentMethod),
+            const SizedBox(height: 16),
+            _buildPaymentInfoRow(
+              icon: Icons.account_balance_wallet,
+              backgroundColor: successColor,
+              iconColor: onSuccessColor,
+              label: 'Method',
+              value: Text(
+                receipt.paymentMethod,
+                style: AppTypography.bodyMediumSemibold(context),
+                textAlign: TextAlign.end,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
             if (receipt.referenceNumber?.isNotEmpty == true)
-              _buildPaymentRow('Reference', receipt.referenceNumber!),
+              _buildPaymentInfoRow(
+                icon: Icons.chat_bubble_outline,
+                backgroundColor: cs.primary,
+                iconColor: cs.onPrimary,
+                label: 'Reference',
+                value: Text(
+                  receipt.referenceNumber!,
+                  style: AppTypography.bodyMediumSemibold(context),
+                  textAlign: TextAlign.end,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             if (receipt.customerName?.isNotEmpty == true)
-              _buildPaymentRow('Customer', receipt.customerName!),
-            _buildPaymentRowWidget(
-              'Status',
-              AppStatusChip(
+              _buildPaymentInfoRow(
+                icon: Icons.person_outline,
+                backgroundColor: cs.primary,
+                iconColor: cs.onPrimary,
+                label: 'Customer',
+                value: Text(
+                  receipt.customerName!,
+                  style: AppTypography.bodyMediumSemibold(context),
+                  textAlign: TextAlign.end,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            _buildPaymentInfoRow(
+              icon: _statusIcon(receipt.paymentStatus),
+              backgroundColor: statusColor,
+              iconColor: onStatusColor,
+              label: 'Status',
+              value: _buildPill(
                 label: receipt.statusLabel,
                 color: statusColor,
-                icon: _statusIcon(receipt.paymentStatus),
-                filled: true,
+                onColor: onStatusColor,
+                small: true,
               ),
             ),
             if (receipt.paymentStatus == 'pending' && canVerify) ...[
@@ -1105,53 +1069,43 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
     );
   }
 
-  Widget _buildPaymentRow(String label, String value) {
+  Widget _buildPaymentInfoRow({
+    required IconData icon,
+    required Color backgroundColor,
+    required Color iconColor,
+    required String label,
+    required Widget value,
+  }) {
     final cs = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: AppTypography.bodyMedium(context).copyWith(
-                color: cs.onSurfaceVariant,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              value,
-              style: AppTypography.bodyMediumSemibold(context),
-              textAlign: TextAlign.end,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPaymentRowWidget(String label, Widget value) {
-    final cs = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Expanded(
-            child: Text(
-              label,
-              style: AppTypography.bodyMedium(context).copyWith(
-                color: cs.onSurfaceVariant,
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildCircleIcon(
+                icon: icon,
+                backgroundColor: backgroundColor,
+                iconColor: iconColor,
+                size: 16,
+                radius: 16,
               ),
-            ),
+              const SizedBox(width: 12),
+              Text(
+                label,
+                style: AppTypography.bodyMedium(context).copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+            ],
           ),
           const SizedBox(width: 12),
-          value,
+          Flexible(
+            child: value,
+          ),
         ],
       ),
     );
@@ -1172,7 +1126,11 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
           children: [
             Row(
               children: [
-                Icon(Icons.file_present_outlined, size: 20, color: cs.primary),
+                _buildRoundedSquareIcon(
+                  icon: Icons.file_present_outlined,
+                  color: cs.primary,
+                  size: 18,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -1213,8 +1171,8 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
                         borderRadius: BorderRadius.circular(AppRadius.sm),
                         child: Image.file(
                           info.file,
-                          width: 80,
-                          height: 80,
+                          width: 100,
+                          height: 100,
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) {
                             return _buildProofEmptyState();
@@ -1298,44 +1256,51 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
   // ── Bottom actions ──────────────────────────────────────────────
 
   Widget _buildBottomActions(ReceiptViewData receipt) {
-    return ResponsiveBuilder(
-      builder: (context, layout) {
-        final viewButton = AppButton.outlined(
-          label: 'View Receipt',
-          icon: Icons.receipt_long_outlined,
-          color: AppButtonColor.primary,
-          onPressed: _viewReceipt,
-          fullWidth: layout.isCompact,
-        );
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(Spacing.md),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final viewButton = AppButton.outlined(
+              label: 'View Receipt',
+              icon: Icons.receipt_long_outlined,
+              color: AppButtonColor.primary,
+              onPressed: _viewReceipt,
+              fullWidth: true,
+            );
 
-        final downloadButton = AppButton.filled(
-          label: 'Download PDF',
-          icon: Icons.download,
-          color: AppButtonColor.primary,
-          isLoading: _isExporting,
-          onPressed: _isExporting ? null : () => _downloadPdf(receipt),
-          fullWidth: layout.isCompact,
-        );
+            final downloadButton = AppButton.filled(
+              label: 'Download PDF',
+              icon: Icons.download,
+              color: AppButtonColor.primary,
+              isLoading: _isExporting,
+              onPressed: _isExporting ? null : () => _downloadPdf(receipt),
+              fullWidth: true,
+            );
 
-        if (layout.isCompact) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              viewButton,
-              const SizedBox(height: 12),
-              downloadButton,
-            ],
-          );
-        }
+            if (constraints.maxWidth < 420) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  viewButton,
+                  const SizedBox(height: 12),
+                  downloadButton,
+                ],
+              );
+            }
 
-        return Row(
-          children: [
-            Expanded(child: viewButton),
-            const SizedBox(width: 12),
-            Expanded(child: downloadButton),
-          ],
-        );
-      },
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: viewButton),
+                const SizedBox(width: 12),
+                Expanded(child: downloadButton),
+              ],
+            );
+          },
+        ),
+      ),
     );
   }
 
@@ -1363,6 +1328,77 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
     return result;
   }
 
+  Widget _buildRoundedSquareIcon({
+    required IconData icon,
+    required Color color,
+    double size = 18,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
+      child: Icon(
+        icon,
+        size: size,
+        color: AppColorTokens.onPrimaryBlue,
+      ),
+    );
+  }
+
+  Widget _buildCircleIcon({
+    required IconData icon,
+    required Color backgroundColor,
+    required Color iconColor,
+    double size = 18,
+    double radius = 20,
+  }) {
+    return Container(
+      width: radius * 2,
+      height: radius * 2,
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        shape: BoxShape.circle,
+      ),
+      child: Center(
+        child: Icon(
+          icon,
+          size: size,
+          color: iconColor,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPill({
+    required String label,
+    required Color color,
+    required Color onColor,
+    bool small = false,
+  }) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: small ? 8 : 14,
+        vertical: small ? 3 : 6,
+      ),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: (small
+                ? AppTypography.labelMedium(context)
+                : AppTypography.bodySmall(context))
+            .copyWith(
+          fontWeight: FontWeight.w600,
+          color: onColor,
+        ),
+      ),
+    );
+  }
+
   Color _statusColor(String status, ColorScheme cs) {
     final brightness = Theme.of(context).brightness;
     return switch (status) {
@@ -1376,31 +1412,24 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
     };
   }
 
-  IconData _statusIcon(String status) {
+  Color _statusOnColor(String status, Brightness brightness) {
     return switch (status) {
-      'confirmed' => Icons.check_circle,
-      'pending' => Icons.hourglass_empty,
-      'cancelled' || 'refunded' => Icons.cancel,
-      _ => Icons.help,
+      'confirmed' =>
+        AppSemanticColors.resolveOn(AppSemanticColors.onSuccess, brightness),
+      'pending' =>
+        AppSemanticColors.resolveOn(AppSemanticColors.onWarning, brightness),
+      'cancelled' || 'refunded' =>
+        AppSemanticColors.resolveOn(AppSemanticColors.onError, brightness),
+      _ => AppColorTokens.onPrimaryBlue,
     };
   }
-}
 
-class _MenuRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _MenuRow({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Row(
-      children: [
-        Icon(icon, size: 20, color: cs.onSurface),
-        const SizedBox(width: 12),
-        Text(label, style: AppTypography.bodyMedium(context)),
-      ],
-    );
+  IconData _statusIcon(String status) {
+    return switch (status) {
+      'confirmed' => Icons.check,
+      'pending' => Icons.hourglass_empty,
+      'cancelled' || 'refunded' => Icons.close,
+      _ => Icons.help,
+    };
   }
 }

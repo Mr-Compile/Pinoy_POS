@@ -1,5 +1,68 @@
 # Pinoy POS Agent Notes
 
+## Responsive CRUD Action Placement
+
+### Rule
+
+The primary Add/Create action for a CRUD module lives in exactly one place
+per layout:
+
+- **Compact width + portrait** → `FloatingActionButton` (extended at >=360
+  logical px, circular below).
+- **Every other layout** (compact landscape, tablet, desktop, resized
+  windows) → labeled `AppButton` inside the screen's `CrudToolbar`.
+- **`AppHeader` never hosts a module create action.** It keeps title,
+  back, theme toggle, notification bell, and profile menu only.
+
+### API (`lib/ui/widgets/responsive_create_action.dart`)
+
+- `ResponsiveCreateAction(label, icon, onPressed, tooltip?, color?)`
+  - `isFabLayout(context)` — true only for compact width AND portrait.
+  - `contentAction(context)` — toolbar button, `null` on FAB layouts.
+  - `fab(context)` — FAB, `null` on non-FAB layouts. Per-label `heroTag`.
+    `color` defaults to `AppButtonColor.primary`; other roles resolve to
+    semantic background/foreground pairs (e.g. `warning` for Reset All).
+  - `contentBottomClearance(context)` — `fabClearance` (88) on FAB layouts,
+    else 0. Add it to scrollable list bottom padding so the last item
+    clears the FAB.
+  - Permission gating stays at the call site: construct the object only
+    when `hasPermission(...)` allows it.
+- `CrudToolbar(search?, controls, pinnedControls, primaryAction, padding, maxSearchWidth)`
+  - Compact: search stacked above a horizontally scrollable controls row
+    with pinned controls and the primary action pinned right.
+  - Medium+: single row — capped search (`Flexible` + `ConstrainedBox`),
+    scrollable `controls` in `Expanded`, `pinnedControls` and
+    `primaryAction` trailing.
+
+### Screens migrated
+
+- `products_screen.dart` — toolbar: search + category dropdown + Add Product.
+- `categories_screen.dart` — toolbar: search + status chips + Add Category;
+  a lone action row renders when the list is empty so the action stays
+  reachable. Refresh stays in the header as a secondary icon.
+- `users_screen.dart` — toolbar: search + pinned refresh + Add User; role
+  chips remain on their own row.
+- `staff_management_screen.dart` — toolbar: search + filter chips +
+  pinned sort menu + Add Staff.
+- `stock_screen.dart` — toolbar: search + stock chips + divider +
+  category chips + Add Stock.
+- `report_submissions_screen.dart` — owner-only toolbar: Import.
+- `announcements_screen.dart` — toolbar: pinned refresh + Add Announcement.
+- `ai_quota_management_page.dart` — Reset All Usage uses the same
+  component (warning color); FAB only on compact portrait, content button
+  next to "Change Default Quota" otherwise.
+
+### Verification
+
+```powershell
+flutter analyze
+flutter test test/responsive_create_action_test.dart
+```
+
+`flutter analyze` reports no issues; the new widget tests cover FAB on
+compact portrait, circular FAB below 360px, in-content button on compact
+landscape/tablet/desktop, single-action exclusivity, and FAB clearance.
+
 ## GCash Payment Proof Image Lifecycle Fix
 
 ### Root Cause
@@ -776,3 +839,114 @@ flutter test test/receipt_number_test.dart test/gcash_payment_service_test.dart 
 `
 
 Result: lutter analyze clean on changed files; 12/12 new tests pass and all sales/payment regression suites pass.
+
+## GCash Payment Screen Audit, QR Payload Decoding, and Mobile-First Redesign
+
+### Audit Findings
+
+- `GcashPaymentScreen` already split compact/wide via `layoutClassFor`, scrolled safely, and enforced settings-driven validation, but `PaymentQrService` only detected QR bounds for cropping — the payload was never decoded.
+- The QR was capped at 220 px on phones and merchant identity came only from manually configured `storeName`/`storePhone`; nothing distinguished QR-decoded data from configured data.
+- No QR-amount vs POS-total handling existed.
+
+### Changes Made
+
+- `lib/data/models/decoded_payment_qr.dart` (new)
+  - `DecodedPaymentQr` model: `rawPayload`, `status` (`notDetected` / `unreadable` / `decodedUnparsed` / `recognized`), `detectionSource`, `paymentNetwork`, `merchantName`, `merchantCity`, `countryCode`, `currencyCode`, `amount`, `accountIdentifier`, `mobileNumber`, `qrReference`, `isStatic`, `crcValid`. Missing fields stay null — nothing is fabricated.
+
+- `lib/services/payment_qr_parser.dart` (new)
+  - Pure-Dart EMVCo MPM TLV parser (the standard behind QR Ph / GCash / InstaPay codes).
+  - Extracts payload format, point of initiation (static/dynamic), merchant account templates (tags 02-51), MCC, currency (608 → PHP), amount, country, merchant name (59), city (60), additional-data mobile (62.02) and QR-carried reference (62.01/62.05).
+  - PH mobile numbers are only reported when a field actually encodes one (masked values like `955241****` are normalized to `+63 955 241 ****`); unrelated values are never converted into a mobile number.
+  - CRC-16/CCITT-FALSE is verified when present and reported as `crcValid` without discarding parsed fields.
+
+- `lib/services/payment_qr_service.dart`
+  - New `decodePaymentQr(relativePath)`: ZXing `QRCodeMultiReader` results now expose payload `text` (bounds logic unchanged); falls back to `qr_code_dart_decoder`, then feeds the payload through `PaymentQrParser`.
+  - Pipeline: QR image → decoder → raw payload → EMVCo parser → `DecodedPaymentQr` → UI state.
+
+- `lib/providers/service_providers.dart` / `lib/providers/payment_settings_provider.dart`
+  - `paymentQrServiceProvider` and `paymentQrDecodeProvider` (family keyed by image path, cached per path).
+
+- `lib/ui/screens/gcash_payment_screen.dart`
+  - Portrait hierarchy: Total Due → Scan to Pay QR card → Payment Details → Customer/Payment info → Order Summary → Review Payment → secure note.
+  - QR sized at 78% of available width clamped to 220-320 px (was 55% capped at 220 px), centered, `BoxFit.contain`, full-resolution decode, tap-to-enlarge into the existing pinch/zoom `AppPaymentQrViewer`.
+  - Live decode-status chip in the QR card header: `Reading QR…` (non-blocking spinner), `Merchant details detected`, `Payment QR recognized`, `QR detected — details unavailable`, `Unable to read QR code`.
+  - New `Payment Details` card shows only fields that exist: Merchant, Mobile, Account, Network, Amount in QR, QR Reference, marked `Detected from QR` when payload-derived. Configured `storeName`/`storePhone` remain as fallback when the QR encodes nothing.
+  - QR-encoded amount is compared against the POS total; a mismatch shows a warning banner while the POS total stays authoritative.
+  - Wide layout restructured: QR + configure action on the left; amount, payment details, inputs, order summary and primary action on the right.
+  - Customer name is deliberately NOT auto-filled from the QR: the merchant QR identifies the payee, not the customer (documented in `_buildCustomerInfoSection`). Required/optional validation from Payment Settings is unchanged.
+  - GCash reference field stays a separate post-payment input; QR-carried references are shown only as `QR Reference`.
+
+### Verification
+
+```powershell
+flutter analyze lib\ui\screens\gcash_payment_screen.dart lib\services\payment_qr_service.dart lib\services\payment_qr_parser.dart lib\data\models\decoded_payment_qr.dart lib\providers\payment_settings_provider.dart lib\providers\service_providers.dart
+flutter test test/payment_qr_parser_test.dart test/payment_qr_service_test.dart
+```
+
+Results:
+- Scoped `flutter analyze` — No issues found.
+- `payment_qr_parser_test.dart` — 10/10 passed (QR Ph payload, dynamic amount, CRC pass/fail, non-payment payloads, no-fabrication, masked mobile normalization).
+- `payment_qr_service_test.dart` — 11/11 passed, including an end-to-end decode of a generated EMVCo QR image.
+
+### Environment Notes (pre-existing, unrelated)
+
+- `flutter analyze` on the whole project reports 4 errors from the in-progress `responsive-crud-actions` refactor (`ResponsiveCreateAction.appBarAction` missing; `AppColorTokens.primaryBlueDark` renamed away) in files this task did not touch.
+- DB-backed integration tests (`gcash_payment_service_test.dart`, `user_service_test.dart`) fail in this session with `database is locked` because another `flutter run`/test process holds `.dart_tool\sqflite_common_ffi\databases\pinoy_pos.db`; they fail identically on code paths this task did not modify.
+
+## Reports Role Separation + Sales Import/Export + Announcement Icons
+
+### Business rule enforced
+
+- **Staff** author and submit reports ("My Reports" -> submit to Owner).
+- **Owner** reviews staff submissions ("Submitted Reports") and manages sales data directly ("Sales" -> Import/Export). The Owner is never a report author/submitter.
+
+### Changes
+
+- `lib/core/session_manager.dart`
+  - Added `submit_reports` (Staff only) and `import_sales` (Owner only).
+
+- `lib/services/report_service.dart`
+  - `submitReport` now requires `submit_reports` and `createdBy == currentUser.id`.
+  - `getMyReports` returns `[]` for non-author roles (Owner/Admin).
+  - `importReport` requires `submit_reports` — importing a report file creates an `export_history` record authored by the current user, so it is staff-only.
+
+- `lib/services/report_export_service.dart`
+  - `submitSalesReport` returns `null` early without `submit_reports` (service-layer guard, not just UI).
+  - `exportSalesReport` still records an `export_history` `generated` row — that table doubles as the export audit log (used by the admin dashboard export count); those rows never surface as "My Reports" or staff submissions.
+
+- `lib/ui/screens/more_screen.dart`
+  - "My Reports" entry gated on `submit_reports` (staff-only). "Submitted Reports" remains `view_report_submissions` (owner-only).
+
+- `lib/ui/screens/report_submissions_screen.dart`
+  - `submissionsOnly: true` = Owner inbox (title "Submitted Reports"); `false` = Staff history ("My Reports").
+  - Access-denied empty state when the viewer lacks the required permission.
+  - The "Import Report" action only exists on the staff "My Reports" view.
+  - Owner cards show "Staff: <name>"; staff cards show the report number.
+  - `markReportViewed` only runs in the owner inbox.
+
+- `lib/ui/screens/sales_analytics_screen.dart`
+  - "Submit to Owner" in the export sheet is gated on `submit_reports` instead of a role check.
+
+- `lib/services/sales_import_service.dart` (new) + `salesImportServiceProvider`
+  - `previewSalesImport(fileName, bytes)` parses/validates CSV (required columns: `date`, `total`; optional: `payment_method`, `payment_status`, `cash_received`, `customer`, `reference`, `receipt_number`, `notes`).
+  - `importSales(preview)` inserts valid rows inside a transaction, generates `YYYYMMDD-NNNN` receipt numbers when absent, skips duplicate receipt numbers (UNIQUE conflict), and logs `import_sales` to the activity log.
+  - Throws `AuthorizationException('import_sales')` for non-owners. No `export_history` writes — imports never create report records.
+
+- `lib/services/sales_analytics_service.dart`
+  - `getAnalyticsForBounds` accepts optional `paymentMethod`/`paymentStatus` so the Sales screen exports exactly the filtered slice it shows.
+
+- `lib/ui/screens/sales_screen.dart`
+  - Added Export (`export_reports`, PDF/Excel/CSV via `ReportExportService`) and Import (`import_sales`, CSV pick -> validate -> preview -> confirm) actions to the toolbar.
+
+- `lib/ui/screens/announcements_screen.dart`
+  - Create action icon changed to `Icons.add`; card actions converted to `AppIconButton` (48px touch targets, tooltips): view (`Icons.visibility_outlined` -> read-only `AppDialog`), pin (`selected` state), edit (`Icons.edit_outlined`), delete (`Icons.delete_outline` with `cs.error`). Card tap also opens the view dialog.
+
+### Verification
+
+- `dart analyze lib test` — no issues.
+- `flutter test` — 433 tests pass (97 in the reports/sales/RBAC batch + 336 remainder), including 12 new tests in `test/report_workflow_test.dart` covering owner-submission denial, staff submit->owner inbox, More-entry filtering, CSV preview validation, owner-only import gating, duplicate receipt skipping, and "import creates no report records".
+
+### Notes
+
+- Import is CSV-only (header row required); exported multi-section report CSVs are not import sources.
+- Legacy `export_history` rows with status `imported` may still appear in the owner inbox (historical data); new ones can only be authored by staff.

@@ -12,6 +12,7 @@ class LoadingButton extends StatelessWidget {
   final ButtonStyle? style;
   final bool isDanger;
   final IconData? icon;
+  final bool fullWidth;
 
   const LoadingButton({
     super.key,
@@ -22,18 +23,27 @@ class LoadingButton extends StatelessWidget {
     this.style,
     this.isDanger = false,
     this.icon,
+    this.fullWidth = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return AppButton(
-      variant: isDanger
-          ? AppButtonVariant.destructive
-          : AppButtonVariant.filled,
+    if (isDanger) {
+      return AppButton.destructive(
+        onPressed: isLoading ? null : onPressed,
+        label: label,
+        icon: icon,
+        isLoading: isLoading,
+        fullWidth: fullWidth,
+        child: child,
+      );
+    }
+    return AppButton.filled(
       onPressed: isLoading ? null : onPressed,
       label: label,
       icon: icon,
       isLoading: isLoading,
+      fullWidth: fullWidth,
       child: child,
     );
   }

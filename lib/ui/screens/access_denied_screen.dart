@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
+import 'package:pinoy_pos/ui/widgets/app_icon_circle.dart';
 
 class AccessDeniedScreen extends StatelessWidget {
   const AccessDeniedScreen({super.key});
@@ -23,16 +25,16 @@ class AccessDeniedScreen extends StatelessWidget {
             children: [
               Semantics(
                 label: 'Access denied',
-                child: Icon(
-                  Icons.lock,
-                  size: 64,
-                  color: colorScheme.error,
+                child: AppIconCircle.fullscreen(
+                  icon: Icons.lock,
+                  backgroundColor: colorScheme.surfaceContainerHigh,
+                  iconColor: colorScheme.error,
                 ),
               ),
               const SizedBox(height: 16),
               Text(
                 'Access Denied',
-                style: AppTypography.headlineSmallBold(context),
+                style: AppTypography.titleLargeBold(context),
               ),
               const SizedBox(height: 8),
               Text(
@@ -43,10 +45,11 @@ class AccessDeniedScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
-              FilledButton.icon(
+              AppButton.filled(
                 onPressed: () => Navigator.of(context).maybePop(),
-                icon: const Icon(Icons.arrow_back),
-                label: const Text('Go Back'),
+                icon: Icons.arrow_back,
+                label: 'Go Back',
+                fullWidth: true,
               ),
             ],
           ),

@@ -66,11 +66,21 @@ class SalesAnalyticsService {
   }
 
   /// Complete analytics for explicit [bounds].
+  ///
+  /// [paymentMethod] and [paymentStatus] forward to the filtered analytics
+  /// path so callers such as the Sales screen can export exactly the slice
+  /// they are viewing.
   Future<SalesAnalytics> getAnalyticsForBounds(
-    ReportingPeriodBounds bounds,
-  ) async {
+    ReportingPeriodBounds bounds, {
+    String? paymentMethod,
+    String? paymentStatus,
+  }) async {
     if (!_canViewReports) return SalesAnalytics.empty(bounds);
-    return _analyticsForBounds(bounds);
+    return _analyticsForBounds(
+      bounds,
+      paymentMethod: paymentMethod,
+      paymentStatus: paymentStatus,
+    );
   }
 
   /// Complete analytics for a single staff member over the selected [period].
@@ -294,11 +304,7 @@ class SalesAnalyticsService {
     );
 
     final staffSummaries = userId == null && _canViewStaffPerformance
-        ? await _saleRepository.getStaffSalesSummary(
-            bounds.start,
-            bounds.end,
-            role: UserRole.staff,
-          )
+        ? await _staffSummariesWithPrevious(bounds)
         : <StaffSalesSummary>[];
 
     final sales = await _saleRepository.getConfirmedSalesForRange(
@@ -427,11 +433,14 @@ class SalesAnalyticsService {
     final previousTrend = _trendFromSales(previousSales, previousBounds);
 
     final paymentBreakdown = _paymentBreakdownFromSales(currentSales);
-    final topProducts = _topProductsFromItems(currentItems);
+    final topProducts = await _topProductsFromItems(currentItems);
     final categorySales =
         await _categorySalesFromSales(currentSales, currentItems);
-    final staffSummaries =
-        await _staffSummariesFromSales(currentSales, userId);
+    final staffSummaries = await _staffSummariesFromSales(
+      currentSales,
+      userId,
+      previousSales: previousSales,
+    );
 
     return SalesAnalytics(
       bounds: bounds,
@@ -485,7 +494,16 @@ class SalesAnalyticsService {
       ..sort((a, b) => b.total.compareTo(a.total));
   }
 
-  List<TopProductResult> _topProductsFromItems(List<SaleItem> items) {
+  Future<List<TopProductResult>> _topProductsFromItems(
+    List<SaleItem> items,
+  ) async {
+    final products = await _productRepository.getAll();
+    final categories = await _categoryRepository.getAll();
+    final categoryNames = {for (final c in categories) c.id: c.name};
+    final productCategory = {
+      for (final p in products) p.id: categoryNames[p.categoryId],
+    };
+
     final grouped = <int, TopProductResult>{};
     for (final item in items) {
       final name = item.productName?.isNotEmpty == true
@@ -497,6 +515,7 @@ class SalesAnalyticsService {
         productName: name,
         totalQuantity: (existing?.totalQuantity ?? 0) + item.quantity,
         revenue: (existing?.revenue ?? 0.0) + item.totalPrice,
+        categoryName: productCategory[item.productId],
       );
     }
     final list = grouped.values.toList()
@@ -540,10 +559,39 @@ class SalesAnalyticsService {
       ..sort((a, b) => b.totalSales.compareTo(a.totalSales));
   }
 
+  /// Staff sales summaries for [bounds] merged with each member's previous-
+  /// period total so the UI can render a per-staff trend pill.
+  Future<List<StaffSalesSummary>> _staffSummariesWithPrevious(
+    ReportingPeriodBounds bounds,
+  ) async {
+    final current = await _saleRepository.getStaffSalesSummary(
+      bounds.start,
+      bounds.end,
+      role: UserRole.staff,
+    );
+    final previous = await _saleRepository.getStaffSalesSummary(
+      bounds.previousStart,
+      bounds.previousEnd,
+      role: UserRole.staff,
+    );
+    final previousByUser = {for (final s in previous) s.userId: s.totalSales};
+    return current
+        .map((s) => StaffSalesSummary(
+              userId: s.userId,
+              fullName: s.fullName,
+              role: s.role,
+              totalSales: s.totalSales,
+              transactionCount: s.transactionCount,
+              previousTotalSales: previousByUser[s.userId] ?? 0.0,
+            ))
+        .toList();
+  }
+
   Future<List<StaffSalesSummary>> _staffSummariesFromSales(
     List<Sale> sales,
-    int? filteredUserId,
-  ) async {
+    int? filteredUserId, {
+    List<Sale>? previousSales,
+  }) async {
     if (filteredUserId == null && !_canViewStaffPerformance) {
       return const [];
     }
@@ -563,6 +611,12 @@ class SalesAnalyticsService {
       }
     }
 
+    final previousByUser = <int, double>{};
+    for (final sale in previousSales ?? const <Sale>[]) {
+      previousByUser[sale.userId] =
+          (previousByUser[sale.userId] ?? 0.0) + sale.totalAmount;
+    }
+
     final summaries = <StaffSalesSummary>[];
     for (final user in users) {
       if (filteredUserId != null && user.id != filteredUserId) continue;
@@ -577,6 +631,7 @@ class SalesAnalyticsService {
         role: user.role,
         totalSales: data.$1,
         transactionCount: data.$2,
+        previousTotalSales: previousByUser[user.id] ?? 0.0,
       ));
     }
 

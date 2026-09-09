@@ -45,6 +45,26 @@ class ProductService {
     return _productRepository.searchProducts(query);
   }
 
+  /// Number of sellable products per category id. Read-only metadata used
+  /// by the Categories screen; gated on `view_products` like the rest of
+  /// the product reads.
+  Future<Map<int, int>> getProductCountsByCategory() async {
+    if (!_sessionManager.hasPermission('view_products')) {
+      return {};
+    }
+    return _productRepository.getCountsByCategory();
+  }
+
+  /// Catalog-wide stock summary (total / low / out of stock) for the
+  /// Products screen stat strip. SQL-level counts, independent of any
+  /// active search query.
+  Future<({int total, int lowStock, int outOfStock})> getStockSummary() async {
+    if (!_sessionManager.hasPermission('view_products')) {
+      return (total: 0, lowStock: 0, outOfStock: 0);
+    }
+    return _productRepository.getStockSummary();
+  }
+
   Future<Product?> getProductById(int id) async {
     if (!_sessionManager.hasPermission('view_products')) {
       return null;

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/modal_result.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/services/image_service.dart';
+import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_form.dart';
@@ -13,7 +15,7 @@ import 'package:pinoy_pos/ui/widgets/app_image.dart';
 import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/validators.dart';
 
-/// Profile screen — shows the current user's profile information and
+/// Profile screen — shows the current user’s profile information and
 /// allows editing their full name and profile picture.
 ///
 /// Security (password) and PIN management have been moved to the
@@ -31,6 +33,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
     final user = authState.user;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     if (user == null) {
       return Scaffold(
@@ -39,12 +43,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       );
     }
 
+    final brightness = theme.brightness;
+    final successColor = AppSemanticColors.resolve(
+      AppSemanticColors.success,
+      brightness,
+    );
+
     return Scaffold(
       appBar: const AppHeader(title: 'Profile', showBackButton: true),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Avatar + name header
             Center(
@@ -54,68 +64,91 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   const SizedBox(height: 16),
                   Text(
                     user.fullName,
-                    style: Theme.of(context).textTheme.headlineSmall,
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     '@${user.username}',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  Chip(
-                    label: Text(user.role.displayName),
-                    avatar: const Icon(Icons.badge),
+                  const SizedBox(height: 10),
+                  _RolePill(
+                    role: user.role.displayName,
+                    color: successColor,
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 24),
-            // Account information
-            Text(
-              'Account Information',
-              style: Theme.of(context).textTheme.titleLarge,
+            AppButton.gradient(
+              label: 'Edit Profile',
+              fullWidth: true,
+              onPressed: () => _showEditProfileDialog(user),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
+            // Account information
+            _SectionLabel(label: 'Account Information'),
+            const SizedBox(height: 12),
             AppCard(
               child: Column(
                 children: [
-                  ListTile(
-                    leading: const Icon(Icons.person),
-                    title: const Text('Full Name'),
-                    subtitle: Text(user.fullName),
-                    trailing: const Icon(Icons.edit, size: 20),
+                  _ProfileInfoRow(
+                    icon: Icons.person,
+                    iconColor: AppSemanticColors.resolve(
+                      AppSemanticColors.info,
+                      brightness,
+                    ),
+                    title: 'Full Name',
+                    subtitle: user.fullName,
+                    isEditable: true,
                     onTap: () => _showEditProfileDialog(user),
                   ),
-                  const Divider(),
-                  ListTile(
-                    leading: const Icon(Icons.alternate_email),
-                    title: const Text('Username'),
-                    subtitle: Text(user.username),
-                    trailing: const Icon(Icons.edit, size: 20),
+                  const Divider(height: 1),
+                  _ProfileInfoRow(
+                    icon: Icons.alternate_email,
+                    iconColor: AppSemanticColors.resolve(
+                      AppSemanticColors.purple,
+                      brightness,
+                    ),
+                    title: 'Username',
+                    subtitle: user.username,
+                    isEditable: true,
                     onTap: () => _showEditProfileDialog(user),
                   ),
-                  const Divider(),
-                  ListTile(
-                    leading: const Icon(Icons.admin_panel_settings),
-                    title: const Text('Role'),
-                    subtitle: Text(user.role.displayName),
+                  const Divider(height: 1),
+                  _ProfileInfoRow(
+                    icon: Icons.admin_panel_settings,
+                    iconColor: AppSemanticColors.resolve(
+                      AppSemanticColors.success,
+                      brightness,
+                    ),
+                    title: 'Role',
+                    subtitle: user.role.displayName,
                   ),
-                  const Divider(),
-                  ListTile(
-                    leading: const Icon(Icons.calendar_today),
-                    title: const Text('Member Since'),
-                    subtitle:
-                        Text(user.createdAt.toLocal().toString().split('.')[0]),
+                  const Divider(height: 1),
+                  _ProfileInfoRow(
+                    icon: Icons.calendar_today,
+                    iconColor: AppSemanticColors.resolve(
+                      AppSemanticColors.warning,
+                      brightness,
+                    ),
+                    title: 'Member Since',
+                    subtitle: _formatDateTime(user.createdAt),
                   ),
                   if (user.lastLogin != null) ...[
-                    const Divider(),
-                    ListTile(
-                      leading: const Icon(Icons.login),
-                      title: const Text('Last Login'),
-                      subtitle: Text(
-                          user.lastLogin!.toLocal().toString().split('.')[0]),
+                    const Divider(height: 1),
+                    _ProfileInfoRow(
+                      icon: Icons.login,
+                      iconColor: AppSemanticColors.resolve(
+                        AppSemanticColors.teal,
+                        brightness,
+                      ),
+                      title: 'Last Login',
+                      subtitle: _formatDateTime(user.lastLogin!),
                     ),
                   ],
                 ],
@@ -127,22 +160,60 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
+  // ── HELPERS ───────────────────────────────────────────────────────────
+
+  String _initials(User user) {
+    final parts = user.fullName.trim().split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}';
+    }
+    return parts.isNotEmpty ? parts[0][0] : '?';
+  }
+
+  String _formatDateTime(DateTime value) {
+    return value.toLocal().toString().split('.')[0];
+  }
+
   // ── AVATAR ───────────────────────────────────────────────────────────
 
   Widget _buildAvatar(User user) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final brightness = theme.brightness;
+
     return Stack(
       children: [
-        AppAvatar(
-          imagePath: user.profileImagePath,
-          initials: user.fullName,
-          radius: 48,
-          semanticLabel: 'Profile picture',
+        Container(
+          width: 96,
+          height: 96,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: theme.scaffoldBackgroundColor,
+              width: 3,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: colorScheme.primary.withValues(
+                  alpha: brightness == Brightness.dark ? 0.28 : 0.22,
+                ),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: AppAvatar(
+            imagePath: user.profileImagePath,
+            initials: _initials(user),
+            radius: 45,
+            semanticLabel: 'Profile picture',
+          ),
         ),
         Positioned(
           bottom: 0,
           right: 0,
           child: Material(
-            color: Theme.of(context).colorScheme.primary,
+            color: colorScheme.primary,
             shape: const CircleBorder(),
             child: InkWell(
               onTap: () => _changeProfilePicture(user),
@@ -152,7 +223,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 child: Icon(
                   Icons.camera_alt,
                   size: 20,
-                  color: Theme.of(context).colorScheme.onPrimary,
+                  color: colorScheme.onPrimary,
                 ),
               ),
             ),
@@ -217,7 +288,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       context: context,
       useRootNavigator: true,
       builder: (dialogContext) => AppDialogForm<ModalResult<void>>(
-        type: AppDialogType.info,
+        type: AppDialogType.edit,
         title: 'Edit Profile',
         childBuilder: (context, state) {
           final fullNameController =
@@ -233,6 +304,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 AppTextFormField(
                   controller: fullNameController,
                   label: 'Full Name',
+                  prefixIcon: Icons.person,
                   validator: (value) =>
                       Validators.required(value, 'Full Name'),
                   onChanged: (_) => state.markChanged(),
@@ -242,6 +314,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   controller: usernameController,
                   readOnly: user.hasChangedUsername,
                   label: 'Username',
+                  prefixIcon: Icons.person_outline,
                   helperText: user.hasChangedUsername
                       ? 'You have already changed your username.'
                       : 'You can only change your username once.',
@@ -348,5 +421,118 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         message: r.error ?? 'Failed to update profile.',
       );
     }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Local widgets
+// ─────────────────────────────────────────────────────────────────────────
+
+class _SectionLabel extends StatelessWidget {
+  final String label;
+
+  const _SectionLabel({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      label,
+      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+          ),
+    );
+  }
+}
+
+class _RolePill extends StatelessWidget {
+  final String role;
+  final Color color;
+
+  const _RolePill({required this.role, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.badge, size: 13, color: color),
+          const SizedBox(width: 5),
+          Text(
+            role,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileInfoRow extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final bool isEditable;
+  final VoidCallback? onTap;
+
+  const _ProfileInfoRow({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    this.isEditable = false,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return ListTile(
+      leading: _IconBadge(icon: icon, color: iconColor),
+      title: Text(title),
+      subtitle: Text(
+        subtitle,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: Theme.of(context).textTheme.bodySmall,
+      ),
+      trailing: isEditable
+          ? Icon(Icons.edit, size: 20, color: colorScheme.onSurfaceVariant)
+          : null,
+      onTap: onTap,
+    );
+  }
+}
+
+class _IconBadge extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+
+  const _IconBadge({required this.icon, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 38,
+      height: 38,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: Icon(icon, size: 19, color: color),
+    );
   }
 }

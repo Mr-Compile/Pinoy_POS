@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
 import 'package:pinoy_pos/providers/payment_settings_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
+import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_payment_qr_preview.dart';
 import 'package:pinoy_pos/ui/widgets/app_payment_qr_viewer.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
-import 'package:pinoy_pos/ui/widgets/loading_button.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 
@@ -236,6 +237,66 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
         'always confirmed immediately and never require verification.';
   }
 
+  Widget _buildToggleRow({
+    required String title,
+    String? subtitle,
+    required bool value,
+    required ValueChanged<bool>? onChanged,
+  }) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      title: Text(title),
+      subtitle: subtitle != null ? Text(subtitle) : null,
+      trailing: Switch(
+        value: value,
+        onChanged: onChanged,
+      ),
+    );
+  }
+
+  Widget _buildSelectRow({
+    required String title,
+    required String value,
+    required Widget child,
+  }) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      title: Text(title),
+      subtitle: Text(
+        value,
+        style: const TextStyle(fontWeight: FontWeight.w700),
+      ),
+      trailing: child,
+    );
+  }
+
+  Widget _buildDropdown({
+    required String value,
+    required List<String> options,
+    required ValueChanged<String?>? onChanged,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+
+    return DropdownButton<String>(
+      value: value,
+      onChanged: onChanged,
+      underline: const SizedBox.shrink(),
+      isDense: true,
+      icon: Icon(Icons.expand_more, color: cs.onSurfaceVariant),
+      dropdownColor: cs.surface,
+      style: AppTypography.bodyMedium(context).copyWith(
+        fontWeight: FontWeight.w700,
+        color: cs.onSurface,
+      ),
+      items: options
+          .map((v) => DropdownMenuItem(
+                value: v,
+                child: Text(_label(v)),
+              ))
+          .toList(),
+    );
+  }
+
   void _openQrViewer(BuildContext context, String qrPath) {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -254,7 +315,7 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
       children: [
         Text(
           'Merchant Identity',
-          style: Theme.of(context).textTheme.titleLarge,
+          style: AppTypography.titleMediumBold(context).copyWith(fontSize: 17),
         ),
         const SizedBox(height: 16),
         AppTextFormField(
@@ -332,18 +393,20 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
           Row(
             children: [
               Expanded(
-                child: LoadingButton(
+                child: AppButton.filled(
                   isLoading: widget.isLoading,
                   onPressed: widget.isLoading ? null : widget.onUploadGcashQr,
+                  icon: Icons.upload,
                   label: hasImage ? 'Change QR Image' : 'Upload QR Image',
                 ),
               ),
               if (hasImage) ...[
                 const SizedBox(width: 12),
                 Expanded(
-                  child: LoadingButton(
+                  child: AppButton.destructive(
                     isLoading: widget.isLoading,
                     onPressed: widget.isLoading ? null : widget.onClearGcashQr,
+                    icon: Icons.delete_outline,
                     label: 'Remove',
                   ),
                 ),
@@ -383,88 +446,77 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
           ),
           const SizedBox(height: 24),
           AppCard(
+            padding: EdgeInsets.zero,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'GCash',
-                  style: Theme.of(context).textTheme.titleLarge,
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: Text(
+                    'GCash',
+                    style: AppTypography.titleMediumBold(context)
+                        .copyWith(fontSize: 17),
+                  ),
                 ),
-                const SizedBox(height: 16),
-                SwitchListTile(
-                  title: const Text('Enable GCash payments'),
+                const SizedBox(height: 8),
+                _buildToggleRow(
+                  title: 'Enable GCash payments',
                   value: _gcashEnabled,
                   onChanged: widget.isLoading
                       ? null
                       : (value) => setState(() => _gcashEnabled = value),
                 ),
-                const Divider(),
-                SwitchListTile(
-                  title: const Text('Reference number required'),
-                  subtitle: const Text(
-                      'Cashiers must enter the GCash reference number.'),
+                _buildToggleRow(
+                  title: 'Reference number required',
+                  subtitle: 'Cashiers must enter the GCash reference number.',
                   value: _gcashReferenceRequired,
                   onChanged: widget.isLoading
                       ? null
                       : (value) =>
                           setState(() => _gcashReferenceRequired = value),
                 ),
-                const Divider(),
-                ListTile(
-                  title: const Text('Customer name'),
-                  subtitle: Text(_label(_customerNameRequirement)),
-                  trailing: DropdownButton<String>(
+                _buildSelectRow(
+                  title: 'Customer name',
+                  value: _label(_customerNameRequirement),
+                  child: _buildDropdown(
                     value: _customerNameRequirement,
+                    options: _customerNameOptions,
                     onChanged: widget.isLoading
                         ? null
                         : (value) {
                             if (value == null) return;
                             setState(() => _customerNameRequirement = value);
                           },
-                    items: _customerNameOptions
-                        .map((v) => DropdownMenuItem(
-                              value: v,
-                              child: Text(_label(v)),
-                            ))
-                        .toList(),
                   ),
                 ),
-                const Divider(),
-                ListTile(
-                  title: const Text('Payment proof'),
-                  subtitle: Text(_label(_paymentProofRequirement)),
-                  trailing: DropdownButton<String>(
+                _buildSelectRow(
+                  title: 'Payment proof',
+                  value: _label(_paymentProofRequirement),
+                  child: _buildDropdown(
                     value: _paymentProofRequirement,
+                    options: _proofOptions,
                     onChanged: widget.isLoading
                         ? null
                         : (value) {
                             if (value == null) return;
                             setState(() => _paymentProofRequirement = value);
                           },
-                    items: _proofOptions
-                        .map((v) => DropdownMenuItem(
-                              value: v,
-                              child: Text(_label(v)),
-                            ))
-                        .toList(),
                   ),
                 ),
-                const Divider(),
-                SwitchListTile(
-                  title: const Text('Verify staff GCash sales'),
-                  subtitle: const Text(
-                      'Staff GCash payments must be approved by the Owner before the sale is completed.'),
+                _buildToggleRow(
+                  title: 'Verify staff GCash sales',
+                  subtitle:
+                      'Staff GCash payments must be approved by the Owner before the sale is completed.',
                   value: _verificationRequired,
                   onChanged: widget.isLoading
                       ? null
                       : (value) =>
                           setState(() => _verificationRequired = value),
                 ),
-                const Divider(),
-                ListTile(
-                  title: const Text('Minimum reference length'),
-                  subtitle: Text('$_referenceMinLength characters'),
-                  trailing: SizedBox(
+                _buildSelectRow(
+                  title: 'Minimum reference length',
+                  value: '$_referenceMinLength characters',
+                  child: SizedBox(
                     width: 80,
                     child: AppTextFormField(
                       initialValue: _referenceMinLength.toString(),
@@ -472,30 +524,31 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
                       enabled: !widget.isLoading,
                       onChanged: (value) {
                         final parsed = int.tryParse(value) ?? 1;
-                        setState(() => _referenceMinLength = parsed.clamp(1, 50));
+                        setState(
+                            () => _referenceMinLength = parsed.clamp(1, 50));
                       },
                       isDense: true,
                     ),
                   ),
                 ),
-                const Divider(),
                 _buildGcashQrSection(context),
               ],
             ),
           ),
           const SizedBox(height: 24),
           AppCard(
-            color: cs.secondaryContainer,
+            padding: const EdgeInsets.all(14),
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(0),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.info_outline, color: cs.onSecondaryContainer),
+                  Icon(Icons.info_outline, color: cs.onSurfaceVariant),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       _verificationInfoText,
-                      style: TextStyle(color: cs.onSecondaryContainer),
+                      style: TextStyle(color: cs.onSurfaceVariant),
                     ),
                   ),
                 ],
@@ -503,13 +556,12 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
             ),
           ),
           const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            child: LoadingButton(
-              isLoading: widget.isLoading,
-              onPressed: widget.isLoading ? null : _submit,
-              label: 'Save Payment Settings',
-            ),
+          AppButton.filled(
+            isLoading: widget.isLoading,
+            onPressed: widget.isLoading ? null : _submit,
+            icon: Icons.save,
+            label: 'Save Payment Settings',
+            fullWidth: true,
           ),
         ],
       ),

@@ -1,12 +1,9 @@
-// ignore_for_file: unused_import
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/route_guard.dart';
-import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/ui/widgets/dashboard_blocks.dart';
 import 'package:pinoy_pos/ui/screens/activity_logs_screen.dart';
 import 'package:pinoy_pos/ui/screens/ai_config_screen.dart';
 import 'package:pinoy_pos/ui/screens/announcements_screen.dart';
@@ -72,10 +69,14 @@ class MoreEntry {
       routeName: 'report_submissions',
       screen: ReportSubmissionsScreen(submissionsOnly: true),
     ),
+    // "My Reports" is a Staff-only feature: it lists reports authored by the
+    // current user. The Owner reviews staff work through "Submitted Reports"
+    // and is never a report author, so this entry is gated on the
+    // Staff-only `submit_reports` permission rather than `view_reports`.
     MoreEntry(
       icon: Icons.folder_copy_outlined,
       title: 'My Reports',
-      permission: 'view_reports',
+      permission: 'submit_reports',
       routeName: 'my_reports',
       screen: ReportSubmissionsScreen(submissionsOnly: false),
     ),
@@ -139,10 +140,14 @@ class MoreScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authNotifier = ref.read(authStateProvider.notifier);
+    final user = ref.watch(authStateProvider).user;
     final entries = MoreEntry.accessibleFor(authNotifier.hasPermission);
 
     return Scaffold(
-      appBar: const AppHeader(title: 'More'),
+      appBar: AppHeader(
+        title: 'More',
+        subtitle: user?.role.displayName,
+      ),
       body: LayoutBuilder(
         builder: (context, constraints) {
           final layout = layoutClassFor(constraints.maxWidth);
@@ -168,37 +173,37 @@ class MoreScreen extends ConsumerWidget {
   }
 
   Widget _buildEntryCard(BuildContext context, WidgetRef ref, MoreEntry entry) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final cs = Theme.of(context).colorScheme;
 
-    return AppCard(
-      variant: AppCardVariant.elevated,
-      borderRadius: AppRadius.control,
-      onTap: () {
-        RouteGuard.pushIfAuthorized(
-          context,
-          ref,
-          screen: entry.screen,
-          permission: entry.permission,
-          routeName: entry.routeName,
-        );
-      },
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(entry.icon, size: 32, color: colorScheme.primary),
-            const SizedBox(height: 8),
-            Text(
-              entry.title,
-              style: Theme.of(context).textTheme.bodySmall,
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
+    return QuickActionTile(
+      icon: entry.icon,
+      label: entry.title,
+      accent: _accentFor(entry.title),
+      maxLines: 2,
+      labelColor: cs.onSurface,
+      onTap: () => RouteGuard.pushIfAuthorized(
+        context,
+        ref,
+        screen: entry.screen,
+        permission: entry.permission,
+        routeName: entry.routeName,
       ),
     );
+  }
+
+  DashAccent _accentFor(String title) {
+    return switch (title) {
+      'Categories' => DashAccent.purple,
+      'Stock' => DashAccent.amber,
+      'Reports' => DashAccent.blue,
+      'Submitted Reports' => DashAccent.teal,
+      'My Reports' => DashAccent.amber,
+      'Announcements' => DashAccent.amber,
+      'Staff Management' => DashAccent.green,
+      'Activity Logs' => DashAccent.grey,
+      'Trash' => DashAccent.red,
+      'AI Configuration' => DashAccent.teal,
+      _ => DashAccent.blue,
+    };
   }
 }

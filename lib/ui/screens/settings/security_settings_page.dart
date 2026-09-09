@@ -21,6 +21,10 @@ import 'package:pinoy_pos/ui/widgets/password_strength_meter.dart';
 ///
 /// Accessible from the Settings hub. Available to all authenticated
 /// users (users can always change their own password).
+///
+/// Session management (inactivity timeout and warning) is only visible
+/// and editable by users with the `manage_session_settings` permission
+/// (System Admin).
 class SecuritySettingsPage extends ConsumerWidget {
   const SecuritySettingsPage({super.key});
 
@@ -29,8 +33,8 @@ class SecuritySettingsPage extends ConsumerWidget {
     final authState = ref.watch(authStateProvider);
     final user = authState.user;
     final settingsAsync = ref.watch(settingsProvider);
-    final canEditTimeout =
-        SessionManager().hasPermission('edit_settings');
+    final canManageSession =
+        SessionManager().hasPermission('manage_session_settings');
 
     if (user == null) {
       return Scaffold(
@@ -63,55 +67,50 @@ class SecuritySettingsPage extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 16),
-            Text('Session', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 8),
-            Text(
-              'How long the app waits for input before ending the session, '
-              'and how early the expiry warning appears.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 16),
-            AppCard(
-              child: Column(
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.timer_outlined),
-                    title: const Text('Inactivity timeout'),
-                    subtitle: settingsAsync.when(
-                      data: (settings) => Text(
-                        '${settings.inactivityTimeoutMinutes} minutes',
-                      ),
-                      loading: () => const Text('Loading…'),
-                      error: (_, _) => const Text('Unable to load'),
-                    ),
-                    trailing: canEditTimeout
-                        ? const Icon(Icons.chevron_right)
-                        : null,
-                    onTap: canEditTimeout
-                        ? () => _showInactivityTimeoutDialog(context, ref, settingsAsync)
-                        : null,
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.notification_important_outlined),
-                    title: const Text('Session warning'),
-                    subtitle: settingsAsync.when(
-                      data: (settings) => Text(
-                        'Warn ${settings.sessionWarningSeconds} seconds before logout',
-                      ),
-                      loading: () => const Text('Loading…'),
-                      error: (_, _) => const Text('Unable to load'),
-                    ),
-                    trailing: canEditTimeout
-                        ? const Icon(Icons.chevron_right)
-                        : null,
-                    onTap: canEditTimeout
-                        ? () => _showSessionWarningDialog(context, ref, settingsAsync)
-                        : null,
-                  ),
-                ],
+            if (canManageSession) ...[
+              const SizedBox(height: 16),
+              Text('Session', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 8),
+              Text(
+                'How long the app waits for input before ending the session, '
+                'and how early the expiry warning appears.',
+                style: Theme.of(context).textTheme.bodySmall,
               ),
-            ),
+              const SizedBox(height: 16),
+              AppCard(
+                child: Column(
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.timer_outlined),
+                      title: const Text('Inactivity timeout'),
+                      subtitle: settingsAsync.when(
+                        data: (settings) => Text(
+                          '${settings.inactivityTimeoutMinutes} minutes',
+                        ),
+                        loading: () => const Text('Loading…'),
+                        error: (_, _) => const Text('Unable to load'),
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => _showInactivityTimeoutDialog(context, ref, settingsAsync),
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: const Icon(Icons.notification_important_outlined),
+                      title: const Text('Session warning'),
+                      subtitle: settingsAsync.when(
+                        data: (settings) => Text(
+                          'Warn ${settings.sessionWarningSeconds} seconds before logout',
+                        ),
+                        loading: () => const Text('Loading…'),
+                        error: (_, _) => const Text('Unable to load'),
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => _showSessionWarningDialog(context, ref, settingsAsync),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -127,7 +126,7 @@ class SecuritySettingsPage extends ConsumerWidget {
       context: context,
       useRootNavigator: true,
       builder: (dialogContext) => AppDialogForm<ModalResult<void>>(
-        type: AppDialogType.info,
+        type: AppDialogType.edit,
         title: 'Change Password',
         childBuilder: (context, state) {
           final oldController = state.textController('oldPassword');
@@ -292,6 +291,7 @@ class SecuritySettingsPage extends ConsumerWidget {
                   controller: minutesController,
                   label: 'Minutes',
                   hint: 'e.g. 15',
+                  prefixIcon: Icons.timer_outlined,
                   keyboardType: TextInputType.number,
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
@@ -334,7 +334,7 @@ class SecuritySettingsPage extends ConsumerWidget {
 
               final updated = await ref
                   .read(settingsServiceProvider)
-                  .updateSettings(
+                  .updateSessionSettings(
                     settings.copyWith(inactivityTimeoutMinutes: minutes),
                   );
 
@@ -406,6 +406,7 @@ class SecuritySettingsPage extends ConsumerWidget {
                   controller: secondsController,
                   label: 'Seconds',
                   hint: 'e.g. 30',
+                  prefixIcon: Icons.timer_outlined,
                   keyboardType: TextInputType.number,
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
@@ -452,7 +453,7 @@ class SecuritySettingsPage extends ConsumerWidget {
 
               final updated = await ref
                   .read(settingsServiceProvider)
-                  .updateSettings(
+                  .updateSessionSettings(
                     settings.copyWith(sessionWarningSeconds: seconds),
                   );
 

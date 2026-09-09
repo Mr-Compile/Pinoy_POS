@@ -12,6 +12,7 @@ import 'package:pinoy_pos/ui/widgets/app_image.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog_form.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/responsive_create_action.dart';
@@ -167,7 +168,7 @@ class _StockScreenState extends ConsumerState<StockScreen> {
       return;
     }
 
-    final result = await showDialog<_StockOperationResult>(
+    final result = await showDialog<_StockOperationResult?>(
       context: context,
       builder: (context) => _StockOperationDialog(
         product: product,
@@ -220,7 +221,7 @@ class _StockScreenState extends ConsumerState<StockScreen> {
       return;
     }
 
-    final result = await showDialog<_StockOperationResult>(
+    final result = await showDialog<_StockOperationResult?>(
       context: context,
       builder: (context) => _StockOperationDialog(
         product: product,
@@ -328,14 +329,15 @@ class _StockScreenState extends ConsumerState<StockScreen> {
           )
         : null;
 
-    final appBarAction = createAction?.appBarAction(context);
+    final toolbarAction = createAction?.contentAction(context);
     final createFab = createAction?.fab(context);
+    final bottomClearance =
+        createAction?.contentBottomClearance(context) ?? 0;
 
     return Scaffold(
-      appBar: AppHeader(
+      appBar: const AppHeader(
         title: 'Stock Management',
         showBackButton: true,
-        actions: appBarAction != null ? [appBarAction] : null,
       ),
       floatingActionButton: createFab,
       body: _products.isEmpty
@@ -344,8 +346,8 @@ class _StockScreenState extends ConsumerState<StockScreen> {
               children: [
                 // Summary cards
                 _buildSummaryCards(),
-                // Search + filters
-                _buildSearchAndFilters(),
+                // Search + filters + primary add-stock action
+                _buildToolbar(toolbarAction),
                 // Stock list
                 Expanded(
                   child: _filteredProducts.isEmpty
@@ -355,10 +357,18 @@ class _StockScreenState extends ConsumerState<StockScreen> {
                             final layout = layoutClassFor(constraints.maxWidth);
                             if (layout == LayoutClass.expanded) {
                               return _buildTabletStockList(
-                                  canAddStock, canAdjustStock, canViewStock);
+                                canAddStock,
+                                canAdjustStock,
+                                canViewStock,
+                                bottomClearance,
+                              );
                             }
                             return _buildMobileStockList(
-                                canAddStock, canAdjustStock, canViewStock);
+                              canAddStock,
+                              canAdjustStock,
+                              canViewStock,
+                              bottomClearance,
+                            );
                           },
                         ),
                 ),
@@ -541,81 +551,64 @@ class _StockScreenState extends ConsumerState<StockScreen> {
     );
   }
 
-  // ── Search + filters ───────────────────────────────────────────────
+  // ── Content toolbar: search + filters + add-stock action ───────────
 
-  Widget _buildSearchAndFilters() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(Spacing.lg, Spacing.sm, Spacing.lg, Spacing.sm),
-      child: Column(
-        children: [
-          // Search field
-          AppSearchField(
-            controller: _searchController,
-            hint: 'Search products...',
-            onChanged: _onSearchChanged,
-            onClear: _clearSearch,
-          ),
-          const SizedBox(height: Spacing.sm),
-          // Stock status filter chips
-          SizedBox(
-            height: 40,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: [
-                _buildStockFilterChip(StockFilter.all, 'All'),
-                _buildStockFilterChip(StockFilter.lowStock, 'Low Stock'),
-                _buildStockFilterChip(StockFilter.outOfStock, 'Out of Stock'),
-              ],
-            ),
-          ),
-          // Category chips
-          if (_categories.isNotEmpty) ...[
-            const SizedBox(height: Spacing.xs),
-            SizedBox(
-              height: 40,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: [
-                  _buildCategoryChip(null, 'All Categories'),
-                  ..._categories.map((c) => _buildCategoryChip(c.id, c.name)),
-                ],
-              ),
-            ),
-          ],
-        ],
+  Widget _buildToolbar(Widget? primaryAction) {
+    return CrudToolbar(
+      padding: const EdgeInsets.fromLTRB(
+        Spacing.lg,
+        Spacing.sm,
+        Spacing.lg,
+        Spacing.sm,
       ),
+      search: AppSearchField(
+        controller: _searchController,
+        hint: 'Search products...',
+        onChanged: _onSearchChanged,
+        onClear: _clearSearch,
+      ),
+      controls: [
+        _buildStockFilterChip(StockFilter.all, 'All'),
+        _buildStockFilterChip(StockFilter.lowStock, 'Low Stock'),
+        _buildStockFilterChip(StockFilter.outOfStock, 'Out of Stock'),
+        if (_categories.isNotEmpty) ...[
+          const SizedBox(
+            height: 28,
+            child: VerticalDivider(width: 1),
+          ),
+          _buildCategoryChip(null, 'All Categories'),
+          ..._categories.map((c) => _buildCategoryChip(c.id, c.name)),
+        ],
+      ],
+      primaryAction: primaryAction,
     );
   }
 
   Widget _buildStockFilterChip(StockFilter filter, String label) {
     final isSelected = _stockFilter == filter;
-    return Padding(
-      padding: const EdgeInsets.only(right: Spacing.sm),
-      child: FilterChip(
-        label: Text(label),
-        selected: isSelected,
-        onSelected: (_) {
-          setState(() {
-            _stockFilter = filter;
-          });
-        },
-      ),
+    return FilterChip(
+      label: Text(label),
+      showCheckmark: false,
+      selected: isSelected,
+      onSelected: (_) {
+        setState(() {
+          _stockFilter = filter;
+        });
+      },
     );
   }
 
   Widget _buildCategoryChip(int? categoryId, String label) {
     final isSelected = _selectedCategoryId == categoryId;
-    return Padding(
-      padding: const EdgeInsets.only(right: Spacing.sm),
-      child: FilterChip(
-        label: Text(label),
-        selected: isSelected,
-        onSelected: (_) {
-          setState(() {
-            _selectedCategoryId = categoryId;
-          });
-        },
-      ),
+    return FilterChip(
+      label: Text(label),
+      showCheckmark: false,
+      selected: isSelected,
+      onSelected: (_) {
+        setState(() {
+          _selectedCategoryId = categoryId;
+        });
+      },
     );
   }
 
@@ -742,9 +735,19 @@ class _StockScreenState extends ConsumerState<StockScreen> {
 
   // ── Mobile stock list ──────────────────────────────────────────────
 
-  Widget _buildMobileStockList(bool canAddStock, bool canAdjustStock, bool canViewStock) {
+  Widget _buildMobileStockList(
+    bool canAddStock,
+    bool canAdjustStock,
+    bool canViewStock,
+    double bottomClearance,
+  ) {
     return ListView.builder(
-      padding: const EdgeInsets.all(Spacing.lg),
+      padding: EdgeInsets.fromLTRB(
+        Spacing.lg,
+        Spacing.lg,
+        Spacing.lg,
+        Spacing.lg + bottomClearance,
+      ),
       itemCount: _filteredProducts.length,
       itemBuilder: (context, index) {
         final product = _filteredProducts[index];
@@ -859,9 +862,19 @@ class _StockScreenState extends ConsumerState<StockScreen> {
 
   // ── Tablet stock list ──────────────────────────────────────────────
 
-  Widget _buildTabletStockList(bool canAddStock, bool canAdjustStock, bool canViewStock) {
+  Widget _buildTabletStockList(
+    bool canAddStock,
+    bool canAdjustStock,
+    bool canViewStock,
+    double bottomClearance,
+  ) {
     return ListView.builder(
-      padding: const EdgeInsets.all(Spacing.lg),
+      padding: EdgeInsets.fromLTRB(
+        Spacing.lg,
+        Spacing.lg,
+        Spacing.lg,
+        Spacing.lg + bottomClearance,
+      ),
       itemCount: _filteredProducts.length,
       itemBuilder: (context, index) {
         final product = _filteredProducts[index];
@@ -1056,7 +1069,7 @@ class _StockOperationResult {
 
 // ── Stock operation dialog (Add / Adjust) ────────────────────────────
 
-class _StockOperationDialog extends StatefulWidget {
+class _StockOperationDialog extends StatelessWidget {
   final Product product;
   final String category;
   final bool isAdjust;
@@ -1068,147 +1081,66 @@ class _StockOperationDialog extends StatefulWidget {
   });
 
   @override
-  State<_StockOperationDialog> createState() => _StockOperationDialogState();
-}
-
-class _StockOperationDialogState extends State<_StockOperationDialog> {
-  final _formKey = GlobalKey<FormState>();
-  final _quantityController = TextEditingController();
-  final _reasonController = TextEditingController();
-
-  @override
-  void dispose() {
-    _quantityController.dispose();
-    _reasonController.dispose();
-    super.dispose();
-  }
-
-  int _parseInt() {
-    return int.tryParse(_quantityController.text.trim()) ?? -1;
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final title = widget.isAdjust ? 'Adjust Stock' : 'Add Stock';
+    final title = isAdjust ? 'Adjust Stock' : 'Add Stock';
 
-    return AppDialog(
-      type: AppDialogType.info,
+    return AppDialogForm<_StockOperationResult?>(
+      type: isAdjust ? AppDialogType.edit : AppDialogType.add,
       title: title,
-      actions: [
-        AppDialogAction(
-          label: 'Cancel',
-          onPressed: (context) =>
-              Navigator.of(context, rootNavigator: true).pop(),
-        ),
-        AppDialogAction(
-          label: widget.isAdjust ? 'Continue' : 'Add Stock',
-          isPrimary: true,
-          onPressed: (context) {
-            if (!_formKey.currentState!.validate()) return;
-            final qty = _parseInt();
-            Navigator.of(context, rootNavigator: true).pop(
-              _StockOperationResult(
-                quantity: widget.isAdjust ? qty - widget.product.stock : qty,
-                newStock: widget.isAdjust ? qty : widget.product.stock + qty,
-                reason: _reasonController.text.trim().isEmpty
-                    ? null
-                    : _reasonController.text.trim(),
-              ),
-            );
-          },
-        ),
-      ],
-      child: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-              // Product info
-              Container(
-                padding: const EdgeInsets.all(Spacing.md),
-                decoration: BoxDecoration(
-                  color: cs.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(AppRadius.control),
-                ),
-                child: Row(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(AppRadius.sm),
-                      child: SizedBox(
-                        width: 40,
-                        height: 40,
-                        child: AppImage(
-                          imagePath: widget.product.imageUrl,
-                          placeholderIcon: Icons.inventory_2,
-                          placeholderIconSize: 18,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: Spacing.md),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.product.name,
-                            style: AppTypography.titleMediumBold(context),
-                          ),
-                          Text(
-                            widget.category,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(color: cs.onSurfaceVariant),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+      childBuilder: (context, state) {
+        final cs = Theme.of(context).colorScheme;
+        final quantityController = state.textController(
+          'quantity',
+          text: isAdjust ? product.stock.toString() : '',
+        );
+        final reasonController = state.textController('reason');
+        final qtyValue =
+            state.value<int>('quantity', isAdjust ? product.stock : 0) ?? 0;
+
+        return Form(
+          key: state.formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildProductInfo(context, cs),
               const SizedBox(height: Spacing.md),
-              // Current stock
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Current Stock',
-                      style: Theme.of(context).textTheme.bodyMedium),
                   Text(
-                    '${widget.product.stock}',
+                    'Current Stock',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  Text(
+                    '${product.stock}',
                     style: AppTypography.titleMediumBold(context),
                   ),
                 ],
               ),
               const SizedBox(height: Spacing.lg),
-              // Quantity / New stock input
               AppTextFormField(
-                controller: _quantityController,
-                label: widget.isAdjust
-                    ? 'New Stock Quantity'
-                    : 'Quantity to Add',
+                controller: quantityController,
+                label: isAdjust ? 'New Stock Quantity' : 'Quantity to Add',
                 prefixIcon: Icons.inventory,
                 keyboardType: TextInputType.number,
                 validator: (value) {
-                  final qty = int.tryParse(value?.trim() ?? '');
-                  if (qty == null) {
-                    return 'Enter a valid number';
-                  }
-                  if (qty <= 0) {
-                    return 'Quantity must be greater than 0';
-                  }
-                  if (widget.isAdjust && qty > 999999) {
-                    return 'Value too large';
-                  }
+                  final q = int.tryParse(value?.trim() ?? '');
+                  if (q == null) return 'Enter a valid number';
+                  if (q <= 0) return 'Quantity must be greater than 0';
+                  if (isAdjust && q > 999999) return 'Value too large';
                   return null;
                 },
-                onChanged: (_) => setState(() {}),
+                onChanged: (value) {
+                  state.setValue<int>(
+                    'quantity',
+                    int.tryParse(value.trim()) ?? 0,
+                  );
+                },
+                onFieldSubmitted: (_) => _save(state),
               ),
               const SizedBox(height: Spacing.md),
-              // Preview new stock
-              if (_parseInt() > 0)
+              if (qtyValue > 0)
                 Container(
                   padding: const EdgeInsets.all(Spacing.md),
                   decoration: BoxDecoration(
@@ -1219,13 +1151,11 @@ class _StockOperationDialogState extends State<_StockOperationDialog> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        widget.isAdjust ? 'New Stock' : 'Stock After Adding',
+                        isAdjust ? 'New Stock' : 'Stock After Adding',
                         style: TextStyle(color: cs.onPrimaryContainer),
                       ),
                       Text(
-                        widget.isAdjust
-                            ? '${_parseInt()}'
-                            : '${widget.product.stock + _parseInt()}',
+                        isAdjust ? '$qtyValue' : '${product.stock + qtyValue}',
                         style: AppTypography.titleLargeBold(context)
                             .copyWith(color: cs.onPrimaryContainer),
                       ),
@@ -1233,15 +1163,91 @@ class _StockOperationDialogState extends State<_StockOperationDialog> {
                   ),
                 ),
               const SizedBox(height: Spacing.md),
-              // Reason / Remarks
               AppTextFormField(
-                controller: _reasonController,
+                controller: reasonController,
                 label: 'Remarks (optional)',
                 prefixIcon: Icons.note,
                 maxLines: 2,
+                onChanged: (_) => state.markChanged(),
               ),
-          ],
+            ],
+          ),
+        );
+      },
+      actionsBuilder: (context, state) => [
+        AppDialogAction(
+          label: 'Cancel',
+          onPressed: state.isSaving
+              ? null
+              : (context) => state.pop(null),
         ),
+        AppDialogAction(
+          label: isAdjust ? 'Continue' : 'Add Stock',
+          isPrimary: true,
+          isLoading: state.isSaving,
+          onPressed: state.isSaving ? null : (context) => _save(state),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProductInfo(BuildContext context, ColorScheme cs) {
+    return Container(
+      padding: const EdgeInsets.all(Spacing.md),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppRadius.control),
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            child: SizedBox(
+              width: 40,
+              height: 40,
+              child: AppImage(
+                imagePath: product.imageUrl,
+                placeholderIcon: Icons.inventory_2,
+                placeholderIconSize: 18,
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+          const SizedBox(width: Spacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  product.name,
+                  style: AppTypography.titleMediumBold(context),
+                ),
+                Text(
+                  category,
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: cs.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _save(AppDialogFormState<_StockOperationResult?> state) {
+    if (!state.formKey.currentState!.validate()) return;
+
+    final qty = int.parse(state.textController('quantity').text.trim());
+    final reason = state.textController('reason').text.trim();
+
+    state.pop(
+      _StockOperationResult(
+        quantity: isAdjust ? qty - product.stock : qty,
+        newStock: isAdjust ? qty : product.stock + qty,
+        reason: reason.isEmpty ? null : reason,
       ),
     );
   }

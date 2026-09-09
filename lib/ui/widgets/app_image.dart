@@ -153,7 +153,7 @@ class _AppImageState extends State<AppImage> {
           : Icon(
               widget.placeholderIcon,
               size: widget.placeholderIconSize,
-              color: Theme.of(context).colorScheme.primary,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
     );
   }
@@ -181,8 +181,17 @@ class AppAvatar extends StatefulWidget {
   /// Initials to display when no image is available.
   final String initials;
 
-  /// Radius of the avatar circle.
+  /// Radius of the avatar circle (including any border).
   final double radius;
+
+  /// Optional background color behind the initials or while an image loads.
+  final Color? backgroundColor;
+
+  /// Optional border color for the avatar ring.
+  final Color? borderColor;
+
+  /// Width of the avatar border ring.
+  final double borderWidth;
 
   /// Optional semantic label.
   final String? semanticLabel;
@@ -192,6 +201,9 @@ class AppAvatar extends StatefulWidget {
     required this.imagePath,
     required this.initials,
     this.radius = 48,
+    this.backgroundColor,
+    this.borderColor,
+    this.borderWidth = 0,
     this.semanticLabel,
   });
 
@@ -255,6 +267,7 @@ class _AppAvatarState extends State<AppAvatar> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final diameter = widget.radius * 2;
 
     if (_isLoading) {
@@ -263,36 +276,63 @@ class _AppAvatarState extends State<AppAvatar> {
         height: diameter,
         child: CircularProgressIndicator(
           strokeWidth: 2,
-          color: Theme.of(context).colorScheme.primary,
+          color: cs.primary,
         ),
       );
     }
 
-    if (_imageFile != null) {
-      return CircleAvatar(
-        radius: widget.radius,
-        foregroundImage: FileImage(_imageFile!),
-        onForegroundImageError: (exception, stackTrace) {
-          // Fall back to initials silently
-        },
-        child: Text(
-          widget.initials.isNotEmpty
-              ? widget.initials[0].toUpperCase()
-              : '?',
-          style: TextStyle(fontSize: widget.radius * 0.6),
-        ),
-      );
-    }
-
-    // No image — show initials
-    return CircleAvatar(
-      radius: widget.radius,
-      child: Text(
-        widget.initials.isNotEmpty
-            ? widget.initials[0].toUpperCase()
-            : '?',
-        style: TextStyle(fontSize: widget.radius * 0.6),
-      ),
+    final initials = _formatInitials(widget.initials);
+    final effectiveRadius = widget.radius - widget.borderWidth;
+    final fontSize = initials.length > 1 ? effectiveRadius * 0.45 : effectiveRadius * 0.6;
+    final avatar = CircleAvatar(
+      radius: effectiveRadius,
+      backgroundColor: widget.backgroundColor ?? cs.surfaceContainerHigh,
+      foregroundImage: _imageFile != null ? FileImage(_imageFile!) : null,
+      onForegroundImageError: _imageFile != null
+          ? (exception, stackTrace) {
+              // Fall back to initials silently
+            }
+          : null,
+      child: _imageFile == null
+          ? Text(
+              initials,
+              style: TextStyle(fontSize: fontSize, color: cs.onSurface),
+            )
+          : null,
     );
+
+    if (widget.borderColor == null || widget.borderWidth <= 0) return avatar;
+
+    return Container(
+      width: diameter,
+      height: diameter,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: widget.borderColor,
+      ),
+      padding: EdgeInsets.all(widget.borderWidth),
+      child: avatar,
+    );
+  }
+
+  String _formatInitials(String value) {
+    if (value.isEmpty) return '?';
+
+    // Treat an already-short initials string as-is (e.g. "JD" or "M").
+    final compact = value.trim();
+    if (RegExp(r'^[A-Za-z]{1,2}$').hasMatch(compact)) {
+      return compact.toUpperCase();
+    }
+
+    // Otherwise extract the first letter of the first two words.
+    final parts = compact.split(RegExp(r'\s+'));
+    final buffer = StringBuffer();
+    for (final part in parts) {
+      if (part.isNotEmpty) {
+        buffer.write(part[0].toUpperCase());
+      }
+      if (buffer.length == 2) break;
+    }
+    return buffer.isEmpty ? '?' : buffer.toString();
   }
 }

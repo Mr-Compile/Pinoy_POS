@@ -77,6 +77,13 @@ class SessionManager {
   /// Owner (Business Owner) — manages store operations, business decisions,
   /// and business continuity. The Owner uses the AI Business Advisor for
   /// business-wide analytics (sales, products, inventory, trends).
+  ///
+  /// System administration tasks (backups, AI configuration / quota,
+  /// session timeout, and global system settings) are reserved for the
+  /// System Admin role.
+  ///
+  /// `import_sales` is Owner-only: the Owner imports sales records directly
+  /// under Sales — completely independent of the staff reporting workflow.
   static const List<String> _ownerPermissions = [
     'view_dashboard',
     'view_pos',
@@ -112,7 +119,7 @@ class SessionManager {
     'view_profile',
     'view_more',
     'view_report_submissions',
-    'backup_restore',
+    'import_sales',
     'manage_users',
     'edit_users',
     'delete_users',
@@ -126,6 +133,10 @@ class SessionManager {
   /// user accounts, backups, and system configuration. Does NOT have access to
   /// POS, products, categories, stock, sales, business reports, business
   /// analytics, or announcements.
+  ///
+  /// System Admin manages backups (`backup_restore`), AI configuration
+  /// (`manage_ai_config`), AI quotas (`manage_ai_quota`), and global session
+  /// timeout (`manage_session_settings`).
   ///
   /// `verify_payments` is granted so the Admin can act as an authorized
   /// verifier for Staff-tendered GCash payments at the point of sale (when
@@ -148,6 +159,8 @@ class SessionManager {
     'edit_settings',
     'backup_restore',
     'manage_ai_config',
+    'manage_ai_quota',
+    'manage_session_settings',
     'view_ai_advisor',
     'use_ai_advisor',
     'verify_payments',
@@ -163,6 +176,10 @@ class SessionManager {
   /// Staff (Operational User) — daily cashier and inventory operations.
   /// Can view products/categories, add stock, create sales, view own
   /// sales/reports, and manage their own profile.
+  ///
+  /// `submit_reports` is Staff-only by business rule: Staff generate and
+  /// submit reports to the Owner. The Owner reviews submissions and must
+  /// never be treated as a report author/submitter.
   ///
   /// AI access: Staff can use the AI Work Assistant (`use_ai_advisor`)
   /// for their own sales, low-stock alerts, product information, and daily
@@ -181,6 +198,7 @@ class SessionManager {
     'create_sales',
     'view_reports',
     'export_reports',
+    'submit_reports',
     'view_ai_advisor',
     'use_ai_advisor',
     'view_notifications',

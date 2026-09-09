@@ -124,39 +124,34 @@ class _SessionExpiringDialogState extends State<SessionExpiringDialog> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Semantics(
             liveRegion: true,
             label: '$remainingSeconds $unit remaining',
             child: ExcludeSemantics(
               child: AppCountdownRing(
                 value: fraction,
-                size: 96,
+                size: 100,
                 center: Text(
                   '$remainingSeconds',
                   style: theme.textTheme.displaySmall?.copyWith(
+                    fontSize: 32,
                     fontWeight: FontWeight.bold,
-                    color: cs.error,
+                    color: cs.onSurface,
                   ),
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Text(
             '$remainingSeconds $unit',
-            style: theme.textTheme.titleMedium?.copyWith(
+            style: theme.textTheme.labelSmall?.copyWith(
               fontWeight: FontWeight.w600,
               color: cs.onSurfaceVariant,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Your session will automatically lock or log out '
-            'due to inactivity.',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium,
-          ),
+          const SizedBox(height: 12),
         ],
       ),
     );

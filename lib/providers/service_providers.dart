@@ -4,6 +4,7 @@ import 'package:pinoy_pos/services/product_service.dart';
 import 'package:pinoy_pos/services/category_service.dart';
 import 'package:pinoy_pos/services/sales_service.dart';
 import 'package:pinoy_pos/services/sales_analytics_service.dart';
+import 'package:pinoy_pos/services/sales_import_service.dart';
 import 'package:pinoy_pos/services/stock_service.dart';
 import 'package:pinoy_pos/services/activity_log_service.dart';
 import 'package:pinoy_pos/services/notification_service.dart';
@@ -20,6 +21,7 @@ import 'package:pinoy_pos/services/trash_service.dart';
 import 'package:pinoy_pos/services/announcement_service.dart';
 import 'package:pinoy_pos/services/user_service.dart';
 import 'package:pinoy_pos/services/image_service.dart';
+import 'package:pinoy_pos/services/payment_qr_service.dart';
 import 'package:pinoy_pos/services/payment_verification_service.dart';
 
 final productServiceProvider = Provider<ProductService>((ref) {
@@ -36,6 +38,10 @@ final salesServiceProvider = Provider<SalesService>((ref) {
 
 final salesAnalyticsServiceProvider = Provider<SalesAnalyticsService>((ref) {
   return SalesAnalyticsService();
+});
+
+final salesImportServiceProvider = Provider<SalesImportService>((ref) {
+  return SalesImportService();
 });
 
 final cartServiceProvider = Provider<CartService>((ref) {
@@ -109,6 +115,10 @@ final userServiceProvider = Provider<UserService>((ref) {
 
 final imageServiceProvider = Provider<ImageService>((ref) {
   return ImageService();
+});
+
+final paymentQrServiceProvider = Provider<PaymentQrService>((ref) {
+  return PaymentQrService();
 });
 
 final paymentVerificationServiceProvider =
