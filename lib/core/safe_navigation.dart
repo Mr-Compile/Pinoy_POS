@@ -18,11 +18,12 @@ class SafeNavigator {
     Widget screen, {
     bool useRootNavigator = false,
     VoidCallback? onComplete,
+    String? routeName,
   }) {
     if (!context.mounted) return null;
 
     final navigator = Navigator.of(context, rootNavigator: useRootNavigator);
-    final screenName = screen.runtimeType.toString();
+    final screenName = routeName ?? screen.runtimeType.toString();
     var isAlreadyOnScreen = false;
 
     navigator.popUntil((route) {

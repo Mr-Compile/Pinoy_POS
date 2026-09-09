@@ -4,7 +4,6 @@ import 'package:pinoy_pos/core/auth_navigation.dart';
 import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/user.dart';
-import 'package:pinoy_pos/providers/ai_advisor_provider.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/navigation_provider.dart';
 import 'package:pinoy_pos/ui/screens/dashboard_screen.dart';
@@ -16,8 +15,6 @@ import 'package:pinoy_pos/ui/screens/settings_screen.dart';
 import 'package:pinoy_pos/ui/screens/users_screen.dart';
 import 'package:pinoy_pos/ui/screens/more_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_logo.dart';
-import 'package:pinoy_pos/ui/widgets/ai_chat_head.dart';
-import 'package:pinoy_pos/ui/widgets/ai_chat_panel.dart';
 
 class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key});
@@ -140,31 +137,15 @@ class _AppShellState extends ConsumerState<AppShell> {
       _updateCurrentDestination();
     }
 
-    // AI Advisor floating chat head — available to users with
-    // use_ai_advisor permission (Owner, Admin, Staff). Each role gets a
-    // role-appropriate AI assistant (Business Advisor, System Assistant,
-    // or Work Assistant). Tapping it opens the full AIAdvisorScreen route.
-    final canUseAIAdvisor =
-        ref.read(authStateProvider.notifier).hasPermission('use_ai_advisor');
-    final aiChatState = ref.watch(aiAdvisorChatProvider);
-
     if (isTablet) {
       return Scaffold(
-        body: Stack(
+        body: Row(
           children: [
-            Row(
-              children: [
-                _buildNavigationRail(tabs, constraints.maxWidth, selectedIndex),
-                const VerticalDivider(thickness: 1, width: 1),
-                Expanded(
-                  child: _getScreen(tabs, selectedIndex),
-                ),
-              ],
+            _buildNavigationRail(tabs, constraints.maxWidth, selectedIndex),
+            const VerticalDivider(thickness: 1, width: 1),
+            Expanded(
+              child: _getScreen(tabs, selectedIndex),
             ),
-            if (canUseAIAdvisor && !aiChatState.isPanelOpen)
-              AIChatHead(userId: authState.user!.id!),
-            if (canUseAIAdvisor && aiChatState.isPanelOpen)
-              const AIChatPanel(),
           ],
         ),
       );
@@ -172,15 +153,7 @@ class _AppShellState extends ConsumerState<AppShell> {
 
     return Scaffold(
       drawer: _buildDrawer(tabs, selectedIndex),
-      body: Stack(
-        children: [
-          _getScreen(tabs, selectedIndex),
-          if (canUseAIAdvisor && !aiChatState.isPanelOpen)
-            AIChatHead(userId: authState.user!.id!),
-          if (canUseAIAdvisor && aiChatState.isPanelOpen)
-            const AIChatPanel(),
-        ],
-      ),
+      body: _getScreen(tabs, selectedIndex),
       bottomNavigationBar: _buildBottomNavigationBar(tabs, selectedIndex),
     );
       },

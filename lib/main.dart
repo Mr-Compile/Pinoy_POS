@@ -11,6 +11,7 @@ import 'package:pinoy_pos/providers/navigation_provider.dart';
 import 'package:pinoy_pos/providers/theme_provider.dart';
 import 'package:pinoy_pos/services/trash_service.dart';
 import 'package:pinoy_pos/ui/screens/splash_screen.dart';
+import 'package:pinoy_pos/ui/widgets/global_ai_chat_overlay.dart';
 import 'package:pinoy_pos/ui/widgets/session_guard.dart';
 
 Future<void> main() async {
@@ -98,7 +99,7 @@ class _MyAppState extends ConsumerState<MyApp> {
       navigatorObservers: [_navigationObserver],
       builder: (context, child) => SessionGuard(
         navigatorKey: _navigatorKey,
-        child: child!,
+        child: GlobalAIChatOverlay(child: child!),
       ),
       home: const SplashScreen(),
     );

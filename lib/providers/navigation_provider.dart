@@ -10,11 +10,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// example, during app launch or on a route without a known destination ID).
 final currentRouteProvider = StateProvider<String?>((ref) => null);
 
-/// Signature for callbacks invoked when the top [Navigator] route has a
-/// non-empty route name.
-typedef NavigationRouteChangedCallback = void Function(String routeName);
+/// Signature for callbacks invoked when the top [Navigator] route changes.
+/// The [routeName] is `null` when the route has no [RouteSettings.name].
+typedef NavigationRouteChangedCallback = void Function(String? routeName);
 
-/// A [NavigatorObserver] that reports named route changes to [onRouteChanged].
+/// A [NavigatorObserver] that reports route changes to [onRouteChanged].
 ///
 /// [NavigatorObserver] methods are invoked synchronously during route
 /// transitions, so callers that need to update state during the build phase
@@ -29,9 +29,7 @@ class NavigationRouteObserver extends NavigatorObserver {
     if (route == null) return;
 
     final name = route.settings.name;
-    if (name == null || name.isEmpty) return;
-
-    onRouteChanged?.call(name);
+    onRouteChanged?.call(name?.isNotEmpty == true ? name : null);
   }
 
   @override
