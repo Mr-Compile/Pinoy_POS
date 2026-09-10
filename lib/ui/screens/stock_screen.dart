@@ -6,11 +6,11 @@ import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/data/models/product.dart';
 import 'package:pinoy_pos/data/models/stock_history.dart';
-import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/catalog_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
+import 'package:pinoy_pos/ui/widgets/app_detail_row.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_form.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
@@ -44,6 +44,8 @@ class _StockScreenState extends ConsumerState<StockScreen> {
   StockFilter _stockFilter = StockFilter.all;
   int? _selectedCategoryId;
   Timer? _debounce;
+
+  String? get _roleLabel => ref.read(authStateProvider).user?.role.displayName;
 
   // Kept alive inside the app shell's PageView: reload whenever catalog
   // data changes elsewhere (product save, POS sale, trash restore).
@@ -296,6 +298,35 @@ class _StockScreenState extends ConsumerState<StockScreen> {
     }
   }
 
+  Future<void> _showStockView(Product product) async {
+    final authNotifier = ref.read(authStateProvider.notifier);
+    if (!authNotifier.hasPermission('view_stock')) {
+      AppDialogService.accessDenied(context);
+      return;
+    }
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      useRootNavigator: true,
+      builder: (context) => _StockViewDialog(
+        product: product,
+        categoryName: _categoryName(product.categoryId),
+        onAdd: () {
+          Navigator.of(context, rootNavigator: true).pop();
+          _showAddStockDialog(product);
+        },
+        onAdjust: () {
+          Navigator.of(context, rootNavigator: true).pop();
+          _showAdjustStockDialog(product);
+        },
+        canAddStock: authNotifier.hasPermission('add_stock'),
+        canAdjustStock: authNotifier.hasPermission('adjust_stock'),
+      ),
+    );
+  }
+
   Future<void> _showStockHistory(Product product) async {
     final authNotifier = ref.read(authStateProvider.notifier);
     if (!authNotifier.hasPermission('view_stock')) {
@@ -332,6 +363,7 @@ class _StockScreenState extends ConsumerState<StockScreen> {
       return Scaffold(
         appBar: AppHeader(
           title: 'Stock',
+          subtitle: _roleLabel,
           showBackButton: true,
         ),
         body: const LoadingState(),
@@ -352,8 +384,9 @@ class _StockScreenState extends ConsumerState<StockScreen> {
         createAction?.contentBottomClearance(context) ?? 0;
 
     return Scaffold(
-      appBar: const AppHeader(
+      appBar: AppHeader(
         title: 'Stock',
+        subtitle: _roleLabel,
         showBackButton: true,
       ),
       floatingActionButton: createFab,
@@ -362,7 +395,6 @@ class _StockScreenState extends ConsumerState<StockScreen> {
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildRoleChipBar(),
                 _buildToolbar(toolbarAction),
                 Expanded(
                   child: _filteredProducts.isEmpty
@@ -393,103 +425,58 @@ class _StockScreenState extends ConsumerState<StockScreen> {
     );
   }
 
-  // ── Role / permission bar ──────────────────────────────────────────
+  // ── Toolbar: search + category filter + stock chips ────────────────
 
-  Widget _buildRoleChipBar() {
-    final cs = Theme.of(context).colorScheme;
-    final user = ref.read(authStateProvider).user;
-    final isOwner = user?.role == UserRole.owner;
-    final roleColor = isOwner
-        ? AppSemanticColors.resolve(AppSemanticColors.info, Theme.of(context).brightness)
-        : AppSemanticColors.resolve(AppSemanticColors.success, Theme.of(context).brightness);
-
-    final label = isOwner ? 'Owner' : 'Staff';
-    final permText = isOwner
-        ? 'view/add/adjust stock'
-        : 'view/add stock only';
-
+  Widget _buildToolbar(Widget? primaryAction) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         Spacing.lg,
         Spacing.md,
         Spacing.lg,
-        0,
+        Spacing.sm,
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 5,
-            ),
-            decoration: BoxDecoration(
-              color: roleColor.withValues(alpha: 0.16),
-              border: Border.all(color: roleColor.withValues(alpha: 0.4)),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.person_outline,
-                  size: 12,
-                  color: roleColor,
+          Row(
+            children: [
+              Expanded(
+                child: AppSearchField(
+                  controller: _searchController,
+                  hint: 'Search products',
+                  onChanged: _onSearchChanged,
+                  onClear: _clearSearch,
                 ),
-                const SizedBox(width: 6),
-                Text(
-                  label,
-                  style: AppTypography.labelSmall(context).copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: roleColor,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: Spacing.sm),
-          Expanded(
-            child: Text(
-              permText,
-              style: AppTypography.bodySmall(context).copyWith(
-                color: cs.onSurfaceVariant,
               ),
-            ),
+              const SizedBox(width: Spacing.sm),
+              _buildCategoryFilter(),
+              if (primaryAction != null) ...[
+                const SizedBox(width: Spacing.sm),
+                primaryAction,
+              ],
+            ],
+          ),
+          const SizedBox(height: Spacing.sm),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildStockFilterChip(StockFilter.all, 'All'),
+              const SizedBox(width: Spacing.xs),
+              _buildStockFilterChip(StockFilter.lowStock, 'Low'),
+              const SizedBox(width: Spacing.xs),
+              _buildStockFilterChip(StockFilter.outOfStock, 'Out'),
+            ],
           ),
         ],
       ),
     );
   }
 
-  // ── Toolbar: search + category filter + stock chips ────────────────
-
-  Widget _buildToolbar(Widget? primaryAction) {
-    return CrudToolbar(
-      padding: const EdgeInsets.fromLTRB(
-        Spacing.lg,
-        Spacing.sm,
-        Spacing.lg,
-        Spacing.sm,
-      ),
-      search: AppSearchField(
-        controller: _searchController,
-        hint: 'Search products...',
-        onChanged: _onSearchChanged,
-        onClear: _clearSearch,
-      ),
-      controls: [
-        _buildCategoryFilter(),
-        _buildStockFilterChip(StockFilter.all, 'All'),
-        _buildStockFilterChip(StockFilter.lowStock, 'Low'),
-        _buildStockFilterChip(StockFilter.outOfStock, 'Out'),
-      ],
-      primaryAction: primaryAction,
-    );
-  }
-
   Widget _buildCategoryFilter() {
     final cs = Theme.of(context).colorScheme;
     final selectedLabel =
-        _selectedCategoryId == null ? 'Filter' : _categoryName(_selectedCategoryId);
+        _selectedCategoryId == null ? 'All' : _categoryName(_selectedCategoryId);
 
     return PopupMenuButton<int?>(
       initialValue: _selectedCategoryId,
@@ -554,16 +541,36 @@ class _StockScreenState extends ConsumerState<StockScreen> {
   }
 
   Widget _buildStockFilterChip(StockFilter filter, String label) {
+    final cs = Theme.of(context).colorScheme;
     final isSelected = _stockFilter == filter;
-    return FilterChip(
-      label: Text(label),
-      showCheckmark: false,
-      selected: isSelected,
-      onSelected: (_) {
+
+    return RawMaterialButton(
+      onPressed: () {
         setState(() {
-          _stockFilter = filter;
+          _stockFilter = isSelected ? StockFilter.all : filter;
         });
       },
+      elevation: 0,
+      fillColor: isSelected ? cs.primary : cs.surface,
+      splashColor: cs.onPrimary.withValues(alpha: 0.12),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 14,
+        vertical: 7,
+      ),
+      constraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        side: BorderSide(
+          color: isSelected ? cs.primary : cs.outline,
+        ),
+      ),
+      child: Text(
+        label,
+        style: AppTypography.labelMedium(context).copyWith(
+          color: isSelected ? cs.onPrimary : cs.onSurfaceVariant,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 
@@ -712,47 +719,50 @@ class _StockScreenState extends ConsumerState<StockScreen> {
     final cs = Theme.of(context).colorScheme;
     final stockColor = _stockColor(product);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: Spacing.md,
-        vertical: Spacing.sm,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          _buildStockThumb(product),
-          const SizedBox(width: Spacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  product.name,
-                  style: AppTypography.titleMediumSemibold(context),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: Spacing.xs),
-                Text(
-                  '${_categoryName(product.categoryId)} · Min ${product.minStock}',
-                  style: AppTypography.bodySmall(context).copyWith(
-                    color: cs.onSurfaceVariant,
+    return InkWell(
+      onTap: canViewStock ? () => _showStockView(product) : null,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: Spacing.md,
+          vertical: Spacing.sm,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            _buildStockThumb(product),
+            const SizedBox(width: Spacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    product.name,
+                    style: AppTypography.titleMediumSemibold(context),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ],
+                  const SizedBox(height: Spacing.xs),
+                  Text(
+                    '${_categoryName(product.categoryId)} · Min ${product.minStock}',
+                    style: AppTypography.bodySmall(context).copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: Spacing.sm),
-          _buildStockPill('${product.stock} left', stockColor),
-          const SizedBox(width: Spacing.sm),
-          _buildStockActions(
-            product,
-            canAddStock,
-            canAdjustStock,
-            canViewStock,
-          ),
-        ],
+            const SizedBox(width: Spacing.sm),
+            _buildStockPill('${product.stock} left', stockColor),
+            const SizedBox(width: Spacing.sm),
+            _buildStockActions(
+              product,
+              canAddStock,
+              canAdjustStock,
+              canViewStock,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -835,6 +845,9 @@ class _StockScreenState extends ConsumerState<StockScreen> {
       padding: EdgeInsets.zero,
       onSelected: (value) {
         switch (value) {
+          case 'view':
+            _showStockView(product);
+            break;
           case 'add':
             _showAddStockDialog(product);
             break;
@@ -847,6 +860,15 @@ class _StockScreenState extends ConsumerState<StockScreen> {
         }
       },
       itemBuilder: (context) => [
+        if (canViewStock)
+          PopupMenuItem<String>(
+            value: 'view',
+            child: _buildMenuItem(
+              Icons.visibility_outlined,
+              'View',
+              infoColor,
+            ),
+          ),
         if (canAddStock)
           PopupMenuItem<String>(
             value: 'add',
@@ -909,62 +931,128 @@ class _StockScreenState extends ConsumerState<StockScreen> {
   // ── Product picker dialog (for FAB Add Stock) ──────────────────────
 
   Future<void> _showProductPickerDialog() async {
-    final selectedProduct = await showModalBottomSheet<Product>(
+    final searchController = TextEditingController();
+    final selectedProduct = await showDialog<Product>(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-      ),
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.4,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (context, scrollController) => Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(Spacing.lg),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      useRootNavigator: true,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            final query = searchController.text.toLowerCase();
+            final filtered = query.isEmpty
+                ? _products
+                : _products
+                    .where((p) => p.name.toLowerCase().contains(query))
+                    .toList();
+
+            final brightness = Theme.of(context).brightness;
+
+            return AppDialog(
+              type: AppDialogType.add,
+              title: 'Select Product',
+              message: 'Choose the product to add stock to.',
+              icon: Icons.add,
+              iconColor: AppSemanticColors.resolve(
+                AppSemanticColors.warning,
+                brightness,
+              ),
+              actions: [
+                AppDialogAction(
+                  label: 'Cancel',
+                  onPressed: (context) => Navigator.of(context, rootNavigator: true).pop(),
+                ),
+              ],
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text('Select Product', style: AppTypography.titleLargeBold(context)),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
+                  AppSearchField(
+                    controller: searchController,
+                    hint: 'Search products',
+                    onChanged: (_) => setState(() {}),
+                    onClear: () {
+                      searchController.clear();
+                      setState(() {});
+                    },
+                  ),
+                  const SizedBox(height: Spacing.md),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 380),
+                    child: filtered.isEmpty
+                        ? const Center(
+                            child: Text('No products found.'),
+                          )
+                        : ListView.builder(
+                            physics: const ClampingScrollPhysics(),
+                            itemCount: filtered.length,
+                            itemBuilder: (context, index) {
+                              final product = filtered[index];
+                              final stockColor = _stockColor(product);
+                              return InkWell(
+                                onTap: () => Navigator.of(
+                                  context,
+                                  rootNavigator: true,
+                                ).pop(product),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: Spacing.sm,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      _buildStockThumb(product),
+                                      const SizedBox(width: Spacing.md),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              product.name,
+                                              style: AppTypography
+                                                  .titleMediumSemibold(context),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            const SizedBox(height: Spacing.xs),
+                                            Text(
+                                              'Stock: ${product.stock} · ${_categoryName(product.categoryId)}',
+                                              style: AppTypography.bodySmall(
+                                                      context)
+                                                  .copyWith(
+                                                color: _isOutOfStock(product)
+                                                    ? Theme.of(context)
+                                                        .colorScheme
+                                                        .error
+                                                    : Theme.of(context)
+                                                        .colorScheme
+                                                        .onSurfaceVariant,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: Spacing.sm),
+                                      _buildStockPill(
+                                        '${product.stock} left',
+                                        stockColor,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
                   ),
                 ],
               ),
-            ),
-            const Divider(height: 1),
-            Expanded(
-              child: ListView.builder(
-                controller: scrollController,
-                itemCount: _products.length,
-                itemBuilder: (context, index) {
-                  final product = _products[index];
-                  final stockColor = _stockColor(product);
-                  return ListTile(
-                    leading: _buildStockThumb(product),
-                    title: Text(product.name),
-                    subtitle: Text(
-                      'Stock: ${product.stock} · ${_categoryName(product.categoryId)}',
-                      style: AppTypography.bodySmall(context).copyWith(
-                        color: _isOutOfStock(product)
-                            ? Theme.of(context).colorScheme.error
-                            : Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    trailing: _buildStockPill('${product.stock} left', stockColor),
-                    onTap: () => Navigator.pop(context, product),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
+            );
+          },
+        );
+      },
     );
+
+    searchController.dispose();
 
     if (selectedProduct == null || !mounted) return;
 
@@ -1003,10 +1091,20 @@ class _StockOperationDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final title = isAdjust ? 'Adjust Stock' : 'Add Stock';
+    final message = isAdjust
+        ? 'Set the new stock quantity.'
+        : 'Enter the quantity to add.';
+    final brightness = Theme.of(context).brightness;
 
     return AppDialogForm<_StockOperationResult?>(
       type: isAdjust ? AppDialogType.edit : AppDialogType.add,
       title: title,
+      message: message,
+      icon: isAdjust ? Icons.tune : Icons.add,
+      iconColor: AppSemanticColors.resolve(
+        AppSemanticColors.warning,
+        brightness,
+      ),
       childBuilder: (context, state) {
         final cs = Theme.of(context).colorScheme;
         final quantityController = state.textController(
@@ -1088,7 +1186,6 @@ class _StockOperationDialog extends StatelessWidget {
                 controller: reasonController,
                 label: 'Remarks (optional)',
                 hint: 'e.g. Restock / Adjustment',
-                prefixIcon: Icons.note,
                 maxLines: 2,
                 onChanged: (_) => state.markChanged(),
               ),
@@ -1175,6 +1272,167 @@ class _StockOperationDialog extends StatelessWidget {
   }
 }
 
+// ── Stock view dialog ────────────────────────────────────────────────
+
+class _StockViewDialog extends StatelessWidget {
+  final Product product;
+  final String categoryName;
+  final VoidCallback onAdd;
+  final VoidCallback onAdjust;
+  final bool canAddStock;
+  final bool canAdjustStock;
+
+  const _StockViewDialog({
+    required this.product,
+    required this.categoryName,
+    required this.onAdd,
+    required this.onAdjust,
+    required this.canAddStock,
+    required this.canAdjustStock,
+  });
+
+  Color _stockColor(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    if (product.stock <= 0) return cs.error;
+    if (product.isLowStock) {
+      return AppSemanticColors.resolve(
+        AppSemanticColors.warning,
+        Theme.of(context).brightness,
+      );
+    }
+    return AppSemanticColors.resolve(
+      AppSemanticColors.success,
+      Theme.of(context).brightness,
+    );
+  }
+
+  String _stockStatus() {
+    if (product.stock <= 0) return 'Out of stock';
+    if (product.isLowStock) return 'Low stock';
+    return 'In stock';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
+    final stockColor = _stockColor(context);
+
+    final statusIcon = product.stock <= 0
+        ? Icons.error_outline
+        : product.isLowStock
+            ? Icons.warning_amber_outlined
+            : Icons.check_circle_outline;
+
+    final viewRows = [
+      AppDetailRow(
+        icon: Icons.inventory_2_outlined,
+        iconColor: stockColor,
+        label: 'Current Stock',
+        value: '${product.stock} units',
+      ),
+      AppDetailRow(
+        icon: Icons.production_quantity_limits,
+        iconColor: cs.primary,
+        label: 'Minimum Level',
+        value: '${product.minStock}',
+      ),
+      AppDetailRow(
+        icon: statusIcon,
+        iconColor: stockColor,
+        label: 'Status',
+        value: _stockStatus(),
+        valueColor: stockColor,
+      ),
+    ];
+
+    return AppDialog(
+      type: AppDialogType.info,
+      title: product.name,
+      message: 'Stock details',
+      icon: Icons.inventory_2,
+      iconColor: AppSemanticColors.resolve(AppSemanticColors.info, brightness),
+      actions: [
+        AppDialogAction(
+          label: 'Close',
+          onPressed: (dialogContext) => Navigator.of(dialogContext).pop(),
+        ),
+        if (canAddStock)
+          AppDialogAction(
+            label: 'Add Stock',
+            isPrimary: true,
+            onPressed: (_) => onAdd(),
+          ),
+        if (canAdjustStock)
+          AppDialogAction(
+            label: 'Adjust',
+            onPressed: (_) => onAdjust(),
+          ),
+      ],
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildProductInfo(context, cs),
+          const SizedBox(height: Spacing.lg),
+          for (var i = 0; i < viewRows.length; i++) ...[
+            viewRows[i],
+            if (i < viewRows.length - 1) const Divider(height: 1),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProductInfo(BuildContext context, ColorScheme cs) {
+    return Container(
+      padding: const EdgeInsets.all(Spacing.md),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppRadius.control),
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            child: SizedBox(
+              width: 40,
+              height: 40,
+              child: AppImage(
+                imagePath: product.imageUrl,
+                placeholderIcon: Icons.inventory_2,
+                placeholderIconSize: 18,
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+          const SizedBox(width: Spacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  product.name,
+                  style: AppTypography.titleMediumBold(context),
+                ),
+                Text(
+                  categoryName,
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: cs.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+}
+
 // ── Stock history dialog ─────────────────────────────────────────────
 
 class _StockHistoryDialog extends StatelessWidget {
@@ -1226,6 +1484,9 @@ class _StockHistoryDialog extends StatelessWidget {
     return AppDialog(
       type: AppDialogType.info,
       title: 'Stock History',
+      message: history.isEmpty
+          ? null
+          : '${history.length} operation${history.length == 1 ? '' : 's'}',
       actions: [
         AppDialogAction(
           label: 'Close',

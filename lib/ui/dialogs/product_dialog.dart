@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 
-import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/modal_result.dart';
 import 'package:pinoy_pos/core/spacing.dart';
@@ -91,9 +90,19 @@ class _ProductDialogState extends ConsumerState<_ProductDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isEditing = widget.product != null;
+    final brightness = Theme.of(context).brightness;
+
     return AppDialogForm<ModalResult<void>>(
-      type: widget.product == null ? AppDialogType.add : AppDialogType.edit,
-      title: widget.product == null ? 'Add Product' : 'Edit Product',
+      type: isEditing ? AppDialogType.edit : AppDialogType.add,
+      title: isEditing ? 'Edit Product' : 'Add Product',
+      message: isEditing
+          ? 'Update the details and tap Save.'
+          : 'Enter the details and tap Save.',
+      icon: isEditing ? Icons.edit : Icons.add,
+      iconColor: isEditing
+          ? AppSemanticColors.resolve(AppSemanticColors.success, brightness)
+          : AppSemanticColors.resolve(AppSemanticColors.info, brightness),
       canPop: true,
       childBuilder: (context, state) => FutureBuilder<_CategoryList>(
         future: _categoriesFuture,
@@ -177,7 +186,7 @@ class _ProductDialogState extends ConsumerState<_ProductDialog> {
       return;
     }
 
-    final productService = widget.ref.read(productServiceProvider);
+    final productService = ref.read(productServiceProvider);
     final existingProduct = widget.product;
     final existingId = existingProduct?.id;
 
@@ -279,66 +288,26 @@ class _ProductForm extends StatelessWidget {
     final selectedCategoryId = state.value<int?>('categoryId', product?.categoryId);
 
     final cs = Theme.of(context).colorScheme;
-    final authNotifier = ref.read(authStateProvider.notifier);
-    final canEditCategories = authNotifier.hasPermission('edit_categories');
 
     return Form(
       key: state.formKey,
-      child: ResponsiveBuilder(
-        builder: (context, layout) {
-          final isWide = layout.isAtLeastMedium;
-
-          final imageSection = _buildImageSection(context, cs, selectedImagePath);
-          final nameField = _buildNameField(context, nameController);
-          final priceField = _buildPriceField(context, priceController);
-          final stockField = _buildStockField(context, stockController);
-          final categorySection = _buildCategorySection(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildImageSection(context, cs, selectedImagePath),
+          const SizedBox(height: Spacing.lg),
+          _buildNameField(context, nameController),
+          const SizedBox(height: Spacing.md),
+          _buildPriceField(context, priceController),
+          const SizedBox(height: Spacing.md),
+          _buildStockField(context, stockController),
+          const SizedBox(height: Spacing.md),
+          _buildCategorySection(
             context,
             selectedCategoryId,
-            canEditCategories,
-          );
-
-          final leftColumn = Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              nameField,
-              const SizedBox(height: Spacing.md),
-              priceField,
-            ],
-          );
-
-          final rightColumn = Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              stockField,
-              const SizedBox(height: Spacing.md),
-              categorySection,
-            ],
-          );
-
-          return Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              imageSection,
-              const SizedBox(height: Spacing.lg),
-              if (isWide)
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: leftColumn),
-                    const SizedBox(width: Spacing.lg),
-                    Expanded(child: rightColumn),
-                  ],
-                )
-              else ...[
-                leftColumn,
-                const SizedBox(height: Spacing.md),
-                rightColumn,
-              ],
-            ],
-          );
-        },
+          ),
+        ],
       ),
     );
   }
@@ -351,6 +320,7 @@ class _ProductForm extends StatelessWidget {
     return Center(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
           GestureDetector(
             onTap: () async {
@@ -372,56 +342,62 @@ class _ProductForm extends StatelessWidget {
               height: 120,
               decoration: BoxDecoration(
                 color: cs.surfaceContainerHighest,
-                border: Border.all(color: cs.outlineVariant),
+                border: Border.all(
+                  color: selectedImagePath != null && selectedImagePath.isNotEmpty
+                      ? cs.outline
+                      : cs.outlineVariant,
+                ),
                 borderRadius: BorderRadius.circular(AppRadius.control),
               ),
-              child: selectedImagePath != null && selectedImagePath.isNotEmpty
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(AppRadius.control),
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          AppImage(
-                            imagePath: selectedImagePath,
-                            borderRadius: 12,
-                            placeholderIcon: Icons.inventory_2,
-                            placeholderIconSize: 40,
-                            fit: BoxFit.cover,
-                          ),
-                          Positioned(
-                            bottom: 4,
-                            right: 4,
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                color: cs.primary,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                Icons.camera_alt,
-                                size: 18,
-                                color: cs.onPrimary,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+              clipBehavior: Clip.antiAlias,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (selectedImagePath != null && selectedImagePath.isNotEmpty)
+                    AppImage(
+                      imagePath: selectedImagePath,
+                      borderRadius: AppRadius.control,
+                      placeholderIcon: Icons.inventory_2,
+                      placeholderIconSize: 40,
+                      fit: BoxFit.cover,
                     )
-                  : Column(
+                  else
+                    Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
-                          Icons.add_a_photo,
-                          size: 40,
+                          Icons.inventory_2,
+                          size: 42,
                           color: cs.primary,
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Add Image',
-                          style: Theme.of(context).textTheme.labelSmall,
+                          'Tap to change image',
+                          style: AppTypography.labelSmall(context).copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
                         ),
                       ],
                     ),
+                  Positioned(
+                    bottom: 6,
+                    right: 6,
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: cs.primary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.camera_alt,
+                        size: 16,
+                        color: cs.onPrimary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           if (selectedImagePath != null && selectedImagePath.isNotEmpty)
@@ -495,9 +471,10 @@ class _ProductForm extends StatelessWidget {
   Widget _buildCategorySection(
     BuildContext context,
     int? selectedCategoryId,
-    bool canEditCategories,
   ) {
     final cs = Theme.of(context).colorScheme;
+    final authNotifier = ref.read(authStateProvider.notifier);
+    final canEditCategories = authNotifier.hasPermission('edit_categories');
 
     if (categories.active.isEmpty) {
       return Container(

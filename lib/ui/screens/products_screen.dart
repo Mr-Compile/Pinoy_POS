@@ -5,7 +5,6 @@ import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/data/models/product.dart';
-import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/catalog_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
@@ -13,6 +12,7 @@ import 'package:pinoy_pos/ui/dialogs/category_dialog.dart';
 import 'package:pinoy_pos/ui/dialogs/product_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
+import 'package:pinoy_pos/ui/widgets/app_detail_row.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
@@ -22,7 +22,6 @@ import 'package:pinoy_pos/ui/widgets/app_status_chip.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/responsive_create_action.dart';
-import 'package:pinoy_pos/ui/widgets/summary_stat_card.dart';
 
 class ProductsScreen extends ConsumerStatefulWidget {
   const ProductsScreen({super.key});
@@ -52,6 +51,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
   // so they reflect the whole inventory, not the current search results.
   ({int total, int lowStock, int outOfStock}) _stockSummary =
       (total: 0, lowStock: 0, outOfStock: 0);
+
+  String? get _roleLabel => ref.read(authStateProvider).user?.role.displayName;
 
   // Kept alive inside the app shell's PageView: reload whenever catalog
   // data changes elsewhere (POS sale, stock adjustment, trash restore).
@@ -147,6 +148,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     final confirmed = await AppDialogService.deleteConfirm(
       context,
       itemName: product.name,
+      title: 'Delete product',
+      message: 'Move ${product.name} to Trash? You can restore it later.',
     );
 
     if (confirmed == true && mounted) {
@@ -192,12 +195,14 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
         createAction?.contentBottomClearance(context) ?? 0;
 
     return Scaffold(
-      appBar: const AppHeader(title: 'Products'),
+      appBar: AppHeader(
+        title: 'Products',
+        subtitle: _roleLabel,
+      ),
       floatingActionButton: createFab,
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildRoleChipBar(),
           if (_stockSummary.total > 0) _buildStatsStrip(),
           _buildToolbar(toolbarAction),
           Expanded(
@@ -210,74 +215,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     );
   }
 
-  Widget _buildRoleChipBar() {
-    final cs = Theme.of(context).colorScheme;
-    final user = ref.read(authStateProvider).user;
-    final isOwner = user?.role == UserRole.owner;
-    final roleColor = isOwner
-        ? AppSemanticColors.resolve(AppSemanticColors.info, Theme.of(context).brightness)
-        : AppSemanticColors.resolve(AppSemanticColors.success, Theme.of(context).brightness);
-
-    final label = isOwner ? 'Owner' : 'Staff';
-    final permText = isOwner
-        ? 'view/edit/delete products'
-        : 'view products only';
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        Spacing.lg,
-        Spacing.md,
-        Spacing.lg,
-        0,
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 5,
-            ),
-            decoration: BoxDecoration(
-              color: roleColor.withValues(alpha: 0.16),
-              border: Border.all(color: roleColor.withValues(alpha: 0.4)),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.person_outline,
-                  size: 12,
-                  color: roleColor,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  label,
-                  style: AppTypography.labelSmall(context).copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: roleColor,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: Spacing.sm),
-          Expanded(
-            child: Text(
-              permText,
-              style: AppTypography.bodySmall(context).copyWith(
-                color: cs.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   /// Summary strip doubling as a stock-status filter. Tapping Low or Out
-  /// of Stock toggles that filter; tapping it again (or Products) resets
-  /// to the full list.
   Widget _buildStatsStrip() {
     final cs = Theme.of(context).colorScheme;
     final brightness = Theme.of(context).brightness;
@@ -290,14 +228,6 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
       brightness,
     );
 
-    void select(_ProductStockFilter filter) {
-      setState(() {
-        _stockFilter = _stockFilter == filter
-            ? _ProductStockFilter.all
-            : filter;
-      });
-    }
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         Spacing.lg,
@@ -308,35 +238,62 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
       child: Row(
         children: [
           Expanded(
-            child: SummaryStatCard(
-              icon: Icons.inventory_2_outlined,
-              color: cs.primary,
+            child: _buildProductStat(
               value: '${_stockSummary.total}',
               label: 'Products',
-              selected: _stockFilter == _ProductStockFilter.all,
-              onTap: () => select(_ProductStockFilter.all),
+              valueColor: cs.onSurface,
             ),
           ),
           const SizedBox(width: Spacing.sm),
           Expanded(
-            child: SummaryStatCard(
-              icon: Icons.warning_amber,
-              color: warningColor,
+            child: _buildProductStat(
               value: '${_stockSummary.lowStock}',
               label: 'Low stock',
-              selected: _stockFilter == _ProductStockFilter.lowStock,
-              onTap: () => select(_ProductStockFilter.lowStock),
+              valueColor: warningColor,
             ),
           ),
           const SizedBox(width: Spacing.sm),
           Expanded(
-            child: SummaryStatCard(
-              icon: Icons.error_outline,
-              color: errorColor,
+            child: _buildProductStat(
               value: '${_stockSummary.outOfStock}',
               label: 'Out of stock',
-              selected: _stockFilter == _ProductStockFilter.outOfStock,
-              onTap: () => select(_ProductStockFilter.outOfStock),
+              valueColor: errorColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProductStat({
+    required String value,
+    required String label,
+    required Color valueColor,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+
+    return AppCard(
+      variant: AppCardVariant.filled,
+      padding: const EdgeInsets.all(Spacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            value,
+            style: AppTypography.titleLarge(context).copyWith(
+              fontWeight: FontWeight.w800,
+              color: valueColor,
+              height: 1.1,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label.toUpperCase(),
+            style: AppTypography.labelSmall(context).copyWith(
+              color: cs.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.4,
             ),
           ),
         ],
@@ -345,17 +302,48 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
   }
 
   Widget _buildToolbar(Widget? primaryAction) {
-    return CrudToolbar(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-      search: AppSearchField(
-        controller: _searchController,
-        hint: 'Search products',
-        onChanged: _onSearchChanged,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        Spacing.lg,
+        Spacing.md,
+        Spacing.lg,
+        Spacing.sm,
       ),
-      controls: [
-        _buildCategoryFilter(),
-      ],
-      primaryAction: primaryAction,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: AppSearchField(
+                  controller: _searchController,
+                  hint: 'Search products',
+                  onChanged: _onSearchChanged,
+                ),
+              ),
+              const SizedBox(width: Spacing.sm),
+              _buildCategoryFilter(),
+              if (primaryAction != null) ...[
+                const SizedBox(width: Spacing.sm),
+                primaryAction,
+              ],
+            ],
+          ),
+          const SizedBox(height: Spacing.sm),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildStockFilterChip(_ProductStockFilter.all, 'All'),
+              const SizedBox(width: Spacing.xs),
+              _buildStockFilterChip(_ProductStockFilter.lowStock, 'Low stock'),
+              const SizedBox(width: Spacing.xs),
+              _buildStockFilterChip(
+                  _ProductStockFilter.outOfStock, 'Out of stock'),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -426,6 +414,40 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     );
   }
 
+  Widget _buildStockFilterChip(_ProductStockFilter filter, String label) {
+    final cs = Theme.of(context).colorScheme;
+    final isSelected = _stockFilter == filter;
+
+    return RawMaterialButton(
+      onPressed: () {
+        setState(() {
+          _stockFilter = isSelected ? _ProductStockFilter.all : filter;
+        });
+      },
+      elevation: 0,
+      fillColor: isSelected ? cs.primary : cs.surface,
+      splashColor: cs.onPrimary.withValues(alpha: 0.12),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 14,
+        vertical: 7,
+      ),
+      constraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        side: BorderSide(
+          color: isSelected ? cs.primary : cs.outline,
+        ),
+      ),
+      child: Text(
+        label,
+        style: AppTypography.labelMedium(context).copyWith(
+          color: isSelected ? cs.onPrimary : cs.onSurfaceVariant,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
   Widget _buildEmptyState() {
     final authNotifier = ref.read(authStateProvider.notifier);
     final canEditCategories = authNotifier.hasPermission('edit_categories');
@@ -482,6 +504,9 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     bool canDelete,
     double bottomClearance,
   ) {
+    final brightness = Theme.of(context).brightness;
+    final listAccent = AppSemanticColors.resolve(AppSemanticColors.violet, brightness);
+
     return AppCard(
       margin: const EdgeInsets.fromLTRB(
         Spacing.lg,
@@ -497,7 +522,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
             'All Products',
             Icons.inventory_2_outlined,
             '${_filteredProducts.length} items',
-            Theme.of(context).colorScheme.primary,
+            listAccent,
           ),
           Expanded(
             child: ListView.separated(
@@ -579,55 +604,67 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     bool canDelete,
   ) {
     final cs = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
+    final canView =
+        ref.read(authStateProvider.notifier).hasPermission('view_products');
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: Spacing.md,
-        vertical: Spacing.sm,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          _buildProductThumb(product),
-          const SizedBox(width: Spacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  product.name,
-                  style: AppTypography.titleMediumSemibold(context),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: Spacing.xs),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildMiniChip(category.name),
-                    const SizedBox(width: Spacing.xs),
-                    Text(
-                      'Stock: ${product.stock}',
-                      style: AppTypography.bodySmall(context).copyWith(
-                        color: cs.onSurfaceVariant,
+    final stockColor = product.stock <= 0
+        ? cs.error
+        : product.isLowStock
+            ? AppSemanticColors.resolve(AppSemanticColors.warning, brightness)
+            : cs.onSurfaceVariant;
+
+    return InkWell(
+      onTap: canView ? () => _showProductView(product, category, canEdit) : null,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: Spacing.md,
+          vertical: Spacing.sm,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            _buildProductThumb(product),
+            const SizedBox(width: Spacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    product.name,
+                    style: AppTypography.titleMediumSemibold(context),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: Spacing.xs),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildCategoryChip(category, brightness),
+                      const SizedBox(width: Spacing.xs),
+                      Text(
+                        'Stock: ${product.stock}',
+                        style: AppTypography.bodySmall(context).copyWith(
+                          color: stockColor,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: Spacing.sm),
-          Text(
-            CurrencyUtils.format(product.price),
-            style: AppTypography.titleMediumBold(context).copyWith(
-              color: cs.primary,
+            const SizedBox(width: Spacing.sm),
+            Text(
+              CurrencyUtils.format(product.price),
+              style: AppTypography.titleMediumBold(context).copyWith(
+                color: cs.primary,
+              ),
             ),
-          ),
-          const SizedBox(width: Spacing.sm),
-          _buildProductActions(product, category, canEdit, canDelete),
-        ],
+            const SizedBox(width: Spacing.sm),
+            _buildProductActions(product, category, canEdit, canDelete),
+          ],
+        ),
       ),
     );
   }
@@ -663,22 +700,23 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     );
   }
 
-  Widget _buildMiniChip(String label) {
-    final cs = Theme.of(context).colorScheme;
+  Widget _buildCategoryChip(Category category, Brightness brightness) {
+    final chipColor = _categoryBadgeColor(category.name, brightness);
+
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: 9,
         vertical: 3,
       ),
       decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest,
+        color: chipColor.withValues(alpha: 0.16),
         borderRadius: BorderRadius.circular(AppRadius.pill),
       ),
       child: Text(
-        label,
+        category.name,
         style: AppTypography.labelSmall(context).copyWith(
           fontWeight: FontWeight.w700,
-          color: cs.onSurfaceVariant,
+          color: chipColor,
         ),
       ),
     );
@@ -738,7 +776,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
       onSelected: (value) {
         switch (value) {
           case 'view':
-            _showProductView(product, category);
+            _showProductView(product, category, canEdit);
             break;
           case 'edit':
             _showProductDialog(product: product);
@@ -789,6 +827,39 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     }
   }
 
+  /// Semantic category badge colour used for the product row category chip.
+  /// Matches the category-screen palette so products and categories share one
+  /// visual language.
+  Color _categoryBadgeColor(String name, Brightness brightness) {
+    final n = name.toLowerCase();
+    if (n.contains('coffee')) {
+      return AppSemanticColors.resolve(AppSemanticColors.warning, brightness);
+    }
+    if (n.contains('drink') ||
+        n.contains('beverage') ||
+        n.contains('juice') ||
+        n.contains('tea')) {
+      return AppSemanticColors.resolve(AppSemanticColors.teal, brightness);
+    }
+    if (n.contains('dessert') ||
+        n.contains('sweet') ||
+        n.contains('cake') ||
+        n.contains('bread') ||
+        n.contains('baker')) {
+      return AppSemanticColors.resolve(AppSemanticColors.violet, brightness);
+    }
+    if (n.contains('snack') || n.contains('merienda')) {
+      return AppSemanticColors.resolve(AppSemanticColors.error, brightness);
+    }
+    if (n.contains('meal') ||
+        n.contains('rice') ||
+        n.contains('food') ||
+        n.contains('ulam')) {
+      return AppSemanticColors.resolve(AppSemanticColors.warning, brightness);
+    }
+    return AppSemanticColors.resolve(AppSemanticColors.info, brightness);
+  }
+
   Future<void> _showProductDialog({Product? product}) async {
     final result = await showProductDialog(context, ref, product: product);
 
@@ -809,20 +880,86 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     }
   }
 
-  void _showProductView(Product product, Category category) {
+  void _showProductView(Product product, Category category, bool canEdit) {
     showDialog(
       context: context,
       useRootNavigator: true,
       builder: (context) {
+        final cs = Theme.of(context).colorScheme;
+        final status = product.stock <= 0
+            ? 'Out of stock'
+            : product.isLowStock
+                ? 'Low stock'
+                : 'In stock';
+        final statusColor = product.stock <= 0
+            ? cs.error
+            : product.isLowStock
+                ? AppSemanticColors.resolve(
+                    AppSemanticColors.warning,
+                    Theme.of(context).brightness,
+                  )
+                : AppSemanticColors.resolve(
+                    AppSemanticColors.success,
+                    Theme.of(context).brightness,
+                  );
+        final viewRows = [
+          AppDetailRow(
+            icon: Icons.label_outline,
+            iconColor: _categoryBadgeColor(
+              category.name,
+              Theme.of(context).brightness,
+            ),
+            label: 'Category',
+            value: category.name,
+          ),
+          AppDetailRow(
+            icon: Icons.payments_outlined,
+            iconColor: cs.primary,
+            label: 'Price',
+            value: CurrencyUtils.format(product.price),
+          ),
+          AppDetailRow(
+            icon: Icons.inventory_2_outlined,
+            iconColor: statusColor,
+            label: 'Stock',
+            value: '${product.stock} units',
+          ),
+          AppDetailRow(
+            icon: product.stock <= 0
+                ? Icons.error_outline
+                : product.isLowStock
+                    ? Icons.warning_amber_outlined
+                    : Icons.check_circle_outline,
+            iconColor: statusColor,
+            label: 'Status',
+            value: status,
+            valueColor: statusColor,
+          ),
+        ];
+
         return AppDialog(
           type: AppDialogType.info,
           title: product.name,
           message: 'Product details',
+          icon: Icons.visibility_outlined,
+          iconColor: AppSemanticColors.resolve(
+            AppSemanticColors.info,
+            Theme.of(context).brightness,
+          ),
           actions: [
             AppDialogAction(
               label: 'Close',
               onPressed: (dialogContext) => Navigator.of(dialogContext).pop(),
             ),
+            if (canEdit)
+              AppDialogAction(
+                label: 'Edit',
+                isPrimary: true,
+                onPressed: (dialogContext) {
+                  Navigator.of(dialogContext).pop();
+                  _showProductDialog(product: product);
+                },
+              ),
           ],
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -844,38 +981,14 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                 ),
               ),
               const SizedBox(height: Spacing.lg),
-              _buildViewRow('Category', category.name),
-              _buildViewRow('Price', CurrencyUtils.format(product.price)),
-              _buildViewRow('Stock', '${product.stock}'),
-              _buildViewRow('Minimum Stock', '${product.minStock}'),
+              for (var i = 0; i < viewRows.length; i++) ...[
+                viewRows[i],
+                if (i < viewRows.length - 1) const Divider(height: 1),
+              ],
             ],
           ),
         );
       },
-    );
-  }
-
-  Widget _buildViewRow(String label, String value) {
-    final cs = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: Spacing.md),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: AppTypography.bodyMedium(context).copyWith(
-              color: cs.onSurfaceVariant,
-            ),
-          ),
-          Text(
-            value,
-            style: AppTypography.titleSmall(context).copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
     );
   }
 

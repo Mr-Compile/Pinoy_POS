@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/modal_result.dart';
 import 'package:pinoy_pos/data/models/category.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
@@ -35,9 +36,19 @@ class _CategoryDialog extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isEditing = category != null;
+    final brightness = Theme.of(context).brightness;
+
     return AppDialogForm<ModalResult<void>>(
-      type: category == null ? AppDialogType.add : AppDialogType.edit,
-      title: category == null ? 'Add Category' : 'Edit Category',
+      type: isEditing ? AppDialogType.edit : AppDialogType.add,
+      title: isEditing ? 'Edit Category' : 'Add Category',
+      message: isEditing
+          ? 'Update the name and tap Save.'
+          : 'Enter the category name and tap Save.',
+      icon: isEditing ? Icons.edit : Icons.label_outline,
+      iconColor: isEditing
+          ? AppSemanticColors.resolve(AppSemanticColors.success, brightness)
+          : AppSemanticColors.resolve(AppSemanticColors.violet, brightness),
       childBuilder: (context, state) {
         final nameController = state.textController(
           'name',
@@ -50,7 +61,7 @@ class _CategoryDialog extends ConsumerWidget {
             controller: nameController,
             label: 'Category Name',
             hint: 'e.g. Desserts',
-            prefixIcon: Icons.category_outlined,
+            prefixIcon: Icons.label_outlined,
             textInputAction: TextInputAction.done,
             validator: (value) => Validators.required(value, 'Category name'),
             onChanged: (_) => state.markChanged(),

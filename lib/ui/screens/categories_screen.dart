@@ -4,12 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/category.dart';
-import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/catalog_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/dialogs/category_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
+import 'package:pinoy_pos/ui/widgets/app_detail_row.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
@@ -38,6 +38,8 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
   String _searchQuery = '';
   CategoryFilter _categoryFilter = CategoryFilter.all;
   Timer? _debounce;
+
+  String? get _roleLabel => ref.read(authStateProvider).user?.role.displayName;
 
   // Kept alive inside the app shell's PageView: reload whenever catalog
   // data changes elsewhere (product dialog, POS, trash restore).
@@ -132,17 +134,31 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
     _searchController.clear();
   }
 
-  Future<void> _toggleCategoryStatus(Category category) async {
+  Future<void> _toggleCategoryStatus(Category category, int productCount) async {
     final authNotifier = ref.read(authStateProvider.notifier);
     if (!authNotifier.hasPermission('change_category_status')) {
       AppDialogService.accessDenied(context);
       return;
     }
 
+    if (category.isActive && productCount > 0) {
+      await AppDialogService.error(
+        context,
+        title: 'Cannot Deactivate',
+        message: 'This category still has $productCount product${productCount == 1 ? '' : 's'}. Move them to another category first.',
+      );
+      return;
+    }
+
+    final toggleMessage = !category.isActive
+        ? 'Activate ${category.name}? It will be visible in POS again.'
+        : 'Deactivate ${category.name}? It will be hidden from POS but keep its products.';
+
     final confirmed = await AppDialogService.toggleCategoryConfirm(
       context,
       categoryName: category.name,
       isActivate: !category.isActive,
+      message: toggleMessage,
     );
 
     if (confirmed == true && mounted) {
@@ -178,6 +194,9 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
     final confirmed = await AppDialogService.deleteConfirm(
       context,
       itemName: category.name,
+      title: 'Delete category',
+      message:
+          'Delete ${category.name}? Products in this category will become uncategorized.',
     );
 
     if (confirmed == true && mounted) {
@@ -215,6 +234,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
       return Scaffold(
         appBar: AppHeader(
           title: 'Categories',
+          subtitle: _roleLabel,
           showBackButton: true,
         ),
         body: const LoadingState(),
@@ -229,6 +249,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
     return Scaffold(
       appBar: AppHeader(
         title: 'Categories',
+        subtitle: _roleLabel,
         showBackButton: true,
         actions: [
           IconButton(
@@ -241,7 +262,6 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
       floatingActionButton: createFab,
       body: Column(
         children: [
-          _buildRoleChipBar(),
           if (_categories.isNotEmpty) ...[
             _buildStatsStrip(),
             _buildToolbar(toolbarAction),
@@ -264,71 +284,6 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
                         canToggleStatus,
                         bottomClearance,
                       ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRoleChipBar() {
-    final cs = Theme.of(context).colorScheme;
-    final user = ref.read(authStateProvider).user;
-    final isOwner = user?.role == UserRole.owner;
-    final roleColor = isOwner
-        ? AppSemanticColors.resolve(AppSemanticColors.info, Theme.of(context).brightness)
-        : AppSemanticColors.resolve(AppSemanticColors.success, Theme.of(context).brightness);
-
-    final label = isOwner ? 'Owner' : 'Staff';
-    final permText = isOwner
-        ? 'view/edit/delete/change category status'
-        : 'view and toggle category status';
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        Spacing.lg,
-        Spacing.md,
-        Spacing.lg,
-        0,
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 5,
-            ),
-            decoration: BoxDecoration(
-              color: roleColor.withValues(alpha: 0.16),
-              border: Border.all(color: roleColor.withValues(alpha: 0.4)),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.person_outline,
-                  size: 12,
-                  color: roleColor,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  label,
-                  style: AppTypography.labelSmall(context).copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: roleColor,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: Spacing.sm),
-          Expanded(
-            child: Text(
-              permText,
-              style: AppTypography.bodySmall(context).copyWith(
-                color: cs.onSurfaceVariant,
-              ),
-            ),
           ),
         ],
       ),
@@ -461,25 +416,48 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
   }
 
   Widget _buildToolbar(Widget? primaryAction) {
-    return CrudToolbar(
+    return Padding(
       padding: const EdgeInsets.fromLTRB(
         Spacing.lg,
         Spacing.md,
         Spacing.lg,
         Spacing.sm,
       ),
-      search: AppSearchField(
-        controller: _searchController,
-        hint: 'Search categories...',
-        onChanged: _onSearchChanged,
-        onClear: _clearSearch,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: AppSearchField(
+                  controller: _searchController,
+                  hint: 'Search categories',
+                  onChanged: _onSearchChanged,
+                  onClear: _clearSearch,
+                ),
+              ),
+              const SizedBox(width: Spacing.sm),
+              _buildStatusFilter(),
+              if (primaryAction != null) ...[
+                const SizedBox(width: Spacing.sm),
+                primaryAction,
+              ],
+            ],
+          ),
+          const SizedBox(height: Spacing.sm),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildFilterChip(CategoryFilter.all, 'All'),
+              const SizedBox(width: Spacing.xs),
+              _buildFilterChip(CategoryFilter.active, 'Active'),
+              const SizedBox(width: Spacing.xs),
+              _buildFilterChip(CategoryFilter.inactive, 'Inactive'),
+            ],
+          ),
+        ],
       ),
-      controls: [
-        _buildFilterChip(CategoryFilter.all, 'All'),
-        _buildFilterChip(CategoryFilter.active, 'Active'),
-        _buildFilterChip(CategoryFilter.inactive, 'Inactive'),
-      ],
-      primaryAction: primaryAction,
     );
   }
 
@@ -516,7 +494,10 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
     bool canToggleStatus,
   ) {
     final cs = Theme.of(context).colorScheme;
-    final statusColor = category.isActive ? cs.primary : cs.outline;
+    final brightness = Theme.of(context).brightness;
+    final statusColor = category.isActive
+        ? AppSemanticColors.resolve(AppSemanticColors.success, brightness)
+        : cs.outline;
     final canView =
         ref.read(authStateProvider.notifier).hasPermission('view_categories');
     final count = _productCounts[category.id] ?? 0;
@@ -526,13 +507,20 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
         AppListMenuAction(
           icon: Icons.visibility_outlined,
           label: 'View',
-          onPressed: () => _showCategoryView(category, count),
+          onPressed: () => _showCategoryView(category, count, canEdit),
         ),
       if (canEdit)
         AppListMenuAction(
           icon: Icons.edit,
           label: 'Edit',
           onPressed: () => _showCategoryDialog(category: category),
+        ),
+      if (canToggleStatus)
+        AppListMenuAction(
+          icon: category.isActive ? Icons.toggle_on : Icons.toggle_off,
+          label: category.isActive ? 'Deactivate' : 'Activate',
+          color: statusColor,
+          onPressed: () => _toggleCategoryStatus(category, count),
         ),
       if (canDelete)
         AppListMenuAction(
@@ -541,16 +529,9 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
           color: cs.error,
           onPressed: () => _deleteCategory(category),
         ),
-      if (!canEdit && canToggleStatus)
-        AppListMenuAction(
-          icon: category.isActive ? Icons.toggle_on : Icons.toggle_off,
-          label: category.isActive ? 'Deactivate' : 'Activate',
-          color: statusColor,
-          onPressed: () => _toggleCategoryStatus(category),
-        ),
     ];
 
-    final badgeColor = _categoryBadgeColor(category, Theme.of(context).brightness);
+    final badgeColor = _categoryBadgeColor(category, brightness);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: Spacing.md),
@@ -570,25 +551,158 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
         ),
         title: category.name,
         subtitle: '$count product${count == 1 ? '' : 's'}',
-        statusLabel: category.isActive ? 'Active' : 'Inactive',
-        statusColor: statusColor,
-        menuActions: menuActions.isNotEmpty ? menuActions : null,
-        onTap: canView ? () => _showCategoryView(category, count) : null,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppStatusChip(
+              label: category.isActive ? 'Active' : 'Inactive',
+              color: statusColor,
+              dot: true,
+            ),
+            if (menuActions.isNotEmpty)
+              _buildCategoryMenuButton(menuActions),
+          ],
+        ),
+        onTap: canView ? () => _showCategoryView(category, count, canEdit) : null,
+      ),
+    );
+  }
+
+  Widget _buildCategoryMenuButton(List<AppListMenuAction> menuActions) {
+    final cs = Theme.of(context).colorScheme;
+    return PopupMenuButton<int>(
+      icon: Icon(Icons.more_vert, color: cs.onSurfaceVariant),
+      tooltip: 'Category options',
+      padding: EdgeInsets.zero,
+      onSelected: (index) => menuActions[index].onPressed?.call(),
+      itemBuilder: (context) {
+        return menuActions.asMap().entries.map((entry) {
+          final index = entry.key;
+          final action = entry.value;
+          final color = action.color ?? cs.onSurfaceVariant;
+          return PopupMenuItem<int>(
+            value: index,
+            child: Row(
+              children: [
+                Icon(action.icon, size: 18, color: color),
+                const SizedBox(width: 8),
+                Text(
+                  action.label,
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList();
+      },
+    );
+  }
+
+  Widget _buildStatusFilter() {
+    final cs = Theme.of(context).colorScheme;
+    final selectedLabel = switch (_categoryFilter) {
+      CategoryFilter.all => 'All',
+      CategoryFilter.active => 'Active',
+      CategoryFilter.inactive => 'Inactive',
+    };
+
+    return PopupMenuButton<CategoryFilter>(
+      initialValue: _categoryFilter,
+      onSelected: (value) => setState(() => _categoryFilter = value),
+      offset: const Offset(0, 40),
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: CategoryFilter.all,
+          child: Row(
+            children: [
+              Icon(Icons.filter_list, size: 18, color: cs.onSurfaceVariant),
+              const SizedBox(width: 8),
+              const Text('All'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: CategoryFilter.active,
+          child: Row(
+            children: [
+              Icon(Icons.toggle_on, size: 18, color: cs.onSurfaceVariant),
+              const SizedBox(width: 8),
+              const Text('Active'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: CategoryFilter.inactive,
+          child: Row(
+            children: [
+              Icon(Icons.toggle_off, size: 18, color: cs.onSurfaceVariant),
+              const SizedBox(width: 8),
+              const Text('Inactive'),
+            ],
+          ),
+        ),
+      ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: cs.surface,
+          border: Border.all(color: cs.outline),
+          borderRadius: BorderRadius.circular(AppRadius.control),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.filter_list, size: 18, color: cs.onSurfaceVariant),
+            const SizedBox(width: 6),
+            Text(
+              selectedLabel,
+              style: AppTypography.bodySmall(context),
+            ),
+            Icon(
+              Icons.arrow_drop_down,
+              size: 18,
+              color: cs.onSurfaceVariant,
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildFilterChip(CategoryFilter filter, String label) {
+    final cs = Theme.of(context).colorScheme;
     final isSelected = _categoryFilter == filter;
-    return FilterChip(
-      label: Text(label),
-      showCheckmark: false,
-      selected: isSelected,
-      onSelected: (_) {
+
+    return RawMaterialButton(
+      onPressed: () {
         setState(() {
-          _categoryFilter = filter;
+          _categoryFilter = isSelected ? CategoryFilter.all : filter;
         });
       },
+      elevation: 0,
+      fillColor: isSelected ? cs.primary : cs.surface,
+      splashColor: cs.onPrimary.withValues(alpha: 0.12),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 14,
+        vertical: 7,
+      ),
+      constraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        side: BorderSide(
+          color: isSelected ? cs.primary : cs.outline,
+        ),
+      ),
+      child: Text(
+        label,
+        style: AppTypography.labelMedium(context).copyWith(
+          color: isSelected ? cs.onPrimary : cs.onSurfaceVariant,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 
@@ -626,97 +740,75 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
     );
   }
 
-  void _showCategoryView(Category category, int count) {
+  void _showCategoryView(Category category, int count, bool canEdit) {
     showDialog(
       context: context,
       useRootNavigator: true,
       builder: (context) {
         final cs = Theme.of(context).colorScheme;
+        final brightness = Theme.of(context).brightness;
+        final badgeColor = _categoryBadgeColor(category, brightness);
+        final statusColor = category.isActive
+            ? AppSemanticColors.resolve(AppSemanticColors.success, brightness)
+            : cs.outline;
+
+        final viewRows = [
+          AppDetailRow(
+            icon: _categoryIcon(category),
+            iconColor: badgeColor,
+            label: 'Name',
+            value: category.name,
+          ),
+          AppDetailRow(
+            icon: Icons.inventory_2_outlined,
+            iconColor: cs.primary,
+            label: 'Products',
+            value: '$count',
+          ),
+          AppDetailRow(
+            icon: category.isActive
+                ? Icons.check_circle_outline
+                : Icons.pause_circle_outline,
+            iconColor: statusColor,
+            label: 'Status',
+            value: category.isActive ? 'Active' : 'Inactive',
+            valueColor: statusColor,
+          ),
+        ];
+
         return AppDialog(
           type: AppDialogType.info,
           title: category.name,
           message: 'Category details',
+          icon: _categoryIcon(category),
+          iconColor: badgeColor,
           actions: [
             AppDialogAction(
               label: 'Close',
               onPressed: (dialogContext) => Navigator.of(dialogContext).pop(),
             ),
+            if (canEdit)
+              AppDialogAction(
+                label: 'Edit',
+                isPrimary: true,
+                onPressed: (dialogContext) {
+                  Navigator.of(dialogContext).pop();
+                  _showCategoryDialog(category: category);
+                },
+              ),
           ],
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: _categoryBadgeColor(category, Theme.of(context).brightness)
-                          .withValues(alpha: 0.16),
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                    ),
-                    child: Icon(
-                      _categoryIcon(category),
-                      color: _categoryBadgeColor(category, Theme.of(context).brightness),
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: Spacing.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          category.name,
-                          style: AppTypography.titleMediumSemibold(context),
-                        ),
-                        Text(
-                          '$count product${count == 1 ? '' : 's'}',
-                          style: AppTypography.bodySmall(context).copyWith(
-                            color: cs.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  AppStatusChip(
-                    label: category.isActive ? 'Active' : 'Inactive',
-                    color: category.isActive ? cs.primary : cs.outline,
-                  ),
-                ],
-              ),
-              const SizedBox(height: Spacing.lg),
-              _buildViewRow('Status', category.isActive ? 'Active' : 'Inactive'),
-              _buildViewRow('Products', '$count'),
+              for (var i = 0; i < viewRows.length; i++) ...[
+                viewRows[i],
+                if (i < viewRows.length - 1) const Divider(height: 1),
+              ],
             ],
           ),
         );
       },
-    );
-  }
-
-  Widget _buildViewRow(String label, String value) {
-    final cs = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: Spacing.md),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: AppTypography.bodyMedium(context).copyWith(
-              color: cs.onSurfaceVariant,
-            ),
-          ),
-          Text(
-            value,
-            style: AppTypography.titleSmall(context).copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
     );
   }
 
