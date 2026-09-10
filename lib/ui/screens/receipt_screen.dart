@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/currency_utils.dart';
+import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/receipt_view_data.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
@@ -12,26 +16,22 @@ import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
-import 'package:pinoy_pos/ui/widgets/app_status_chip.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
-import 'package:pinoy_pos/core/app_theme.dart';
 
 class ReceiptScreen extends ConsumerStatefulWidget {
   final Sale? sale;
   final int? saleId;
 
-  const ReceiptScreen({
-    super.key,
-    this.sale,
-    this.saleId,
-  }) : assert(sale != null || saleId != null);
+  const ReceiptScreen({super.key, this.sale, this.saleId})
+    : assert(sale != null || saleId != null);
 
   @override
   ConsumerState<ReceiptScreen> createState() => _ReceiptScreenState();
 }
 
 class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
+  bool _isSharing = false;
   bool _isExporting = false;
   bool _isExportingProof = false;
   bool _isLoading = false;
@@ -67,6 +67,48 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
           _notFound = true;
           _isLoading = false;
         });
+      }
+    }
+  }
+
+  Future<void> _shareReceipt(ReceiptViewData receipt) async {
+    setState(() => _isSharing = true);
+
+    try {
+      final receiptService = ref.read(receiptServiceProvider);
+      final bytes = await receiptService.generateReceiptPdf(receipt);
+      final fileName = receiptService.buildFileName(receipt);
+
+      final savedPath = await receiptService.saveReceiptToAppDocuments(
+        bytes,
+        fileName: fileName,
+      );
+
+      if (mounted) {
+        setState(() => _isSharing = false);
+        if (savedPath != null) {
+          await AppDialogService.success(
+            context,
+            title: 'Receipt Ready',
+            message: 'The receipt has been saved and is ready to share:',
+            details: savedPath,
+          );
+        } else {
+          AppDialogService.error(
+            context,
+            title: 'Share Failed',
+            message: 'Unable to prepare the receipt for sharing.',
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSharing = false);
+        AppDialogService.error(
+          context,
+          title: 'Share Failed',
+          message: 'Unable to prepare the receipt: $e',
+        );
       }
     }
   }
@@ -116,9 +158,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
   Future<void> _viewPaymentProof(ReceiptViewData receipt) async {
     if (receipt.paymentProofPath == null) return;
     await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => PaymentProofViewerScreen(sale: _sale),
-      ),
+      MaterialPageRoute(builder: (_) => PaymentProofViewerScreen(sale: _sale)),
     );
   }
 
@@ -159,14 +199,17 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
     }
   }
 
+  void _viewSaleDetails() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => SaleDetailScreen(sale: _sale)));
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Scaffold(
-        appBar: AppHeader(
-          title: 'Receipt',
-          showBackButton: true,
-        ),
+        appBar: AppHeader(title: 'Receipt', showBackButton: true),
         body: LoadingState(),
       );
     }
@@ -188,408 +231,309 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
 
     final receiptAsync = ref.watch(receiptViewDataProvider(_saleId));
 
-    return Scaffold(
-      appBar: AppHeader(
-        title: 'Receipt',
-        showBackButton: true,
+    return receiptAsync.when(
+      loading: () => const Scaffold(
+        appBar: AppHeader(title: 'Receipt', showBackButton: true),
+        body: LoadingState(),
       ),
-      body: receiptAsync.when(
-        loading: () => const LoadingState(),
-        error: (e, _) => ErrorState(
+      error: (e, _) => Scaffold(
+        appBar: const AppHeader(title: 'Receipt', showBackButton: true),
+        body: ErrorState(
           title: 'Error',
           message: 'Failed to load receipt: $e',
           onRetry: () => ref.invalidate(receiptViewDataProvider(_saleId)),
         ),
-        data: (receipt) {
-          if (receipt == null) {
-            return const ErrorState(
-              title: 'Not Found',
-              message: 'The receipt could not be found or you do not have permission to view it.',
-            );
-          }
-          return _buildReceipt(receipt);
-        },
       ),
+      data: (receipt) {
+        if (receipt == null) {
+          return const Scaffold(
+            appBar: AppHeader(title: 'Receipt Not Found', showBackButton: true),
+            body: ErrorState(
+              title: 'Not Found',
+              message:
+                  'The receipt could not be found or you do not have permission to view it.',
+            ),
+          );
+        }
+        return _buildReceipt(receipt);
+      },
     );
   }
 
   Widget _buildReceipt(ReceiptViewData receipt) {
-    final cs = Theme.of(context).colorScheme;
-
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 520),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildStoreHeader(receipt, cs),
-              const SizedBox(height: 16),
-              _buildTransactionHeader(receipt, cs),
-              const SizedBox(height: 16),
-              _buildItemsCard(receipt),
-              const SizedBox(height: 16),
-              _buildTotalsCard(receipt),
-              const SizedBox(height: 16),
-              _buildPaymentCard(receipt),
-              if (receipt.notes != null && receipt.notes!.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                _buildNotesCard(receipt),
+    return Scaffold(
+      appBar: AppHeader(
+        title: 'Receipt',
+        subtitle: receipt.receiptNumber,
+        showBackButton: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.article_outlined),
+            tooltip: 'View Sale Details',
+            onPressed: _viewSaleDetails,
+          ),
+        ],
+      ),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(Spacing.md),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildReceiptCard(receipt),
+                const SizedBox(height: Spacing.md),
+                _buildActions(receipt),
               ],
-              const SizedBox(height: 16),
-              _buildFooterCard(receipt, cs),
-              const SizedBox(height: 24),
-              _buildActions(receipt),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildStoreHeader(ReceiptViewData receipt, ColorScheme cs) {
-    return AppCard(
-      variant: AppCardVariant.soft,
-      color: cs.primary,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Text(
-              receipt.storeName,
-              style: AppTypography.titleMediumBold(context)
-                  .copyWith(color: cs.onSurface),
-              textAlign: TextAlign.center,
-            ),
-            if (receipt.storeAddress.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                receipt.storeAddress,
-                style: AppTypography.bodySmall(context)
-                    .copyWith(color: cs.onSurfaceVariant),
-                textAlign: TextAlign.center,
-              ),
-            ],
-            if (receipt.storePhone.isNotEmpty) ...[
-              const SizedBox(height: 2),
-              Text(
-                'Contact: ${receipt.storePhone}',
-                style: AppTypography.bodySmall(context)
-                    .copyWith(color: cs.onSurfaceVariant),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTransactionHeader(ReceiptViewData receipt, ColorScheme cs) {
-    return AppCard(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Text(
-              'OFFICIAL RECEIPT',
-              style: AppTypography.titleSmall(context).copyWith(
-                fontWeight: FontWeight.w700,
-                color: cs.primary,
-                letterSpacing: 1,
-                fontSize: 13,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              receipt.receiptNumber,
-              style: AppTypography.titleMediumBold(context).copyWith(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              receipt.date.toLocal().toString().split('.')[0],
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
-            ),
-            Text(
-              'Cashier: ${receipt.cashierName}',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildItemsCard(ReceiptViewData receipt) {
+  Widget _buildReceiptCard(ReceiptViewData receipt) {
     final cs = Theme.of(context).colorScheme;
+    final dateFormat = DateFormat('yyyy-MM-dd hh:mm a');
 
     return AppCard(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Item', style: Theme.of(context).textTheme.titleSmall),
-                Text('Total', style: Theme.of(context).textTheme.titleSmall),
-              ],
-            ),
-            const Divider(),
-            for (var i = 0; i < receipt.items.length; i++) ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            receipt.items[i].productName,
-                            style: AppTypography.titleSmall(context),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          receipt.items[i].formattedTotal(receipt.currency),
-                          style: AppTypography.titleSmallBold(context),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${receipt.items[i].quantity} x ${receipt.items[i].formattedUnitPrice(receipt.currency)}',
-                      style: AppTypography.bodySmall(context).copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (i < receipt.items.length - 1)
-                Divider(color: cs.outline, height: 1),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTotalsCard(ReceiptViewData receipt) {
-    return AppCard(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            _buildValueRow('Subtotal', receipt.formattedSubtotal()),
-            if (receipt.discount > 0)
-              _buildValueRow('Discount', receipt.formattedDiscount()),
-            const Divider(),
-            _buildValueRow('TOTAL', receipt.formattedTotal(), isTotal: true),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPaymentCard(ReceiptViewData receipt) {
-    final brightness = Theme.of(context).brightness;
-
-    return AppCard(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            _buildValueRow('Payment Method', receipt.paymentMethod),
-            if (receipt.cashReceived > 0)
-              _buildValueRow('Amount Paid', receipt.formattedCashReceived()),
-            if (receipt.change > 0)
-              _buildValueRow('Change', receipt.formattedChange()),
-            if (receipt.referenceNumber != null &&
-                receipt.referenceNumber!.isNotEmpty)
-              _buildValueRow('Reference', receipt.referenceNumber!),
-            if (receipt.customerName != null &&
-                receipt.customerName!.isNotEmpty)
-              _buildValueRow('Customer', receipt.customerName!),
-            _buildValueRow(
-              'Status',
-              null,
-              trailing: AppStatusChip(
-                label: receipt.statusLabel,
-                color: AppSemanticColors.resolve(
-                  AppSemanticColors.success,
-                  brightness,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNotesCard(ReceiptViewData receipt) {
-    return AppCard(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Notes', style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 8),
-            Text(receipt.notes!),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFooterCard(ReceiptViewData receipt, ColorScheme cs) {
-    final brightness = Theme.of(context).brightness;
-
-    return AppCard(
-      variant: AppCardVariant.soft,
-      color: AppSemanticColors.resolve(AppSemanticColors.success, brightness),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            if (receipt.receiptFooter != null &&
-                receipt.receiptFooter!.isNotEmpty)
-              Text(
-                receipt.receiptFooter!,
-                style: TextStyle(
-                  color: cs.onSurface,
-                  fontSize: 13,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            if (receipt.receiptFooter != null &&
-                receipt.receiptFooter!.isNotEmpty)
-              const SizedBox(height: 8),
-            Text(
-              'Thank you!',
-              style: TextStyle(
-                color: cs.onSurface,
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildValueRow(
-    String label,
-    String? value, {
-    bool isTotal = false,
-    Widget? trailing,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      variant: AppCardVariant.outlined,
+      padding: const EdgeInsets.all(Spacing.xl),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Expanded(
-            child: Text(
-              label,
-              style: isTotal
-                  ? AppTypography.titleMediumBold(context)
-                  : Theme.of(context).textTheme.bodyMedium,
+          Text(
+            receipt.storeName,
+            style: AppTypography.titleMediumBold(
+              context,
+            ).copyWith(fontSize: 18, fontWeight: FontWeight.w800),
+            textAlign: TextAlign.center,
+          ),
+          if (receipt.storeAddress.isNotEmpty) ...[
+            const SizedBox(height: Spacing.xs),
+            Text(
+              receipt.storeAddress,
+              style: AppTypography.bodySmall(
+                context,
+              ).copyWith(color: cs.onSurfaceVariant),
+              textAlign: TextAlign.center,
+            ),
+          ],
+          if (receipt.storePhone.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              'Contact: ${receipt.storePhone}',
+              style: AppTypography.bodySmall(
+                context,
+              ).copyWith(color: cs.onSurfaceVariant),
+              textAlign: TextAlign.center,
+            ),
+          ],
+          const SizedBox(height: Spacing.lg),
+          const _DashedDivider(),
+          const SizedBox(height: Spacing.lg),
+          for (final item in receipt.items)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${item.productName} x${item.quantity}',
+                      style: AppTypography.bodyMedium(context),
+                    ),
+                  ),
+                  const SizedBox(width: Spacing.sm),
+                  Text(
+                    CurrencyUtils.format(
+                      item.totalPrice,
+                      currency: receipt.currency,
+                    ),
+                    style: AppTypography.bodyMedium(context),
+                  ),
+                ],
+              ),
+            ),
+          const SizedBox(height: Spacing.sm),
+          Container(
+            decoration: BoxDecoration(
+              border: Border(top: BorderSide(color: cs.outlineVariant)),
+            ),
+            padding: const EdgeInsets.symmetric(vertical: Spacing.md),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Total',
+                  style: AppTypography.titleMediumBold(
+                    context,
+                  ).copyWith(fontSize: 16, fontWeight: FontWeight.w800),
+                ),
+                Text(
+                  CurrencyUtils.format(
+                    receipt.total,
+                    currency: receipt.currency,
+                  ),
+                  style: AppTypography.titleMediumBold(
+                    context,
+                  ).copyWith(fontSize: 16, fontWeight: FontWeight.w800),
+                ),
+              ],
             ),
           ),
-          const SizedBox(width: 12),
-          if (trailing != null)
-            trailing
-          else
-            Text(
-              value ?? '',
-              style: isTotal
-                  ? AppTypography.titleMediumBold(context)
-                  : Theme.of(context).textTheme.bodyMedium,
-            ),
+          const SizedBox(height: Spacing.lg),
+          _buildMetaSection(receipt, dateFormat),
+          const SizedBox(height: Spacing.lg),
+          Text(
+            receipt.receiptFooter ?? 'Thank you, please come again!',
+            style: AppTypography.bodySmall(
+              context,
+            ).copyWith(color: cs.onSurfaceVariant),
+            textAlign: TextAlign.center,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildActions(ReceiptViewData receipt) {
-    final canViewEvidence =
-        ref.read(authStateProvider.notifier).hasPermission('view_payment_evidence');
-
-    final actions = <Widget>[
-      if (canViewEvidence &&
-          receipt.paymentProofPath != null &&
-          receipt.paymentProofPath!.isNotEmpty) ...[
-        AppButton.outlined(
-          onPressed: () => _viewPaymentProof(receipt),
-          icon: Icons.image_outlined,
-          label: 'View Image',
-        ),
-        AppButton.outlined(
-          isLoading: _isExportingProof,
-          onPressed: _isExportingProof
-              ? null
-              : () => _downloadGcashProofImage(receipt),
-          icon: Icons.download,
-          label: 'Download Image',
-        ),
-      ],
-      AppButton.filled(
-        isLoading: _isExporting,
-        onPressed: _isExporting ? null : () => _downloadPdf(receipt),
-        icon: Icons.download,
-        label: 'Download as PDF',
-      ),
-      AppButton.outlined(
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => SaleDetailScreen(sale: _sale),
-            ),
-          );
-        },
-        icon: Icons.arrow_forward,
-        label: 'View Sale Details',
-      ),
+  Widget _buildMetaSection(ReceiptViewData receipt, DateFormat dateFormat) {
+    final rows = <Widget>[
+      _buildMetaRow('Payment', receipt.paymentMethod),
+      _buildMetaRow('Cashier', receipt.cashierName),
+      if (receipt.customerName != null && receipt.customerName!.isNotEmpty)
+        _buildMetaRow('Customer', receipt.customerName!),
+      _buildMetaRow('Date', dateFormat.format(receipt.date.toLocal())),
+      _buildMetaRow('Receipt #', receipt.receiptNumber),
+      _buildMetaRow('Status', receipt.statusLabel),
     ];
 
-    return _buildActionPairs(actions);
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: rows);
   }
 
-  Widget _buildActionPairs(List<Widget> actions) {
-    final rows = <Widget>[];
-    for (var i = 0; i < actions.length; i += 2) {
-      final children = <Widget>[Expanded(child: actions[i])];
-      if (i + 1 < actions.length) {
-        children.add(const SizedBox(width: 12));
-        children.add(Expanded(child: actions[i + 1]));
-      }
-      rows.add(Row(children: children));
-      if (i + 2 < actions.length) {
-        rows.add(const SizedBox(height: 12));
-      }
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: rows,
+  Widget _buildMetaRow(String label, String value) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: RichText(
+        text: TextSpan(
+          style: AppTypography.bodySmall(
+            context,
+          ).copyWith(color: cs.onSurfaceVariant, height: 1.6),
+          children: [
+            TextSpan(text: '$label: '),
+            TextSpan(
+              text: value,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+      ),
     );
   }
+
+  Widget _buildActions(ReceiptViewData receipt) {
+    final canViewEvidence = ref
+        .read(authStateProvider.notifier)
+        .hasPermission('view_payment_evidence');
+
+    final hasProof =
+        receipt.paymentProofPath != null &&
+        receipt.paymentProofPath!.isNotEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: AppButton.outlined(
+                isLoading: _isSharing,
+                onPressed: _isSharing ? null : () => _shareReceipt(receipt),
+                icon: Icons.share,
+                label: 'Share',
+                fullWidth: true,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: AppButton.filled(
+                isLoading: _isExporting,
+                onPressed: _isExporting ? null : () => _downloadPdf(receipt),
+                icon: Icons.download,
+                label: 'Download',
+                fullWidth: true,
+              ),
+            ),
+          ],
+        ),
+        if (canViewEvidence && hasProof) ...[
+          const SizedBox(height: Spacing.md),
+          Row(
+            children: [
+              Expanded(
+                child: AppButton.outlined(
+                  onPressed: () => _viewPaymentProof(receipt),
+                  icon: Icons.image_outlined,
+                  label: 'View Image',
+                  fullWidth: true,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: AppButton.outlined(
+                  isLoading: _isExportingProof,
+                  onPressed: _isExportingProof
+                      ? null
+                      : () => _downloadGcashProofImage(receipt),
+                  icon: Icons.download,
+                  label: 'Download Image',
+                  fullWidth: true,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _DashedDivider extends StatelessWidget {
+  const _DashedDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.outlineVariant;
+    return CustomPaint(
+      size: const Size(double.infinity, 1),
+      painter: _DashedLinePainter(color: color),
+    );
+  }
+}
+
+class _DashedLinePainter extends CustomPainter {
+  final Color color;
+
+  const _DashedLinePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1
+      ..style = PaintingStyle.stroke;
+    const dashWidth = 4.0;
+    const dashSpace = 4.0;
+    var startX = 0.0;
+    while (startX < size.width) {
+      canvas.drawLine(Offset(startX, 0), Offset(startX + dashWidth, 0), paint);
+      startX += dashWidth + dashSpace;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
