@@ -54,10 +54,6 @@ class ResponsiveCreateAction {
   /// clears the FAB (56dp FAB + margins + breathing room).
   static const double fabClearance = 88;
 
-  /// Below this width a compact circular FAB is used instead of an extended
-  /// one so the FAB does not crowd very narrow screens.
-  static const double extendedFabMinWidth = 360;
-
   /// True when the action should be a FAB: compact width AND portrait
   /// orientation. Compact landscape and every wider layout use the content
   /// toolbar button instead.
@@ -93,15 +89,14 @@ class ResponsiveCreateAction {
 
   /// A floating action button for compact portrait layouts.
   ///
-  /// Returns `null` on medium+ layouts and on compact landscape. Extended
-  /// when the screen is wide enough, compact circular on very narrow
-  /// screens. The button uses the Pinoy POS primary blue gradient and
-  /// rounded-rectangle shape used in the CRUD mockups.
+  /// Returns `null` on medium+ layouts and on compact landscape. Always
+  /// renders the compact icon-only variant (plus sign) — the mockups use
+  /// a 56×56 rounded-square FAB without a text label. The button uses the
+  /// Pinoy POS primary blue gradient and rounded-rectangle shape used in
+  /// the CRUD mockups.
   Widget? fab(BuildContext context) {
     if (!isFabLayout(context)) return null;
 
-    final width = MediaQuery.sizeOf(context).width;
-    final isExtended = width >= extendedFabMinWidth;
     final effectiveTooltip = tooltip ?? label;
     final heroTag = 'crud_fab_$label';
     final brightness = Theme.of(context).brightness;
@@ -116,30 +111,17 @@ class ResponsiveCreateAction {
     );
     final borderRadius = BorderRadius.circular(AppRadius.fab);
 
-    final fabButton = isExtended
-        ? FloatingActionButton.extended(
-            heroTag: heroTag,
-            onPressed: onPressed,
-            tooltip: effectiveTooltip,
-            backgroundColor: Colors.transparent,
-            foregroundColor: AppSemanticColors.onPrimary,
-            elevation: 0,
-            shape: RoundedRectangleBorder(borderRadius: borderRadius),
-            clipBehavior: Clip.antiAlias,
-            icon: Icon(icon),
-            label: Text(label),
-          )
-        : FloatingActionButton(
-            heroTag: heroTag,
-            onPressed: onPressed,
-            tooltip: effectiveTooltip,
-            backgroundColor: Colors.transparent,
-            foregroundColor: AppSemanticColors.onPrimary,
-            elevation: 0,
-            shape: RoundedRectangleBorder(borderRadius: borderRadius),
-            clipBehavior: Clip.antiAlias,
-            child: Icon(icon),
-          );
+    final fabButton = FloatingActionButton(
+      heroTag: heroTag,
+      onPressed: onPressed,
+      tooltip: effectiveTooltip,
+      backgroundColor: Colors.transparent,
+      foregroundColor: AppSemanticColors.onPrimary,
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: borderRadius),
+      clipBehavior: Clip.antiAlias,
+      child: Icon(icon),
+    );
 
     return Container(
       decoration: BoxDecoration(

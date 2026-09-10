@@ -51,20 +51,22 @@ void _setView(
 }
 
 void main() {
-  testWidgets('compact portrait: FAB only, no toolbar button', (tester) async {
+  testWidgets('compact portrait: icon-only FAB, no toolbar button',
+      (tester) async {
     _setView(tester, 390, 800);
     await tester.pumpWidget(_harness());
 
     expect(find.byType(FloatingActionButton), findsOneWidget);
+    // Icon-only FAB: the label lives in the tooltip, not inside the button.
     expect(
       find.descendant(
         of: find.byType(FloatingActionButton),
         matching: find.text('Add Product'),
       ),
-      findsOneWidget,
+      findsNothing,
     );
-    // Exactly one rendered "Add Product" control.
-    expect(find.text('Add Product'), findsOneWidget);
+    expect(find.byTooltip('Add Product'), findsOneWidget);
+    expect(find.text('Add Product'), findsNothing);
     expect(find.text('clearance:88.0'), findsOneWidget);
   });
 
