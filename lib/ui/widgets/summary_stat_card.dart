@@ -14,6 +14,7 @@ class SummaryStatCard extends StatelessWidget {
   final Color onColor;
   final String value;
   final String label;
+  final Color? valueColor;
   final bool selected;
   final VoidCallback? onTap;
 
@@ -23,6 +24,7 @@ class SummaryStatCard extends StatelessWidget {
     required this.color,
     required this.value,
     required this.label,
+    this.valueColor,
     this.onColor = Colors.white,
     this.selected = false,
     this.onTap,
@@ -57,7 +59,7 @@ class SummaryStatCard extends StatelessWidget {
                 height: 34,
                 decoration: BoxDecoration(
                   color: color,
-                  shape: BoxShape.circle,
+                  borderRadius: BorderRadius.circular(AppRadius.icon),
                 ),
                 child: Icon(icon, size: 17, color: onColor),
               ),
@@ -66,7 +68,7 @@ class SummaryStatCard extends StatelessWidget {
                 value,
                 style: AppTypography.titleLarge(context).copyWith(
                   fontWeight: FontWeight.bold,
-                  color: cs.onSurface,
+                  color: valueColor ?? cs.onSurface,
                   height: 1.1,
                 ),
                 maxLines: 1,
