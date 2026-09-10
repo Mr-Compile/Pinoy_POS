@@ -53,6 +53,8 @@ class AppDialogForm<T> extends StatefulWidget {
     this.canPop = true,
     this.onPopInvokedWithResult,
     this.showIcon = true,
+    this.icon,
+    this.iconColor,
     this.showClose = true,
     required this.childBuilder,
     required this.actionsBuilder,
@@ -74,6 +76,13 @@ class AppDialogForm<T> extends StatefulWidget {
   /// Whether the dialog type icon is shown at the top of the dialog.
   /// Defaults to `true` so every form has the same visual hierarchy.
   final bool showIcon;
+
+  /// Optional icon override. When null, the dialog [type] determines the icon.
+  final IconData? icon;
+
+  /// Optional icon color override. When null, the dialog [type] determines
+  /// the color.
+  final Color? iconColor;
 
   /// Whether a close button is shown in the dialog header. Defaults to `true`.
   final bool showClose;
@@ -169,6 +178,8 @@ class AppDialogFormState<T> extends State<AppDialogForm<T>> {
       message: widget.message,
       dismissible: widget.canPop,
       showIcon: widget.showIcon,
+      icon: widget.icon,
+      iconColor: widget.iconColor,
       showClose: widget.showClose,
       onClosePressed: (dialogContext) async {
         if (hasChanges) {

@@ -253,18 +253,27 @@ class AppDialogService {
     BuildContext context, {
     required String itemName,
     bool permanent = false,
+    String? title,
+    String? message,
   }) {
-    final title = permanent ? 'Permanently delete?' : 'Move to Trash?';
-    final message = permanent
-        ? 'This action cannot be undone.'
-        : 'This item will be moved to Trash and can be restored later.';
+    final resolvedTitle = title ??
+        (permanent ? 'Permanently delete?' : 'Move to Trash?');
+    final resolvedMessage = message ??
+        (permanent
+            ? 'This action cannot be undone.'
+            : 'This item will be moved to Trash and can be restored later.');
     final confirmLabel = permanent ? 'Delete Permanently' : 'Move to Trash';
+
+    // Callers may pass a fully-formed message that already mentions the item.
+    final fullMessage = message != null
+        ? resolvedMessage
+        : '$itemName will be affected.\n$resolvedMessage';
 
     return _show<bool>(
       context: context,
       type: permanent ? AppDialogType.permanentDelete : AppDialogType.delete,
-      title: title,
-      message: '$itemName will be affected.\n$message',
+      title: resolvedTitle,
+      message: fullMessage,
       actions: [
         AppDialogAction(
           label: 'Cancel',
@@ -883,12 +892,16 @@ class AppDialogService {
     BuildContext context, {
     required String categoryName,
     required bool isActivate,
+    String? message,
   }) {
+    final resolvedMessage = message ??
+        '${isActivate ? "Activate" : "Deactivate"} "$categoryName"?';
+
     return _show<bool>(
       context: context,
       type: AppDialogType.confirmation,
       title: isActivate ? 'Activate Category' : 'Deactivate Category',
-      message: '${isActivate ? "Activate" : "Deactivate"} "$categoryName"?',
+      message: resolvedMessage,
       actions: [
         AppDialogAction(
           label: 'Cancel',

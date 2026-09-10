@@ -227,6 +227,8 @@ class AppDialog extends StatefulWidget {
   final List<AppDialogAction> actions;
   final bool dismissible;
   final bool showIcon;
+  final IconData? icon;
+  final Color? iconColor;
   final Widget? child;
   final bool showClose;
   final void Function(BuildContext dialogContext)? onClosePressed;
@@ -240,6 +242,8 @@ class AppDialog extends StatefulWidget {
     this.actions = const [],
     this.dismissible = true,
     this.showIcon = true,
+    this.icon,
+    this.iconColor,
     this.child,
     this.showClose = false,
     this.onClosePressed,
@@ -464,21 +468,24 @@ class _AppDialogState extends State<AppDialog> {
       );
     }
 
-    final iconData = widget.type.icon;
+    final iconData = widget.icon ?? widget.type.icon;
     if (iconData == null) return const SizedBox.shrink();
+
+    final iconColor = widget.iconColor ?? widget.type.iconColor(brightness);
+    final iconBgColor = iconColor.withValues(alpha: 0.16);
 
     return Center(
       child: Container(
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: widget.type.iconBgColor(brightness),
+          color: iconBgColor,
           shape: BoxShape.circle,
         ),
         child: Icon(
           iconData,
           size: 20,
-          color: widget.type.iconColor(brightness),
+          color: iconColor,
         ),
       ),
     );
