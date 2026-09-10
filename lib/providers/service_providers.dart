@@ -10,6 +10,7 @@ import 'package:pinoy_pos/services/notification_service.dart';
 import 'package:pinoy_pos/services/settings_service.dart';
 import 'package:pinoy_pos/services/receipt_service.dart';
 import 'package:pinoy_pos/services/report_service.dart';
+import 'package:pinoy_pos/services/auto_backup_service.dart';
 import 'package:pinoy_pos/services/backup_service.dart';
 import 'package:pinoy_pos/services/ai_usage_service.dart';
 import 'package:pinoy_pos/services/ai_advisor_service.dart';
@@ -73,6 +74,10 @@ final receiptServiceProvider = Provider<ReceiptService>((ref) {
 
 final backupServiceProvider = Provider<BackupService>((ref) {
   return BackupService();
+});
+
+final autoBackupServiceProvider = Provider<AutoBackupService>((ref) {
+  return AutoBackupService();
 });
 
 final aiUsageServiceProvider = Provider<AIUsageService>((ref) {

@@ -5,8 +5,11 @@ import 'package:intl/intl.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/spacing.dart';
+import 'package:pinoy_pos/data/models/auto_backup_settings.dart';
 import 'package:pinoy_pos/data/models/backup_history.dart';
 import 'package:pinoy_pos/data/models/backup_location.dart';
+import 'package:pinoy_pos/ui/widgets/app_button.dart';
+import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/providers/notification_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/providers/user_provider.dart';
@@ -68,11 +71,17 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
   bool _isImporting = false;
   bool _isSelectingLocation = false;
 
+  // ── Automated backup state ──
+  AutoBackupSettings _autoBackupSettings = const AutoBackupSettings();
+  bool _autoBackupLoading = true;
+  bool _isSavingAutoBackup = false;
+
   @override
   void initState() {
     super.initState();
     _loadBackups();
     _loadBackupLocation();
+    _loadAutoBackupSettings();
   }
 
   // ── Load Backup History ──────────────────────────────────────────────
@@ -522,6 +531,93 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
     return DateFormat('MMM d, y · h:mm a').format(date.toLocal());
   }
 
+  // ── Automated Backup ─────────────────────────────────────────────────
+
+  Future<void> _loadAutoBackupSettings() async {
+    setState(() => _autoBackupLoading = true);
+    try {
+      final settings =
+          await ref.read(settingsServiceProvider).getAutoBackupSettings();
+      if (mounted) {
+        setState(() {
+          _autoBackupSettings = settings;
+          _autoBackupLoading = false;
+        });
+      }
+    } catch (e, st) {
+      _log('Failed to load auto backup settings', e, st);
+      if (mounted) setState(() => _autoBackupLoading = false);
+    }
+  }
+
+  Future<void> _saveAutoBackupSettings() async {
+    setState(() => _isSavingAutoBackup = true);
+    try {
+      final success = await ref
+          .read(settingsServiceProvider)
+          .updateAutoBackupSettings(_autoBackupSettings);
+      if (!mounted) return;
+      if (success) {
+        await AppDialogService.success(
+          context,
+          title: 'Saved',
+          message: 'Automatic backup schedule updated.',
+        );
+        await _loadAutoBackupSettings();
+      }
+    } catch (e, st) {
+      _log('Failed to save auto backup settings', e, st);
+      if (mounted) {
+        await AppDialogService.error(
+          context,
+          title: 'Save Failed',
+          message: 'Could not save the automatic backup schedule.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSavingAutoBackup = false);
+    }
+  }
+
+  Future<void> _pickAutoBackupTime() async {
+    final parts = _autoBackupSettings.time.split(':');
+    final initial = TimeOfDay(
+      hour: int.tryParse(parts[0]) ?? 2,
+      minute: int.tryParse(parts[1]) ?? 0,
+    );
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: initial,
+      helpText: 'Select backup time',
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      final hour = picked.hour.toString().padLeft(2, '0');
+      final minute = picked.minute.toString().padLeft(2, '0');
+      _autoBackupSettings =
+          _autoBackupSettings.copyWith(time: '$hour:$minute');
+    });
+  }
+
+  String _frequencyLabel(String frequency) {
+    return switch (frequency) {
+      '3_days' => 'Every 3 days',
+      '7_days' => 'Every 7 days',
+      'monthly' => 'Once a month',
+      _ => 'Every 7 days',
+    };
+  }
+
+  String _nextBackupText() {
+    if (!_autoBackupSettings.enabled) return 'Automatic backups are disabled.';
+    final next = _autoBackupSettings.nextRun;
+    if (next == null) return 'Set a backup location to enable automatic backups.';
+    if (_backupLocation == null || _backupLocation!.isNone) {
+      return 'Choose a backup location to run automatic backups.';
+    }
+    return 'Next backup: ${_formatDate(next)}';
+  }
+
   /// Logs a debug message with the full exception and stack trace. In
   /// debug/development mode this prints to the console so the actual
   /// failure is visible during development. In release builds it is a
@@ -569,11 +665,6 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                           Text(
-                            'Backup & Restore',
-                            style: AppTypography.headlineSmallBold(context),
-                          ),
-                          const SizedBox(height: Spacing.xs),
-                          Text(
                             'Protect your business data and recover it when needed.',
                             style: theme.textTheme.bodyMedium?.copyWith(
                                   color: cs.onSurfaceVariant,
@@ -582,6 +673,9 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                           const SizedBox(height: Spacing.lg),
 
                           _buildLocationCard(context),
+                          const SizedBox(height: Spacing.lg),
+
+                          _buildAutoBackupCard(context),
                           const SizedBox(height: Spacing.lg),
 
                           _buildSectionHeader(context, 'Quick Actions'),
@@ -869,12 +963,190 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
     );
   }
 
+  // ── Automated Backup Card ────────────────────────────────────────────
+
+  Widget _buildAutoBackupCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    if (_autoBackupLoading) {
+      return AppCard(
+        padding: const EdgeInsets.all(Spacing.lg),
+        child: Row(
+          children: [
+            _buildIconBadge(
+              icon: Icons.autorenew,
+              color: cs.primary,
+            ),
+            const SizedBox(width: Spacing.md),
+            Expanded(
+              child: Text(
+                'Loading automated backup settings...',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
+              ),
+            ),
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: cs.primary,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final isWeb = kIsWeb;
+    final frequencyItems = ['3_days', '7_days', 'monthly'];
+
+    return AppCard(
+      padding: const EdgeInsets.all(Spacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _buildIconBadge(
+                icon: Icons.autorenew,
+                color: cs.primary,
+              ),
+              const SizedBox(width: Spacing.md),
+              Text(
+                'Automated Backup',
+                style: AppTypography.titleMediumBold(context),
+              ),
+            ],
+          ),
+          const SizedBox(height: Spacing.sm),
+          Text(
+            'Schedule a recurring database backup. Backups run while the app is open.',
+            style: theme.textTheme.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
+          ),
+          if (isWeb) ...[
+            const SizedBox(height: Spacing.lg),
+            Row(
+              children: [
+                _buildIconBadge(
+                  icon: Icons.info_outline,
+                  color: cs.onSurfaceVariant,
+                  size: 28,
+                  iconSize: 15,
+                ),
+                const SizedBox(width: Spacing.sm),
+                Expanded(
+                  child: Text(
+                    'Automatic backups are not available on web.',
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                ),
+              ],
+            ),
+          ] else ...[
+            const SizedBox(height: Spacing.lg),
+            Row(
+              children: [
+                Text('Enable automatic backups', style: AppTypography.bodyMedium(context)),
+                const Spacer(),
+                Switch(
+                  value: _autoBackupSettings.enabled,
+                  onChanged: (value) {
+                    setState(() {
+                      _autoBackupSettings =
+                          _autoBackupSettings.copyWith(enabled: value);
+                    });
+                  },
+                ),
+              ],
+            ),
+            if (_autoBackupSettings.enabled) ...[
+              const SizedBox(height: Spacing.lg),
+              AppDropdown<String>(
+                label: 'Frequency',
+                prefixIcon: Icons.repeat,
+                value: _autoBackupSettings.frequency,
+                items: frequencyItems
+                    .map(
+                      (f) => DropdownMenuItem(
+                        value: f,
+                        child: Text(_frequencyLabel(f)),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() {
+                    _autoBackupSettings =
+                        _autoBackupSettings.copyWith(frequency: value);
+                  });
+                },
+              ),
+              const SizedBox(height: Spacing.lg),
+              AppTextFormField(
+                label: 'Backup Time',
+                prefixIcon: Icons.schedule,
+                controller: TextEditingController(
+                  text: _format12HourTime(_autoBackupSettings.time),
+                ),
+                readOnly: true,
+                onTap: _pickAutoBackupTime,
+              ),
+              const SizedBox(height: Spacing.lg),
+              Row(
+                children: [
+                  _buildIconBadge(
+                    icon: Icons.info_outline,
+                    color: cs.onSurfaceVariant,
+                    size: 28,
+                    iconSize: 15,
+                  ),
+                  const SizedBox(width: Spacing.sm),
+                  Expanded(
+                    child: Text(
+                      _nextBackupText(),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: Spacing.lg),
+            AppButton.filled(
+              onPressed: _isSavingAutoBackup ? null : _saveAutoBackupSettings,
+              label: _isSavingAutoBackup ? 'Saving...' : 'Save Schedule',
+              icon: _isSavingAutoBackup ? null : Icons.save_outlined,
+              isLoading: _isSavingAutoBackup,
+              fullWidth: true,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _format12HourTime(String time) {
+    final parts = time.split(':');
+    final hour = int.tryParse(parts[0]) ?? 0;
+    final minute = int.tryParse(parts[1]) ?? 0;
+    final period = hour >= 12 ? 'PM' : 'AM';
+    final h = (hour % 12) == 0 ? 12 : hour % 12;
+    final m = minute.toString().padLeft(2, '0');
+    return '$h:$m $period';
+  }
+
   // ── Section Header ───────────────────────────────────────────────────
 
   Widget _buildSectionHeader(BuildContext context, String title) {
     final cs = Theme.of(context).colorScheme;
     return Text(
-      title,
+      title.toUpperCase(),
       style: TextStyle(
         fontSize: 12.5,
         fontWeight: FontWeight.w700,

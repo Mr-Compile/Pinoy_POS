@@ -464,6 +464,23 @@ class DatabaseHelper {
       }
     }
 
+    // Migration from v24 → v25: add automatic backup schedule columns.
+    if (oldVersion < 25) {
+      final autoBackupColumns = [
+        'auto_backup_enabled INTEGER NOT NULL DEFAULT 0',
+        'auto_backup_frequency TEXT NOT NULL DEFAULT \'7_days\'',
+        'auto_backup_time TEXT NOT NULL DEFAULT \'02:00\'',
+        'auto_backup_last_run TEXT',
+      ];
+      for (final column in autoBackupColumns) {
+        try {
+          await db.execute('ALTER TABLE settings ADD COLUMN $column');
+        } catch (_) {
+          // Column may already exist.
+        }
+      }
+    }
+
     // Create any tables that were introduced after the backup's original
     // version but do not have an explicit migration block above (e.g.
     // `announcements`, `ai_usage`).  All CREATE statements in _createTables
@@ -812,6 +829,10 @@ class DatabaseHelper {
         ai_daily_quota INTEGER NOT NULL DEFAULT 20,
         inactivity_timeout_minutes INTEGER NOT NULL DEFAULT 15,
         session_warning_seconds INTEGER NOT NULL DEFAULT 30,
+        auto_backup_enabled INTEGER NOT NULL DEFAULT 0,
+        auto_backup_frequency TEXT NOT NULL DEFAULT '7_days',
+        auto_backup_time TEXT NOT NULL DEFAULT '02:00',
+        auto_backup_last_run TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       )

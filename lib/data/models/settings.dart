@@ -22,6 +22,10 @@
   final int aiDailyQuota;
   final int inactivityTimeoutMinutes;
   final int sessionWarningSeconds;
+  final bool autoBackupEnabled;
+  final String autoBackupFrequency;
+  final String autoBackupTime;
+  final DateTime? autoBackupLastRun;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -47,6 +51,10 @@
     this.aiDailyQuota = 20,
     this.inactivityTimeoutMinutes = 15,
     this.sessionWarningSeconds = 30,
+    this.autoBackupEnabled = false,
+    this.autoBackupFrequency = '7_days',
+    this.autoBackupTime = '02:00',
+    this.autoBackupLastRun,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -74,6 +82,10 @@
       'ai_daily_quota': aiDailyQuota,
       'inactivity_timeout_minutes': inactivityTimeoutMinutes,
       'session_warning_seconds': sessionWarningSeconds,
+      'auto_backup_enabled': autoBackupEnabled ? 1 : 0,
+      'auto_backup_frequency': autoBackupFrequency,
+      'auto_backup_time': autoBackupTime,
+      'auto_backup_last_run': autoBackupLastRun?.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -142,6 +154,12 @@
       aiDailyQuota: intOrNull('ai_daily_quota') ?? 20,
       inactivityTimeoutMinutes: intOrNull('inactivity_timeout_minutes') ?? 15,
       sessionWarningSeconds: intOrNull('session_warning_seconds') ?? 30,
+      autoBackupEnabled: boolFromInt('auto_backup_enabled'),
+      autoBackupFrequency: stringOrNull('auto_backup_frequency') ?? '7_days',
+      autoBackupTime: stringOrNull('auto_backup_time') ?? '02:00',
+      autoBackupLastRun: stringOrNull('auto_backup_last_run') != null
+          ? DateTime.tryParse(stringOrNull('auto_backup_last_run')!)
+          : null,
       createdAt: parseDateTime('created_at'),
       updatedAt: parseDateTime('updated_at'),
     );
@@ -169,6 +187,10 @@
     int? aiDailyQuota,
     Object? inactivityTimeoutMinutes = _sentinel,
     int? sessionWarningSeconds,
+    bool? autoBackupEnabled,
+    String? autoBackupFrequency,
+    String? autoBackupTime,
+    Object? autoBackupLastRun = _sentinel,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -207,6 +229,12 @@
           : inactivityTimeoutMinutes as int,
       sessionWarningSeconds:
           sessionWarningSeconds ?? this.sessionWarningSeconds,
+      autoBackupEnabled: autoBackupEnabled ?? this.autoBackupEnabled,
+      autoBackupFrequency: autoBackupFrequency ?? this.autoBackupFrequency,
+      autoBackupTime: autoBackupTime ?? this.autoBackupTime,
+      autoBackupLastRun: autoBackupLastRun == _sentinel
+          ? this.autoBackupLastRun
+          : autoBackupLastRun as DateTime?,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

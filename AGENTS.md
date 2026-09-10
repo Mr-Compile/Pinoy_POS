@@ -950,3 +950,48 @@ Results:
 
 - Import is CSV-only (header row required); exported multi-section report CSVs are not import sources.
 - Legacy `export_history` rows with status `imported` may still appear in the owner inbox (historical data); new ones can only be authored by staff.
+
+## AppDetailRow + View-Dialog Icons
+
+### What Changed
+
+- `lib/ui/widgets/app_detail_row.dart` (new)
+  - Shared read-only detail row: `AppIconSquare` (38px, tinted 0.16) + label (`bodyMedium`, `onSurfaceVariant`) + value (`titleSmall`, w700, optional `valueColor`, end-aligned, ellipsizes). Use it for label/value rows inside view/detail dialogs so every screen renders the same `.isquare`-style row.
+- `categories_screen.dart` — view modal rows now carry icons: Name = category icon in its badge color, Products = `inventory_2_outlined` (primary), Status = `check_circle_outline`/`pause_circle_outline` in the status color.
+- `products_screen.dart` — view modal rows: Category = `label_outline` in the category badge color, Price = `payments_outlined` (primary), Stock = `inventory_2_outlined` (status color), Status = `error_outline`/`warning_amber_outlined`/`check_circle_outline`.
+- `stock_screen.dart` — stock view rows: Current Stock = `inventory_2_outlined` (status color), Minimum Level = `production_quantity_limits` (primary), Status = same stock-status icon set.
+- `mockups/categories_screen.html`, `products_screen.html`, `stock_screen.html` — `.view-row` markup gained a `.lead > .isquare` group (30px) so the HTML mockups match the Flutter dialogs; status/stock icons swap class+glyph by state.
+
+### Verification
+
+- `dart analyze` on the four touched Dart files — no issues.
+- `flutter test test/responsive_create_action_test.dart` — 6/6 pass.
+
+## Automated Database Backup
+
+### What changed
+
+- `lib/core/constants.dart` — DB version bumped to 25.
+- `lib/core/database.dart` — migration v24→v25 adds `auto_backup_*` columns to `settings`.
+- `lib/data/models/settings.dart` — added `autoBackupEnabled`, `autoBackupFrequency`, `autoBackupTime`, `autoBackupLastRun`.
+- `lib/data/models/auto_backup_settings.dart` — new DTO for the schedule with `nextRun`/`computeNextRun` helpers.
+- `lib/services/settings_service.dart` — `getAutoBackupSettings()` and `updateAutoBackupSettings()` (gated by `backup_restore`).
+- `lib/services/backup_service.dart` — new `exportAutomaticBackup()` that reuses the export pipeline without a logged-in session and without a per-user notification.
+- `lib/services/auto_backup_service.dart` — reads the schedule from `SettingsRepository` (no UI session), runs when due, records `auto_backup_last_run` on success, and sends `backup` notifications to all active Owners and Admins.
+- `lib/services/auto_backup_scheduler.dart` — `WidgetsBindingObserver` timer; checks on startup, resume, and every 15 minutes while the app is open. Skipped on web.
+- `lib/main.dart` — starts the scheduler in `_MyAppState` and disposes it.
+- `lib/providers/service_providers.dart` — adds `autoBackupServiceProvider`.
+- `lib/ui/screens/backup_restore_screen.dart` — new "Automated Backup" card with enable toggle, frequency dropdown (3/7 days/monthly), time picker, next-run status, and save action.
+
+### Behavior
+
+- Schedule is Admin-controlled (`backup_restore`).
+- The scheduler does not add an OS background dependency; it only runs while the app is open.
+- Backup destination must be configured before automatic backups run; the scheduler skips silently (logs in debug) if missing or invalid.
+- Monthly scheduling clamps the day to the last day of the next month.
+
+### Verification
+
+- `flutter analyze` — no issues.
+- `flutter test test/backup_service_test.dart test/backup_service_integration_test.dart test/backup_validation_test.dart test/auto_backup_settings_test.dart` — pass.
+- `test/auto_backup_settings_test.dart` — schedule math (3 days, 7 days, monthly, clamping, catch-up, disabled, time respect).

@@ -9,6 +9,8 @@ import 'package:pinoy_pos/core/database_seeder.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/providers/navigation_provider.dart';
 import 'package:pinoy_pos/providers/theme_provider.dart';
+import 'package:pinoy_pos/services/auto_backup_scheduler.dart';
+import 'package:pinoy_pos/services/auto_backup_service.dart';
 import 'package:pinoy_pos/services/trash_service.dart';
 import 'package:pinoy_pos/ui/screens/splash_screen.dart';
 import 'package:pinoy_pos/ui/widgets/global_ai_chat_overlay.dart';
@@ -53,6 +55,7 @@ class MyApp extends ConsumerStatefulWidget {
 
 class _MyAppState extends ConsumerState<MyApp> {
   late final NavigationRouteObserver _navigationObserver;
+  late final AutoBackupScheduler _autoBackupScheduler;
   final _navigatorKey = GlobalKey<NavigatorState>();
 
   @override
@@ -74,6 +77,17 @@ class _MyAppState extends ConsumerState<MyApp> {
         });
       },
     );
+
+    _autoBackupScheduler = AutoBackupScheduler(
+      service: AutoBackupService(),
+    );
+    _autoBackupScheduler.start();
+  }
+
+  @override
+  void dispose() {
+    _autoBackupScheduler.stop();
+    super.dispose();
   }
 
   @override

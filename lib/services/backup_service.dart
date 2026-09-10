@@ -293,8 +293,27 @@ class BackupService {
   Future<BackupExportRecord> exportBackup({
     BackupLocation? override,
     bool setAsDefault = false,
+  }) => _exportBackup(
+        override: override,
+        setAsDefault: setAsDefault,
+        requirePermission: true,
+      );
+
+  /// Creates a backup automatically, without requiring a logged-in user.
+  ///
+  /// This is used by the automatic backup scheduler. It uses the saved
+  /// backup location, does not create a per-user notification, and records
+  /// the backup with `createdBy: null`.
+  Future<BackupExportRecord> exportAutomaticBackup() => _exportBackup(
+        requirePermission: false,
+      );
+
+  Future<BackupExportRecord> _exportBackup({
+    BackupLocation? override,
+    bool setAsDefault = false,
+    bool requirePermission = true,
   }) async {
-    if (!_sessionManager.hasPermission('backup_restore')) {
+    if (requirePermission && !_sessionManager.hasPermission('backup_restore')) {
       throw AuthorizationException('backup_restore');
     }
 
@@ -370,7 +389,7 @@ class BackupService {
       storageType: write.writtenTo?.type.name,
       locationJson: write.writtenTo?.toJsonString(),
       fileSize: write.fileSize,
-      createdBy: _sessionManager.currentUser?.id,
+      createdBy: requirePermission ? _sessionManager.currentUser?.id : null,
       createdAt: DateTime.now(),
     ));
 
@@ -386,16 +405,18 @@ class BackupService {
       _log('Failed to log backup creation: $e');
     }
 
-    // 7. Notification.
-    try {
-      await _notificationService.createNotification(
-        title: 'Backup Created',
-        message:
-            'Your Pinoy POS backup (${write.displayName}) was saved successfully.',
-        type: 'backup',
-      );
-    } catch (e) {
-      _log('Failed to create backup notification: $e');
+    // 7. Notify the current user for manual exports only.
+    if (requirePermission) {
+      try {
+        await _notificationService.createNotification(
+          title: 'Backup Created',
+          message:
+              'Your Pinoy POS backup (${write.displayName}) was saved successfully.',
+          type: 'backup',
+        );
+      } catch (e) {
+        _log('Failed to create backup notification: $e');
+      }
     }
 
     return BackupExportRecord(

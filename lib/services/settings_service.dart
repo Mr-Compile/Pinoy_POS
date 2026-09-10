@@ -1,5 +1,6 @@
 import 'package:pinoy_pos/core/authorization_exception.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
+import 'package:pinoy_pos/data/models/auto_backup_settings.dart';
 import 'package:pinoy_pos/data/models/payment_settings.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
 import 'package:pinoy_pos/data/models/user.dart';
@@ -108,6 +109,41 @@ class SettingsService {
     _currentSettings = settings;
 
     return PaymentSettings.fromSettings(settings);
+  }
+
+  /// Returns the automatic backup schedule.
+  ///
+  /// Requires `backup_restore` permission because only Admins may view or
+  /// change the backup schedule.
+  Future<AutoBackupSettings> getAutoBackupSettings() async {
+    if (!_sessionManager.hasPermission('backup_restore')) {
+      throw AuthorizationException('backup_restore');
+    }
+    final settings = await getSettings();
+    return AutoBackupSettings(
+      enabled: settings.autoBackupEnabled,
+      frequency: settings.autoBackupFrequency,
+      time: settings.autoBackupTime,
+      lastRun: settings.autoBackupLastRun,
+    );
+  }
+
+  /// Persists the automatic backup schedule.
+  ///
+  /// Requires `backup_restore` permission because only Admins may view or
+  /// change the backup schedule.
+  Future<bool> updateAutoBackupSettings(AutoBackupSettings schedule) async {
+    if (!_sessionManager.hasPermission('backup_restore')) {
+      throw AuthorizationException('backup_restore');
+    }
+    final current = await getSettings();
+    final updated = current.copyWith(
+      autoBackupEnabled: schedule.enabled,
+      autoBackupFrequency: schedule.frequency,
+      autoBackupTime: schedule.time,
+      updatedAt: DateTime.now(),
+    );
+    return updateSettings(updated);
   }
 
   Future<bool> updateSettings(Settings settings) async {
