@@ -329,15 +329,6 @@ class ReportExportService {
       };
     }
 
-    PdfColor methodBackgroundColor(String method) {
-      return switch (method.toLowerCase()) {
-        'cash' => toPdfColor(AppColorTokens.primaryBlueLight.withValues(alpha: 0.16)),
-        'gcash' => toPdfColor(AppSemanticColors.success.withValues(alpha: 0.16)),
-        'card' => toPdfColor(AppSemanticColors.info.withValues(alpha: 0.16)),
-        _ => toPdfColor(AppColorTokens.textMuted.withValues(alpha: 0.18)),
-      };
-    }
-
     pw.Widget buildCell(
       pw.Widget child, {
       bool right = false,
@@ -376,18 +367,11 @@ class ReportExportService {
           right: right,
         );
 
-    pw.Widget buildMethodBadge(String method) => pw.Container(
-          padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-          decoration: pw.BoxDecoration(
-            color: methodBackgroundColor(method),
-            borderRadius: pw.BorderRadius.circular(20),
-          ),
-          child: buildText(
-            method,
-            color: methodTextColor(method),
-            bold: true,
-            fontSize: 10.5,
-          ),
+    pw.Widget buildMethodBadge(String method) => buildText(
+          method,
+          color: methodTextColor(method),
+          bold: true,
+          fontSize: 10.5,
         );
 
     pw.Widget buildStoreHeader() => pw.Column(
