@@ -647,7 +647,7 @@ class _FieldIcon extends StatelessWidget {
       return Positioned(left: 12.0, top: 12.0, child: child);
     }
 
-    return Positioned(left: 12.0, bottom: 12.0, child: child);
+    return Positioned(left: 12.0, top: 14.0, child: child);
   }
 }
 

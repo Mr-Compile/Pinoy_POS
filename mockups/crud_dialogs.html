@@ -90,7 +90,9 @@
 
   .toolbar { display: flex; gap: 8px; }
   .search { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; display: flex; align-items: center; gap: 8px; color: var(--text-3); font-size: 13px; }
-  .search svg { width: 16px; height: 16px; fill: var(--text-3); }
+  .search svg { width: 16px; height: 16px; fill: var(--text-3); flex-shrink: 0; }
+  .search input { flex: 1; background: transparent; border: none; color: var(--text); font-size: 13px; outline: none; min-width: 0; padding: 0; }
+  .search input::placeholder { color: var(--text-3); }
   .filterbtn { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 0 12px; display: flex; align-items: center; gap: 6px; color: var(--text-2); font-size: 12.5px; font-weight: 600; }
   .filterbtn svg { width: 15px; height: 15px; fill: var(--text-2); }
 
@@ -277,7 +279,7 @@
       <div class="stats" id="statsRow"></div>
 
       <div class="toolbar">
-        <div class="search"><svg><use href="#i-search"/></svg><span>Search...</span></div>
+        <div class="search"><svg><use href="#i-search"/></svg><input type="text" placeholder="Search items..." aria-label="Search items"></div>
         <div class="filterbtn"><svg><use href="#i-filter"/></svg>All</div>
       </div>
 
@@ -325,17 +327,17 @@ const modules = {
     ],
     chips: ['All','Low stock','Out of stock'],
     rows: [
-      {id:1, name:'Pastil', sub:'Snacks · Stock: 45', price:'₱10.00', pill:'', pillClass:'', icon:'#i-food', iconColor:'c-orange'},
-      {id:2, name:'Chicken Adobo Rice', sub:'Meals · Stock: 4', price:'₱80.00', pill:'Low stock', pillClass:'pill-amber', icon:'#i-food', iconColor:'c-orange'},
-      {id:3, name:'Iced Tea', sub:'Drinks · Stock: 32', price:'₱25.00', pill:'', pillClass:'', icon:'#i-drink', iconColor:'c-teal'},
-      {id:4, name:'Banana Cue', sub:'Snacks · Stock: 0', price:'₱15.00', pill:'Out of stock', pillClass:'pill-red', icon:'#i-cake', iconColor:'c-pink'}
+      {id:1, name:'Pastil', category:'Snacks', status:'Active', sub:'Snacks · Stock: 45', price:'₱10.00', pill:'', pillClass:'', icon:'#i-food', iconColor:'c-orange'},
+      {id:2, name:'Chicken Adobo Rice', category:'Meals', status:'Active', sub:'Meals · Stock: 4', price:'₱80.00', pill:'Low stock', pillClass:'pill-amber', icon:'#i-food', iconColor:'c-orange'},
+      {id:3, name:'Iced Tea', category:'Drinks', status:'Active', sub:'Drinks · Stock: 32', price:'₱25.00', pill:'', pillClass:'', icon:'#i-drink', iconColor:'c-teal'},
+      {id:4, name:'Banana Cue', category:'Snacks', status:'Active', sub:'Snacks · Stock: 0', price:'₱15.00', pill:'Out of stock', pillClass:'pill-red', icon:'#i-cake', iconColor:'c-pink'}
     ],
     fields: [
       {id:'name', label:'Product name', type:'text', placeholder:'e.g. Pastil', value:''},
-      {id:'category', label:'Category', type:'select', options:['Meals','Drinks','Snacks','Coffee'], value:'Snacks'},
-      {id:'price', label:'Price', type:'text', placeholder:'0.00', value:''},
-      {id:'stock', label:'Stock quantity', type:'number', placeholder:'0', value:''},
-      {id:'status', label:'Status', type:'select', options:['Active','Inactive'], value:'Active'}
+      {id:'category', label:'Category', type:'select', placeholder:'Select category', options:['Meals','Drinks','Snacks','Coffee'], value:''},
+      {id:'price', label:'Price', type:'text', placeholder:'₱0.00', value:''},
+      {id:'stock', label:'Stock quantity', type:'number', placeholder:'Enter quantity', value:''},
+      {id:'status', label:'Status', type:'select', placeholder:'Select status', options:['Active','Inactive'], value:''}
     ],
     deleteTitle: 'Delete product',
     deleteMsg: item => `Move <b>${item.name}</b> to Trash? You can restore it later.`,
@@ -354,15 +356,15 @@ const modules = {
     ],
     chips: ['All','Active','Inactive'],
     rows: [
-      {id:1, name:'Meals', sub:'12 products', price:'', pill:'Active', pillClass:'pill-green', icon:'#i-food', iconColor:'c-orange'},
-      {id:2, name:'Drinks', sub:'6 products', price:'', pill:'Active', pillClass:'pill-green', icon:'#i-drink', iconColor:'c-teal'},
-      {id:3, name:'Snacks', sub:'4 products', price:'', pill:'Active', pillClass:'pill-green', icon:'#i-cake', iconColor:'c-pink'},
-      {id:4, name:'Coffee', sub:'2 products', price:'', pill:'Inactive', pillClass:'pill-grey', icon:'#i-coffee', iconColor:'c-amber'}
+      {id:1, name:'Meals', status:'Active', description:'Rice meals and ulam', sub:'12 products', price:'', pill:'Active', pillClass:'pill-green', icon:'#i-food', iconColor:'c-orange'},
+      {id:2, name:'Drinks', status:'Active', description:'Beverages and refreshments', sub:'6 products', price:'', pill:'Active', pillClass:'pill-green', icon:'#i-drink', iconColor:'c-teal'},
+      {id:3, name:'Snacks', status:'Active', description:'Light snacks and desserts', sub:'4 products', price:'', pill:'Active', pillClass:'pill-green', icon:'#i-cake', iconColor:'c-pink'},
+      {id:4, name:'Coffee', status:'Inactive', description:'Hot and iced coffee', sub:'2 products', price:'', pill:'Inactive', pillClass:'pill-grey', icon:'#i-coffee', iconColor:'c-amber'}
     ],
     fields: [
       {id:'name', label:'Category name', type:'text', placeholder:'e.g. Desserts', value:''},
-      {id:'description', label:'Description', type:'text', placeholder:'Optional', value:''},
-      {id:'status', label:'Status', type:'select', options:['Active','Inactive'], value:'Active'}
+      {id:'description', label:'Description', type:'text', placeholder:'Short description (optional)', value:''},
+      {id:'status', label:'Status', type:'select', placeholder:'Select status', options:['Active','Inactive'], value:''}
     ],
     deleteTitle: 'Delete category',
     deleteMsg: item => `Delete <b>${item.name}</b>? Products in this category will become uncategorized.`,
@@ -381,15 +383,15 @@ const modules = {
     ],
     chips: ['All','Low','Out'],
     rows: [
-      {id:1, name:'Spicy Pork Sisig', sub:'Meals · Min 10', price:'24 left', pill:'', pillClass:'pill-green', icon:'#i-food', iconColor:'c-orange'},
-      {id:2, name:'Iced Coffee', sub:'Drinks · Min 15', price:'18 left', pill:'', pillClass:'pill-green', icon:'#i-coffee', iconColor:'c-teal'},
-      {id:3, name:'Chicharon', sub:'Snacks · Min 20', price:'7 left', pill:'Low', pillClass:'pill-amber', icon:'#i-cake', iconColor:'c-pink'},
-      {id:4, name:'Halo-Halo', sub:'Dessert · Min 8', price:'0 left', pill:'Out', pillClass:'pill-red', icon:'#i-drink', iconColor:'c-blue'}
+      {id:1, name:'Spicy Pork Sisig', product:'Spicy Pork Sisig', sub:'Meals · Min 10', price:'24 left', pill:'', pillClass:'pill-green', icon:'#i-food', iconColor:'c-orange'},
+      {id:2, name:'Iced Coffee', product:'Iced Coffee', sub:'Drinks · Min 15', price:'18 left', pill:'', pillClass:'pill-green', icon:'#i-coffee', iconColor:'c-teal'},
+      {id:3, name:'Chicharon', product:'Chicharon', sub:'Snacks · Min 20', price:'7 left', pill:'Low', pillClass:'pill-amber', icon:'#i-cake', iconColor:'c-pink'},
+      {id:4, name:'Halo-Halo', product:'Halo-Halo', sub:'Dessert · Min 8', price:'0 left', pill:'Out', pillClass:'pill-red', icon:'#i-drink', iconColor:'c-blue'}
     ],
     fields: [
-      {id:'product', label:'Product', type:'select', options:['Pastil','Chicken Adobo Rice','Iced Tea','Banana Cue'], value:'Pastil'},
-      {id:'quantity', label:'Quantity to add', type:'number', placeholder:'0', value:''},
-      {id:'reason', label:'Reason', type:'text', placeholder:'Restock / Adjustment', value:''}
+      {id:'product', label:'Product', type:'select', placeholder:'Select product', options:['Pastil','Chicken Adobo Rice','Iced Tea','Banana Cue','Spicy Pork Sisig','Iced Coffee','Chicharon','Halo-Halo'], value:''},
+      {id:'quantity', label:'Quantity to add', type:'number', placeholder:'Enter quantity', value:''},
+      {id:'reason', label:'Reason', type:'text', placeholder:'e.g. Restock / Adjustment', value:''}
     ],
     deleteTitle: 'Deduct stock',
     deleteMsg: item => `Record a stock deduction for <b>${item.name}</b>?`,
@@ -408,15 +410,15 @@ const modules = {
     ],
     chips: ['All','Active','Inactive'],
     rows: [
-      {id:1, name:'Maria Santos', sub:'maria.s', price:'', pill:'Active', pillClass:'pill-green', icon:'#i-person', iconColor:'c-purple'},
-      {id:2, name:'Juan Cruz', sub:'juan.c', price:'', pill:'Active', pillClass:'pill-green', icon:'#i-person', iconColor:'c-teal'},
-      {id:3, name:'Ana Reyes', sub:'ana.r', price:'', pill:'Inactive', pillClass:'pill-amber', icon:'#i-person', iconColor:'c-amber'}
+      {id:1, name:'Maria Santos', username:'maria.s', role:'Staff', status:'Active', sub:'maria.s', price:'', pill:'Active', pillClass:'pill-green', icon:'#i-person', iconColor:'c-purple'},
+      {id:2, name:'Juan Cruz', username:'juan.c', role:'Staff', status:'Active', sub:'juan.c', price:'', pill:'Active', pillClass:'pill-green', icon:'#i-person', iconColor:'c-teal'},
+      {id:3, name:'Ana Reyes', username:'ana.r', role:'Staff', status:'Inactive', sub:'ana.r', price:'', pill:'Inactive', pillClass:'pill-amber', icon:'#i-person', iconColor:'c-amber'}
     ],
     fields: [
       {id:'name', label:'Full name', type:'text', placeholder:'Juan Dela Cruz', value:''},
       {id:'username', label:'Username', type:'text', placeholder:'juan.c', value:''},
-      {id:'role', label:'Role', type:'select', options:['Staff','Admin','Owner'], value:'Staff'},
-      {id:'status', label:'Status', type:'select', options:['Active','Inactive'], value:'Active'}
+      {id:'role', label:'Role', type:'select', placeholder:'Select role', options:['Staff','Admin','Owner'], value:''},
+      {id:'status', label:'Status', type:'select', placeholder:'Select status', options:['Active','Inactive'], value:''}
     ],
     deleteTitle: 'Delete staff',
     deleteMsg: item => `Remove <b>${item.name}</b> from the team? This cannot be undone.`,
@@ -435,9 +437,9 @@ const modules = {
     ],
     chips: ['All','Pinned','Active'],
     rows: [
-      {id:1, name:'New menu items launching Sept 15', sub:'Pinned · Sep 7, 9:00 AM', price:'', pill:'Pinned', pillClass:'pill-solid-amber', icon:'#i-campaign', iconColor:'c-orange'},
-      {id:2, name:'GCash payment reminders', sub:'Sep 5, 2:30 PM', price:'', pill:'', pillClass:'', icon:'#i-campaign', iconColor:'c-blue'},
-      {id:3, name:'Staff meeting moved to 4 PM', sub:'Sep 4, 10:00 AM', price:'', pill:'', pillClass:'', icon:'#i-campaign', iconColor:'c-green'}
+      {id:1, name:'New menu items launching Sept 15', pinned:true, sub:'Pinned · Sep 7, 9:00 AM', price:'', pill:'Pinned', pillClass:'pill-solid-amber', icon:'#i-campaign', iconColor:'c-orange'},
+      {id:2, name:'GCash payment reminders', pinned:false, sub:'Sep 5, 2:30 PM', price:'', pill:'', pillClass:'', icon:'#i-campaign', iconColor:'c-blue'},
+      {id:3, name:'Staff meeting moved to 4 PM', pinned:false, sub:'Sep 4, 10:00 AM', price:'', pill:'', pillClass:'', icon:'#i-campaign', iconColor:'c-green'}
     ],
     fields: [
       {id:'title', label:'Title', type:'text', placeholder:'Announcement title', value:''},
@@ -490,7 +492,7 @@ const modules = {
     fields: [
       {id:'apikey', label:'Groq API Key', type:'text', placeholder:'gsk_...', value:'gsk_••••••••••••••••••'},
       {id:'enabled', label:'AI Advisor enabled', type:'toggle', value:true},
-      {id:'model', label:'Model', type:'select', options:['llama-3.1-70b-versatile','mixtral-8x7b-32768'], value:'llama-3.1-70b-versatile'}
+      {id:'model', label:'Model', type:'select', placeholder:'Select AI model', options:['llama-3.1-70b-versatile','mixtral-8x7b-32768'], value:'llama-3.1-70b-versatile'}
     ],
     deleteTitle: 'Reset AI configuration',
     deleteMsg: () => 'Clear the API key and reset AI settings?',
@@ -514,8 +516,8 @@ const modules = {
       {id:3, name:'Inventory Audit', sub:'by Maria Santos · 856 KB', price:'', pill:'Imported', pillClass:'pill-green', icon:'#i-inbox', iconColor:'c-blue'}
     ],
     fields: [
-      {id:'file', label:'Report file', type:'text', placeholder:'Tap to choose PDF / Excel / CSV', value:''},
-      {id:'note', label:'Note', type:'text', placeholder:'Optional note', value:''}
+      {id:'file', label:'Report file', type:'text', placeholder:'Tap to choose PDF or Excel', value:''},
+      {id:'note', label:'Note', type:'text', placeholder:'Note (optional)', value:''}
     ],
     deleteTitle: 'Archive report',
     deleteMsg: item => `Archive <b>${item.name}</b>? It will no longer appear in the active list.`,
@@ -749,16 +751,26 @@ function openDialog(type, id) {
     message.style.display = 'block';
 
     bodyHtml = m.fields.map(f => {
-      let val = isAdd ? (f.value || '') : (item ? (['name','title'].includes(f.id) ? item.name : f.value) : f.value);
+      let val;
+      if (isAdd) {
+        val = f.type === 'toggle' ? f.value : '';
+      } else if (isEdit && item) {
+        val = item[f.id] !== undefined ? item[f.id] : (['name','title'].includes(f.id) ? item.name : f.value);
+      } else {
+        val = f.value;
+      }
       const icon = fieldIcon(f);
       const iconHtml = icon ? `<svg class="field-icon ${f.type === 'textarea' ? 'textarea-icon' : 'input-icon'}"><use href="${icon}"/></svg>` : '';
       const hasIcon = icon ? 'has-icon' : '';
 
       if (f.type === 'select') {
+        const hasPlaceholder = !!f.placeholder;
+        const isValueSelected = val && f.options.includes(val);
         return `<div class="field ${hasIcon}">
           <label>${f.label}</label>
           ${iconHtml}<select class="select" id="field_${f.id}">
-            ${f.options.map(opt => `<option ${opt === val ? 'selected' : ''}>${opt}</option>`).join('')}
+            ${hasPlaceholder ? `<option value="" disabled ${!isValueSelected ? 'selected' : ''}>${f.placeholder}</option>` : ''}
+            ${f.options.map(opt => `<option value="${opt}" ${opt === val ? 'selected' : ''}>${opt}</option>`).join('')}
           </select>
         </div>`;
       }

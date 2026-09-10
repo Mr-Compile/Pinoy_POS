@@ -81,9 +81,6 @@ class SessionManager {
   /// System administration tasks (backups, AI configuration / quota,
   /// session timeout, and global system settings) are reserved for the
   /// System Admin role.
-  ///
-  /// `import_sales` is Owner-only: the Owner imports sales records directly
-  /// under Sales — completely independent of the staff reporting workflow.
   static const List<String> _ownerPermissions = [
     'view_dashboard',
     'view_pos',
@@ -119,7 +116,6 @@ class SessionManager {
     'view_profile',
     'view_more',
     'view_report_submissions',
-    'import_sales',
     'manage_users',
     'edit_users',
     'delete_users',

@@ -196,9 +196,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                         .copyWith(color: colorScheme.onSurfaceVariant),
                                   ),
                                   const SizedBox(height: 40),
-                                  _buildUsernameField(colorScheme),
+                                  _buildUsernameField(),
                                   const SizedBox(height: 16),
-                                  _buildPasswordField(colorScheme, authState.isLoading),
+                                  _buildPasswordField(authState.isLoading),
                                   const SizedBox(height: 32),
                                   AppButton.gradient(
                     label: 'Sign In',
@@ -228,12 +228,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
-  Widget _buildUsernameField(ColorScheme colorScheme) {
+  Widget _buildUsernameField() {
     return AppTextFormField(
       controller: _usernameController,
       focusNode: _usernameFocus,
       hint: 'Username',
-      prefix: Icon(Icons.person_outline, color: colorScheme.primary),
+      prefixIcon: Icons.person_outline,
       autofillHints: const [AutofillHints.username],
       textInputAction: TextInputAction.next,
       validator: (value) {
@@ -248,13 +248,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
-  Widget _buildPasswordField(ColorScheme colorScheme, bool isLoading) {
+  Widget _buildPasswordField(bool isLoading) {
     return AppPasswordField(
       controller: _passwordController,
       focusNode: _passwordFocus,
       label: null,
       hint: 'Password',
-      prefix: Icon(Icons.lock_outline, color: colorScheme.primary),
+      prefixIcon: Icons.lock_outline,
       autofillHints: const [AutofillHints.password],
       isLoading: isLoading,
       textInputAction: TextInputAction.done,

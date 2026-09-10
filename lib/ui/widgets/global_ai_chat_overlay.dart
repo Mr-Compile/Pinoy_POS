@@ -18,9 +18,14 @@ import 'package:pinoy_pos/ui/widgets/ai_chat_panel.dart';
 /// It hides the chat head while the AI panel is open and displays the panel
 /// in that case.
 class GlobalAIChatOverlay extends ConsumerWidget {
-  const GlobalAIChatOverlay({super.key, required this.child});
-
+  final GlobalKey<NavigatorState> navigatorKey;
   final Widget child;
+
+  const GlobalAIChatOverlay({
+    super.key,
+    required this.navigatorKey,
+    required this.child,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -44,7 +49,10 @@ class GlobalAIChatOverlay extends ConsumerWidget {
       children: [
         child,
         if (!isOnAiScreen && !chatState.isPanelOpen)
-          AIChatHead(userId: user.id!),
+          AIChatHead(
+            userId: user.id!,
+            navigatorKey: navigatorKey,
+          ),
         if (!isOnAiScreen && chatState.isPanelOpen)
           const AIChatPanel(),
       ],

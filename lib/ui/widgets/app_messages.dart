@@ -114,8 +114,6 @@ class AppMessages {
   static const String notificationMarkAllReadError = 'Failed to mark all notifications as read.';
 
   // Export
-  static const String exportCsvSuccess = 'CSV exported successfully.';
-  static const String exportCsvError = 'Failed to export CSV.';
   static const String exportPdfSuccess = 'PDF exported successfully.';
   static const String exportPdfError = 'Failed to export PDF.';
 

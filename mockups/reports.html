@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinoy POS — Reports (Sales Analytics)</title>
+<link rel="stylesheet" href="mockup.css">
+<style>
+  .frames-legend { max-width: 900px; margin: 0 auto 24px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; color: var(--text-2); font-size: 13px; }
+  .role-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; border: 1px solid var(--border); }
+  .role-owner { background: rgba(75,130,233,.16); color: var(--info); border-color: rgba(75,130,233,.4); }
+  .role-staff { background: rgba(22,163,74,.16); color: var(--success); border-color: rgba(22,163,74,.4); }
+  .frame-notes { max-width: 360px; color: var(--text-3); font-size: 12.5px; line-height: 1.6; margin-top: 8px; }
+  .pill-outline { background: transparent; border: 1px solid var(--border); color: var(--text-2); }
+
+  .section-heading { font-size: 15.5px; font-weight: 700; color: var(--text); margin-bottom: 10px; }
+  .section-sub { font-size: 12px; color: var(--text-3); margin-top: -8px; margin-bottom: 10px; }
+
+  /* KPI cards */
+  .kpi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .kpi-card.primary { padding: 16px; border-color: rgba(75,130,233,.35); }
+  .kpi-head { display: flex; align-items: center; gap: 8px; }
+  .kpi-head .icircle { width: 28px; height: 28px; }
+  .kpi-head .icircle svg { width: 15px; height: 15px; }
+  .kpi-label { font-size: 11.5px; font-weight: 600; color: var(--text-3); }
+  .kpi-value { font-size: 19px; font-weight: 800; color: var(--text); line-height: 1.1; }
+  .kpi-card.primary .kpi-value { font-size: 22px; color: var(--primary); }
+  .kpi-sub { font-size: 11px; color: var(--text-3); }
+  .kpi-sub.up { color: var(--success); }
+  .kpi-sub.down { color: var(--error); }
+
+  /* Period selector */
+  .period-selector { display: flex; flex-direction: column; gap: 10px; }
+  .period-bar { display: flex; gap: 8px; align-items: center; }
+  .segmented { flex: 1; display: flex; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .segment { flex: 1; padding: 9px 0; text-align: center; font-size: 12.5px; font-weight: 700; color: var(--text-2); background: transparent; cursor: pointer; border: none; }
+  .segment.on { background: var(--primary); color: #fff; }
+  .cal-btn { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; cursor: pointer; }
+  .cal-btn svg { width: 18px; height: 18px; fill: var(--text-2); }
+  .date-nav { display: flex; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 2px 8px; }
+  .date-nav .nav { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .date-nav .nav svg { width: 18px; height: 18px; fill: var(--text-2); }
+  .date-nav .range { flex: 1; text-align: center; font-size: 13px; font-weight: 600; color: var(--text); }
+
+  /* Period header + actions */
+  .period-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .period-title { font-size: 15px; font-weight: 700; color: var(--text); }
+  .period-dates { font-size: 12px; color: var(--text-3); }
+  .set-store { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--primary); background: transparent; border: none; cursor: pointer; }
+  .set-store svg { width: 16px; height: 16px; fill: var(--primary); }
+
+  .actions-bar { display: flex; align-items: center; gap: 10px; }
+  .actions-bar .btn { width: auto; flex: 0; padding: 10px 16px; }
+  .actions-bar .spacer { flex: 1; }
+
+  /* Mini bar chart */
+  .mini-bar-chart { display: flex; flex-direction: column; gap: 4px; height: 150px; }
+  .mini-bar-row { display: flex; gap: 4px; flex: 1; align-items: flex-end; }
+  .mini-bar { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .mini-bar .bar { width: 100%; border-radius: 4px 4px 0 0; background: var(--primary); min-height: 2px; }
+  .mini-bar.highlight .bar { background: var(--info); }
+  .mini-bar.zero .bar { background: var(--surface-elev); }
+  .mini-bar .value { font-size: 9.5px; color: var(--text-3); text-align: center; }
+  .mini-bar .label { font-size: 10px; color: var(--text-3); text-align: center; }
+
+  /* Trend legend */
+  .chart-legend { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 8px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-3); }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+  /* Donut chart */
+  .donut-wrap { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .donut { width: 130px; height: 130px; border-radius: 50%; position: relative; }
+  .donut-hole { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 70px; height: 70px; border-radius: 50%; background: var(--surface); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .donut-hole b { font-size: 18px; font-weight: 800; color: var(--text); }
+  .donut-hole span { font-size: 10px; color: var(--text-3); }
+  .donut-legend { flex: 1; min-width: 130px; display: flex; flex-direction: column; gap: 10px; }
+  .donut-legend-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+  .donut-legend-item .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .donut-legend-item .label { color: var(--text); }
+  .donut-legend-item .value { margin-left: auto; font-weight: 700; color: var(--text); }
+  .donut-legend-item .count { font-size: 11px; color: var(--text-3); margin-left: 6px; }
+
+  /* Horizontal bar chart */
+  .hbar-list { display: flex; flex-direction: column; gap: 12px; }
+  .hbar-row { display: flex; align-items: center; gap: 10px; }
+  .hbar-label { width: 100px; font-size: 12px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hbar-track { flex: 1; height: 22px; background: var(--surface-elev); border-radius: 6px; position: relative; overflow: hidden; }
+  .hbar-fill { height: 100%; border-radius: 6px; background: var(--primary); opacity: .35; position: absolute; left: 0; top: 0; }
+  .hbar-row:first-child .hbar-fill { opacity: 1; }
+  .hbar-value { width: 70px; text-align: right; font-size: 12px; color: var(--text-2); font-weight: 600; }
+
+  /* Staff performance */
+  .staff-list { display: flex; flex-direction: column; gap: 10px; }
+  .staff-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .staff-head { display: flex; align-items: center; gap: 10px; }
+  .staff-avatar { width: 32px; height: 32px; border-radius: 50%; background: rgba(75,130,233,.16); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; color: var(--primary); flex-shrink: 0; }
+  .staff-meta { flex: 1; min-width: 0; }
+  .staff-name { font-size: 13.5px; font-weight: 700; color: var(--text); }
+  .staff-count { font-size: 11.5px; color: var(--text-3); }
+  .staff-amt { text-align: right; }
+  .staff-total { font-size: 14px; font-weight: 700; color: var(--text); }
+  .staff-avg { font-size: 11px; color: var(--text-3); }
+  .staff-progress { height: 8px; background: var(--surface-elev); border-radius: 4px; overflow: hidden; }
+  .staff-progress .fill { height: 100%; background: var(--primary); border-radius: 4px; }
+
+  /* Transaction list */
+  .txn-list { display: flex; flex-direction: column; gap: 10px; }
+  .txn-row { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 14px; display: grid; grid-template-columns: 40px 1fr auto; grid-template-areas: "avatar main trailing" ". chips chips"; gap: 10px; align-items: center; }
+  .txn-avatar { grid-area: avatar; width: 36px; height: 36px; border-radius: 50%; background: rgba(75,130,233,.16); display: flex; align-items: center; justify-content: center; }
+  .txn-avatar svg { width: 18px; height: 18px; fill: var(--primary); }
+  .txn-main { grid-area: main; min-width: 0; }
+  .txn-title { font-size: 14px; font-weight: 700; color: var(--text); }
+  .txn-sub { font-size: 11.5px; color: var(--text-3); margin-top: 2px; }
+  .txn-trailing { grid-area: trailing; text-align: right; }
+  .txn-price { font-size: 15px; font-weight: 800; color: var(--text); }
+  .txn-chips { grid-area: chips; display: flex; gap: 6px; flex-wrap: wrap; }
+
+  /* Bottom sheets */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: none; z-index: 99; }
+  .overlay.show { display: block; }
+  .bottom-sheet { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--border); border-radius: 24px 24px 0 0; padding: 20px; box-shadow: 0 -12px 40px rgba(0,0,0,.4); transform: translateY(110%); transition: transform .25s; z-index: 100; max-width: 400px; margin: 0 auto; }
+  .bottom-sheet.show { transform: translateY(0); }
+  .sheet-close { position: absolute; top: 12px; right: 16px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .sheet-close svg { width: 18px; height: 18px; fill: var(--text-3); }
+  .sheet-title { font-size: 17px; font-weight: 700; color: var(--text); margin-bottom: 18px; text-align: center; }
+  .sheet-item { display: flex; align-items: center; gap: 14px; padding: 14px; border-radius: 14px; cursor: pointer; }
+  .sheet-item:hover { background: var(--surface-elev); }
+  .sheet-item .icircle { width: 38px; height: 38px; }
+  .sheet-item .icircle svg { width: 19px; height: 19px; }
+  .sheet-item .grow { flex: 1; }
+  .sheet-item .name { font-size: 14px; font-weight: 600; color: var(--text); }
+  .sheet-item .sub { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+
+  /* Filter sheet */
+  .filter-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+  .filter-field label { font-size: 12px; font-weight: 700; color: var(--text-3); }
+  .filter-select { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-elev); color: var(--text); font-size: 13.5px; font-weight: 600; }
+  .filter-actions { display: flex; gap: 10px; margin-top: 10px; }
+  .filter-actions .btn { flex: 1; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M12 21l3.5-4.5c-.97-.74-2.18-1.16-3.5-1.16s-2.53.42-3.5 1.16L12 21zM12 3C7.31 3 3.07 4.69 0 7.55l1.93 2.43C4.48 7.9 8.01 6.4 12 6.4s7.52 1.5 10.07 3.58L24 7.55C20.93 4.69 16.69 3 12 3z"/></symbol>
+  <symbol id="i-batt" viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24"><path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></symbol>
+  <symbol id="i-wallet" viewBox="0 0 24 24"><path d="M18 4H6C4.89 4 4 4.89 4 6v12c0 1.1.89 2 2 2h12c1.1 0 2-.9 2-2V6c0-1.11-.9-2-2-2zm0 10H6V8h12v6zm-6-2H8v2h4v-2z"/></symbol>
+  <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M19.5 3.5 18 2l-1.5 1.5L15 2l-1.5 1.5L12 2l-1.5 1.5L9 2 7.5 3.5 6 2 4.5 3.5 3 2v20l1.5-1.5L6 22l1.5-1.5L9 22l1.5-1.5L12 22l1.5-1.5L15 22l1.5-1.5L18 22l1.5-1.5L21 22V2l-1.5 1.5zM19 19.09H5V4.91h14v14.18zM6 15h12v2H6zm0-4h12v2H6zm0-4h12v2H6z"/></symbol>
+  <symbol id="i-trend" viewBox="0 0 24 24"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="M20 2H4c-1 0-2 .9-2 2v3.01c0 .72.43 1.34 1 1.69V20c0 1.1 1.1 2 2 2h14c.9 0 2-.9 2-2V8.7c.57-.35 1-.97 1-1.69V4c0-1.1-1-2-2-2zm-5 12H9v-2h6v2zm5-7H4V4h16v3z"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM9 10H7v2h2v-2z"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M8.59 16.59 13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></symbol>
+  <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="M15.41 16.59 10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></symbol>
+  <symbol id="i-pdf" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></symbol>
+  <symbol id="i-table" viewBox="0 0 24 24"><path d="M5 3h14c1.1 0 2 .9 2 2v14c0 1.1-.9 2-2 2H5c-1.1 0-2-.9-2-2V5c0-1.1.9-2 2-2zm0 4v5h14V7H5zm0 7v5h14v-5H5z"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></symbol>
+  <symbol id="i-store" viewBox="0 0 24 24"><path d="M20 4H4v2h16V4zm1 10v-2l-1-6H4L3 12v2h1v6h5v-6h4v6h5v-6h1zm-3 4H5v-4h14v4z"/></symbol>
+</svg>
+
+<div class="page-head">
+  <div>
+    <h1>Reports — Sales Analytics</h1>
+    <p>Role-aware mockup of lib/ui/screens/sales_analytics_screen.dart</p>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <div class="chips" id="roleSwitcher">
+      <button class="chip on" data-role="owner" onclick="setRole('owner')">Owner</button>
+      <button class="chip" data-role="staff" onclick="setRole('staff')">Staff</button>
+    </div>
+    <button class="theme-toggle" onclick="toggleTheme()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
+      <span id="themeLabel">Light mode</span>
+    </button>
+  </div>
+</div>
+
+<div class="frames-legend">
+  <span class="role-chip role-owner" id="roleChip">Owner</span>
+  <span id="roleFlowText">Owner export menu: PDF and Excel only.</span>
+</div>
+
+<div class="frames">
+  <div class="frame-wrap">
+    <div class="frame-label" id="frameLabel">Reports — Owner</div>
+    <div class="phone">
+      <div class="statusbar">
+        <span>9:41</span>
+        <span class="icons">
+          <svg><use href="#i-wifi"/></svg>
+          <svg><use href="#i-batt"/></svg>
+        </span>
+      </div>
+      <div class="appbar">
+        <div class="back">
+          <svg><use href="#i-back"/></svg>
+        </div>
+        <div class="title"><h2>Reports</h2></div>
+        <div class="act" onclick="openExport()">
+          <svg><use href="#i-download"/></svg>
+        </div>
+        <div class="act"><svg class="ic-moon"><use href="#i-moon"/></svg></div>
+        <div class="act" title="Notifications">
+          <div class="bell-wrap"><svg><use href="#i-bell"/></svg></div>
+        </div>
+        <div class="avatar" id="avatar">OW</div>
+      </div>
+      <div class="screen">
+        <div class="screen-body">
+
+          <!-- KPIs -->
+          <div class="kpi-grid">
+            <div class="kpi-card primary">
+              <div class="kpi-head">
+                <div class="icircle c-blue"><svg><use href="#i-wallet"/></svg></div>
+                <span class="kpi-label">Total Sales</span>
+              </div>
+              <div class="kpi-value">₱19,300.00</div>
+              <div class="kpi-sub up">▲ 8.5% vs previous period</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-head">
+                <div class="icircle c-purple"><svg><use href="#i-receipt"/></svg></div>
+                <span class="kpi-label">Transactions</span>
+              </div>
+              <div class="kpi-value">102</div>
+              <div class="kpi-sub up">▲ 5.2% vs previous period</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-head">
+                <div class="icircle c-green"><svg><use href="#i-trend"/></svg></div>
+                <span class="kpi-label">Average Sale</span>
+              </div>
+              <div class="kpi-value">₱189.22</div>
+              <div class="kpi-sub up">▲ 3.1% vs previous period</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-head">
+                <div class="icircle c-blue"><svg><use href="#i-box"/></svg></div>
+                <span class="kpi-label">Items Sold</span>
+              </div>
+              <div class="kpi-value">276</div>
+              <div class="kpi-sub up">▲ 4.8% vs previous period</div>
+            </div>
+          </div>
+
+          <!-- Period selector -->
+          <div class="period-selector">
+            <div class="period-bar">
+              <div class="segmented">
+                <button class="segment" data-period="daily" onclick="setPeriod('daily')">Daily</button>
+                <button class="segment on" data-period="weekly" onclick="setPeriod('weekly')">Weekly</button>
+                <button class="segment" data-period="monthly" onclick="setPeriod('monthly')">Monthly</button>
+              </div>
+              <div class="cal-btn"><svg><use href="#i-calendar"/></svg></div>
+            </div>
+            <div class="date-nav">
+              <div class="nav"><svg><use href="#i-chevron-left"/></svg></div>
+              <div class="range">Sep 1 - Sep 7, 2026</div>
+              <div class="nav"><svg><use href="#i-chevron"/></svg></div>
+            </div>
+          </div>
+
+          <!-- Period header -->
+          <div class="period-header">
+            <div>
+              <div class="period-title">This Week</div>
+              <div class="period-dates">9/1/2026 - 9/7/2026</div>
+            </div>
+            <button class="set-store">
+              <svg><use href="#i-store"/></svg>
+              Set store
+            </button>
+          </div>
+
+          <!-- Actions bar -->
+          <div class="actions-bar">
+            <button class="btn btn-outlined" onclick="openFilter()">
+              <svg><use href="#i-filter"/></svg>
+              Filters
+            </button>
+            <div class="spacer"></div>
+            <button class="btn btn-primary" onclick="openExport()">
+              <svg><use href="#i-download"/></svg>
+              Export
+            </button>
+          </div>
+
+          <!-- Sales Trend -->
+          <div>
+            <div class="section-heading">Sales Trend</div>
+            <div class="mini-bar-chart">
+              <div class="mini-bar-row" id="trendBars">
+                <div class="mini-bar"><div class="value">₱1.2k</div><div class="bar" style="height:18%"></div><div class="label">Mon</div></div>
+                <div class="mini-bar"><div class="value">₱2.1k</div><div class="bar" style="height:32%"></div><div class="label">Tue</div></div>
+                <div class="mini-bar"><div class="value">₱1.8k</div><div class="bar" style="height:28%"></div><div class="label">Wed</div></div>
+                <div class="mini-bar"><div class="value">₱2.5k</div><div class="bar" style="height:38%"></div><div class="label">Thu</div></div>
+                <div class="mini-bar"><div class="value">₱3.0k</div><div class="bar" style="height:46%"></div><div class="label">Fri</div></div>
+                <div class="mini-bar"><div class="value">₱2.2k</div><div class="bar" style="height:34%"></div><div class="label">Sat</div></div>
+                <div class="mini-bar highlight"><div class="value">₱6.5k</div><div class="bar" style="height:100%"></div><div class="label">Sun</div></div>
+              </div>
+            </div>
+            <div class="chart-legend">
+              <div class="legend-item"><span class="legend-dot" style="background:var(--primary)"></span>Sales</div>
+              <div class="legend-item"><span class="legend-dot" style="background:var(--info)"></span>Top</div>
+            </div>
+          </div>
+
+          <!-- Payment Methods -->
+          <div>
+            <div class="section-heading">Payment Methods</div>
+            <div class="donut-wrap">
+              <div class="donut" style="background: conic-gradient(var(--primary) 0% 62%, var(--success) 62% 100%);">
+                <div class="donut-hole"><b>102</b><span>transactions</span></div>
+              </div>
+              <div class="donut-legend">
+                <div class="donut-legend-item">
+                  <span class="dot" style="background:var(--primary)"></span>
+                  <span class="label">Cash</span>
+                  <span class="count">62</span>
+                  <span class="value">₱11,973.00</span>
+                </div>
+                <div class="donut-legend-item">
+                  <span class="dot" style="background:var(--success)"></span>
+                  <span class="label">GCash</span>
+                  <span class="count">40</span>
+                  <span class="value">₱7,327.00</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Top Products -->
+          <div>
+            <div class="section-heading">Top Products</div>
+            <div class="hbar-list">
+              <div class="hbar-row">
+                <div class="hbar-label">Chicken Adobo Rice</div>
+                <div class="hbar-track"><div class="hbar-fill" style="width:78%"></div></div>
+                <div class="hbar-value">68 sold</div>
+              </div>
+              <div class="hbar-row">
+                <div class="hbar-label">Iced Tea</div>
+                <div class="hbar-track"><div class="hbar-fill" style="width:52%"></div></div>
+                <div class="hbar-value">80 sold</div>
+              </div>
+              <div class="hbar-row">
+                <div class="hbar-label">Pastil</div>
+                <div class="hbar-track"><div class="hbar-fill" style="width:35%"></div></div>
+                <div class="hbar-value">120 sold</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sales by Category -->
+          <div>
+            <div class="section-heading">Sales by Category</div>
+            <div class="hbar-list">
+              <div class="hbar-row">
+                <div class="hbar-label">Meals</div>
+                <div class="hbar-track"><div class="hbar-fill" style="width:60%"></div></div>
+                <div class="hbar-value">160 items</div>
+              </div>
+              <div class="hbar-row">
+                <div class="hbar-label">Drinks</div>
+                <div class="hbar-track"><div class="hbar-fill" style="width:30%"></div></div>
+                <div class="hbar-value">90 items</div>
+              </div>
+              <div class="hbar-row">
+                <div class="hbar-label">Snacks</div>
+                <div class="hbar-track"><div class="hbar-fill" style="width:10%"></div></div>
+                <div class="hbar-value">26 items</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Staff Performance -->
+          <div>
+            <div class="section-heading">Staff Performance</div>
+            <div class="staff-list">
+              <div class="staff-card">
+                <div class="staff-head">
+                  <div class="staff-avatar">M</div>
+                  <div class="staff-meta">
+                    <div class="staff-name">Maria Santos</div>
+                    <div class="staff-count">60 sales</div>
+                  </div>
+                  <div class="staff-amt">
+                    <div class="staff-total">₱11,580.00</div>
+                    <div class="staff-avg">Avg ₱193.00</div>
+                  </div>
+                </div>
+                <div class="staff-progress"><div class="fill" style="width:100%"></div></div>
+              </div>
+              <div class="staff-card">
+                <div class="staff-head">
+                  <div class="staff-avatar">J</div>
+                  <div class="staff-meta">
+                    <div class="staff-name">Juan Cruz</div>
+                    <div class="staff-count">30 sales</div>
+                  </div>
+                  <div class="staff-amt">
+                    <div class="staff-total">₱5,790.00</div>
+                    <div class="staff-avg">Avg ₱193.00</div>
+                  </div>
+                </div>
+                <div class="staff-progress"><div class="fill" style="width:50%"></div></div>
+              </div>
+              <div class="staff-card">
+                <div class="staff-head">
+                  <div class="staff-avatar">A</div>
+                  <div class="staff-meta">
+                    <div class="staff-name">Ana Reyes</div>
+                    <div class="staff-count">12 sales</div>
+                  </div>
+                  <div class="staff-amt">
+                    <div class="staff-total">₱1,930.00</div>
+                    <div class="staff-avg">Avg ₱160.83</div>
+                  </div>
+                </div>
+                <div class="staff-progress"><div class="fill" style="width:17%"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Transactions -->
+          <div>
+            <div class="section-heading">Recent Transactions</div>
+            <div class="section-sub">Confirmed sales for the selected period</div>
+            <div class="txn-list">
+              <div class="txn-row">
+                <div class="txn-avatar"><svg><use href="#i-receipt"/></svg></div>
+                <div class="txn-main">
+                  <div class="txn-title">20260907-0103</div>
+                  <div class="txn-sub">9/7/2026 9:45 AM · Cashier: Maria Santos</div>
+                </div>
+                <div class="txn-trailing">
+                  <div class="txn-price">₱120.00</div>
+                </div>
+                <div class="txn-chips">
+                  <span class="pill pill-solid-green">Paid</span>
+                  <span class="pill pill-outline">Cash</span>
+                </div>
+              </div>
+              <div class="txn-row">
+                <div class="txn-avatar"><svg><use href="#i-receipt"/></svg></div>
+                <div class="txn-main">
+                  <div class="txn-title">20260907-0102</div>
+                  <div class="txn-sub">9/7/2026 9:30 AM · Cashier: Maria Santos</div>
+                </div>
+                <div class="txn-trailing">
+                  <div class="txn-price">₱450.00</div>
+                </div>
+                <div class="txn-chips">
+                  <span class="pill pill-solid-green">Paid</span>
+                  <span class="pill pill-outline">GCash</span>
+                </div>
+              </div>
+              <div class="txn-row">
+                <div class="txn-avatar"><svg><use href="#i-receipt"/></svg></div>
+                <div class="txn-main">
+                  <div class="txn-title">20260906-0089</div>
+                  <div class="txn-sub">9/6/2026 9:12 AM · Cashier: Juan Cruz</div>
+                </div>
+                <div class="txn-trailing">
+                  <div class="txn-price">₱80.00</div>
+                </div>
+                <div class="txn-chips">
+                  <span class="pill pill-amber">Pending</span>
+                  <span class="pill pill-outline">Cash</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes" id="frameNotes">
+      Owner view: full analytics, export as PDF or Excel, and the option to open store settings.
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay" onclick="closeSheets()"></div>
+
+<div class="bottom-sheet" id="filterSheet">
+  <div class="sheet-close" onclick="closeSheets()"><svg><use href="#i-close"/></svg></div>
+  <div class="sheet-title">Filters</div>
+  <div class="filter-field">
+    <label>Payment method</label>
+    <select class="filter-select">
+      <option>All methods</option>
+      <option>Cash</option>
+      <option>GCash</option>
+    </select>
+  </div>
+  <div class="filter-field">
+    <label>Payment status</label>
+    <select class="filter-select">
+      <option>All active</option>
+      <option>Pending</option>
+      <option>Confirmed</option>
+      <option>Failed</option>
+      <option>Cancelled</option>
+      <option>Refunded</option>
+    </select>
+  </div>
+  <div class="filter-actions">
+    <button class="btn btn-outlined" onclick="showToast('Filters cleared', 'info'); closeSheets()">Clear</button>
+    <button class="btn btn-primary" onclick="showToast('Filters applied', 'success'); closeSheets()">Apply</button>
+  </div>
+</div>
+
+<div class="bottom-sheet" id="exportSheet">
+  <div class="sheet-close" onclick="closeSheets()"><svg><use href="#i-close"/></svg></div>
+  <div class="sheet-title" id="sheetTitle">Export Report</div>
+  <div class="sheet-item" onclick="showToast('PDF exported', 'success'); closeSheets()">
+    <div class="icircle c-red"><svg><use href="#i-pdf"/></svg></div>
+    <div class="grow">
+      <div class="name">PDF</div>
+      <div class="sub">Print-friendly sales summary</div>
+    </div>
+    <svg style="width:18px;height:18px;fill:var(--text-3)"><use href="#i-chevron"/></svg>
+  </div>
+  <div class="sheet-item" onclick="showToast('Excel exported', 'success'); closeSheets()">
+    <div class="icircle c-green"><svg><use href="#i-table"/></svg></div>
+    <div class="grow">
+      <div class="name">Excel</div>
+      <div class="sub">Spreadsheet with summary and transactions</div>
+    </div>
+    <svg style="width:18px;height:18px;fill:var(--text-3)"><use href="#i-chevron"/></svg>
+  </div>
+  <div class="sheet-item" id="submitRow" style="display:none" onclick="showToast('Report submitted to Owner', 'success'); closeSheets()">
+    <div class="icircle c-blue"><svg><use href="#i-send"/></svg></div>
+    <div class="grow">
+      <div class="name">Submit to Owner</div>
+      <div class="sub">Staff workflow: generate PDF and send</div>
+    </div>
+    <svg style="width:18px;height:18px;fill:var(--text-3)"><use href="#i-chevron"/></svg>
+  </div>
+</div>
+
+<script src="mockup.js"></script>
+<script>
+const state = { role: 'owner' };
+
+function setRole(role) {
+  state.role = role;
+  document.getElementById('roleChip').textContent = role === 'owner' ? 'Owner' : 'Staff';
+  document.getElementById('roleChip').className = 'role-chip ' + (role === 'owner' ? 'role-owner' : 'role-staff');
+  document.getElementById('roleFlowText').textContent = role === 'owner'
+    ? 'Owner export menu: PDF and Excel only.'
+    : 'Staff export menu: PDF, Excel, and Submit to Owner.';
+  document.getElementById('frameLabel').textContent = 'Reports — ' + (role === 'owner' ? 'Owner' : 'Staff');
+  document.getElementById('avatar').textContent = role === 'owner' ? 'OW' : 'ST';
+  document.getElementById('sheetTitle').textContent = role === 'owner' ? 'Export Report' : 'Report';
+  document.getElementById('submitRow').style.display = role === 'owner' ? 'none' : 'flex';
+  document.getElementById('frameNotes').textContent = role === 'owner'
+    ? 'Owner view: full analytics, export as PDF or Excel, and the option to open store settings.'
+    : 'Staff view: full analytics, export as PDF or Excel, and submit to Owner from the same menu.';
+
+  document.querySelectorAll('#roleSwitcher .chip').forEach(c => c.classList.toggle('on', c.dataset.role === role));
+}
+
+function setPeriod(period) {
+  document.querySelectorAll('.segmented .segment').forEach(s => s.classList.toggle('on', s.dataset.period === period));
+  const labels = period === 'daily'
+    ? ['9/1', '9/2', '9/3', '9/4', '9/5', '9/6', '9/7']
+    : period === 'weekly'
+    ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    : ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
+  const bars = document.querySelectorAll('#trendBars .mini-bar');
+  bars.forEach((bar, i) => {
+    if (labels[i]) {
+      bar.querySelector('.label').textContent = labels[i];
+    }
+  });
+}
+
+function openFilter() {
+  document.getElementById('overlay').classList.add('show');
+  document.getElementById('filterSheet').classList.add('show');
+}
+
+function openExport() {
+  closeSheets();
+  document.getElementById('overlay').classList.add('show');
+  document.getElementById('exportSheet').classList.add('show');
+}
+
+function closeSheets() {
+  document.getElementById('overlay').classList.remove('show');
+  document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('show'));
+}
+</script>
+</body>
+</html>

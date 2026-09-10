@@ -76,10 +76,11 @@
   .overlay { position: absolute; inset: 0; background: rgba(0,0,0,.35); z-index: 3; display: none; cursor: pointer; }
 
   /* Dropdown menu anchored to top-right */
-  .dropdown { position: absolute; top: 8px; right: 10px; width: 264px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 16px 40px rgba(0,0,0,.30); z-index: 4; overflow: hidden; display: none; }
+  .dropdown { position: absolute; top: 8px; right: 10px; width: max-content; min-width: 150px; max-width: 260px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 16px 40px rgba(0,0,0,.30); z-index: 4; overflow: hidden; display: none; }
   .phone.open .overlay,
   .phone.open .dropdown { display: block; }
   .dropdown-header { padding: 14px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--divider); }
+  .dropdown-header > div:last-child { min-width: 0; overflow-wrap: break-word; }
   .avatar-lg { width: 48px; height: 48px; border-radius: 50%; background: var(--primary); color: #fff; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .user-name { font-size: 14.5px; font-weight: 700; color: var(--text); }
   .role-wrap { margin-top: 4px; }
@@ -91,7 +92,7 @@
   .menu-item.logout .ic { background: rgba(220,38,38,.16); }
   .menu-item.logout .ic svg { fill: var(--error); }
   .menu-item.logout .label { color: var(--error); }
-  .menu-item .label { flex: 1; font-size: 14px; font-weight: 600; color: var(--text); }
+  .menu-item .label { flex: 1; font-size: 14px; font-weight: 600; color: var(--text); min-width: 0; overflow-wrap: break-word; }
 
   /* Fake background page content */
   .page-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 16px; }

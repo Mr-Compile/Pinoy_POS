@@ -643,6 +643,7 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
                 AppTextFormField(
                   controller: usernameController,
                   label: 'Username',
+                  hint: 'juan.c',
                   prefixIcon: Icons.person_outline,
                   textInputAction: TextInputAction.next,
                   onChanged: (_) => state.markChanged(),
@@ -653,6 +654,7 @@ class _StaffDetailScreenState extends ConsumerState<StaffDetailScreen> {
                 AppTextFormField(
                   controller: fullNameController,
                   label: 'Full Name',
+                  hint: 'Juan Dela Cruz',
                   prefixIcon: Icons.person,
                   textInputAction: TextInputAction.next,
                   onChanged: (_) => state.markChanged(),

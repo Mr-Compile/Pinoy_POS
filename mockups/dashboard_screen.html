@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinoy POS — Dashboard Screen (lib/ui/screens/dashboard_screen.dart)</title>
+<link rel="stylesheet" href="mockup.css">
+<style>
+  .role-switcher { display: flex; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 4px; }
+  .role-switcher button { border: none; background: transparent; color: var(--text-3); border-radius: 20px; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .role-switcher button.on { background: var(--primary); color: #fff; }
+  .role-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; border: 1px solid var(--border); }
+  .role-owner { background: rgba(75,130,233,.16); color: var(--info); border-color: rgba(75,130,233,.4); }
+  .role-admin { background: rgba(139,92,246,.16); color: var(--purple); border-color: rgba(139,92,246,.4); }
+  .role-staff { background: rgba(22,163,74,.16); color: var(--success); border-color: rgba(22,163,74,.4); }
+  .frames-legend { max-width: 900px; margin: 0 auto 24px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; color: var(--text-2); font-size: 13px; }
+
+  .hero { background: linear-gradient(135deg, var(--primary), var(--primary-strong)); border-radius: var(--radius-card); padding: 18px; color: #fff; }
+  .hero .label { font-size: 12px; opacity: .85; }
+  .hero .amount { font-size: 30px; font-weight: 800; margin: 6px 0; }
+  .hero .delta { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; background: rgba(255,255,255,.2); padding: 4px 10px; border-radius: 20px; }
+  .hero .foot { display: flex; gap: 16px; margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.2); }
+  .hero .foot div { font-size: 12px; opacity: .85; }
+  .hero .foot span { font-size: 15px; font-weight: 700; display: block; opacity: 1; }
+
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { padding: 7px 14px; border-radius: 20px; font-size: 12.5px; font-weight: 600; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); cursor: pointer; }
+  .chip.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+  .quick-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .quick-tile { background: var(--surface-elev); border: 1px solid var(--border); border-radius: 14px; padding: 14px 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; cursor: pointer; }
+  .quick-tile .icircle { width: 36px; height: 36px; }
+  .quick-tile .icircle svg { width: 18px; height: 18px; }
+  .quick-tile .title { font-size: 11px; font-weight: 700; color: var(--text); text-align: center; }
+  .quick-tile.primary { background: var(--primary); border-color: var(--primary); }
+  .quick-tile.primary .title { color: #fff; }
+  .quick-tile.primary .icircle { background: rgba(255,255,255,.2); }
+  .quick-tile.primary .icircle svg { fill: #fff; }
+
+  .kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 12px; }
+  .kpi .num { font-size: 17px; font-weight: 800; color: var(--text); }
+  .kpi .lbl { font-size: 10.5px; color: var(--text-3); margin-top: 3px; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 14px; }
+  .card h3 { font-size: 14.5px; font-weight: 700; color: var(--text); margin-bottom: 12px; }
+  .mini-bars { display: flex; align-items: flex-end; gap: 6px; height: 90px; padding: 6px 0; }
+  .bar { flex: 1; border-radius: 4px 4px 0 0; background: var(--primary); }
+  .bar.dim { opacity: .25; }
+  .bar-labels { display: flex; justify-content: space-between; color: var(--text-3); font-size: 10px; margin-top: 4px; }
+
+  .progress-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; }
+  .progress-row + .progress-row { border-top: 1px solid var(--divider); }
+  .progress-track { flex: 1; height: 6px; border-radius: 3px; background: var(--surface-elev); overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 3px; background: var(--info); }
+  .progress-row .pct { font-size: 11px; font-weight: 700; color: var(--info); min-width: 34px; text-align: right; }
+  .progress-row .pay-name { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 5px; }
+
+  .log-row { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; }
+  .log-row + .log-row { border-top: 1px solid var(--divider); }
+  .log-row .title { font-size: 13px; font-weight: 700; color: var(--text); }
+  .log-row .meta { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M12 21l3.5-4.5c-.97-.74-2.18-1.16-3.5-1.16s-2.53.42-3.5 1.16L12 21zM12 3C7.31 3 3.07 4.69 0 7.55l1.93 2.43C4.48 7.9 8.01 6.4 12 6.4s7.52 1.5 10.07 3.58L24 7.55C20.93 4.69 16.69 3 12 3z"/></symbol>
+  <symbol id="i-batt" viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></symbol>
+  <symbol id="i-dash" viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></symbol>
+  <symbol id="i-cart" viewBox="0 0 24 24"><path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.13.12-.27.12-.42 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/></symbol>
+  <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M19.5 3.5 18 2l-1.5 1.5L15 2l-1.5 1.5L12 2l-1.5 1.5L9 2 7.5 3.5 6 2 4.5 3.5 3 2v20l1.5-1.5L6 22l1.5-1.5L9 22l1.5-1.5L12 22l1.5-1.5L15 22l1.5-1.5L18 22l1.5-1.5L21 22V2l-1.5 1.5zM19 19.09H5V4.91h14v14.18z"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="M20 2H4c-1 0-2 .9-2 2v3.01c0 .72.43 1.34 1 1.69V20c0 1.1 1.1 2 2 2h14c.9 0 2-.9 2-2V8.7c.57-.35 1-.97 1-1.69V4c0-1.1-1-2-2-2zm-5 12H9v-2h6v2zm5-7H4V4h16v3z"/></symbol>
+  <symbol id="i-tag" viewBox="0 0 24 24"><path d="m21.41 11.58-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58s1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41s-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/></symbol>
+  <symbol id="i-bar" viewBox="0 0 24 24"><path d="M5 15h4v6H5zM10 10h4v11h-4zM15 5h4v16h-4z"/></symbol>
+  <symbol id="i-people" viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></symbol>
+  <symbol id="i-psych" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84a.484.484 0 0 0-.48.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.488.488 0 0 0-.59.22L2.74 8.87c-.12.22 0 .49.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.39.3.61.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.29.41.48.41h3.84c.24 0 .48-.17.5-.41l.36-2.54c.59-.24 1.13-.58 1.62-.94l2.39.96c.22.08.49 0 .61-.22l1.92-3.32c.12-.22.07-.49-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></symbol>
+  <symbol id="i-backup" viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H8l4-4 4 4h-2z"/></symbol>
+  <symbol id="i-history" viewBox="0 0 24 24"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></symbol>
+  <symbol id="i-delete" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></symbol>
+  <symbol id="i-person" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></symbol>
+  <symbol id="i-person-off" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4zm-6.3 1.36c.6-.19 1.27-.32 1.96-.36C8.94 14.35 12 15.5 12 15.5s3.06-1.15 4.34-1.5c.69.04 1.36.17 1.96.36l-.5 1.28h-11.6z"/></symbol>
+  <symbol id="i-warning" viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></symbol>
+  <symbol id="i-trending" viewBox="0 0 24 24"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></symbol>
+</svg>
+
+<div class="page-head">
+  <div>
+    <h1>Dashboard — lib/ui/screens/dashboard_screen.dart</h1>
+    <p>Role-specific layout: Owner sees business analytics, Admin sees system overview, Staff sees My Work.</p>
+  </div>
+  <div class="role-switcher">
+    <button class="on" data-role="owner" onclick="setRole('owner')">Owner</button>
+    <button data-role="admin" onclick="setRole('admin')">Admin</button>
+    <button data-role="staff" onclick="setRole('staff')">Staff</button>
+  </div>
+  <button class="theme-toggle" onclick="toggleTheme()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
+    <span id="themeLabel">Light mode</span>
+  </button>
+</div>
+
+<div class="frames-legend">
+  <span class="role-chip role-owner">Owner</span>
+  <span id="legendText">Full business dashboard: sales, trend, payments, top products, staff, low stock, recent activity.</span>
+</div>
+
+<div class="frames">
+  <div class="frame-wrap">
+    <div class="frame-label" id="frameLabel">Dashboard — Owner</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="appbar">
+        <div class="title"><h2>Dashboard</h2><div class="sub" id="roleSubtitle">Pinoy POS</div></div>
+        <div class="act"><div class="bell-wrap"><svg><use href="#i-bell"/></svg><span class="badge">2</span></div></div>
+        <div class="avatar" id="avatar">OW</div>
+      </div>
+      <div class="screen">
+        <div class="screen-body">
+
+          <div id="ownerContent">
+            <div class="hero" id="heroKpi">
+              <div class="label">Total Sales · Today</div>
+              <div class="amount">₱12,450.00</div>
+              <div class="delta">▲ 8.4% vs yesterday</div>
+              <div class="foot">
+                <div><span>24</span>transactions</div>
+                <div><span>86</span>items sold</div>
+                <div><span>₱519</span>avg sale</div>
+              </div>
+            </div>
+
+            <div class="chips" id="periodChips" onclick="selectChip(event.target, 'period')">
+              <div class="chip on" data-group="period">Today</div>
+              <div class="chip" data-group="period">Yesterday</div>
+              <div class="chip" data-group="period">This Week</div>
+              <div class="chip" data-group="period">This Month</div>
+            </div>
+
+            <div class="quick-grid">
+              <div class="quick-tile primary" onclick="showToast('New Sale', 'success')"><div class="icircle solid-blue"><svg><use href="#i-cart"/></svg></div><span class="title">New Sale</span></div>
+              <div class="quick-tile" onclick="showToast('Add Product', 'info')"><div class="icircle c-blue"><svg><use href="#i-box"/></svg></div><span class="title">Add Product</span></div>
+              <div class="quick-tile" onclick="showToast('Add Stock', 'info')"><div class="icircle c-amber"><svg><use href="#i-tag"/></svg></div><span class="title">Add Stock</span></div>
+              <div class="quick-tile" onclick="showToast('View Sales', 'info')"><div class="icircle c-blue"><svg><use href="#i-receipt"/></svg></div><span class="title">View Sales</span></div>
+              <div class="quick-tile" onclick="showToast('Reports', 'info')"><div class="icircle c-blue"><svg><use href="#i-bar"/></svg></div><span class="title">Reports</span></div>
+              <div class="quick-tile" onclick="showToast('Manage Staff', 'info')"><div class="icircle c-green"><svg><use href="#i-people"/></svg></div><span class="title">Manage Staff</span></div>
+              <div class="quick-tile" onclick="showToast('AI Advisor', 'info')"><div class="icircle c-purple"><svg><use href="#i-psych"/></svg></div><span class="title">AI Advisor</span></div>
+            </div>
+
+            <div class="card"><h3>Sales Trend</h3><div class="mini-bars"><div class="bar" style="height:40%"></div><div class="bar" style="height:60%"></div><div class="bar" style="height:30%"></div><div class="bar" style="height:80%"></div><div class="bar" style="height:55%"></div><div class="bar" style="height:90%"></div><div class="bar" style="height:70%"></div></div><div class="bar-labels"><span>Mon</span><span>Sun</span></div></div>
+
+            <div class="card"><h3>Payment Methods</h3>
+              <div class="progress-row"><div class="grow"><div class="pay-name">Cash</div><div class="progress-track"><div class="progress-fill" style="width:45%"></div></div></div><div class="pct">45%</div></div>
+              <div class="progress-row"><div class="grow"><div class="pay-name">GCash</div><div class="progress-track"><div class="progress-fill" style="width:35%"></div></div></div><div class="pct">35%</div></div>
+              <div class="progress-row"><div class="grow"><div class="pay-name">Card</div><div class="progress-track"><div class="progress-fill" style="width:20%"></div></div></div><div class="pct">20%</div></div>
+            </div>
+
+            <div class="card"><h3>Top Products</h3>
+              <div class="row"><div class="thumb">🍗</div><div class="grow"><div class="name">Chicken Adobo Rice</div><div class="sub">45 sold</div></div><div class="price">₱3,600</div></div>
+              <div class="row"><div class="thumb">🥤</div><div class="grow"><div class="name">Iced Tea</div><div class="sub">32 sold</div></div><div class="price">₱800</div></div>
+              <div class="row"><div class="thumb">🍚</div><div class="grow"><div class="name">Pastil</div><div class="sub">28 sold</div></div><div class="price">₱280</div></div>
+            </div>
+
+            <div class="card"><h3>Staff Performance</h3>
+              <div class="row"><div class="thumb letter">JD</div><div class="grow"><div class="name">Juan Dela Cruz</div><div class="sub">18 transactions</div></div><div class="price">₱8,240</div></div>
+              <div class="row"><div class="thumb letter">MR</div><div class="grow"><div class="name">Maria Reyes</div><div class="sub">6 transactions</div></div><div class="price">₱4,210</div></div>
+            </div>
+
+            <div class="card"><h3>Low Stock Alert</h3>
+              <div class="row"><div class="thumb">🍗</div><div class="grow"><div class="name">Chicken Adobo Rice</div><div class="sub">Stock: 4 · Meals</div></div><span class="pill pill-amber">Low</span></div>
+              <div class="row"><div class="thumb">🍌</div><div class="grow"><div class="name">Banana Cue</div><div class="sub">Stock: 0 · Snacks</div></div><span class="pill pill-red">Out</span></div>
+            </div>
+
+            <div class="card"><h3>Recent Activity</h3>
+              <div class="log-row"><div class="grow"><div class="title">New sale completed</div><div class="meta">₱450 · Cash · 2 minutes ago</div></div></div>
+              <div class="log-row"><div class="grow"><div class="title">Restocked Pastil</div><div class="meta">+50 units · Juan Dela Cruz · 15m ago</div></div></div>
+            </div>
+          </div>
+
+          <div id="adminContent" class="hidden">
+            <div class="kpi-row" style="grid-template-columns: repeat(2, 1fr);">
+              <div class="kpi"><div class="icircle c-green" style="margin-bottom:8px;"><svg><use href="#i-person"/></svg></div><div class="num">3</div><div class="lbl">Active Users</div></div>
+              <div class="kpi"><div class="icircle c-grey" style="margin-bottom:8px;"><svg><use href="#i-person-off"/></svg></div><div class="num">1</div><div class="lbl">Inactive Users</div></div>
+              <div class="kpi"><div class="icircle c-blue" style="margin-bottom:8px;"><svg><use href="#i-history"/></svg></div><div class="num">12</div><div class="lbl">Recent activity</div></div>
+              <div class="kpi"><div class="icircle c-amber" style="margin-bottom:8px;"><svg><use href="#i-delete"/></svg></div><div class="num">5</div><div class="lbl">Trash Items</div></div>
+            </div>
+
+            <div class="quick-grid" style="grid-template-columns: repeat(3, 1fr);">
+              <div class="quick-tile" onclick="showToast('Manage Users', 'info')"><div class="icircle c-blue"><svg><use href="#i-people"/></svg></div><span class="title">Manage Users</span></div>
+              <div class="quick-tile" onclick="showToast('Backup', 'info')"><div class="icircle c-blue"><svg><use href="#i-backup"/></svg></div><span class="title">Backup</span></div>
+              <div class="quick-tile" onclick="showToast('Trash', 'info')"><div class="icircle c-amber"><svg><use href="#i-delete"/></svg></div><span class="title">Trash</span></div>
+              <div class="quick-tile" onclick="showToast('Activity Logs', 'info')"><div class="icircle c-grey"><svg><use href="#i-history"/></svg></div><span class="title">Activity Logs</span></div>
+              <div class="quick-tile" onclick="showToast('AI Config', 'info')"><div class="icircle c-purple"><svg><use href="#i-psych"/></svg></div><span class="title">AI Config</span></div>
+              <div class="quick-tile" onclick="showToast('Settings', 'info')"><div class="icircle c-grey"><svg><use href="#i-gear"/></svg></div><span class="title">Settings</span></div>
+            </div>
+
+            <div class="card"><h3>Users by Role</h3>
+              <div class="row"><div class="thumb letter">OW</div><div class="grow"><div class="name">Owner</div></div><div class="val">1</div></div>
+              <div class="row"><div class="thumb letter">AD</div><div class="grow"><div class="name">Admin</div></div><div class="val">1</div></div>
+              <div class="row"><div class="thumb letter">ST</div><div class="grow"><div class="name">Staff</div></div><div class="val">2</div></div>
+            </div>
+
+            <div class="card"><h3>System Health</h3>
+              <div class="row"><div class="grow"><div class="name">Database</div><div class="sub">Last backup: today 08:00</div></div><span class="pill pill-solid-green">OK</span></div>
+              <div class="row"><div class="grow"><div class="name">AI Service</div><div class="sub">Groq API connected</div></div><span class="pill pill-solid-green">OK</span></div>
+            </div>
+
+            <div class="card"><h3>Needs Attention</h3>
+              <div class="log-row"><div class="icircle c-amber sm"><svg><use href="#i-warning"/></svg></div><div class="grow"><div class="title">1 inactive user</div><div class="meta">Review in Users screen</div></div></div>
+            </div>
+
+            <div class="card"><h3>Recent Activity</h3>
+              <div class="log-row"><div class="grow"><div class="title">Backup completed</div><div class="meta">Admin · 1 hour ago</div></div></div>
+              <div class="log-row"><div class="grow"><div class="title">User password reset</div><div class="meta">Admin · 3 hours ago</div></div></div>
+            </div>
+          </div>
+
+          <div id="staffContent" class="hidden">
+            <div class="hero">
+              <div class="label">My Sales · Today</div>
+              <div class="amount">₱4,210.00</div>
+              <div class="delta">▲ 5.2% vs yesterday</div>
+              <div class="foot">
+                <div><span>8</span>transactions</div>
+                <div><span>24</span>items sold</div>
+                <div><span>₱526</span>avg sale</div>
+              </div>
+            </div>
+
+            <div class="quick-grid">
+              <div class="quick-tile primary" onclick="showToast('New Sale', 'success')"><div class="icircle solid-blue"><svg><use href="#i-cart"/></svg></div><span class="title">New Sale</span></div>
+              <div class="quick-tile" onclick="showToast('Add Stock', 'info')"><div class="icircle c-amber"><svg><use href="#i-tag"/></svg></div><span class="title">Add Stock</span></div>
+              <div class="quick-tile" onclick="showToast('View Sales', 'info')"><div class="icircle c-blue"><svg><use href="#i-receipt"/></svg></div><span class="title">View Sales</span></div>
+              <div class="quick-tile" onclick="showToast('AI Advisor', 'info')"><div class="icircle c-purple"><svg><use href="#i-psych"/></svg></div><span class="title">AI Advisor</span></div>
+            </div>
+
+            <div class="card"><h3>Sales Trend</h3><div class="mini-bars"><div class="bar" style="height:35%"></div><div class="bar" style="height:55%"></div><div class="bar" style="height:25%"></div><div class="bar" style="height:70%"></div><div class="bar" style="height:50%"></div><div class="bar" style="height:80%"></div><div class="bar" style="height:60%"></div></div><div class="bar-labels"><span>Mon</span><span>Sun</span></div></div>
+
+            <div class="card"><h3>Low Stock Alert</h3>
+              <div class="row"><div class="thumb">🍗</div><div class="grow"><div class="name">Chicken Adobo Rice</div><div class="sub">Stock: 4 · Meals</div></div><span class="pill pill-amber">Low</span></div>
+            </div>
+
+            <div class="card"><h3>Recent Activity</h3>
+              <div class="log-row"><div class="grow"><div class="title">Sale completed</div><div class="meta">₱450 · Cash · 10m ago</div></div></div>
+              <div class="log-row"><div class="grow"><div class="title">Added stock to Pastil</div><div class="meta">+20 units · 1h ago</div></div></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+      <div class="bottomnav" id="bottomNav">
+        <div class="navitem sel"><span class="navicon"><svg><use href="#i-dash"/></svg></span><span class="navlbl">Dashboard</span></div>
+        <div class="navitem"><span class="navicon"><svg><use href="#i-cart"/></svg></span><span class="navlbl">POS</span></div>
+        <div class="navitem"><span class="navicon"><svg><use href="#i-box"/></svg></span><span class="navlbl">Products</span></div>
+        <div class="navitem"><span class="navicon"><svg><use href="#i-receipt"/></svg></span><span class="navlbl">Sales</span></div>
+        <div class="navitem"><span class="navicon"><svg><use href="#i-more"/></svg></span><span class="navlbl">More</span></div>
+      </div>
+    </div>
+    <div class="frame-notes" id="frameNotes">Owner sees total sales, trend, payment breakdown, top products, staff performance, low stock, and recent activity. Admin sees system overview. Staff sees own sales only.</div>
+  </div>
+</div>
+
+<script src="mockup.js"></script>
+<script>
+function selectChip(el, group) {
+  if (!el.dataset.group) return;
+  document.querySelectorAll(`[data-group="${group}"]`).forEach(c => c.classList.remove('on'));
+  el.classList.add('on');
+}
+
+const roleData = {
+  owner: {
+    chipClass: 'role-owner',
+    text: 'Full business dashboard: sales, trend, payments, top products, staff, low stock, recent activity.',
+    subtitle: 'Pinoy POS',
+    avatar: 'OW',
+    notes: 'Owner sees total sales, trend, payment breakdown, top products, staff performance, low stock, and recent activity.',
+    nav: [
+      { icon: '#i-dash', label: 'Dashboard', sel: true },
+      { icon: '#i-cart', label: 'POS' },
+      { icon: '#i-box', label: 'Products' },
+      { icon: '#i-receipt', label: 'Sales' },
+      { icon: '#i-more', label: 'More' }
+    ]
+  },
+  admin: {
+    chipClass: 'role-admin',
+    text: 'System overview: user counts, backup/restore, AI config, activity logs. No business sales data.',
+    subtitle: 'System Overview',
+    avatar: 'AD',
+    notes: 'Admin sees active/inactive users, users by role, system health, needs attention, and recent activity. No sales data.',
+    nav: [
+      { icon: '#i-dash', label: 'Dashboard', sel: true },
+      { icon: '#i-people', label: 'Users' },
+      { icon: '#i-backup', label: 'Backup' },
+      { icon: '#i-gear', label: 'Settings' },
+      { icon: '#i-more', label: 'More' }
+    ]
+  },
+  staff: {
+    chipClass: 'role-staff',
+    text: 'My Work dashboard: own sales trend, quick actions, low stock, recent activity.',
+    subtitle: 'My Work',
+    avatar: 'ST',
+    notes: 'Staff sees My Sales, low stock, and own recent activity. No business-wide analytics or staff performance.',
+    nav: [
+      { icon: '#i-dash', label: 'Dashboard', sel: true },
+      { icon: '#i-cart', label: 'POS' },
+      { icon: '#i-box', label: 'Products' },
+      { icon: '#i-receipt', label: 'My Sales' },
+      { icon: '#i-more', label: 'More' }
+    ]
+  }
+};
+
+function setRole(role) {
+  const data = roleData[role];
+  if (!data) return;
+
+  document.querySelectorAll('.role-switcher button').forEach(b => b.classList.toggle('on', b.dataset.role === role));
+
+  const chip = document.querySelector('.frames-legend .role-chip');
+  chip.className = 'role-chip ' + data.chipClass;
+  chip.textContent = role === 'admin' ? 'System Admin' : role.charAt(0).toUpperCase() + role.slice(1);
+  document.getElementById('legendText').textContent = data.text;
+  document.getElementById('frameLabel').textContent = 'Dashboard — ' + data.subtitle;
+  document.getElementById('roleSubtitle').textContent = data.subtitle;
+  document.getElementById('avatar').textContent = data.avatar;
+  document.getElementById('frameNotes').textContent = data.notes;
+
+  document.getElementById('ownerContent').classList.toggle('hidden', role !== 'owner');
+  document.getElementById('adminContent').classList.toggle('hidden', role !== 'admin');
+  document.getElementById('staffContent').classList.toggle('hidden', role !== 'staff');
+
+  const nav = document.getElementById('bottomNav');
+  nav.innerHTML = data.nav.map(item => `
+    <div class="navitem ${item.sel ? 'sel' : ''}">
+      <span class="navicon"><svg><use href="${item.icon}"/></svg></span>
+      <span class="navlbl">${item.label}</span>
+    </div>
+  `).join('');
+}
+
+setRole('owner');
+</script>
+</body>
+</html>

@@ -3,20 +3,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/spacing.dart';
-import 'package:pinoy_pos/data/models/product.dart';
 import 'package:pinoy_pos/data/models/category.dart';
+import 'package:pinoy_pos/data/models/product.dart';
+import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/catalog_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/dialogs/category_dialog.dart';
 import 'package:pinoy_pos/ui/dialogs/product_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_button.dart';
+import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
-import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
-import 'package:pinoy_pos/ui/widgets/app_list_item.dart';
+import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/app_status_chip.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
@@ -151,7 +152,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     if (confirmed == true && mounted) {
       try {
         final productService = ref.read(productServiceProvider);
-      await productService.deleteProduct(product.id!);
+        await productService.deleteProduct(product.id!);
         if (mounted) {
           await AppDialogService.success(context, title: 'Deleted', message: 'Product deleted successfully.');
           bumpCatalogRevision(ref);
@@ -194,46 +195,80 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
       appBar: const AppHeader(title: 'Products'),
       floatingActionButton: createFab,
       body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          _buildRoleChipBar(),
           if (_stockSummary.total > 0) _buildStatsStrip(),
-          CrudToolbar(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-            search: AppSearchField(
-              controller: _searchController,
-              hint: 'Search products',
-              onChanged: _onSearchChanged,
-            ),
-            controls: [
-              SizedBox(
-                width: 220,
-                child: AppDropdownField<int?>(
-                  initialValue: _selectedCategoryId,
-                  label: 'Category',
-                  isDense: true,
-                  items: [
-                    const DropdownMenuItem<int?>(
-                      value: null,
-                      child: Text('All'),
-                    ),
-                    ..._categories.map((category) => DropdownMenuItem<int?>(
-                          value: category.id,
-                          child: Text(category.name),
-                        )),
-                  ],
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedCategoryId = value;
-                    });
-                  },
-                ),
-              ),
-            ],
-            primaryAction: toolbarAction,
-          ),
+          _buildToolbar(toolbarAction),
           Expanded(
             child: _filteredProducts.isEmpty
                 ? _buildEmptyState()
                 : _buildProductList(canEdit, canDelete, bottomClearance),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRoleChipBar() {
+    final cs = Theme.of(context).colorScheme;
+    final user = ref.read(authStateProvider).user;
+    final isOwner = user?.role == UserRole.owner;
+    final roleColor = isOwner
+        ? AppSemanticColors.resolve(AppSemanticColors.info, Theme.of(context).brightness)
+        : AppSemanticColors.resolve(AppSemanticColors.success, Theme.of(context).brightness);
+
+    final label = isOwner ? 'Owner' : 'Staff';
+    final permText = isOwner
+        ? 'view/edit/delete products'
+        : 'view products only';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        Spacing.lg,
+        Spacing.md,
+        Spacing.lg,
+        0,
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 5,
+            ),
+            decoration: BoxDecoration(
+              color: roleColor.withValues(alpha: 0.16),
+              border: Border.all(color: roleColor.withValues(alpha: 0.4)),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.person_outline,
+                  size: 12,
+                  color: roleColor,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: AppTypography.labelSmall(context).copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: roleColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: Spacing.sm),
+          Expanded(
+            child: Text(
+              permText,
+              style: AppTypography.bodySmall(context).copyWith(
+                color: cs.onSurfaceVariant,
+              ),
+            ),
           ),
         ],
       ),
@@ -309,6 +344,88 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     );
   }
 
+  Widget _buildToolbar(Widget? primaryAction) {
+    return CrudToolbar(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      search: AppSearchField(
+        controller: _searchController,
+        hint: 'Search products',
+        onChanged: _onSearchChanged,
+      ),
+      controls: [
+        _buildCategoryFilter(),
+      ],
+      primaryAction: primaryAction,
+    );
+  }
+
+  Widget _buildCategoryFilter() {
+    final cs = Theme.of(context).colorScheme;
+    final selectedLabel =
+        _selectedCategoryId == null ? 'All' : _categoryName(_selectedCategoryId);
+
+    return PopupMenuButton<int?>(
+      initialValue: _selectedCategoryId,
+      onSelected: (value) => setState(() => _selectedCategoryId = value),
+      offset: const Offset(0, 40),
+      itemBuilder: (context) => [
+        PopupMenuItem<int?>(
+          value: null,
+          child: Row(
+            children: [
+              Icon(Icons.all_inbox, size: 18, color: cs.onSurfaceVariant),
+              const SizedBox(width: 8),
+              const Text('All'),
+            ],
+          ),
+        ),
+        ..._categories.map((category) {
+          return PopupMenuItem<int?>(
+            value: category.id,
+            child: Row(
+              children: [
+                Icon(Icons.label_outline, size: 18, color: cs.onSurfaceVariant),
+                const SizedBox(width: 8),
+                Text(category.name),
+              ],
+            ),
+          );
+        }),
+      ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 8,
+        ),
+        decoration: BoxDecoration(
+          color: cs.surface,
+          border: Border.all(color: cs.outline),
+          borderRadius: BorderRadius.circular(AppRadius.control),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.filter_list,
+              size: 18,
+              color: cs.onSurfaceVariant,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              selectedLabel,
+              style: AppTypography.bodySmall(context),
+            ),
+            Icon(
+              Icons.arrow_drop_down,
+              size: 18,
+              color: cs.onSurfaceVariant,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildEmptyState() {
     final authNotifier = ref.read(authStateProvider.notifier);
     final canEditCategories = authNotifier.hasPermission('edit_categories');
@@ -365,129 +482,311 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     bool canDelete,
     double bottomClearance,
   ) {
-    return ListView.builder(
-      padding: EdgeInsets.fromLTRB(
+    return AppCard(
+      margin: const EdgeInsets.fromLTRB(
         Spacing.lg,
         Spacing.lg,
         Spacing.lg,
-        Spacing.lg + bottomClearance,
+        Spacing.lg,
       ),
-      itemCount: _filteredProducts.length,
-      itemBuilder: (context, index) {
-        final product = _filteredProducts[index];
-        final category = _categories.firstWhere(
-          (c) => c.id == product.categoryId,
-          orElse: () => Category(
-            id: 0,
-            name: 'Uncategorized',
-            createdAt: DateTime.now(),
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildCardHead(
+            'All Products',
+            Icons.inventory_2_outlined,
+            '${_filteredProducts.length} items',
+            Theme.of(context).colorScheme.primary,
           ),
-        );
-        return _buildProductItem(product, category, canEdit, canDelete);
-      },
+          Expanded(
+            child: ListView.separated(
+              padding: EdgeInsets.fromLTRB(
+                Spacing.md,
+                Spacing.sm,
+                Spacing.md,
+                bottomClearance + Spacing.md,
+              ),
+              itemCount: _filteredProducts.length,
+              separatorBuilder: (context, index) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final product = _filteredProducts[index];
+                final category = _categories.firstWhere(
+                  (c) => c.id == product.categoryId,
+                  orElse: () => Category(
+                    id: 0,
+                    name: 'Uncategorized',
+                    createdAt: DateTime.now(),
+                  ),
+                );
+                return _buildProductRow(
+                  product,
+                  category,
+                  canEdit,
+                  canDelete,
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildProductItem(
+  Widget _buildCardHead(
+    String title,
+    IconData icon,
+    String pill,
+    Color color,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.all(Spacing.md),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+            child: Icon(
+              icon,
+              color: color,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: Spacing.sm),
+          Text(
+            title,
+            style: AppTypography.titleMediumBold(context),
+          ),
+          const Spacer(),
+          AppStatusChip(
+            label: pill,
+            color: color,
+            filled: true,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProductRow(
     Product product,
     Category category,
     bool canEdit,
     bool canDelete,
   ) {
     final cs = Theme.of(context).colorScheme;
-    final isOutOfStock = product.stock <= 0;
-    final isLowStock = !isOutOfStock && product.isLowStock;
 
-    final String? statusLabel;
-    final Color? statusColor;
-    final IconData? statusIcon;
-    if (isOutOfStock) {
-      statusLabel = 'Out of stock';
-      statusColor = cs.error;
-      statusIcon = Icons.error_outline;
-    } else if (isLowStock) {
-      statusLabel = 'Low stock';
-      statusColor = AppSemanticColors.resolve(
-        AppSemanticColors.warning,
-        Theme.of(context).brightness,
-      );
-      statusIcon = Icons.warning_amber;
-    } else {
-      statusLabel = null;
-      statusColor = null;
-      statusIcon = null;
-    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: Spacing.md,
+        vertical: Spacing.sm,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          _buildProductThumb(product),
+          const SizedBox(width: Spacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  product.name,
+                  style: AppTypography.titleMediumSemibold(context),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: Spacing.xs),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildMiniChip(category.name),
+                    const SizedBox(width: Spacing.xs),
+                    Text(
+                      'Stock: ${product.stock}',
+                      style: AppTypography.bodySmall(context).copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: Spacing.sm),
+          Text(
+            CurrencyUtils.format(product.price),
+            style: AppTypography.titleMediumBold(context).copyWith(
+              color: cs.primary,
+            ),
+          ),
+          const SizedBox(width: Spacing.sm),
+          _buildProductActions(product, category, canEdit, canDelete),
+        ],
+      ),
+    );
+  }
 
+  Widget _buildProductThumb(Product product) {
+    final cs = Theme.of(context).colorScheme;
+    final initials = _initials(product.name);
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        border: Border.all(color: cs.outline),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: AppImage(
+        imagePath: product.imageUrl,
+        placeholderIcon: Icons.inventory_2,
+        placeholderIconSize: 24,
+        borderRadius: AppRadius.md,
+        fit: BoxFit.cover,
+        placeholderBuilder: (context) => Center(
+          child: Text(
+            initials,
+            style: AppTypography.labelMedium(context).copyWith(
+              fontWeight: FontWeight.w800,
+              color: cs.onSurface,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMiniChip(String label) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 9,
+        vertical: 3,
+      ),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Text(
+        label,
+        style: AppTypography.labelSmall(context).copyWith(
+          fontWeight: FontWeight.w700,
+          color: cs.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProductActions(
+    Product product,
+    Category category,
+    bool canEdit,
+    bool canDelete,
+  ) {
+    final cs = Theme.of(context).colorScheme;
     final canView =
         ref.read(authStateProvider.notifier).hasPermission('view_products');
+    final neutralColor = cs.onSurfaceVariant;
+    final editColor = cs.primary;
+    final deleteColor = cs.error;
 
-    final actions = <AppListAction>[
+    final items = <PopupMenuEntry<String>>[
       if (canView)
-        AppListAction(
-          icon: Icons.visibility_outlined,
-          onPressed: () => _showProductView(product, category),
-          tooltip: 'View product',
+        PopupMenuItem<String>(
+          value: 'view',
+          child: _buildMenuItem(
+            Icons.visibility_outlined,
+            'View',
+            neutralColor,
+          ),
         ),
       if (canEdit)
-        AppListAction(
-          icon: Icons.edit,
-          onPressed: () => _showProductDialog(product: product),
-          tooltip: 'Edit product',
+        PopupMenuItem<String>(
+          value: 'edit',
+          child: _buildMenuItem(
+            Icons.edit,
+            'Edit',
+            editColor,
+          ),
         ),
       if (canDelete)
-        AppListAction(
-          icon: Icons.delete,
-          color: cs.error,
-          onPressed: () => _deleteProduct(product),
-          tooltip: 'Delete product',
+        PopupMenuItem<String>(
+          value: 'delete',
+          child: _buildMenuItem(
+            Icons.delete,
+            'Delete',
+            deleteColor,
+          ),
         ),
     ];
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: Spacing.md),
-      child: AppListItem(
-        leading: SizedBox(
-          width: 56,
-          height: 56,
-          child: AppImage(
-            imagePath: product.imageUrl,
-            borderRadius: 8,
-            placeholderIcon: Icons.inventory_2,
-            placeholderIconSize: 28,
-            fit: BoxFit.cover,
-          ),
-        ),
-        title: product.name,
-        subtitle: 'Stock: ${product.stock}',
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (statusLabel != null && statusColor != null)
-              AppStatusChip(
-                label: statusLabel,
-                color: statusColor,
-                icon: statusIcon,
-              ),
-            if (statusLabel != null) const SizedBox(width: Spacing.sm),
-            Text(
-              CurrencyUtils.format(product.price),
-              style: AppTypography.titleMediumBold(context)
-                  .copyWith(color: cs.primary),
-            ),
-          ],
-        ),
-        chips: [
-          AppStatusChip(
-            label: category.name,
-            color: cs.primary,
-            icon: Icons.label_outline,
-            filled: false,
-          ),
-        ],
-        actions: actions.isNotEmpty ? actions : null,
-        onTap: canView ? () => _showProductView(product, category) : null,
-      ),
+    if (items.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return PopupMenuButton<String>(
+      icon: Icon(Icons.more_vert, color: cs.onSurfaceVariant),
+      tooltip: 'Product options',
+      padding: EdgeInsets.zero,
+      onSelected: (value) {
+        switch (value) {
+          case 'view':
+            _showProductView(product, category);
+            break;
+          case 'edit':
+            _showProductDialog(product: product);
+            break;
+          case 'delete':
+            _deleteProduct(product);
+            break;
+        }
+      },
+      itemBuilder: (context) => items,
     );
+  }
+
+  Widget _buildMenuItem(IconData icon, String label, Color color) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: TextStyle(
+            color: color,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _initials(String name) {
+    final buffer = StringBuffer();
+    final parts = name.trim().split(RegExp(r'\s+'));
+    for (final part in parts) {
+      if (part.isNotEmpty) {
+        buffer.write(part[0].toUpperCase());
+      }
+      if (buffer.length == 2) break;
+    }
+    return buffer.isEmpty ? '?' : buffer.toString();
+  }
+
+  String _categoryName(int? categoryId) {
+    if (categoryId == null) return 'All';
+    try {
+      return _categories.firstWhere((c) => c.id == categoryId).name;
+    } catch (_) {
+      return 'Uncategorized';
+    }
   }
 
   Future<void> _showProductDialog({Product? product}) async {

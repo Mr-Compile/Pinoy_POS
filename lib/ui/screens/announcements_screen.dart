@@ -306,6 +306,7 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
                 AppTextFormField(
                   controller: titleController,
                   label: 'Title',
+                  hint: 'Announcement title',
                   prefixIcon: Icons.subject,
                   validator: (value) => Validators.required(value, 'Title'),
                   onChanged: (_) => state.markChanged(),
@@ -314,6 +315,7 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
                 AppTextFormField(
                   controller: contentController,
                   label: 'Content',
+                  hint: 'Write the announcement here...',
                   prefixIcon: Icons.message_outlined,
                   maxLines: 4,
                   validator: (value) => Validators.required(value, 'Content'),

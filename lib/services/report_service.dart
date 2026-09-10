@@ -423,7 +423,6 @@ class ReportService {
     final fileFormat = switch (ext) {
       'pdf' => 'pdf',
       'xlsx' || 'xls' => 'excel',
-      'csv' => 'csv',
       _ => 'unknown',
     };
     if (fileFormat == 'unknown') return null;

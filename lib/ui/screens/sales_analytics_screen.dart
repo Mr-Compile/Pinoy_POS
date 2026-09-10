@@ -45,8 +45,21 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
     final canExport =
         ref.read(authStateProvider.notifier).hasPermission('export_reports');
 
+    final headerActions = canExport
+        ? [
+            IconButton(
+              onPressed: _showExportMenu,
+              icon: const Icon(Icons.download_outlined),
+              tooltip: 'Export',
+            ),
+          ]
+        : null;
+
     return Scaffold(
-      appBar: const AppHeader(title: 'Reports'),
+      appBar: AppHeader(
+        title: 'Reports',
+        actions: headerActions,
+      ),
       body: state.isLoading && state.analytics == null
           ? const LoadingState(message: 'Loading sales analytics...')
           : _buildBody(context, state, canExport),
@@ -86,12 +99,9 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
             const SizedBox(height: Spacing.md),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
-              child: AppSection(
-                title: 'Key Performance Indicators',
-                child: SalesSummaryCards(
-                  analytics: analytics,
-                  storeInfo: state.storeInfo,
-                ),
+              child: SalesSummaryCards(
+                analytics: analytics,
+                storeInfo: state.storeInfo,
               ),
             ),
             const SizedBox(height: Spacing.md),
@@ -254,7 +264,7 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
                         const Spacer(),
                         FilledButton(
                           onPressed: () => Navigator.pop(context),
-                          child: const Text('Close'),
+                          child: const Text('Apply'),
                         ),
                       ],
                     ),
@@ -339,7 +349,7 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
     String? value,
     ValueChanged<String?>? onChanged,
   ) {
-    const methods = ['Cash', 'GCash', 'Card', 'Other'];
+    const methods = ['Cash', 'GCash'];
     final items = [
       const DropdownMenuItem<String>(value: null, child: Text('All methods')),
       ...methods.map((m) => DropdownMenuItem<String>(value: m, child: Text(m))),
@@ -485,26 +495,34 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
               _ExportFormatTile(
                 icon: Icons.picture_as_pdf,
                 label: 'PDF',
+                subtitle: 'Print-friendly sales summary',
+                iconColor: AppSemanticColors.resolve(
+                  AppSemanticColors.error,
+                  Theme.of(context).brightness,
+                ),
                 onTap: () => _export(ExportFormat.pdf),
               ),
               _ExportFormatTile(
                 icon: Icons.table_chart,
                 label: 'Excel',
+                subtitle: 'Spreadsheet with summary and transactions',
+                iconColor: AppSemanticColors.resolve(
+                  AppSemanticColors.success,
+                  Theme.of(context).brightness,
+                ),
                 onTap: () => _export(ExportFormat.excel),
               ),
-              _ExportFormatTile(
-                icon: Icons.description,
-                label: 'CSV',
-                onTap: () => _export(ExportFormat.csv),
-              ),
-              if (canSubmit) ...[
-                const Divider(),
+              if (canSubmit)
                 _ExportFormatTile(
                   icon: Icons.send,
                   label: 'Submit to Owner',
+                  subtitle: 'Staff workflow: generate PDF and send',
+                  iconColor: AppSemanticColors.resolve(
+                    AppSemanticColors.primary,
+                    Theme.of(context).brightness,
+                  ),
                   onTap: _submit,
                 ),
-              ],
             ],
           ),
         ),
@@ -609,21 +627,73 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
 class _ExportFormatTile extends StatelessWidget {
   final IconData icon;
   final String label;
+  final String? subtitle;
+  final Color? iconColor;
   final VoidCallback onTap;
 
   const _ExportFormatTile({
     required this.icon,
     required this.label,
+    this.subtitle,
+    this.iconColor,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      leading: Icon(icon),
-      title: Text(label),
-      trailing: const Icon(Icons.chevron_right),
+    final cs = Theme.of(context).colorScheme;
+    final effectiveIconColor = iconColor ?? cs.primary;
+    return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: effectiveIconColor.withValues(alpha: 0.16),
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: Icon(
+                icon,
+                color: effectiveIconColor,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: AppTypography.bodyMediumSemibold(context).copyWith(
+                      color: cs.onSurface,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle!,
+                      style: AppTypography.bodySmall(context).copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              color: cs.onSurfaceVariant,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

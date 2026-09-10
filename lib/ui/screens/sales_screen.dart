@@ -1,8 +1,6 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
-import 'package:pinoy_pos/core/authorization_exception.dart';
 import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/date_utils.dart';
 import 'package:pinoy_pos/core/spacing.dart';
@@ -12,7 +10,6 @@ import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/catalog_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/services/report_export_service.dart';
-import 'package:pinoy_pos/services/sales_import_service.dart';
 import 'package:pinoy_pos/ui/screens/sale_detail_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
@@ -51,7 +48,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
   final _searchController = TextEditingController();
 
   /// Quick-filter payment methods shown as chips below the search bar.
-  static const _paymentMethods = ['GCash', 'Cash', 'Card'];
+  static const _paymentMethods = ['GCash', 'Cash'];
 
   /// Quick period chips shown at the top of the sales screen.
   static const _quickPeriods = [
@@ -284,7 +281,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
   //
   // Direct export of the sales slice currently shown on this screen. This
   // is a data-management action — it reuses the established report export
-  // pipeline (PDF/Excel/CSV) and never enters the staff "submit report"
+  // pipeline (PDF/Excel) and never enters the staff "submit report"
   // workflow.
 
   void _showExportSheet() {
@@ -297,7 +294,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Export Sales',
+                'Export as',
                 style: Theme.of(sheetContext).textTheme.titleMedium,
               ),
               const SizedBox(height: Spacing.md),
@@ -310,11 +307,6 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                 icon: Icons.table_chart,
                 label: 'Excel',
                 onTap: () => _exportSales(ExportFormat.excel),
-              ),
-              _ExportTile(
-                icon: Icons.description,
-                label: 'CSV',
-                onTap: () => _exportSales(ExportFormat.csv),
               ),
             ],
           ),
@@ -374,155 +366,6 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     }
   }
 
-  // ── Sales import ──────────────────────────────────────────────────────
-  //
-  // Owner-only CSV import: pick file -> validate -> preview -> confirm ->
-  // save. This never creates report records; it writes sale rows through
-  // SalesImportService and records an activity-log entry.
-
-  Future<void> _importSales() async {
-    if (_isProcessing) return;
-
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['csv'],
-      withData: true,
-    );
-    if (result == null || result.files.isEmpty || !mounted) return;
-
-    final file = result.files.first;
-    final bytes = file.bytes;
-    if (bytes == null || bytes.isEmpty) {
-      await AppDialogService.warning(
-        context,
-        title: 'No file data',
-        message: 'The selected file could not be read.',
-      );
-      return;
-    }
-
-    final importService = ref.read(salesImportServiceProvider);
-    final SalesImportPreview? preview;
-    try {
-      preview = await importService.previewSalesImport(
-        fileName: file.name,
-        bytes: bytes,
-      );
-    } on AuthorizationException {
-      if (mounted) {
-        await AppDialogService.accessDenied(context);
-      }
-      return;
-    }
-    if (!mounted) return;
-
-    if (preview == null) {
-      await AppDialogService.warning(
-        context,
-        title: 'Not supported',
-        message: 'Sales import is not available on the web.',
-      );
-      return;
-    }
-
-    if (preview.fileError != null) {
-      await AppDialogService.error(
-        context,
-        title: 'Invalid File',
-        message: preview.fileError!,
-        details: 'Expected columns: date, total, payment_method, '
-            'payment_status, cash_received, customer, reference, '
-            'receipt_number, notes.',
-      );
-      return;
-    }
-
-    if (preview.validRows.isEmpty) {
-      await AppDialogService.warning(
-        context,
-        title: 'Nothing to import',
-        message: 'Every row in ${preview.fileName} failed validation.',
-      );
-      return;
-    }
-
-    final confirmed = await _showImportPreview(preview);
-    if (confirmed != true || !mounted) return;
-
-    setState(() => _isProcessing = true);
-    try {
-      final importResult = await importService.importSales(preview);
-      if (!mounted) return;
-
-      final failed = importResult.errors.length;
-      await AppDialogService.success(
-        context,
-        title: 'Import Complete',
-        message:
-            'Imported ${importResult.imported} sale record(s) from ${preview.fileName}.',
-        details: [
-          if (importResult.skipped > 0)
-            '${importResult.skipped} duplicate receipt number(s) skipped',
-          if (preview.invalidRows.isNotEmpty)
-            '${preview.invalidRows.length} row(s) failed validation',
-          if (failed > 0) '$failed row(s) failed to save',
-        ].join('\n'),
-        primaryLabel: 'Done',
-      );
-      _loadSales();
-    } on AuthorizationException {
-      if (mounted) {
-        await AppDialogService.accessDenied(context);
-      }
-    } catch (e) {
-      if (mounted) {
-        await AppDialogService.error(
-          context,
-          title: 'Import Failed',
-          message: 'The sales records could not be imported.',
-          details: e.toString(),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isProcessing = false);
-    }
-  }
-
-  Future<bool?> _showImportPreview(SalesImportPreview preview) {
-    return showDialog<bool>(
-      context: context,
-      useRootNavigator: true,
-      builder: (dialogContext) => AppDialog(
-        type: AppDialogType.confirmation,
-        title: 'Import Sales',
-        message: '${preview.fileName}: ${preview.validRows.length} valid '
-            'row(s), ${preview.invalidRows.length} invalid.',
-        actions: [
-          AppDialogAction(
-            label: 'Cancel',
-            onPressed: (context) =>
-                Navigator.of(context, rootNavigator: true).pop(false),
-          ),
-          AppDialogAction(
-            label: 'Import ${preview.validRows.length} record(s)',
-            isPrimary: true,
-            onPressed: (context) =>
-                Navigator.of(context, rootNavigator: true).pop(true),
-          ),
-        ],
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 240),
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: preview.rows.length > 50 ? 50 : preview.rows.length,
-            itemBuilder: (context, index) =>
-                _ImportPreviewRow(row: preview.rows[index]),
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final authNotifier = ref.read(authStateProvider.notifier);
@@ -556,7 +399,9 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     final pendingCount = _sales.where((s) => s.paymentStatus == 'pending').length;
 
     return Scaffold(
-      appBar: const AppHeader(title: 'My Sales'),
+      appBar: const AppHeader(
+        title: 'My Sales',
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 800),
@@ -668,6 +513,9 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
   }
 
   Widget _buildSearchBar(BuildContext context) {
+    final canExport =
+        ref.read(authStateProvider.notifier).hasPermission('export_reports');
+
     return Row(
       children: [
         Expanded(
@@ -687,24 +535,12 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
           size: AppButtonSize.small,
           color: AppButtonColor.neutral,
         ),
-        if (ref
-            .read(authStateProvider.notifier)
-            .hasPermission('export_reports')) ...[
+        if (canExport) ...[
           const SizedBox(width: Spacing.xs),
           AppIconButton(
             icon: Icons.file_download_outlined,
             tooltip: 'Export sales',
             onPressed: _isProcessing ? null : _showExportSheet,
-          ),
-        ],
-        if (ref
-            .read(authStateProvider.notifier)
-            .hasPermission('import_sales')) ...[
-          const SizedBox(width: Spacing.xs),
-          AppIconButton(
-            icon: Icons.file_upload_outlined,
-            tooltip: 'Import sales',
-            onPressed: _isProcessing ? null : _importSales,
           ),
         ],
         const SizedBox(width: Spacing.xs),
@@ -972,7 +808,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                   ),
                 ),
                 const SizedBox(height: 5),
-                _buildStatusPill(
+                _buildStatusChip(
                   sale.paymentStatus,
                   statusColor,
                   brightness,
@@ -980,23 +816,15 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                 ),
               ],
             ),
-            if (canVoid && sale.paymentStatus == 'confirmed') ...[
-              const SizedBox(width: 4),
-              AppIconButton(
-                icon: Icons.delete,
-                tooltip: 'Void sale',
-                onPressed: () => _voidSale(sale),
-                color: cs.error,
-                size: 20,
-              ),
-            ],
+            const SizedBox(width: Spacing.sm),
+            _buildSaleActions(sale, canVoid),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildStatusPill(
+  Widget _buildStatusChip(
     String status,
     Color color,
     Brightness brightness,
@@ -1010,7 +838,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
         : color;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
       decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: BorderRadius.circular(AppRadius.pill),
@@ -1022,6 +850,73 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
           color: foregroundColor,
         ),
       ),
+    );
+  }
+
+  Widget _buildSaleActions(Sale sale, bool canVoid) {
+    final cs = Theme.of(context).colorScheme;
+    final isConfirmed = sale.paymentStatus == 'confirmed';
+
+    final items = <PopupMenuEntry<String>>[
+      PopupMenuItem<String>(
+        value: 'view',
+        child: _buildSaleMenuItem(
+          Icons.visibility_outlined,
+          'View',
+          cs.onSurfaceVariant,
+        ),
+      ),
+      if (canVoid && isConfirmed)
+        PopupMenuItem<String>(
+          value: 'void',
+          child: _buildSaleMenuItem(
+            Icons.delete,
+            'Void',
+            cs.error,
+          ),
+        ),
+    ];
+
+    if (items.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return PopupMenuButton<String>(
+      icon: Icon(Icons.more_vert, color: cs.onSurfaceVariant),
+      tooltip: 'Sale options',
+      padding: EdgeInsets.zero,
+      onSelected: (value) {
+        switch (value) {
+          case 'view':
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SaleDetailScreen(sale: sale),
+              ),
+            );
+            break;
+          case 'void':
+            _voidSale(sale);
+            break;
+        }
+      },
+      itemBuilder: (context) => items,
+    );
+  }
+
+  Widget _buildSaleMenuItem(IconData icon, String label, Color color) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: TextStyle(
+            color: color,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 
@@ -1136,45 +1031,3 @@ class _ExportTile extends StatelessWidget {
   }
 }
 
-/// One row in the import preview dialog. Invalid rows are shown in the
-/// error colour with their validation message instead of the parsed data.
-class _ImportPreviewRow extends StatelessWidget {
-  final SalesImportRow row;
-
-  const _ImportPreviewRow({required this.row});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
-    if (!row.isValid) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Text(
-          'Line ${row.lineNumber}: ${row.error}',
-          style: Theme.of(context)
-              .textTheme
-              .bodySmall
-              ?.copyWith(color: cs.error),
-        ),
-      );
-    }
-
-    final date = row.date == null
-        ? ''
-        : '${row.date!.year}-${row.date!.month.toString().padLeft(2, '0')}-'
-            '${row.date!.day.toString().padLeft(2, '0')}';
-    final summary = 'Line ${row.lineNumber}: $date · ${row.paymentMethod} · '
-        '${CurrencyUtils.format(row.totalAmount ?? 0)}';
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Text(
-        summary,
-        style: Theme.of(context).textTheme.bodySmall,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-    );
-  }
-}

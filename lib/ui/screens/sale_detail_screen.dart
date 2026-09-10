@@ -968,7 +968,7 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
             Row(
               children: [
                 _buildRoundedSquareIcon(
-                  icon: Icons.credit_card,
+                  icon: Icons.payments_outlined,
                   color: cs.primary,
                   size: 18,
                 ),

@@ -49,6 +49,7 @@ class _CategoryDialog extends ConsumerWidget {
           child: AppTextFormField(
             controller: nameController,
             label: 'Category Name',
+            hint: 'e.g. Desserts',
             prefixIcon: Icons.category_outlined,
             textInputAction: TextInputAction.done,
             validator: (value) => Validators.required(value, 'Category name'),

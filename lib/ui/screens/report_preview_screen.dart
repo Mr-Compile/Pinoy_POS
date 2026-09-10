@@ -25,11 +25,16 @@ import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 /// In-app report preview.
 ///
 /// * PDF: rendered with [PdfPreview] so the user can scroll/zoom pages.
-/// * Excel/CSV: rendered as a readable data table from the first sheet/page.
+/// * Excel: rendered as a readable data table from the first sheet.
 class ReportPreviewScreen extends StatefulWidget {
   final ExportHistory report;
+  final String? staffName;
 
-  const ReportPreviewScreen({super.key, required this.report});
+  const ReportPreviewScreen({
+    super.key,
+    required this.report,
+    this.staffName,
+  });
 
   @override
   State<ReportPreviewScreen> createState() => _ReportPreviewScreenState();
@@ -171,8 +176,11 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
   Widget _buildSpreadsheetPreview(Uint8List bytes) {
     try {
       final excel = Excel.decodeBytes(bytes);
-      final first = excel.tables.keys.first;
-      final sheet = excel.tables[first]!;
+      final keys = excel.tables.keys;
+      final selected = keys.contains('Sales')
+          ? 'Sales'
+          : (keys.contains('Line Items') ? 'Line Items' : keys.first);
+      final sheet = excel.tables[selected]!;
       final headers = sheet.row(0).map((cell) => cell?.value?.toString() ?? '').toList();
       final rows = sheet.rows.skip(1).take(50).toList();
 
@@ -207,6 +215,21 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
 
           final cs = Theme.of(context).colorScheme;
 
+          final numericHeaderKeywords = const [
+            'qty',
+            'quantity',
+            'items',
+            'total',
+            'unit price',
+            'line total',
+            'revenue',
+            'count',
+            'amount',
+          ];
+          final isNumericColumn = headers
+              .map((h) => numericHeaderKeywords.any((k) => h.toLowerCase().contains(k)))
+              .toList();
+
           return AppCard(
             padding: EdgeInsets.zero,
             child: SingleChildScrollView(
@@ -230,13 +253,30 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
                     horizontalInside: BorderSide(color: cs.outline),
                   ),
                   columns: headers
-                      .map((header) => DataColumn(label: Text(header)))
+                      .asMap()
+                      .entries
+                      .map((e) => DataColumn(
+                            label: Align(
+                              alignment: isNumericColumn[e.key]
+                                  ? Alignment.centerRight
+                                  : Alignment.centerLeft,
+                              child: Text(e.value),
+                            ),
+                          ))
                       .toList(),
                   rows: rows
                       .map((row) => DataRow(
                             cells: row
-                                .map((cell) => DataCell(
-                                    Text(cell?.value?.toString() ?? '')))
+                                .asMap()
+                                .entries
+                                .map((e) => DataCell(
+                                      Align(
+                                        alignment: isNumericColumn.length > e.key && isNumericColumn[e.key]
+                                            ? Alignment.centerRight
+                                            : Alignment.centerLeft,
+                                        child: Text(e.value?.value?.toString() ?? ''),
+                                      ),
+                                    ))
                                 .toList(),
                           ))
                       .toList(),
@@ -284,6 +324,10 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
               value: _periodLabel(),
             ),
             _DetailRow(
+              label: 'Submitted by',
+              value: widget.staffName ?? '—',
+            ),
+            _DetailRow(
               label: 'Date',
               value: dateFormat.format(date.toLocal()),
             ),
@@ -312,7 +356,6 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
             onPressed: _share,
           )
         : null;
-
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(Spacing.md),
@@ -373,7 +416,6 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
     final mime = switch (widget.report.fileFormat) {
       'pdf' => 'application/pdf',
       'excel' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'csv' => 'text/csv',
       _ => 'application/octet-stream',
     };
 

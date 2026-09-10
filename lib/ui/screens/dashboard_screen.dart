@@ -41,6 +41,7 @@ import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/dashboard_blocks.dart';
 import 'package:pinoy_pos/ui/widgets/donut_chart.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
+import 'package:pinoy_pos/ui/widgets/mini_bar_chart.dart';
 import 'package:pinoy_pos/ui/widgets/sales_period_selector.dart';
 
 /// Role-based dashboard screen.
@@ -451,7 +452,9 @@ class _OwnerDashboard extends ConsumerWidget {
       );
     }
 
-    final points = analytics.trend.map(_toBarPoint).toList();
+    final points = analytics.trend
+        .map((p) => _toBarPoint(p, filter.period))
+        .toList();
     final highlightIndex = _highlightIndex(points);
 
     return DashCard(
@@ -472,6 +475,8 @@ class _OwnerDashboard extends ConsumerWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: _buildTrendLabels(context, points),
         ),
+        const SizedBox(height: Spacing.xs),
+        _buildTrendLegend(context),
       ],
     );
   }
@@ -1118,7 +1123,9 @@ class _StaffDashboard extends ConsumerWidget {
         children: [Text('No sales recorded this period.')],
       );
     }
-    final points = analytics.trend.map(_toBarPoint).toList();
+    final points = analytics.trend
+        .map((p) => _toBarPoint(p, filter.period))
+        .toList();
     final highlightIndex = _highlightIndex(points);
     return DashCard(
       title: 'My Sales Trend',
@@ -1136,6 +1143,8 @@ class _StaffDashboard extends ConsumerWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: _buildTrendLabels(context, points),
         ),
+        const SizedBox(height: Spacing.xs),
+        _buildTrendLegend(context),
       ],
     );
   }
@@ -1699,23 +1708,32 @@ List<Widget> _buildTrendBars(
 List<Widget> _buildTrendLabels(BuildContext context, List<_BarPoint> points) {
   final count = points.length;
   if (count <= 1) return const [];
-  final step = math.max(1, (count / 6).ceil());
-  final labels = <String>[];
-  for (var i = 0; i < count; i += step) {
-    labels.add(points[i].label);
-  }
-  if (labels.isNotEmpty && labels.lastOrNull != points.last.label) {
-    labels.add(points.last.label);
-  }
+  // Show all labels for short series (weekly/monthly), sample for long ones.
+  final step = count <= 7 ? 1 : math.max(1, (count / 6).ceil());
   final cs = Theme.of(context).colorScheme;
-  return labels
-      .map((l) => Text(
-            l,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: cs.onSurfaceVariant,
-                ),
-          ))
-      .toList();
+  final style = Theme.of(context).textTheme.labelSmall?.copyWith(
+        color: cs.onSurfaceVariant,
+      );
+
+  final children = <Widget>[];
+  for (var i = 0; i < count; i += step) {
+    final label = Text(
+      points[i].label,
+      textAlign: TextAlign.center,
+      style: style,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+    children.add(step == 1 ? Expanded(child: label) : label);
+  }
+
+  if (step > 1 &&
+      children.isNotEmpty &&
+      (children.last as Text).data != points.last.label) {
+    children.add(Text(points.last.label, style: style));
+  }
+
+  return children;
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -1752,9 +1770,6 @@ String _deltaSuffix(SalesPeriodFilter filter) {
   }
   if (m.contains('maya') || m.contains('paymaya')) {
     return (Icons.qr_code_2, DashAccent.purple);
-  }
-  if (m.contains('card')) {
-    return (Icons.credit_card, DashAccent.deep);
   }
   return (Icons.account_balance_wallet_outlined, DashAccent.grey);
 }
@@ -1820,8 +1835,8 @@ bool _trendIsAllZero(List<DailySalesPoint> trend) {
   return true;
 }
 
-_BarPoint _toBarPoint(DailySalesPoint point) {
-  return _BarPoint(label: _barLabel(point.date), value: point.total);
+_BarPoint _toBarPoint(DailySalesPoint point, SalesPeriod period) {
+  return _BarPoint(label: _barLabel(point.date, period), value: point.total);
 }
 
 int _highlightIndex(List<_BarPoint> points) {
@@ -1833,7 +1848,25 @@ int _highlightIndex(List<_BarPoint> points) {
   return maxIndex;
 }
 
-String _barLabel(DateTime date) {
-  const names = ['M', 'T', 'W', 'T', 'F', 'Sa', 'Su'];
-  return names[date.weekday - 1];
+String _barLabel(DateTime date, SalesPeriod period) {
+  switch (period) {
+    case SalesPeriod.weekly:
+      const names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      return names[date.weekday % 7];
+    case SalesPeriod.monthly:
+      final week = ((date.day - 1) / 7).floor() + 1;
+      return 'Week $week';
+    case SalesPeriod.daily:
+    case SalesPeriod.custom:
+      return '${date.month}/${date.day}';
+  }
+}
+
+Widget _buildTrendLegend(BuildContext context) {
+  final b = Theme.of(context).brightness;
+  final cs = Theme.of(context).colorScheme;
+  return TrendChartLegend(
+    normalColor: AppSemanticColors.resolve(AppSemanticColors.primaryLight, b),
+    highlightColor: cs.primary,
+  );
 }

@@ -16,6 +16,7 @@ import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
+import 'package:pinoy_pos/ui/widgets/app_icon_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_icon_circle.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
 import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
@@ -442,9 +443,6 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
 
     final appBarTitle =
         _selectionMode ? '${_selectedIds.length} selected' : 'Trash';
-    final appBarActions = _selectionMode
-        ? [_buildSelectionActions(authNotifier)]
-        : _buildNormalActions(authNotifier);
 
     return Scaffold(
       appBar: AppHeader(
@@ -453,22 +451,10 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
         showThemeToggle: !_selectionMode,
         showNotificationBell: !_selectionMode,
         showProfileMenu: !_selectionMode,
-        actions: appBarActions,
       ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: AppSearchField(
-              controller: _searchController,
-              hint: 'Search trash...',
-              onChanged: (_) => _filterItems(),
-              onClear: () {
-                _searchController.clear();
-                _filterItems();
-              },
-            ),
-          ),
+          _buildToolbar(authNotifier),
           _buildTypeFilter(),
           Expanded(
             child: _buildBody(),
@@ -835,156 +821,104 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
     }
   }
 
-  List<Widget> _buildNormalActions(AuthStateNotifier authNotifier) {
-    return [
-      if (_allowedTypes.isNotEmpty)
-        IconButton(
-          icon: const Icon(Icons.check_circle_outlined),
-          tooltip: 'Select items',
-          onPressed: () => setState(() => _selectionMode = true),
-        ),
-      if (authNotifier.hasPermission('empty_trash'))
-        IconButton(
-          icon: const Icon(Icons.delete_sweep),
-          tooltip: 'Empty Trash',
-          onPressed: _emptyTrash,
-        ),
-    ];
+  Widget _buildToolbar(AuthStateNotifier authNotifier) {
+    if (_selectionMode) {
+      return _buildSelectionToolbar(authNotifier);
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Row(
+        children: [
+          Expanded(
+            child: AppSearchField(
+              controller: _searchController,
+              hint: 'Search trash...',
+              onChanged: (_) => _filterItems(),
+              onClear: () {
+                _searchController.clear();
+                _filterItems();
+              },
+            ),
+          ),
+          if (_allowedTypes.isNotEmpty) ...[
+            const SizedBox(width: 8),
+            AppIconButton(
+              icon: Icons.check_circle_outlined,
+              tooltip: 'Select items',
+              onPressed: () => setState(() => _selectionMode = true),
+            ),
+          ],
+          if (authNotifier.hasPermission('empty_trash')) ...[
+            const SizedBox(width: 8),
+            AppIconButton(
+              icon: Icons.delete_sweep,
+              tooltip: 'Empty trash',
+              color: Theme.of(context).colorScheme.error,
+              onPressed: _emptyTrash,
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
-  Widget _buildSelectionActions(AuthStateNotifier authNotifier) {
+  Widget _buildSelectionToolbar(AuthStateNotifier authNotifier) {
     final selected = _selectedItems();
     final canRestoreAll = selected.isNotEmpty &&
         selected.every((i) => _canRestoreItem(i, authNotifier));
     final canDeleteAll = selected.isNotEmpty &&
         selected.every((i) => _canDeleteItem(i, authNotifier));
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (constraints.maxWidth < 220) {
-          return _buildSelectionPopupMenu(
-            context,
-            authNotifier,
-            canRestoreAll: canRestoreAll,
-            canDeleteAll: canDeleteAll,
-          );
-        }
+    final cs = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
 
-        return Row(
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            IconButton(
-              icon: const Icon(Icons.select_all),
+            AppIconButton(
+              icon: Icons.select_all,
               tooltip: 'Select all',
               onPressed: _selectAll,
             ),
-            IconButton(
-              icon: const Icon(Icons.clear),
+            const SizedBox(width: 8),
+            AppIconButton(
+              icon: Icons.clear,
               tooltip: 'Clear selection',
               onPressed: _clearSelection,
             ),
-            if (canRestoreAll)
-              IconButton(
-                icon: Icon(
-                  Icons.restore,
-                  color: AppSemanticColors.resolve(
-                    AppSemanticColors.success,
-                    Theme.of(context).brightness,
-                  ),
-                ),
-                tooltip: 'Restore selected',
-                onPressed: _restoreSelected,
-              ),
-            if (canDeleteAll)
-              IconButton(
-                icon: Icon(Icons.delete_forever,
-                  color: Theme.of(context).colorScheme.error),
-                tooltip: 'Delete selected',
-                onPressed: _deleteSelected,
-              ),
-            IconButton(
-              icon: const Icon(Icons.close),
+            const SizedBox(width: 8),
+            AppIconButton(
+              icon: Icons.restore,
+              tooltip: 'Restore selected',
+              color: canRestoreAll
+                  ? AppSemanticColors.resolve(
+                      AppSemanticColors.success,
+                      brightness,
+                    )
+                  : cs.onSurfaceVariant,
+              onPressed: canRestoreAll ? _restoreSelected : null,
+            ),
+            const SizedBox(width: 8),
+            AppIconButton(
+              icon: Icons.delete_forever,
+              tooltip: 'Delete selected',
+              color: canDeleteAll ? cs.error : cs.onSurfaceVariant,
+              onPressed: canDeleteAll ? _deleteSelected : null,
+            ),
+            const SizedBox(width: 8),
+            AppIconButton(
+              icon: Icons.close,
               tooltip: 'Cancel selection',
               onPressed: _exitSelectionMode,
             ),
           ],
-        );
-      },
-    );
-  }
-
-  Widget _buildSelectionPopupMenu(
-    BuildContext context,
-    AuthStateNotifier authNotifier, {
-    required bool canRestoreAll,
-    required bool canDeleteAll,
-  }) {
-    final cs = Theme.of(context).colorScheme;
-
-    return PopupMenuButton<VoidCallback>(
-      icon: const Icon(Icons.more_vert),
-      tooltip: 'Selection actions',
-      onSelected: (callback) => callback(),
-      itemBuilder: (context) => [
-        PopupMenuItem(
-          value: _selectAll,
-          child: Row(
-            children: [
-              Icon(Icons.select_all, color: cs.onSurface),
-              const SizedBox(width: 12),
-              const Text('Select all'),
-            ],
-          ),
         ),
-        PopupMenuItem(
-          value: _clearSelection,
-          child: Row(
-            children: [
-              Icon(Icons.clear, color: cs.onSurface),
-              const SizedBox(width: 12),
-              const Text('Clear selection'),
-            ],
-          ),
-        ),
-        if (canRestoreAll)
-          PopupMenuItem(
-            value: _restoreSelected,
-            child: Row(
-              children: [
-                Icon(
-                  Icons.restore,
-                  color: AppSemanticColors.resolve(
-                    AppSemanticColors.success,
-                    Theme.of(context).brightness,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Text('Restore selected'),
-              ],
-            ),
-          ),
-        if (canDeleteAll)
-          PopupMenuItem(
-            value: _deleteSelected,
-            child: Row(
-              children: [
-                Icon(Icons.delete_forever, color: cs.error),
-                const SizedBox(width: 12),
-                Text('Delete selected', style: TextStyle(color: cs.error)),
-              ],
-            ),
-          ),
-        PopupMenuItem(
-          value: _exitSelectionMode,
-          child: Row(
-            children: [
-              Icon(Icons.close, color: cs.onSurface),
-              const SizedBox(width: 12),
-              const Text('Cancel'),
-            ],
-          ),
-        ),
-      ],
+      ),
     );
   }
 

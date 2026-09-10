@@ -4,7 +4,6 @@ import 'package:pinoy_pos/services/product_service.dart';
 import 'package:pinoy_pos/services/category_service.dart';
 import 'package:pinoy_pos/services/sales_service.dart';
 import 'package:pinoy_pos/services/sales_analytics_service.dart';
-import 'package:pinoy_pos/services/sales_import_service.dart';
 import 'package:pinoy_pos/services/stock_service.dart';
 import 'package:pinoy_pos/services/activity_log_service.dart';
 import 'package:pinoy_pos/services/notification_service.dart';
@@ -38,10 +37,6 @@ final salesServiceProvider = Provider<SalesService>((ref) {
 
 final salesAnalyticsServiceProvider = Provider<SalesAnalyticsService>((ref) {
   return SalesAnalyticsService();
-});
-
-final salesImportServiceProvider = Provider<SalesImportService>((ref) {
-  return SalesImportService();
 });
 
 final cartServiceProvider = Provider<CartService>((ref) {

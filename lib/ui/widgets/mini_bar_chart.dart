@@ -169,3 +169,66 @@ class _Bar extends StatelessWidget {
     );
   }
 }
+
+/// Compact two-dot legend for trend bar charts.
+class TrendChartLegend extends StatelessWidget {
+  final Color normalColor;
+  final Color highlightColor;
+  final String normalLabel;
+  final String highlightLabel;
+
+  const TrendChartLegend({
+    super.key,
+    required this.normalColor,
+    required this.highlightColor,
+    this.normalLabel = 'Sales',
+    this.highlightLabel = 'Top',
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final textStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: cs.onSurfaceVariant,
+        );
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _LegendDot(color: normalColor, label: normalLabel, style: textStyle),
+        const SizedBox(width: Spacing.md),
+        _LegendDot(color: highlightColor, label: highlightLabel, style: textStyle),
+      ],
+    );
+  }
+}
+
+class _LegendDot extends StatelessWidget {
+  final Color color;
+  final String label;
+  final TextStyle? style;
+
+  const _LegendDot({
+    required this.color,
+    required this.label,
+    this.style,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(label, style: style),
+      ],
+    );
+  }
+}

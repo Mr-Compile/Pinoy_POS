@@ -62,18 +62,25 @@ class _ProfileMenuState extends ConsumerState<ProfileMenu> {
   }
 
   void _showDropdown(User user) {
-    final renderBox = _avatarKey.currentContext?.findRenderObject() as RenderBox?;
+    final renderBox =
+        _avatarKey.currentContext?.findRenderObject() as RenderBox?;
     if (renderBox == null) return;
 
     final size = renderBox.size;
     final offset = renderBox.localToGlobal(Offset.zero);
 
     final screenSize = MediaQuery.of(context).size;
-    const menuWidth = 260.0;
-    final desiredLeft = offset.dx + size.width - menuWidth;
-    final maxLeft = (screenSize.width - menuWidth).clamp(0.0, double.infinity);
+    const maxMenuWidth = 260.0;
+    final desiredLeft = offset.dx + size.width - maxMenuWidth;
+    final maxLeft = (screenSize.width - maxMenuWidth).clamp(
+      0.0,
+      double.infinity,
+    );
     final left = desiredLeft.clamp(0.0, maxLeft);
-    final right = (screenSize.width - left - menuWidth).clamp(0.0, double.infinity);
+    final right = (screenSize.width - left - maxMenuWidth).clamp(
+      0.0,
+      double.infinity,
+    );
 
     final brightness = Theme.of(context).brightness;
     final primaryColor = AppSemanticColors.resolve(
@@ -91,7 +98,9 @@ class _ProfileMenuState extends ConsumerState<ProfileMenu> {
         0,
       ),
       constraints: const BoxConstraints(maxWidth: 280),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.menu)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.menu),
+      ),
       items: [
         PopupMenuItem<void>(
           enabled: false,
@@ -153,26 +162,27 @@ class _ProfileDropdownContent extends StatelessWidget {
       brightness,
     );
 
-    return SizedBox(
-      width: 260,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // User info header
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                AppAvatar(
-                  imagePath: user.profileImagePath,
-                  initials: user.fullName,
-                  radius: 24,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 150, maxWidth: 260),
+      child: IntrinsicWidth(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // User info header
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  AppAvatar(
+                    imagePath: user.profileImagePath,
+                    initials: user.fullName,
+                    radius: 24,
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         user.fullName,
@@ -181,37 +191,40 @@ class _ProfileDropdownContent extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 4),
-                      _RolePill(role: user.role.displayName, color: successColor),
+                      _RolePill(
+                        role: user.role.displayName,
+                        color: successColor,
+                      ),
                     ],
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const Divider(height: 1),
-          // Menu items
-          _MenuTile(
-            icon: Icons.person_outline,
-            label: 'Profile',
-            iconColor: primaryColor,
-            onTap: onProfile,
-          ),
-          const Divider(height: 1),
-          _MenuTile(
-            icon: Icons.settings_outlined,
-            label: 'Settings',
-            iconColor: primaryColor,
-            onTap: onSettings,
-          ),
-          const Divider(height: 1),
-          _MenuTile(
-            icon: Icons.logout_rounded,
-            label: 'Logout',
-            iconColor: errorColor,
-            textColor: errorColor,
-            onTap: onLogout,
-          ),
-        ],
+            const Divider(height: 1),
+            // Menu items
+            _MenuTile(
+              icon: Icons.person_outline,
+              label: 'Profile',
+              iconColor: primaryColor,
+              onTap: onProfile,
+            ),
+            const Divider(height: 1),
+            _MenuTile(
+              icon: Icons.settings_outlined,
+              label: 'Settings',
+              iconColor: primaryColor,
+              onTap: onSettings,
+            ),
+            const Divider(height: 1),
+            _MenuTile(
+              icon: Icons.logout_rounded,
+              label: 'Logout',
+              iconColor: errorColor,
+              textColor: errorColor,
+              onTap: onLogout,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -289,9 +302,9 @@ class _MenuTile extends StatelessWidget {
             Text(
               label,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: textColor,
-                  ),
+                fontWeight: FontWeight.w600,
+                color: textColor,
+              ),
             ),
           ],
         ),

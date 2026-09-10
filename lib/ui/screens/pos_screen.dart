@@ -1229,6 +1229,7 @@ class _PaymentDialog extends ConsumerWidget {
             AppTextFormField(
               controller: state.textController('cash', text: ''),
               label: 'Cash Received',
+              hint: '0.00',
               prefixText: CurrencyUtils.symbol(),
               prefixIcon: Icons.payments,
               keyboardType: TextInputType.number,
@@ -1289,8 +1290,9 @@ class _PaymentDialog extends ConsumerWidget {
           // Customer name for non-GCash methods, driven by Payment Settings.
           if (currentMethod != 'GCash' && settings.customerNameVisible) ...[
             AppTextFormField(
-              controller: state.textController('customerName', text: ''),
+              controller: state.textController('customerName', text: 'GUEST'),
               label: _customerNameLabel(settings),
+              hint: 'Customer name',
               prefixIcon: Icons.person,
               textCapitalization: TextCapitalization.words,
               validator: (value) => _validateCustomerName(settings, value),
@@ -1301,6 +1303,7 @@ class _PaymentDialog extends ConsumerWidget {
           AppTextFormField(
             controller: state.textController('notes', text: ''),
             label: 'Notes (optional)',
+            hint: 'e.g. Order instructions',
             prefixIcon: Icons.note,
             maxLines: 2,
           ),

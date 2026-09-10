@@ -23,6 +23,42 @@ class SafeNavigator {
     if (!context.mounted) return null;
 
     final navigator = Navigator.of(context, rootNavigator: useRootNavigator);
+    return _pushUniqueToNavigator<T>(
+      navigator,
+      screen,
+      onComplete,
+      routeName,
+    );
+  }
+
+  /// Pushes [screen] on the root [Navigator] accessed through [key].
+  ///
+  /// Use this when the caller lives above the [Navigator] (for example
+  /// inside [MaterialApp.builder]) and cannot use [Navigator.of] from its
+  /// own [BuildContext].
+  static Future<T?>? pushUniqueWithKey<T>(
+    GlobalKey<NavigatorState> key,
+    Widget screen, {
+    VoidCallback? onComplete,
+    String? routeName,
+  }) {
+    final navigator = key.currentState;
+    if (navigator == null || !navigator.mounted) return null;
+
+    return _pushUniqueToNavigator<T>(
+      navigator,
+      screen,
+      onComplete,
+      routeName,
+    );
+  }
+
+  static Future<T?>? _pushUniqueToNavigator<T>(
+    NavigatorState navigator,
+    Widget screen,
+    VoidCallback? onComplete,
+    String? routeName,
+  ) {
     final screenName = routeName ?? screen.runtimeType.toString();
     var isAlreadyOnScreen = false;
 

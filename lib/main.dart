@@ -99,7 +99,10 @@ class _MyAppState extends ConsumerState<MyApp> {
       navigatorObservers: [_navigationObserver],
       builder: (context, child) => SessionGuard(
         navigatorKey: _navigatorKey,
-        child: GlobalAIChatOverlay(child: child!),
+        child: GlobalAIChatOverlay(
+          navigatorKey: _navigatorKey,
+          child: child!,
+        ),
       ),
       home: const SplashScreen(),
     );

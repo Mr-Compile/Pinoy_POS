@@ -58,6 +58,14 @@ class _SalesPeriodSelectorState extends ConsumerState<SalesPeriodSelector> {
                 },
                 style: SegmentedButton.styleFrom(
                   visualDensity: VisualDensity.compact,
+                  backgroundColor: cs.surface,
+                  foregroundColor: cs.onSurfaceVariant,
+                  selectedBackgroundColor: cs.primary,
+                  selectedForegroundColor: cs.onPrimary,
+                  side: BorderSide(color: cs.outline),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                   textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),

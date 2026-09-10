@@ -69,10 +69,9 @@ dependencies:
   # Archive support for zip backup/restore
   archive: ^3.6.1
   
-  # PDF/CSV Export
+  # PDF/Excel Export
   pdf: ^3.11.1
   printing: 5.14.3
-  csv: ^6.0.0
   excel: ^4.0.6
   flutter_svg: ^2.3.0
 

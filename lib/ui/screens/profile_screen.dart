@@ -304,6 +304,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 AppTextFormField(
                   controller: fullNameController,
                   label: 'Full Name',
+                  hint: 'Juan Dela Cruz',
                   prefixIcon: Icons.person,
                   validator: (value) =>
                       Validators.required(value, 'Full Name'),
@@ -314,6 +315,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   controller: usernameController,
                   readOnly: user.hasChangedUsername,
                   label: 'Username',
+                  hint: 'juan.c',
                   prefixIcon: Icons.person_outline,
                   helperText: user.hasChangedUsername
                       ? 'You have already changed your username.'

@@ -263,7 +263,7 @@ void main() {
   testWidgets('StockScreen builds for owner', (tester) async {
     final owner = await authenticateAsOwner();
     await pumpOwnerScreen(tester, const StockScreen(), owner: owner);
-    expect(find.text('Stock Management'), findsWidgets);
+    expect(find.text('Stock'), findsWidgets);
   });
 
   testWidgets('SalesScreen builds for owner', (tester) async {

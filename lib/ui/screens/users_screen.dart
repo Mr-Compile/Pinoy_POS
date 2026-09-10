@@ -254,6 +254,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                 AppTextFormField(
                   controller: usernameController,
                   label: 'Username',
+                  hint: 'juan.c',
                   prefixIcon: Icons.person_outline,
                   validator: (value) =>
                       Validators.required(value, 'Username'),
@@ -263,6 +264,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                 AppTextFormField(
                   controller: fullNameController,
                   label: 'Full Name',
+                  hint: 'Juan Dela Cruz',
                   prefixIcon: Icons.person,
                   validator: (value) =>
                       Validators.required(value, 'Full Name'),
@@ -303,6 +305,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                 const SizedBox(height: 12),
                 AppDropdownField<UserRole>(
                   label: 'Role',
+                  hint: 'Select role',
                   prefixIcon: Icons.badge_outlined,
                   items: roleItems
                       .map((role) => DropdownMenuItem(
@@ -463,6 +466,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                   AppTextFormField(
                     controller: usernameController,
                     label: 'Username',
+                    hint: 'juan.c',
                     prefixIcon: Icons.person_outline,
                     textInputAction: TextInputAction.next,
                     validator: (value) =>
@@ -475,6 +479,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                   AppTextFormField(
                     controller: fullNameController,
                     label: 'Full Name',
+                    hint: 'Juan Dela Cruz',
                     prefixIcon: Icons.person,
                     textInputAction: TextInputAction.next,
                     validator: (value) =>
@@ -519,6 +524,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                   const SizedBox(height: 12),
                   AppDropdownField<UserRole>(
                     label: 'Role',
+                    hint: 'Select role',
                     prefixIcon: Icons.badge_outlined,
                     items: manageableRoles
                         .map((role) => DropdownMenuItem(

@@ -87,7 +87,6 @@ class FileExportService {
     if (clean == 'avif') return 'image/avif';
     if (clean == 'svg') return 'image/svg+xml';
     if (clean == 'pdf') return 'application/pdf';
-    if (clean == 'csv') return 'text/csv';
     if (clean == 'xlsx') return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
     if (clean == 'xls') return 'application/vnd.ms-excel';
     return null;

@@ -251,7 +251,7 @@ class DatabaseHelper {
     }
 
     // Migration from v9 → v10: add payment_method to sales so reports can
-    // break down revenue by payment method (Cash, GCash, Card, etc.).
+    // break down revenue by payment method (Cash and GCash).
     if (oldVersion < 10) {
       await db.execute('ALTER TABLE sales ADD COLUMN payment_method TEXT NOT NULL DEFAULT \'Cash\'');
     }

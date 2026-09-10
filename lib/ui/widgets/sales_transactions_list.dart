@@ -71,6 +71,12 @@ class _SaleRow extends StatelessWidget {
     final cashierName = staffNames?[sale.userId] ?? 'User ${sale.userId}';
     final subtitle = '$dateTime • Cashier: $cashierName';
 
+    final status = _statusLabel(sale.paymentStatus);
+    final statusColor = _statusColor(
+      sale.paymentStatus,
+      Theme.of(context).brightness,
+    );
+
     return AppListItem(
       title: title,
       subtitle: subtitle,
@@ -89,12 +95,13 @@ class _SaleRow extends StatelessWidget {
               fontWeight: FontWeight.bold,
             ),
       ),
-      statusLabel: _statusLabel(sale.paymentStatus),
-      statusColor: _statusColor(
-        sale.paymentStatus,
-        Theme.of(context).brightness,
-      ),
       chips: [
+        if (status != null)
+          AppStatusChip(
+            label: status,
+            color: statusColor,
+            filled: true,
+          ),
         AppStatusChip(
           label: sale.paymentMethod,
           color: cs.primary,

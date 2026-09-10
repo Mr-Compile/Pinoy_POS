@@ -165,7 +165,7 @@ class MoreScreen extends ConsumerWidget {
               crossAxisCount: crossAxisCount,
               mainAxisSpacing: 12,
               crossAxisSpacing: 12,
-              mainAxisExtent: 112,
+              mainAxisExtent: 108,
             ),
             children: entries.map((entry) {
               return _buildEntryCard(context, ref, entry);
@@ -182,7 +182,7 @@ class MoreScreen extends ConsumerWidget {
 
     return AppCard(
       variant: AppCardVariant.outlined,
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 12),
       onTap: () => RouteGuard.pushIfAuthorized(
         context,
         ref,
@@ -197,14 +197,14 @@ class MoreScreen extends ConsumerWidget {
             icon: entry.icon,
             color: accentColor,
             filled: false,
-            size: 40,
-            iconSize: 20,
+            size: 44,
+            iconSize: 22,
           ),
           const SizedBox(height: 10),
           Text(
             entry.title,
             textAlign: TextAlign.center,
-            maxLines: 2,
+            maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: AppTypography.bodySmall(context).copyWith(
               fontSize: 13,

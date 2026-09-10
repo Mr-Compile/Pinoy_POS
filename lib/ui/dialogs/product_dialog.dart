@@ -442,6 +442,7 @@ class _ProductForm extends StatelessWidget {
     return AppTextFormField(
       controller: controller,
       label: 'Product Name',
+      hint: 'e.g. Pastil',
       prefixIcon: Icons.inventory_2_outlined,
       textInputAction: TextInputAction.next,
       validator: (value) => Validators.required(value, 'Product name'),
@@ -457,6 +458,7 @@ class _ProductForm extends StatelessWidget {
     return AppTextFormField(
       controller: controller,
       label: 'Price',
+      hint: '0.00',
       prefixIcon: Icons.payments_outlined,
       prefixText: '${CurrencyUtils.symbol()} ',
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -477,6 +479,7 @@ class _ProductForm extends StatelessWidget {
     return AppTextFormField(
       controller: controller,
       label: 'Stock',
+      hint: 'Enter quantity',
       prefixIcon: Icons.inventory_outlined,
       keyboardType: TextInputType.number,
       textInputAction: TextInputAction.next,
@@ -539,6 +542,7 @@ class _ProductForm extends StatelessWidget {
 
     return AppDropdownField<int?>(
       label: 'Category',
+      hint: 'Select category',
       prefixIcon: Icons.category_outlined,
       initialValue: selectedCategoryId,
       items: categories.display.map((category) {

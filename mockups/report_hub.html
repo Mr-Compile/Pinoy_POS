@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinoy POS — Reports Hub (Role-Based)</title>
+<link rel="stylesheet" href="mockup.css">
+<style>
+  .hidden { display: none !important; }
+  .role-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; border: 1px solid var(--border); }
+  .role-owner { background: rgba(75,130,233,.16); color: var(--info); border-color: rgba(75,130,233,.4); }
+  .role-staff { background: rgba(22,163,74,.16); color: var(--success); border-color: rgba(22,163,74,.4); }
+  .frames-legend { max-width: 900px; margin: 0 auto 24px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; color: var(--text-2); font-size: 13px; }
+  .chip { transition: background .15s, border-color .15s, color .15s; }
+  .search input { background: transparent; border: none; color: var(--text); flex: 1; outline: none; font-size: 13px; }
+  .search input::placeholder { color: var(--text-3); }
+  .pill-outline { background: transparent; border: 1px solid var(--primary); color: var(--primary); }
+  .report-row { cursor: pointer; transition: background .12s; display: flex; align-items: center; gap: 12px; padding: 14px; }
+  .report-row:hover { background: var(--surface-elev); }
+  .report-row + .report-row { border-top: 1px solid var(--divider); }
+  .thumb-report { width: 56px; height: 72px; border-radius: 12px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border); background: var(--surface-elev); }
+  .thumb-report svg { width: 28px; height: 28px; fill: var(--primary); }
+  .report-row .grow { flex: 1; min-width: 0; }
+  .report-row .name { font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .report-row .sub { font-size: 12px; color: var(--text-3); margin-top: 2px; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .meta-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+  .meta-row .pill { font-size: 10px; padding: 3px 8px; }
+  .chevron { width: 18px; height: 18px; fill: var(--text-3); flex-shrink: 0; }
+  .empty-state { padding: 40px 24px; text-align: center; }
+  .empty-state .icon-lg { width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--surface-elev); margin: 0 auto 16px; }
+  .empty-state .icon-lg svg { width: 40px; height: 40px; fill: var(--text-3); }
+  .empty-state .title { font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+  .empty-state .msg { font-size: 13px; color: var(--text-3); line-height: 1.5; }
+  .format-tabs { display: flex; gap: 8px; padding: 0 14px 14px; }
+  .format-tab { flex: 1; padding: 10px; border-radius: 12px; font-size: 12.5px; font-weight: 700; text-align: center; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); cursor: pointer; }
+  .format-tab.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .actions-row { display: flex; gap: 10px; }
+  .actions-row .btn { flex: 1; }
+  .preview-content { padding: 0; overflow-x: auto; }
+
+  .pdf-page { background: #fff; color: #172033; border-radius: 8px; padding: 18px; box-shadow: 0 8px 24px rgba(0,0,0,.18); font-family: 'Segoe UI', 'Inter', system-ui, sans-serif; margin: 0 -4px; }
+  .pdf-page .pdf-header { display: flex; align-items: center; gap: 14px; padding-bottom: 16px; border-bottom: 2px solid #1B4CAF; margin-bottom: 16px; }
+  .pdf-page .pdf-logo { width: 46px; height: 46px; border-radius: 12px; background: linear-gradient(135deg, #2563C7, #1B4CAF); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 800; }
+  .pdf-page .pdf-store { font-size: 18px; font-weight: 800; color: #172033; }
+  .pdf-page .pdf-meta { font-size: 12px; color: #52627A; margin-top: 2px; }
+  .pdf-page .pdf-title-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; margin-bottom: 14px; }
+  .pdf-page .pdf-title { font-size: 22px; font-weight: 800; color: #1B4CAF; }
+  .pdf-page .pdf-period { font-size: 12px; color: #52627A; text-align: right; }
+  .pdf-summary-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+  .pdf-metric { background: #F5F8FC; border: 1px solid #D7E0EE; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .pdf-metric .num { font-size: 17px; font-weight: 800; color: #172033; }
+  .pdf-metric .lbl { font-size: 10.5px; font-weight: 700; color: #8A9AB3; text-transform: uppercase; letter-spacing: .4px; }
+  .pdf-metric.primary { background: #EEF4FF; border-color: #4B82E9; }
+  .pdf-metric.primary .num { color: #1B4CAF; }
+  .pdf-section-title { font-size: 13px; font-weight: 800; color: #1B4CAF; text-transform: uppercase; letter-spacing: .4px; margin: 16px 0 8px; }
+  .pdf-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .pdf-table th { background: #1B4CAF; color: #fff; text-align: left; padding: 8px 10px; font-weight: 700; }
+  .pdf-table td { padding: 8px 10px; border-bottom: 1px solid #E7ECF4; color: #172033; }
+  .pdf-table tr:last-child td { border-bottom: none; }
+  .pdf-table .right { text-align: right; }
+  .pdf-table .total-row td { background: #DCFCE7; color: #14532D; font-weight: 800; border-bottom: none; }
+  .pdf-method { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 10.5px; font-weight: 700; }
+  .pdf-method.cash { background: rgba(75,130,233,.16); color: #1B4CAF; }
+  .pdf-method.gcash { background: rgba(22,163,74,.16); color: #16A34A; }
+  .pdf-method.card { background: rgba(75,130,233,.16); color: #2563C7; }
+  .pdf-method.other { background: rgba(140,154,184,.18); color: #52627A; }
+  .pdf-mini-chart { display: flex; align-items: flex-end; gap: 6px; height: 70px; margin-top: 10px; padding: 12px; background: #F5F8FC; border-radius: 12px; border: 1px solid #D7E0EE; }
+  .pdf-bar { flex: 1; background: linear-gradient(to top, #1B4CAF, #4B82E9); border-radius: 4px 4px 0 0; min-height: 8px; position: relative; }
+  .pdf-bar span { position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); font-size: 9px; color: #52627A; white-space: nowrap; }
+
+  .excel-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); overflow: hidden; display: flex; flex-direction: column; }
+  .excel-tabs { display: flex; gap: 2px; padding: 8px 8px 0; background: var(--surface-elev); border-bottom: 1px solid var(--border); }
+  .excel-tab { padding: 8px 14px; border-radius: 6px 6px 0 0; font-size: 12px; font-weight: 600; color: var(--text-3); background: transparent; cursor: pointer; }
+  .excel-tab.on { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-bottom-color: var(--surface); }
+  .excel-body { padding: 10px; overflow-x: auto; }
+  .excel-sheet { display: none; }
+  .excel-sheet.on { display: block; }
+  .spreadsheet { border-collapse: collapse; font-size: 12px; min-width: 100%; }
+  .spreadsheet th, .spreadsheet td { border: 1px solid var(--border); padding: 7px 10px; min-width: 70px; text-align: left; white-space: nowrap; }
+  .spreadsheet th { background: #1B4CAF; color: #fff; font-weight: 700; }
+  .spreadsheet td { color: var(--text); background: var(--surface); }
+  .spreadsheet .right { text-align: right; }
+  .spreadsheet .total td { background: rgba(22,163,74,.16); color: var(--success); font-weight: 800; }
+  .spreadsheet .method-cash { background: rgba(75,130,233,.16); color: var(--info); }
+  .spreadsheet .method-gcash { background: rgba(22,163,74,.16); color: var(--success); }
+  .spreadsheet .col-head, .spreadsheet .row-head { background: var(--surface-elev); color: var(--text-3); font-weight: 700; text-align: center; min-width: 30px; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24"><path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/></symbol>
+  <symbol id="i-export" viewBox="0 0 24 24"><path d="M12 4l-5 5 1.41 1.41L11 7.83V16h2V7.83l2.59 2.58L17 9l-5-5zM5 19h14v-2H5v2z"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.91 9.81C8.37 9.31 7.66 9 6.87 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.04 4.12c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></symbol>
+  <symbol id="i-import" viewBox="0 0 24 24"><path d="M12 20l5-5-1.41-1.41L13 16.17V8h-2v8.17l-2.59-2.58L7 15l5 5zM5 5h14v2H5z"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></symbol>
+  <symbol id="i-archive" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 13l-5-4H10l-5 4V5h14v11z"/></symbol>
+  <symbol id="i-pdf" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></symbol>
+  <symbol id="i-table" viewBox="0 0 24 24"><path d="M5 3h14c1.1 0 2 .9 2 2v14c0 1.1-.9 2-2 2H5c-1.1 0-2-.9-2-2V5c0-1.1.9-2 2-2zm0 4v5h14V7H5zm0 7v5h14v-5H5z"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M8.59 16.59 13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></symbol>
+  <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 13l-5-4H10l-5 4V5h14v11z"/></symbol>
+  <symbol id="i-search-off" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14zM6.12 4.54l-1.4-1.4C3.95 4.95 3 6.5 3 8.25c0 1.75.95 3.3 2.72 4.11l1.41-1.41C5.46 10.04 5 9.19 5 8.25c0-.94.46-1.79 1.12-2.71z"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M12 21l3.5-4.5c-.97-.74-2.18-1.16-3.5-1.16s-2.53.42-3.5 1.16L12 21zM12 3C7.31 3 3.07 4.69 0 7.55l1.93 2.43C4.48 7.9 8.01 6.4 12 6.4s7.52 1.5 10.07 3.58L24 7.55C20.93 4.69 16.69 3 12 3z"/></symbol>
+  <symbol id="i-batt" viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></symbol>
+</svg>
+
+<div class="page-head">
+  <div>
+    <h1>Reports Hub</h1>
+    <p>Consolidated report list and preview. Toggle Owner or Staff to see the role-based flow.</p>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <div class="chips" id="roleSwitcher">
+      <button class="chip on" data-role="owner" onclick="setRole('owner')">Owner</button>
+      <button class="chip" data-role="staff" onclick="setRole('staff')">Staff</button>
+    </div>
+    <button class="theme-toggle" onclick="toggleTheme()">
+      <svg viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
+      <span id="themeLabel">Light mode</span>
+    </button>
+  </div>
+</div>
+
+<div class="frames-legend">
+  <span class="role-chip role-owner" id="roleChip">Owner</span>
+  <span id="roleFlowText">view_report_submissions — review, export, and archive staff reports.</span>
+</div>
+
+<div class="frames">
+  <div class="frame-wrap">
+    <div class="frame-label" id="frameLabel">Submitted Reports — Owner</div>
+    <div class="phone">
+      <div class="statusbar">
+        <span>9:41</span>
+        <span class="icons">
+          <svg><use href="#i-wifi"/></svg>
+          <svg><use href="#i-batt"/></svg>
+        </span>
+      </div>
+      <div class="appbar">
+        <div class="back" id="backBtn" onclick="backToList()" style="display:none">
+          <svg><use href="#i-back"/></svg>
+        </div>
+        <div class="title">
+          <h2 id="appTitle">Submitted Reports</h2>
+          <div class="sub" id="appSubtitle">3 new</div>
+        </div>
+        <div class="act" title="Refresh" onclick="refreshList()">
+          <svg><use href="#i-refresh"/></svg>
+        </div>
+      </div>
+      <div class="screen">
+        <div class="screen-body" id="screenBody"></div>
+        <div id="listActions" class="hidden" style="padding:14px;border-top:1px solid var(--border);">
+          <button class="btn btn-primary" onclick="triggerImport()">
+            <svg><use href="#i-import"/></svg> Import Report
+          </button>
+        </div>
+        <div id="previewActions" class="hidden" style="padding:14px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:10px;"></div>
+      </div>
+    </div>
+    <div class="frame-notes" id="frameNotes">
+      Owner sees staff submissions and can export, share, or archive them. Opening a Submitted report marks it as Reviewed.
+    </div>
+  </div>
+</div>
+
+<input type="file" id="importInput" accept=".pdf,.xlsx,.xls" style="display:none" onchange="onImportSelected(this)">
+
+<div class="hidden" id="preview-pdf">
+  <div class="pdf-page">
+    <div class="pdf-header">
+      <div class="pdf-logo">JP</div>
+      <div>
+        <div class="pdf-store">Juan's Pinoy Carinderia</div>
+        <div class="pdf-meta">123 Mabini St, Quezon City · Contact: 0917-123-4567</div>
+      </div>
+    </div>
+    <div class="pdf-title-row">
+      <div>
+        <div class="pdf-title">Sales Summary</div>
+        <div class="pdf-meta">Generated: Sep 10, 2026 10:30 AM</div>
+      </div>
+      <div class="pdf-period">Period<br>Sep 1 - Sep 9, 2026</div>
+    </div>
+    <div class="pdf-summary-grid">
+      <div class="pdf-metric primary"><div class="num">₱25,450.00</div><div class="lbl">Total Sales</div></div>
+      <div class="pdf-metric"><div class="num">142</div><div class="lbl">Transactions</div></div>
+      <div class="pdf-metric"><div class="num">₱179.23</div><div class="lbl">Avg Transaction</div></div>
+      <div class="pdf-metric"><div class="num">386</div><div class="lbl">Items Sold</div></div>
+    </div>
+    <div class="pdf-section-title">Sales Trend</div>
+    <div class="pdf-mini-chart">
+      <div class="pdf-bar" style="height:30%"><span>Sep 1</span></div>
+      <div class="pdf-bar" style="height:55%"><span>Sep 2</span></div>
+      <div class="pdf-bar" style="height:45%"><span>Sep 3</span></div>
+      <div class="pdf-bar" style="height:70%"><span>Sep 4</span></div>
+      <div class="pdf-bar" style="height:60%"><span>Sep 5</span></div>
+      <div class="pdf-bar" style="height:85%"><span>Sep 6</span></div>
+      <div class="pdf-bar" style="height:75%"><span>Sep 7</span></div>
+      <div class="pdf-bar" style="height:90%"><span>Sep 8</span></div>
+      <div class="pdf-bar" style="height:100%"><span>Sep 9</span></div>
+    </div>
+    <div class="pdf-section-title">Payment Breakdown</div>
+    <table class="pdf-table">
+      <thead><tr><th>Method</th><th class="right">Count</th><th class="right">Total</th></tr></thead>
+      <tbody>
+        <tr><td><span class="pdf-method cash">Cash</span></td><td class="right">87</td><td class="right">₱15,780.00</td></tr>
+        <tr><td><span class="pdf-method gcash">GCash</span></td><td class="right">55</td><td class="right">₱9,670.00</td></tr>
+        <tr class="total-row"><td>Total</td><td class="right">142</td><td class="right">₱25,450.00</td></tr>
+      </tbody>
+    </table>
+    <div class="pdf-section-title">Top Products</div>
+    <table class="pdf-table">
+      <thead><tr><th>Product</th><th class="right">Qty</th><th class="right">Revenue</th></tr></thead>
+      <tbody>
+        <tr><td>Chicken Adobo Rice</td><td class="right">68</td><td class="right">₱5,440.00</td></tr>
+        <tr><td>Pastil</td><td class="right">120</td><td class="right">₱1,200.00</td></tr>
+        <tr><td>Iced Tea</td><td class="right">95</td><td class="right">₱2,375.00</td></tr>
+      </tbody>
+    </table>
+    <div class="pdf-section-title">Transactions</div>
+    <table class="pdf-table">
+      <thead><tr><th>Receipt</th><th>Date/Time</th><th>Customer</th><th class="right">Items</th><th class="right">Total</th></tr></thead>
+      <tbody>
+        <tr><td>20260909-0156</td><td>Sep 9, 9:45 AM</td><td>Maria Santos</td><td class="right">3</td><td class="right">₱120.00</td></tr>
+        <tr><td>20260909-0155</td><td>Sep 9, 9:30 AM</td><td>Juan Cruz</td><td class="right">5</td><td class="right">₱450.00</td></tr>
+        <tr><td>20260909-0154</td><td>Sep 9, 9:12 AM</td><td>Ana Reyes</td><td class="right">2</td><td class="right">₱80.00</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="hidden" id="preview-excel">
+  <div class="excel-card">
+    <div class="excel-tabs">
+      <button class="excel-tab on" onclick="setExcelTab(this,'summary')">Summary</button>
+      <button class="excel-tab" onclick="setExcelTab(this,'sales')">Sales</button>
+      <button class="excel-tab" onclick="setExcelTab(this,'line')">Line Items</button>
+    </div>
+    <div class="excel-body">
+      <div class="excel-sheet on" data-sheet="summary">
+        <table class="spreadsheet">
+          <tr><th class="row-head">1</th><th colspan="2" class="col-head" style="background:#1B4CAF;color:#fff;">Juan's Pinoy Carinderia - Sales Report</th></tr>
+          <tr><td class="row-head">3</td><td><b>Total Sales</b></td><td class="right">₱25,450.00</td></tr>
+          <tr><td class="row-head">4</td><td><b>Transaction Count</b></td><td class="right">142</td></tr>
+          <tr><td class="row-head">5</td><td><b>Average Transaction</b></td><td class="right">₱179.23</td></tr>
+          <tr><td class="row-head">6</td><td><b>Items Sold</b></td><td class="right">386</td></tr>
+          <tr><td class="row-head">8</td><th>Payment Method</th><th class="right">Total</th></tr>
+          <tr><td class="row-head">9</td><td class="method-cash">Cash</td><td class="right">₱15,780.00</td></tr>
+          <tr><td class="row-head">10</td><td class="method-gcash">GCash</td><td class="right">₱9,670.00</td></tr>
+          <tr class="total"><td class="row-head">11</td><td><b>Grand Total</b></td><td class="right">₱25,450.00</td></tr>
+        </table>
+      </div>
+      <div class="excel-sheet" data-sheet="sales">
+        <table class="spreadsheet">
+          <tr><th class="col-head">A</th><th>Receipt #</th><th>Date/Time</th><th>Cashier</th><th>Customer</th><th>Method</th><th class="right">Items</th><th class="right">Total</th></tr>
+          <tr><td class="row-head">1</td><td>20260909-0156</td><td>Sep 9, 9:45 AM</td><td>Maria Santos</td><td>Juan Cruz</td><td class="method-cash">Cash</td><td class="right">3</td><td class="right">₱120.00</td></tr>
+          <tr><td class="row-head">2</td><td>20260909-0155</td><td>Sep 9, 9:30 AM</td><td>Maria Santos</td><td>Ana Reyes</td><td class="method-gcash">GCash</td><td class="right">5</td><td class="right">₱450.00</td></tr>
+          <tr><td class="row-head">3</td><td>20260909-0154</td><td>Sep 9, 9:12 AM</td><td>Juan Cruz</td><td>Maria Santos</td><td class="method-cash">Cash</td><td class="right">2</td><td class="right">₱80.00</td></tr>
+          <tr class="total"><td class="row-head">4</td><td colspan="6"><b>Grand Total</b></td><td class="right">₱650.00</td></tr>
+        </table>
+      </div>
+      <div class="excel-sheet" data-sheet="line">
+        <table class="spreadsheet">
+          <tr><th class="col-head">A</th><th>Receipt</th><th>Product</th><th class="right">Qty</th><th class="right">Unit</th><th class="right">Total</th></tr>
+          <tr><td class="row-head">1</td><td>20260909-0156</td><td>Pastil</td><td class="right">2</td><td class="right">₱10.00</td><td class="right">₱20.00</td></tr>
+          <tr><td class="row-head">2</td><td>20260909-0156</td><td>Iced Tea</td><td class="right">1</td><td class="right">₱25.00</td><td class="right">₱25.00</td></tr>
+          <tr><td class="row-head">3</td><td>20260909-0155</td><td>Chicken Adobo Rice</td><td class="right">5</td><td class="right">₱80.00</td><td class="right">₱400.00</td></tr>
+          <tr><td class="row-head">4</td><td>20260909-0154</td><td>Banana Cue</td><td class="right">2</td><td class="right">₱15.00</td><td class="right">₱30.00</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="mockup.js"></script>
+<script>
+const state = {
+  role: 'owner',
+  view: 'list',
+  selectedFilter: 'all',
+  search: '',
+  currentId: null,
+  previewFormat: null,
+  reports: {
+    owner: [
+      { id: 1, number: 'RPT-20260909-001', title: 'Sales Report · Sep 1 - Sep 9', period: 'Sep 1 - Sep 9, 2026', format: 'excel', status: 'submitted', author: 'Maria Santos', size: '2.1 MB', date: 'Sep 9, 2026 10:30 AM' },
+      { id: 2, number: 'RPT-20260908-001', title: 'Sales Report · Sep 1 - Sep 8', period: 'Sep 1 - Sep 8, 2026', format: 'pdf', status: 'viewed', author: 'Juan Cruz', size: '1.4 MB', date: 'Sep 8, 2026 4:15 PM' },
+      { id: 3, number: 'RPT-20260907-001', title: 'Sales Report · Aug 1 - Aug 31', period: 'Aug 1 - Aug 31, 2026', format: 'excel', status: 'imported', author: 'Ana Reyes', size: '856 KB', date: 'Sep 7, 2026 9:00 AM' },
+      { id: 4, number: 'RPT-20260906-001', title: 'Sales Report · Aug 25 - Aug 31', period: 'Aug 25 - Aug 31, 2026', format: 'pdf', status: 'archived', author: 'Maria Santos', size: '3.2 MB', date: 'Sep 6, 2026 11:20 AM' }
+    ],
+    staff: [
+      { id: 101, number: 'RPT-20260909-002', title: 'Sales Report · Sep 1 - Sep 9', period: 'Sep 1 - Sep 9, 2026', format: 'pdf', status: 'generated', author: 'You', size: '1.8 MB', date: 'Sep 9, 2026 10:30 AM' },
+      { id: 102, number: 'RPT-20260908-002', title: 'Sales Report · Sep 1 - Sep 8', period: 'Sep 1 - Sep 8, 2026', format: 'excel', status: 'submitted', author: 'You', size: '2.0 MB', date: 'Sep 8, 2026 3:45 PM' },
+      { id: 103, number: 'RPT-20260907-002', title: 'Sales Report · Aug 25 - Aug 31', period: 'Aug 25 - Aug 31, 2026', format: 'pdf', status: 'viewed', author: 'You', size: '1.3 MB', date: 'Aug 31, 2026 5:00 PM' },
+      { id: 104, number: 'RPT-20260906-002', title: 'Sales Report · Aug 1 - Aug 31', period: 'Aug 1 - Aug 31, 2026', format: 'pdf', status: 'archived', author: 'You', size: '900 KB', date: 'Aug 31, 2026 10:00 AM' }
+    ]
+  }
+};
+
+const statusConfig = {
+  generated: { label: 'Generated', class: 'pill-blue' },
+  submitted: { label: 'Submitted', class: 'pill-amber' },
+  viewed: { label: 'Reviewed', class: 'pill-green' },
+  imported: { label: 'Imported', class: 'pill-blue' },
+  archived: { label: 'Archived', class: 'pill-grey' }
+};
+
+const statusChips = {
+  owner: ['all', 'submitted', 'viewed', 'imported', 'archived'],
+  staff: ['all', 'generated', 'submitted', 'viewed', 'archived', 'imported']
+};
+
+const formatLabels = { pdf: 'PDF', excel: 'Excel' };
+const formatExt = { pdf: 'pdf', excel: 'xlsx' };
+
+function init() { setRole('owner'); }
+
+function setRole(role) {
+  state.role = role;
+  state.view = 'list';
+  state.selectedFilter = 'all';
+  state.search = '';
+  state.currentId = null;
+  state.previewFormat = null;
+  document.getElementById('importInput').value = '';
+  render();
+}
+
+function render() {
+  const roleChip = document.getElementById('roleChip');
+  roleChip.textContent = state.role === 'owner' ? 'Owner' : 'Staff';
+  roleChip.className = 'role-chip ' + (state.role === 'owner' ? 'role-owner' : 'role-staff');
+  document.getElementById('roleFlowText').textContent = state.role === 'owner'
+    ? 'view_report_submissions — review, export, and archive staff reports.'
+    : 'submit_reports + export_reports — generate, export, submit, and import reports for Owner review.';
+
+  document.getElementById('frameLabel').textContent = state.role === 'owner' ? 'Submitted Reports — Owner' : 'My Reports — Staff';
+  document.getElementById('frameNotes').textContent = state.role === 'owner'
+    ? 'Owner sees staff submissions and can export, share, or archive them. Opening a Submitted report marks it as Reviewed.'
+    : 'Staff sees their own report history and can export, share, submit to Owner, or import external files.';
+
+  document.querySelectorAll('#roleSwitcher .chip').forEach(c => c.classList.toggle('on', c.dataset.role === state.role));
+
+  const appTitle = document.getElementById('appTitle');
+  const appSubtitle = document.getElementById('appSubtitle');
+  document.getElementById('backBtn').style.display = state.view === 'preview' ? 'flex' : 'none';
+
+  if (state.view === 'list') {
+    appTitle.textContent = state.role === 'owner' ? 'Submitted Reports' : 'My Reports';
+    const count = state.reports[state.role].filter(r => r.status === 'submitted').length;
+    appSubtitle.textContent = state.role === 'owner' ? `${count} new` : `${state.reports.staff.length} reports`;
+    renderList();
+  } else {
+    const report = getCurrentReport();
+    appTitle.textContent = 'Report Preview';
+    appSubtitle.textContent = `Sales Report · ${formatLabels[report.format]}`;
+    renderPreview();
+  }
+
+  document.getElementById('listActions').classList.toggle('hidden', state.view !== 'list' || state.role !== 'staff');
+  document.getElementById('previewActions').classList.toggle('hidden', state.view !== 'preview');
+}
+
+function renderList() {
+  const body = document.getElementById('screenBody');
+  body.innerHTML = '';
+
+  const search = document.createElement('div');
+  search.className = 'search';
+  search.innerHTML = `<svg><use href="#i-search"/></svg><input type="text" placeholder="Search reports..." value="${escapeHtml(state.search)}" oninput="filterSearch(this.value)">`;
+  body.appendChild(search);
+
+  const chips = document.createElement('div');
+  chips.className = 'chips';
+  statusChips[state.role].forEach(s => {
+    const label = s === 'all' ? 'All' : statusConfig[s].label;
+    const on = state.selectedFilter === s ? 'on' : '';
+    chips.innerHTML += `<button class="chip ${on}" onclick="filterStatus('${s}')">${label}</button>`;
+  });
+  body.appendChild(chips);
+
+  const filtered = state.reports[state.role].filter(r => {
+    if (state.selectedFilter !== 'all' && r.status !== state.selectedFilter) return false;
+    if (!state.search.trim()) return true;
+    const q = state.search.toLowerCase();
+    const haystack = `${r.title} ${r.author} ${r.number} ${r.status} ${r.format} ${r.size}`.toLowerCase();
+    return haystack.includes(q);
+  });
+
+  if (filtered.length === 0) {
+    body.innerHTML += emptyStateHTML();
+    return;
+  }
+
+  const card = document.createElement('div');
+  card.className = 'card';
+  filtered.forEach(r => card.insertAdjacentHTML('beforeend', reportCardHTML(r)));
+  body.appendChild(card);
+}
+
+function reportCardHTML(r) {
+  const cfg = statusConfig[r.status];
+  const subtitle = state.role === 'owner' ? `by ${r.author} · ${r.size}` : `Report #${r.number} · ${r.size}`;
+  const iconId = r.format === 'pdf' ? '#i-pdf' : '#i-table';
+  return `
+    <div class="report-row row" onclick="openPreview(${r.id})">
+      <div class="thumb-report"><svg><use href="${iconId}"/></svg></div>
+      <div class="grow">
+        <div class="name">${escapeHtml(r.title)}</div>
+        <div class="sub">${escapeHtml(subtitle)}</div>
+        <div class="meta-row">
+          <span class="pill ${cfg.class}">${cfg.label}</span>
+          <span class="pill pill-outline">${formatLabels[r.format].toUpperCase()}</span>
+        </div>
+      </div>
+      <svg class="chevron"><use href="#i-chevron"/></svg>
+    </div>`;
+}
+
+function emptyStateHTML() {
+  const hasFilter = state.search || state.selectedFilter !== 'all';
+  const icon = hasFilter ? '#i-search-off' : '#i-inbox';
+  const title = hasFilter ? 'No matching reports' : (state.role === 'owner' ? 'No submitted reports yet' : 'No reports yet');
+  const msg = hasFilter
+    ? 'Try a different search term or filter.'
+    : (state.role === 'owner'
+        ? 'Reports submitted by Staff for your review will appear here.'
+        : 'Submit a report from Reports, or import a report file.');
+  return `
+    <div class="empty-state">
+      <div class="icon-lg"><svg><use href="${icon}"/></svg></div>
+      <div class="title">${title}</div>
+      <div class="msg">${msg}</div>
+    </div>`;
+}
+
+function openPreview(id) {
+  const report = state.reports[state.role].find(r => r.id === id);
+  if (!report) return;
+  state.currentId = id;
+  state.view = 'preview';
+  state.previewFormat = report.format;
+  if (state.role === 'owner' && report.status === 'submitted') {
+    report.status = 'viewed';
+    showToast('Marked as reviewed', 'success');
+  }
+  render();
+}
+
+function backToList() {
+  state.view = 'list';
+  state.currentId = null;
+  state.previewFormat = null;
+  render();
+}
+
+function filterStatus(status) {
+  state.selectedFilter = status;
+  renderList();
+}
+
+function filterSearch(q) {
+  state.search = q;
+  renderList();
+}
+
+function getCurrentReport() {
+  return state.reports[state.role].find(r => r.id === state.currentId);
+}
+
+function renderPreview() {
+  const report = getCurrentReport();
+  if (!report) return;
+  const body = document.getElementById('screenBody');
+  body.innerHTML = '';
+
+  const authorLabel = state.role === 'owner' ? 'Submitted by' : 'Author';
+  const cfg = statusConfig[report.status];
+  const meta = document.createElement('div');
+  meta.className = 'card pad';
+  meta.innerHTML = `
+    <div class="section-head" style="font-size:17px;">Report Details</div>
+    <div class="value-row"><span class="label">Report #</span><span>${escapeHtml(report.number)}</span></div>
+    <div class="value-row"><span class="label">Format</span><span class="pill pill-green">${formatLabels[report.format].toUpperCase()}</span></div>
+    <div class="value-row"><span class="label">Period</span><span>${escapeHtml(report.period)}</span></div>
+    <div class="value-row"><span class="label">${authorLabel}</span><span>${escapeHtml(report.author)}</span></div>
+    <div class="value-row"><span class="label">Date</span><span>${escapeHtml(report.date)}</span></div>
+    <div class="value-row"><span class="label">Size</span><span>${escapeHtml(report.size)}</span></div>
+    <div class="value-row"><span class="label">Status</span><span class="pill ${cfg.class}">${cfg.label}</span></div>`;
+  body.appendChild(meta);
+
+  const tabs = document.createElement('div');
+  tabs.className = 'format-tabs';
+  ['pdf', 'excel'].forEach(f => {
+    const on = state.previewFormat === f ? 'on' : '';
+    tabs.innerHTML += `<button class="format-tab ${on}" onclick="setPreviewFormat('${f}')">${formatLabels[f]}</button>`;
+  });
+  body.appendChild(tabs);
+
+  const content = document.createElement('div');
+  content.className = 'card preview-content';
+  const tmpl = document.getElementById('preview-' + state.previewFormat);
+  content.innerHTML = tmpl ? tmpl.innerHTML : '<div class="empty-state"><div class="msg">Preview not available.</div></div>';
+  body.appendChild(content);
+
+  renderPreviewActions(report);
+}
+
+function setPreviewFormat(fmt) {
+  state.previewFormat = fmt;
+  renderPreview();
+}
+
+function renderPreviewActions(report) {
+  const wrap = document.getElementById('previewActions');
+  const fmt = state.previewFormat;
+  const fmtLabel = formatLabels[fmt];
+  let html = '';
+
+  if (state.role === 'staff' && report.status === 'generated') {
+    html += `<button class="btn btn-primary" onclick="submitReport()">
+      <svg><use href="#i-send"/></svg> Submit to Owner
+    </button>`;
+    html += `<div class="actions-row">
+      <button class="btn btn-outlined" onclick="exportReport()">
+        <svg><use href="#i-export"/></svg> Export ${fmtLabel}
+      </button>
+      <button class="btn btn-outlined" onclick="shareReport()">
+        <svg><use href="#i-share"/></svg> Share
+      </button>
+    </div>`;
+  } else {
+    html += `<div class="actions-row">
+      <button class="btn btn-primary" onclick="exportReport()">
+        <svg><use href="#i-export"/></svg> Export ${fmtLabel}
+      </button>
+      <button class="btn btn-outlined" onclick="shareReport()">
+        <svg><use href="#i-share"/></svg> Share
+      </button>
+    </div>`;
+    if (state.role === 'owner' && report.status !== 'archived') {
+      html += `<button class="btn btn-warn" onclick="archiveReport()">
+        <svg><use href="#i-archive"/></svg> Archive
+      </button>`;
+    }
+  }
+  wrap.innerHTML = html;
+}
+
+function refreshList() {
+  showToast('Reports refreshed', 'success');
+  render();
+}
+
+function exportReport() {
+  const report = getCurrentReport();
+  const fmt = state.previewFormat;
+  const ext = formatExt[fmt];
+  const fileName = `pinoy_pos_sales_${report.number}_${fmt}.${ext}`;
+  openDialog({
+    title: 'Report Exported',
+    message: `Saved as: ${fileName}`,
+    confirmLabel: 'OK',
+    cancelLabel: 'Close'
+  });
+}
+
+function shareReport() {
+  showToast('Share sheet would open', 'info');
+}
+
+function submitReport() {
+  openDialog({
+    title: 'Submit to Owner?',
+    message: 'This will send the report to the Owner for review.',
+    confirmLabel: 'Submit',
+    onConfirm: () => {
+      const r = getCurrentReport();
+      if (r) {
+        r.status = 'submitted';
+        r.author = 'You';
+        showToast('Report submitted to Owner', 'success');
+        render();
+      }
+    }
+  });
+}
+
+function archiveReport() {
+  openDialog({
+    title: 'Archive this report?',
+    message: 'It will be moved to Archived status.',
+    confirmLabel: 'Archive',
+    destructive: true,
+    onConfirm: () => {
+      const r = getCurrentReport();
+      if (r) {
+        r.status = 'archived';
+        showToast('Report archived', 'success');
+        render();
+      }
+    }
+  });
+}
+
+function triggerImport() {
+  document.getElementById('importInput').click();
+}
+
+function onImportSelected(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+  let fmt = 'unknown';
+  if (ext === 'pdf') fmt = 'pdf';
+  else if (ext === 'xlsx' || ext === 'xls') fmt = 'excel';
+
+  if (fmt === 'unknown') {
+    showToast('Unsupported format. Use PDF or Excel.', 'error');
+    return;
+  }
+
+  const size = file.size ? `${(file.size / 1024).toFixed(1)} KB` : '1.2 MB';
+  const id = Date.now();
+  const now = new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+  state.reports.staff.unshift({
+    id,
+    number: `RPT-${id}`,
+    title: `Imported · ${file.name}`,
+    period: '—',
+    format: fmt,
+    status: 'imported',
+    author: 'You',
+    size,
+    date: now
+  });
+  input.value = '';
+  showToast(`Imported ${file.name}`, 'success');
+  renderList();
+}
+
+function setExcelTab(btn, name) {
+  const card = btn.closest('.excel-card');
+  if (!card) return;
+  card.querySelectorAll('.excel-tab').forEach(t => t.classList.remove('on'));
+  btn.classList.add('on');
+  card.querySelectorAll('.excel-sheet').forEach(s => s.classList.toggle('on', s.dataset.sheet === name));
+}
+
+init();
+</script>
+
+</body>
+</html>

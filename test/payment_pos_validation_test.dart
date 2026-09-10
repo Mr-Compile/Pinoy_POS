@@ -140,56 +140,6 @@ void main() {
       );
     });
 
-    test('blocks whitespace-only customer name for Card when required', () async {
-      final productService = ProductService();
-      final categoryService = CategoryService();
-      final salesService = SalesService();
-
-      await setCustomerNameRequirement('required');
-      final productId = await createProduct(productService, categoryService);
-
-      expect(
-        () => createSaleForMethod(
-          salesService,
-          productId,
-          'Card',
-          customerName: '   ',
-        ),
-        throwsA(
-          isA<PaymentValidationException>().having(
-            (e) => e.message,
-            'message',
-            contains('Customer name is required'),
-          ),
-        ),
-      );
-    });
-
-    test('blocks empty customer name for Other when required', () async {
-      final productService = ProductService();
-      final categoryService = CategoryService();
-      final salesService = SalesService();
-
-      await setCustomerNameRequirement('required');
-      final productId = await createProduct(productService, categoryService);
-
-      expect(
-        () => createSaleForMethod(
-          salesService,
-          productId,
-          'Other',
-          customerName: null,
-        ),
-        throwsA(
-          isA<PaymentValidationException>().having(
-            (e) => e.message,
-            'message',
-            contains('Customer name is required'),
-          ),
-        ),
-      );
-    });
-
     test('blocks empty customer name for GCash when required', () async {
       final productService = ProductService();
       final categoryService = CategoryService();
@@ -224,7 +174,7 @@ void main() {
       await setCustomerNameRequirement('required');
       final productId = await createProduct(productService, categoryService);
 
-      for (final method in ['Cash', 'Card', 'Other', 'GCash']) {
+      for (final method in ['Cash', 'GCash']) {
         final reference = method == 'GCash'
             ? 'GCASH-REF-VALID-${method.hashCode}'
             : 'REF-${method.toUpperCase()}-VALID';
@@ -247,7 +197,7 @@ void main() {
       await setCustomerNameRequirement('optional');
       final productId = await createProduct(productService, categoryService);
 
-      for (final method in ['Cash', 'Card', 'Other', 'GCash']) {
+      for (final method in ['Cash', 'GCash']) {
         final reference = method == 'GCash'
             ? 'GCASH-REF-OPT-${method.hashCode}'
             : 'REF-${method.toUpperCase()}-OPT';
@@ -270,7 +220,7 @@ void main() {
       await setCustomerNameRequirement('off');
       final productId = await createProduct(productService, categoryService);
 
-      for (final method in ['Cash', 'Card', 'Other', 'GCash']) {
+      for (final method in ['Cash', 'GCash']) {
         final reference = method == 'GCash'
             ? 'GCASH-REF-OFF-${method.hashCode}'
             : 'REF-${method.toUpperCase()}-OFF';
@@ -327,7 +277,7 @@ void main() {
       );
 
       // Non-GCash methods should not require payment proof.
-      for (final method in ['Cash', 'Card', 'Other']) {
+      for (final method in ['Cash']) {
         final success = await createSaleForMethod(
           salesService,
           productId,

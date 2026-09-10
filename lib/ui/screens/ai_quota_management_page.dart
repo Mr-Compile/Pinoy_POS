@@ -111,6 +111,7 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
                   controller: controller,
                   keyboardType: TextInputType.number,
                   label: 'New default daily quota',
+                  hint: 'e.g. 100',
                   prefixIcon: Icons.auto_awesome,
                   helperText: 'Applies to new users unless overridden',
                 ),
@@ -203,6 +204,7 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
               controller: controller,
               keyboardType: TextInputType.number,
               label: 'Daily quota',
+              hint: 'e.g. 100',
               prefixIcon: Icons.auto_awesome,
             ),
           );

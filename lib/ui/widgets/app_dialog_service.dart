@@ -406,6 +406,7 @@ class AppDialogService {
             child: AppTextFormField(
               controller: controller,
               label: 'Reason',
+              hint: 'e.g. Customer requested cancellation',
               prefixIcon: Icons.notes,
               maxLines: 2,
               validator: (value) =>

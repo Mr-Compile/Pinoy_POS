@@ -442,7 +442,7 @@ class StatStrip extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       mainAxisSpacing: Spacing.md,
       crossAxisSpacing: Spacing.md,
-      childAspectRatio: 1.5,
+      mainAxisExtent: 108,
       children: items,
     );
   }
@@ -730,6 +730,8 @@ class _QuickIconCircle extends StatelessWidget {
   }
 }
 
+const double _kQuickActionTileHeight = 84.0;
+
 /// A panel that lays [QuickActionTile] children out in a grid.
 class QuickActionPanel extends StatelessWidget {
   final List<Widget> children;
@@ -743,13 +745,15 @@ class QuickActionPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GridView.count(
-      crossAxisCount: columns ?? 2,
+    return GridView(
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: columns ?? 2,
+        mainAxisSpacing: Spacing.md,
+        crossAxisSpacing: Spacing.md,
+        mainAxisExtent: _kQuickActionTileHeight,
+      ),
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: Spacing.md,
-      crossAxisSpacing: Spacing.md,
-      childAspectRatio: 1.15,
       children: children,
     );
   }

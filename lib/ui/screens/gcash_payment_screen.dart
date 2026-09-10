@@ -43,7 +43,7 @@ class GcashPaymentScreen extends ConsumerStatefulWidget {
 
 class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _customerController = TextEditingController();
+  final _customerController = TextEditingController(text: 'GUEST');
   final _referenceController = TextEditingController();
 
   final ImageService _imageService = ImageService();
@@ -977,6 +977,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
                 AppTextFormField(
                   controller: _customerController,
                   label: _customerNameLabel(settings),
+                  hint: 'Customer name',
                   prefixIcon: Icons.person_outline,
                   helperText: settings.customerNameRequired
                       ? 'A customer name is required to complete this payment.'
@@ -992,6 +993,7 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
                 label: settings.gcashReferenceRequired
                     ? 'GCash Reference Number *'
                     : 'GCash Reference Number',
+                hint: 'Reference number',
                 prefixIcon: Icons.numbers,
                 helperText:
                     'Enter the reference number shown after completing the GCash payment.',

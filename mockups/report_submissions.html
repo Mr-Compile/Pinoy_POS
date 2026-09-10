@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinoy POS — Submitted Reports (Owner)</title>
+<link rel="stylesheet" href="mockup.css">
+<style>
+  .pill-outline { background: transparent; border: 1px solid var(--primary); color: var(--primary); }
+  .thumb-report { width: 56px; height: 72px; border-radius: 12px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border); background: var(--surface-elev); }
+  .thumb-report svg { width: 28px; height: 28px; fill: var(--primary); }
+  .report-row { cursor: pointer; transition: background .12s; }
+  .report-row:hover { background: var(--surface-elev); }
+  .report-row .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .report-row .sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .report-row .chevron { width: 18px; height: 18px; fill: var(--text-3); flex-shrink: 0; }
+  .meta-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+  .meta-row .pill { font-size: 10px; padding: 3px 8px; }
+  .preview-card { overflow-x: auto; }
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <div>
+    <h1>Submitted Reports — Owner</h1>
+    <p>Staff submissions inbox with status, format, and preview. Excel and PDF previews keep Export and Share only.</p>
+  </div>
+  <button class="theme-toggle" onclick="toggleTheme()">
+    <svg viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
+    <span id="themeLabel">Light mode</span>
+  </button>
+</div>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24"><path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></symbol>
+  <symbol id="i-export" viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.91 9.81C8.37 9.31 7.66 9 6.87 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.04 4.12c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M12 21l3.5-4.5c-.97-.74-2.18-1.16-3.5-1.16s-2.53.42-3.5 1.16L12 21zM12 3C7.31 3 3.07 4.69 0 7.55l1.93 2.43C4.48 7.9 8.01 6.4 12 6.4s7.52 1.5 10.07 3.58L24 7.55C20.93 4.69 16.69 3 12 3z"/></symbol>
+  <symbol id="i-batt" viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M8.59 16.59 13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></symbol>
+  <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 13l-5-4H10l-5 4V5h14v11z"/></symbol>
+  <symbol id="i-table" viewBox="0 0 24 24"><path d="M5 3h14c1.1 0 2 .9 2 2v14c0 1.1-.9 2-2 2H5c-1.1 0-2-.9-2-2V5c0-1.1.9-2 2-2zm0 4v5h14V7H5zm0 7v5h14v-5H5z"/></symbol>
+  <symbol id="i-pdf" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></symbol>
+</svg>
+
+<div class="frames">
+
+  <!-- Owner inbox -->
+  <div class="frame-wrap">
+    <div class="frame-label">Submitted Reports — Owner</div>
+    <div class="phone">
+      <div class="statusbar">
+        <span>9:41</span>
+        <span class="icons">
+          <svg><use href="#i-wifi"/></svg>
+          <svg><use href="#i-batt"/></svg>
+        </span>
+      </div>
+      <div class="appbar">
+        <div class="back"><svg><use href="#i-back"/></svg></div>
+        <div class="title"><h2>Submitted Reports</h2><div class="sub">3 new</div></div>
+        <div class="act" title="Filter"><svg><use href="#i-filter"/></svg></div>
+      </div>
+      <div class="screen">
+        <div class="screen-body">
+          <div class="search"><svg><use href="#i-search"/></svg><span>Search reports...</span></div>
+          <div class="chips">
+            <span class="chip on">All</span>
+            <span class="chip">Submitted</span>
+            <span class="chip">Viewed</span>
+            <span class="chip">Imported</span>
+            <span class="chip">Archived</span>
+          </div>
+
+          <div class="card">
+            <div class="report-row row" onclick="showToast('Opening report preview', 'info')">
+              <div class="thumb-report"><svg><use href="#i-table"/></svg></div>
+              <div class="grow">
+                <div class="name">Daily Sales Sept 8</div>
+                <div class="sub">by Maria Santos · 2.1 MB</div>
+                <div class="meta-row">
+                  <span class="pill pill-amber">Submitted</span>
+                  <span class="pill pill-outline">EXCEL</span>
+                </div>
+              </div>
+              <svg class="chevron"><use href="#i-chevron"/></svg>
+            </div>
+            <div class="report-row row" onclick="showToast('Opening report preview', 'info')">
+              <div class="thumb-report"><svg><use href="#i-pdf"/></svg></div>
+              <div class="grow">
+                <div class="name">Weekly Summary 37</div>
+                <div class="sub">by Juan Cruz · 1.4 MB</div>
+                <div class="meta-row">
+                  <span class="pill pill-green">Viewed</span>
+                  <span class="pill pill-outline">PDF</span>
+                </div>
+              </div>
+              <svg class="chevron"><use href="#i-chevron"/></svg>
+            </div>
+            <div class="report-row row" onclick="showToast('Opening report preview', 'info')">
+              <div class="thumb-report"><svg><use href="#i-pdf"/></svg></div>
+              <div class="grow">
+                <div class="name">Inventory Audit</div>
+                <div class="sub">by Maria Santos · 856 KB</div>
+                <div class="meta-row">
+                  <span class="pill pill-blue">Imported</span>
+                  <span class="pill pill-outline">PDF</span>
+                </div>
+              </div>
+              <svg class="chevron"><use href="#i-chevron"/></svg>
+            </div>
+            <div class="report-row row" onclick="showToast('Opening report preview', 'info')">
+              <div class="thumb-report"><svg><use href="#i-table"/></svg></div>
+              <div class="grow">
+                <div class="name">Monthly Closing Aug</div>
+                <div class="sub">by Ana Reyes · 3.2 MB</div>
+                <div class="meta-row">
+                  <span class="pill pill-grey">Archived</span>
+                  <span class="pill pill-outline">Excel</span>
+                </div>
+              </div>
+              <svg class="chevron"><use href="#i-chevron"/></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes">
+      <b>Owner inbox:</b> Staff-submitted reports as tappable cards. Each row shows the report title, submitting staff, size, status chip (Submitted/Viewed/Imported/Archived), and an outlined format chip. Search and status chips keep the owner’s scan fast.
+    </div>
+  </div>
+
+  <!-- Empty state -->
+  <div class="frame-wrap">
+    <div class="frame-label">Empty Inbox</div>
+    <div class="phone">
+      <div class="statusbar">
+        <span>9:41</span>
+        <span class="icons">
+          <svg><use href="#i-wifi"/></svg>
+          <svg><use href="#i-batt"/></svg>
+        </span>
+      </div>
+      <div class="appbar">
+        <div class="back"><svg><use href="#i-back"/></svg></div>
+        <div class="title"><h2>Submitted Reports</h2></div>
+      </div>
+      <div class="screen">
+        <div class="screen-body" style="padding:0;">
+          <div class="center-screen">
+            <div class="icon-lg"><svg><use href="#i-inbox"/></svg></div>
+            <div class="title">No submitted reports yet</div>
+            <div class="msg">Reports submitted by Staff for your review will appear here.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes">
+      <b>Empty state:</b> Clear, helpful message when no submissions exist. Uses the same inbox icon as the list header.
+    </div>
+  </div>
+
+  <!-- Improved Report Preview — no Open HTML button -->
+  <div class="frame-wrap">
+    <div class="frame-label">Report Preview — Improved</div>
+    <div class="phone">
+      <div class="statusbar">
+        <span>9:41</span>
+        <span class="icons">
+          <svg><use href="#i-wifi"/></svg>
+          <svg><use href="#i-batt"/></svg>
+        </span>
+      </div>
+      <div class="appbar">
+        <div class="back"><svg><use href="#i-back"/></svg></div>
+        <div class="title"><h2>Report Preview</h2><div class="sub">Sales Report · Excel</div></div>
+        <div class="act" onclick="showToast('Report refreshed', 'success')" title="Refresh"><svg><use href="#i-refresh"/></svg></div>
+      </div>
+      <div class="screen">
+        <div class="screen-body">
+
+          <div class="card pad">
+            <div class="section-head" style="font-size:17px;">Report Details</div>
+            <div class="value-row"><span class="label">Report #</span><span>RPT-20260909-001</span></div>
+            <div class="value-row"><span class="label">Format</span><span class="pill pill-green">EXCEL</span></div>
+            <div class="value-row"><span class="label">Period</span><span>Sep 1 - Sep 9, 2026</span></div>
+            <div class="value-row"><span class="label">Submitted by</span><span>Maria Santos</span></div>
+            <div class="value-row"><span class="label">Date</span><span>Sep 9, 2026 10:30 AM</span></div>
+            <div class="value-row"><span class="label">Size</span><span>2.1 MB</span></div>
+          </div>
+
+          <div class="card preview-card" style="padding:0;overflow-x:auto;">
+            <table class="data-table">
+              <thead>
+                <tr><th>Date</th><th>Product</th><th>Qty</th><th>Total</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Sep 9</td><td>Pastil</td><td>12</td><td>₱120</td></tr>
+                <tr><td>Sep 9</td><td>Chicken Adobo Rice</td><td>5</td><td>₱400</td></tr>
+                <tr><td>Sep 8</td><td>Iced Tea</td><td>8</td><td>₱200</td></tr>
+                <tr><td>Sep 8</td><td>Sisig Rice Meal</td><td>3</td><td>₱285</td></tr>
+                <tr><td>Sep 7</td><td>Banana Cue</td><td>10</td><td>₱150</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+        <div style="padding:14px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:10px;">
+          <button class="btn btn-primary" onclick="showToast('Report exported', 'success')">
+            <svg><use href="#i-export"/></svg> Export
+          </button>
+          <button class="btn btn-outlined" onclick="showToast('Share sheet would open', 'info')">
+            <svg><use href="#i-share"/></svg> Share
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes">
+      <b>Excel preview:</b> Report metadata, a scrollable data table, and only the primary Export and secondary Share actions. The Open HTML button has been removed — the preview already renders the report in the app.
+    </div>
+  </div>
+
+  <!-- Improved Report Preview — PDF -->
+  <div class="frame-wrap">
+    <div class="frame-label">Report Preview — PDF</div>
+    <div class="phone">
+      <div class="statusbar">
+        <span>9:41</span>
+        <span class="icons">
+          <svg><use href="#i-wifi"/></svg>
+          <svg><use href="#i-batt"/></svg>
+        </span>
+      </div>
+      <div class="appbar">
+        <div class="back"><svg><use href="#i-back"/></svg></div>
+        <div class="title"><h2>Report Preview</h2><div class="sub">Sales Report · PDF</div></div>
+        <div class="act" onclick="showToast('Report refreshed', 'success')" title="Refresh"><svg><use href="#i-refresh"/></svg></div>
+      </div>
+      <div class="screen">
+        <div class="screen-body" style="gap:0;padding:0;">
+          <div style="flex:1;background:var(--surface-elev);display:flex;align-items:center;justify-content:center;padding:14px;">
+            <div style="text-align:center;color:var(--text-3);">
+              <svg viewBox="0 0 24 24" style="width:64px;height:64px;fill:var(--text-3);margin-bottom:12px;"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+              <div style="font-size:14px;font-weight:600;color:var(--text);">Sales Report</div>
+              <div class="sub">PDF page rendered by PdfPreview</div>
+            </div>
+          </div>
+        </div>
+        <div style="padding:14px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:10px;">
+          <button class="btn btn-primary" onclick="showToast('PDF exported', 'success')">
+            <svg><use href="#i-export"/></svg> Export
+          </button>
+          <button class="btn btn-outlined" onclick="showToast('Share sheet would open', 'info')">
+            <svg><use href="#i-share"/></svg> Share
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes">
+      <b>PDF preview:</b> Same improved action bar — only Export and Share. No Open HTML button. The PDF is rendered in-app by PdfPreview.
+    </div>
+  </div>
+
+</div>
+
+<script src="mockup.js"></script>
+</body>
+</html>

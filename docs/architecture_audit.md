@@ -172,7 +172,7 @@ The cycles are currently used for cross-provider invalidation but increase coupl
 ### 10. Backup / restore / export
 
 - `BackupService` correctly owns backup/restore and uses platform-specific `BackupStorageService` implementations.
-- `ReceiptService` and `ReportService` both produce PDFs; `ReportService` also produces CSV/Excel. The two PDF formatters are separate, which is appropriate (receipt vs. report), but shared PDF helpers could be extracted.
+- `ReceiptService` and `ReportService` both produce PDFs; `ReportService` also produces Excel. The two PDF formatters are separate, which is appropriate (receipt vs. report), but shared PDF helpers could be extracted.
 - `ReportService` contains both business analytics queries and export file generation; the query portion overlaps with `SalesService` and `BusinessIntelligenceService`.
 
 ## Consolidation Plan

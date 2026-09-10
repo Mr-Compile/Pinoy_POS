@@ -51,40 +51,55 @@ class KpiCard extends StatelessWidget {
     final TextStyle valueStyle;
     final double iconSize;
     final EdgeInsets padding;
+    final Color? borderColor;
     switch (tier) {
       case KpiCardTier.primary:
         valueStyle = AppTypography.headlineMedium(context).copyWith(
-          color: cs.onSurface,
+          color: cs.primary,
           height: 1.1,
         );
-        iconSize = 28;
+        iconSize = 15;
         padding = const EdgeInsets.all(Spacing.lg);
+        borderColor = cs.primary.withValues(alpha: 0.35);
       case KpiCardTier.secondary:
         valueStyle = AppTypography.titleLarge(context).copyWith(
           color: cs.onSurface,
           height: 1.1,
         );
-        iconSize = 24;
+        iconSize = 15;
         padding = const EdgeInsets.all(Spacing.md + 2);
+        borderColor = null;
       case KpiCardTier.compact:
         valueStyle = AppTypography.titleMedium(context).copyWith(
           color: cs.onSurface,
           height: 1.1,
         );
-        iconSize = 20;
+        iconSize = 15;
         padding = const EdgeInsets.all(Spacing.md);
+        borderColor = null;
     }
 
     return AppCard(
       padding: padding,
       onTap: onTap,
+      variant: AppCardVariant.outlined,
+      borderColor: borderColor,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [
-              Icon(icon, size: iconSize, color: iconColor),
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.16),
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Icon(icon, size: iconSize, color: iconColor),
+              ),
               const SizedBox(width: Spacing.sm),
               Expanded(
                 child: Text(

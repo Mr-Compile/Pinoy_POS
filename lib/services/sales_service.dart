@@ -339,6 +339,14 @@ class SalesService {
 
     // ── Payment-method-specific validation ───────────────────────────────
 
+    const supportedMethods = ['Cash', 'GCash'];
+    if (!supportedMethods.contains(paymentMethod)) {
+      throw PaymentValidationException(
+        'Unsupported payment method',
+        details: 'Only Cash and GCash are accepted.',
+      );
+    }
+
     if (paymentMethod == 'Cash') {
       if (received < totalAmount) {
         throw PaymentValidationException(
@@ -473,9 +481,7 @@ class SalesService {
           referenceNumber: trimmedReference?.isNotEmpty == true
               ? trimmedReference
               : null,
-          customerName: trimmedCustomer?.isNotEmpty == true
-              ? trimmedCustomer
-              : null,
+          customerName: trimmedCustomer?.isNotEmpty == true ? trimmedCustomer : 'GUEST',
           paymentProofPath: paymentProofPath,
           paymentProofType: resolvedProofType,
           verifiedAt: verifiedAt,

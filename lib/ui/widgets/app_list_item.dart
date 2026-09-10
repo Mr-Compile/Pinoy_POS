@@ -23,6 +23,7 @@ class AppListItem extends StatelessWidget {
   final Color? statusColor;
   final IconData? statusIcon;
   final List<AppListAction>? actions;
+  final List<AppListMenuAction>? menuActions;
   final List<Widget>? chips;
   final EdgeInsetsGeometry? padding;
   final EdgeInsetsGeometry margin;
@@ -39,6 +40,7 @@ class AppListItem extends StatelessWidget {
     this.statusColor,
     this.statusIcon,
     this.actions,
+    this.menuActions,
     this.chips,
     this.padding,
     this.margin = EdgeInsets.zero,
@@ -99,7 +101,9 @@ class AppListItem extends StatelessWidget {
             children: chips!,
           ),
         ],
-        if (statusLabel != null || (actions != null && actions!.isNotEmpty)) ...[
+        if (statusLabel != null ||
+            (actions != null && actions!.isNotEmpty) ||
+            (menuActions != null && menuActions!.isNotEmpty)) ...[
           const SizedBox(height: Spacing.md),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -112,7 +116,14 @@ class AppListItem extends StatelessWidget {
                 ),
                 const SizedBox(width: Spacing.sm),
               ],
-              if (actions != null && actions!.isNotEmpty)
+              if (menuActions != null && menuActions!.isNotEmpty)
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: _buildMenuButton(context),
+                  ),
+                )
+              else if (actions != null && actions!.isNotEmpty)
                 Expanded(
                   child: Wrap(
                     alignment: WrapAlignment.end,
@@ -140,6 +151,42 @@ class AppListItem extends StatelessWidget {
       child: content,
     );
   }
+
+  Widget _buildMenuButton(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return PopupMenuButton<int>(
+      icon: Icon(Icons.more_vert, color: cs.onSurfaceVariant),
+      tooltip: 'Options',
+      padding: EdgeInsets.zero,
+      onSelected: (index) {
+        final action = menuActions![index];
+        action.onPressed?.call();
+      },
+      itemBuilder: (context) {
+        return menuActions!.asMap().entries.map((entry) {
+          final index = entry.key;
+          final action = entry.value;
+          final color = action.color ?? cs.onSurfaceVariant;
+          return PopupMenuItem<int>(
+            value: index,
+            child: Row(
+              children: [
+                Icon(action.icon, size: 18, color: color),
+                const SizedBox(width: 8),
+                Text(
+                  action.label,
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList();
+      },
+    );
+  }
 }
 
 /// A single icon action for [AppListItem].
@@ -153,6 +200,21 @@ class AppListAction {
     required this.icon,
     this.onPressed,
     this.tooltip,
+    this.color,
+  });
+}
+
+/// A labeled action for a [PopupMenuButton] inside [AppListItem].
+class AppListMenuAction {
+  final IconData icon;
+  final String label;
+  final VoidCallback? onPressed;
+  final Color? color;
+
+  const AppListMenuAction({
+    required this.icon,
+    required this.label,
+    this.onPressed,
     this.color,
   });
 }

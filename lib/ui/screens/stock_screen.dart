@@ -1,25 +1,26 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pinoy_pos/data/models/product.dart';
+import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/category.dart';
+import 'package:pinoy_pos/data/models/product.dart';
 import 'package:pinoy_pos/data/models/stock_history.dart';
+import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/catalog_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
-import 'package:pinoy_pos/ui/widgets/app_image.dart';
-import 'package:pinoy_pos/ui/widgets/empty_state.dart';
-import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_form.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
-import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
-import 'package:pinoy_pos/ui/widgets/responsive_create_action.dart';
-import 'package:pinoy_pos/core/app_theme.dart';
-import 'package:pinoy_pos/core/breakpoints.dart';
-import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
+import 'package:pinoy_pos/ui/widgets/app_image.dart';
+import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
+import 'package:pinoy_pos/ui/widgets/app_status_chip.dart';
+import 'package:pinoy_pos/ui/widgets/empty_state.dart';
+import 'package:pinoy_pos/ui/widgets/loading_state.dart';
+import 'package:pinoy_pos/ui/widgets/responsive_create_action.dart';
 
 /// Stock status filter options.
 enum StockFilter { all, lowStock, outOfStock }
@@ -128,6 +129,22 @@ class _StockScreenState extends ConsumerState<StockScreen> {
     } catch (_) {
       return 'Uncategorized';
     }
+  }
+
+  Color _stockColor(Product product) {
+    if (_isOutOfStock(product)) {
+      return Theme.of(context).colorScheme.error;
+    }
+    if (_isLowStock(product)) {
+      return AppSemanticColors.resolve(
+        AppSemanticColors.warning,
+        Theme.of(context).brightness,
+      );
+    }
+    return AppSemanticColors.resolve(
+      AppSemanticColors.success,
+      Theme.of(context).brightness,
+    );
   }
 
   // ── Search ─────────────────────────────────────────────────────────
@@ -314,7 +331,7 @@ class _StockScreenState extends ConsumerState<StockScreen> {
     if (_isLoading) {
       return Scaffold(
         appBar: AppHeader(
-          title: 'Stock Management',
+          title: 'Stock',
           showBackButton: true,
         ),
         body: const LoadingState(),
@@ -336,40 +353,25 @@ class _StockScreenState extends ConsumerState<StockScreen> {
 
     return Scaffold(
       appBar: const AppHeader(
-        title: 'Stock Management',
+        title: 'Stock',
         showBackButton: true,
       ),
       floatingActionButton: createFab,
       body: _products.isEmpty
           ? _buildNoProductsState()
           : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Summary cards
-                _buildSummaryCards(),
-                // Search + filters + primary add-stock action
+                _buildRoleChipBar(),
                 _buildToolbar(toolbarAction),
-                // Stock list
                 Expanded(
                   child: _filteredProducts.isEmpty
                       ? _buildEmptyFilterState()
-                      : LayoutBuilder(
-                          builder: (context, constraints) {
-                            final layout = layoutClassFor(constraints.maxWidth);
-                            if (layout == LayoutClass.expanded) {
-                              return _buildTabletStockList(
-                                canAddStock,
-                                canAdjustStock,
-                                canViewStock,
-                                bottomClearance,
-                              );
-                            }
-                            return _buildMobileStockList(
-                              canAddStock,
-                              canAdjustStock,
-                              canViewStock,
-                              bottomClearance,
-                            );
-                          },
+                      : _buildStockList(
+                          canAddStock,
+                          canAdjustStock,
+                          canViewStock,
+                          bottomClearance,
                         ),
                 ),
               ],
@@ -391,167 +393,74 @@ class _StockScreenState extends ConsumerState<StockScreen> {
     );
   }
 
-  // ── Summary / overview ─────────────────────────────────────────────
+  // ── Role / permission bar ──────────────────────────────────────────
 
-  bool _isAvailable(Product p) => p.stock > 0 && !p.isLowStock;
-
-  Widget _buildSummaryCards() {
-    final totalProducts = _products.length;
-    final availableCount = _products.where(_isAvailable).length;
-    final lowStockCount = _products.where(_isLowStock).length;
-    final outOfStockCount = _products.where(_isOutOfStock).length;
+  Widget _buildRoleChipBar() {
     final cs = Theme.of(context).colorScheme;
-    final brightness = Theme.of(context).brightness;
+    final user = ref.read(authStateProvider).user;
+    final isOwner = user?.role == UserRole.owner;
+    final roleColor = isOwner
+        ? AppSemanticColors.resolve(AppSemanticColors.info, Theme.of(context).brightness)
+        : AppSemanticColors.resolve(AppSemanticColors.success, Theme.of(context).brightness);
 
-    final metrics = [
-      (
-        label: 'Total Stock',
-        value: '$totalProducts',
-        icon: Icons.inventory_2,
-        color: cs.primary,
-      ),
-      (
-        label: 'Available',
-        value: '$availableCount',
-        icon: Icons.check_circle,
-        color: AppSemanticColors.resolve(AppSemanticColors.success, brightness),
-      ),
-      (
-        label: 'Low Stock',
-        value: '$lowStockCount',
-        icon: Icons.warning_amber,
-        color: AppSemanticColors.resolve(AppSemanticColors.warning, brightness),
-      ),
-      (
-        label: 'Out of Stock',
-        value: '$outOfStockCount',
-        icon: Icons.error_outline,
-        color: cs.error,
-      ),
-    ];
+    final label = isOwner ? 'Owner' : 'Staff';
+    final permText = isOwner
+        ? 'view/add/adjust stock'
+        : 'view/add stock only';
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         Spacing.lg,
         Spacing.md,
         Spacing.lg,
-        Spacing.sm,
+        0,
       ),
-      child: AppCard(
-        padding: const EdgeInsets.all(Spacing.md),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final layout = layoutClassFor(constraints.maxWidth);
-
-            if (layout == LayoutClass.compact) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (var i = 0; i < metrics.length; i++) ...[
-                    if (i > 0) const Divider(height: 16),
-                    _buildSummaryMetricRow(
-                      metrics[i].label,
-                      metrics[i].value,
-                      metrics[i].icon,
-                      metrics[i].color,
-                    ),
-                  ],
-                ],
-              );
-            }
-
-            if (layout == LayoutClass.medium) {
-              return GridView.count(
-                crossAxisCount: 2,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: Spacing.md,
-                crossAxisSpacing: Spacing.md,
-                childAspectRatio: 2.2,
-                children: metrics
-                    .map((m) => _buildSummaryMetricTile(
-                          m.label,
-                          m.value,
-                          m.icon,
-                          m.color,
-                        ))
-                    .toList(),
-              );
-            }
-
-            return Row(
-              children: metrics
-                  .map((m) => Expanded(
-                        child: _buildSummaryMetricTile(
-                          m.label,
-                          m.value,
-                          m.icon,
-                          m.color,
-                        ),
-                      ))
-                  .toList(),
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  /// Compact phone layout: a single row with label, value, and icon.
-  Widget _buildSummaryMetricRow(
-    String label,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
-    return Row(
-      children: [
-        Icon(icon, color: color, size: 20),
-        const SizedBox(width: Spacing.sm),
-        Expanded(
-          child: Text(
-            label,
-            style: Theme.of(context).textTheme.bodyMedium,
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 5,
+            ),
+            decoration: BoxDecoration(
+              color: roleColor.withValues(alpha: 0.16),
+              border: Border.all(color: roleColor.withValues(alpha: 0.4)),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.person_outline,
+                  size: 12,
+                  color: roleColor,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: AppTypography.labelSmall(context).copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: roleColor,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        Text(
-          value,
-          style: AppTypography.titleMediumBold(context),
-        ),
-      ],
-    );
-  }
-
-  /// Tablet/desktop layout: a centered icon-value-label tile.
-  Widget _buildSummaryMetricTile(
-    String label,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
-    final cs = Theme.of(context).colorScheme;
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, color: color, size: 24),
-        const SizedBox(height: Spacing.xs),
-        Text(
-          value,
-          style: AppTypography.titleLargeBold(context),
-        ),
-        Text(
-          label,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          const SizedBox(width: Spacing.sm),
+          Expanded(
+            child: Text(
+              permText,
+              style: AppTypography.bodySmall(context).copyWith(
                 color: cs.onSurfaceVariant,
               ),
-          textAlign: TextAlign.center,
-        ),
-      ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  // ── Content toolbar: search + filters + add-stock action ───────────
+  // ── Toolbar: search + category filter + stock chips ────────────────
 
   Widget _buildToolbar(Widget? primaryAction) {
     return CrudToolbar(
@@ -568,19 +477,79 @@ class _StockScreenState extends ConsumerState<StockScreen> {
         onClear: _clearSearch,
       ),
       controls: [
+        _buildCategoryFilter(),
         _buildStockFilterChip(StockFilter.all, 'All'),
-        _buildStockFilterChip(StockFilter.lowStock, 'Low Stock'),
-        _buildStockFilterChip(StockFilter.outOfStock, 'Out of Stock'),
-        if (_categories.isNotEmpty) ...[
-          const SizedBox(
-            height: 28,
-            child: VerticalDivider(width: 1),
-          ),
-          _buildCategoryChip(null, 'All Categories'),
-          ..._categories.map((c) => _buildCategoryChip(c.id, c.name)),
-        ],
+        _buildStockFilterChip(StockFilter.lowStock, 'Low'),
+        _buildStockFilterChip(StockFilter.outOfStock, 'Out'),
       ],
       primaryAction: primaryAction,
+    );
+  }
+
+  Widget _buildCategoryFilter() {
+    final cs = Theme.of(context).colorScheme;
+    final selectedLabel =
+        _selectedCategoryId == null ? 'Filter' : _categoryName(_selectedCategoryId);
+
+    return PopupMenuButton<int?>(
+      initialValue: _selectedCategoryId,
+      onSelected: (value) => setState(() => _selectedCategoryId = value),
+      offset: const Offset(0, 40),
+      itemBuilder: (context) => [
+        PopupMenuItem<int?>(
+          value: null,
+          child: Row(
+            children: [
+              Icon(Icons.filter_list, size: 18, color: cs.onSurfaceVariant),
+              const SizedBox(width: 8),
+              const Text('All Categories'),
+            ],
+          ),
+        ),
+        ..._categories.map((category) {
+          return PopupMenuItem<int?>(
+            value: category.id,
+            child: Row(
+              children: [
+                Icon(Icons.label_outline, size: 18, color: cs.onSurfaceVariant),
+                const SizedBox(width: 8),
+                Text(category.name),
+              ],
+            ),
+          );
+        }),
+      ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 8,
+        ),
+        decoration: BoxDecoration(
+          color: cs.surface,
+          border: Border.all(color: cs.outline),
+          borderRadius: BorderRadius.circular(AppRadius.control),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.filter_list,
+              size: 18,
+              color: cs.onSurfaceVariant,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              selectedLabel,
+              style: AppTypography.bodySmall(context),
+            ),
+            Icon(
+              Icons.arrow_drop_down,
+              size: 18,
+              color: cs.onSurfaceVariant,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -593,20 +562,6 @@ class _StockScreenState extends ConsumerState<StockScreen> {
       onSelected: (_) {
         setState(() {
           _stockFilter = filter;
-        });
-      },
-    );
-  }
-
-  Widget _buildCategoryChip(int? categoryId, String label) {
-    final isSelected = _selectedCategoryId == categoryId;
-    return FilterChip(
-      label: Text(label),
-      showCheckmark: false,
-      selected: isSelected,
-      onSelected: (_) {
-        setState(() {
-          _selectedCategoryId = categoryId;
         });
       },
     );
@@ -652,80 +607,56 @@ class _StockScreenState extends ConsumerState<StockScreen> {
     );
   }
 
-  // ── Stock status badge ─────────────────────────────────────────────
+  // ── Stock list ─────────────────────────────────────────────────────
 
-  Widget _buildStockStatusBadge(Product product) {
-    final cs = Theme.of(context).colorScheme;
-    if (_isOutOfStock(product)) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: cs.errorContainer,
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.error_outline, size: 14, color: cs.onErrorContainer),
-            const SizedBox(width: 4),
-            Text(
-              'Out of Stock',
-              style: AppTypography.labelSmall(context).copyWith(
-                fontWeight: FontWeight.w600,
-                color: cs.onErrorContainer,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-    if (_isLowStock(product)) {
-      final warningColor = AppSemanticColors.resolve(
-        AppSemanticColors.warning,
-        Theme.of(context).brightness,
-      );
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: warningColor.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.warning_amber, size: 14, color: warningColor),
-            const SizedBox(width: 4),
-            Text(
-              'Low Stock',
-              style: AppTypography.labelSmall(context).copyWith(
-                fontWeight: FontWeight.w600,
-                color: warningColor,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-    final successColor = AppSemanticColors.resolve(
-      AppSemanticColors.success,
-      Theme.of(context).brightness,
+  Widget _buildStockList(
+    bool canAddStock,
+    bool canAdjustStock,
+    bool canViewStock,
+    double bottomClearance,
+  ) {
+    final brightness = Theme.of(context).brightness;
+    final headColor = AppSemanticColors.resolve(
+      AppSemanticColors.warning,
+      brightness,
     );
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: successColor.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(AppRadius.sm),
+
+    return AppCard(
+      margin: const EdgeInsets.fromLTRB(
+        Spacing.lg,
+        Spacing.lg,
+        Spacing.lg,
+        Spacing.lg,
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Icon(Icons.check_circle, size: 14, color: successColor),
-          const SizedBox(width: 4),
-          Text(
-            'Normal',
-            style: AppTypography.labelSmall(context).copyWith(
-              fontWeight: FontWeight.w600,
-              color: successColor,
+          _buildCardHead(
+            'Inventory',
+            Icons.inventory_2_outlined,
+            '${_filteredProducts.length} items',
+            headColor,
+          ),
+          Expanded(
+            child: ListView.separated(
+              padding: EdgeInsets.fromLTRB(
+                Spacing.md,
+                Spacing.sm,
+                Spacing.md,
+                bottomClearance + Spacing.md,
+              ),
+              itemCount: _filteredProducts.length,
+              separatorBuilder: (context, index) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final product = _filteredProducts[index];
+                return _buildStockRow(
+                  product,
+                  canAddStock,
+                  canAdjustStock,
+                  canViewStock,
+                );
+              },
             ),
           ),
         ],
@@ -733,7 +664,149 @@ class _StockScreenState extends ConsumerState<StockScreen> {
     );
   }
 
-  // ── Stock row actions (three-dot menu) ─────────────────────────────
+  Widget _buildCardHead(
+    String title,
+    IconData icon,
+    String pill,
+    Color color,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.all(Spacing.md),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+            child: Icon(
+              icon,
+              color: color,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: Spacing.sm),
+          Text(
+            title,
+            style: AppTypography.titleMediumBold(context),
+          ),
+          const Spacer(),
+          AppStatusChip(
+            label: pill,
+            color: Theme.of(context).colorScheme.primary,
+            filled: true,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStockRow(
+    Product product,
+    bool canAddStock,
+    bool canAdjustStock,
+    bool canViewStock,
+  ) {
+    final cs = Theme.of(context).colorScheme;
+    final stockColor = _stockColor(product);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: Spacing.md,
+        vertical: Spacing.sm,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          _buildStockThumb(product),
+          const SizedBox(width: Spacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  product.name,
+                  style: AppTypography.titleMediumSemibold(context),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: Spacing.xs),
+                Text(
+                  '${_categoryName(product.categoryId)} · Min ${product.minStock}',
+                  style: AppTypography.bodySmall(context).copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: Spacing.sm),
+          _buildStockPill('${product.stock} left', stockColor),
+          const SizedBox(width: Spacing.sm),
+          _buildStockActions(
+            product,
+            canAddStock,
+            canAdjustStock,
+            canViewStock,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStockThumb(Product product) {
+    final cs = Theme.of(context).colorScheme;
+    final initials = _initials(product.name);
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        border: Border.all(color: cs.outline),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: AppImage(
+        imagePath: product.imageUrl,
+        placeholderIcon: Icons.inventory_2,
+        placeholderIconSize: 24,
+        borderRadius: AppRadius.md,
+        fit: BoxFit.cover,
+        placeholderBuilder: (context) => Center(
+          child: Text(
+            initials,
+            style: AppTypography.labelMedium(context).copyWith(
+              fontWeight: FontWeight.w800,
+              color: cs.onSurface,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStockPill(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: 4,
+      ),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Text(
+        label,
+        style: AppTypography.labelSmall(context).copyWith(
+          fontWeight: FontWeight.w800,
+          color: color,
+        ),
+      ),
+    );
+  }
 
   Widget _buildStockActions(
     Product product,
@@ -742,6 +815,20 @@ class _StockScreenState extends ConsumerState<StockScreen> {
     bool canViewStock,
   ) {
     final cs = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
+    final successColor = AppSemanticColors.resolve(
+      AppSemanticColors.success,
+      brightness,
+    );
+    final warningColor = AppSemanticColors.resolve(
+      AppSemanticColors.warning,
+      brightness,
+    );
+    final infoColor = AppSemanticColors.resolve(
+      AppSemanticColors.info,
+      brightness,
+    );
+
     return PopupMenuButton<String>(
       icon: Icon(Icons.more_vert, color: cs.onSurfaceVariant),
       tooltip: 'Stock options',
@@ -761,250 +848,62 @@ class _StockScreenState extends ConsumerState<StockScreen> {
       },
       itemBuilder: (context) => [
         if (canAddStock)
-          const PopupMenuItem<String>(
+          PopupMenuItem<String>(
             value: 'add',
-            child: Row(
-              children: [
-                Icon(Icons.add, size: 18),
-                SizedBox(width: 8),
-                Text('Add stock'),
-              ],
+            child: _buildMenuItem(
+              Icons.add,
+              'Add stock',
+              successColor,
             ),
           ),
         if (canAdjustStock)
-          const PopupMenuItem<String>(
+          PopupMenuItem<String>(
             value: 'adjust',
-            child: Row(
-              children: [
-                Icon(Icons.edit, size: 18),
-                SizedBox(width: 8),
-                Text('Adjust'),
-              ],
+            child: _buildMenuItem(
+              Icons.edit,
+              'Adjust',
+              warningColor,
             ),
           ),
         if (canViewStock)
-          const PopupMenuItem<String>(
+          PopupMenuItem<String>(
             value: 'history',
-            child: Row(
-              children: [
-                Icon(Icons.history, size: 18),
-                SizedBox(width: 8),
-                Text('History'),
-              ],
+            child: _buildMenuItem(
+              Icons.history,
+              'History',
+              infoColor,
             ),
           ),
       ],
     );
   }
 
-  // ── Mobile stock list ──────────────────────────────────────────────
-
-  Widget _buildMobileStockList(
-    bool canAddStock,
-    bool canAdjustStock,
-    bool canViewStock,
-    double bottomClearance,
-  ) {
-    return ListView.builder(
-      padding: EdgeInsets.fromLTRB(
-        Spacing.lg,
-        Spacing.lg,
-        Spacing.lg,
-        Spacing.lg + bottomClearance,
-      ),
-      itemCount: _filteredProducts.length,
-      itemBuilder: (context, index) {
-        final product = _filteredProducts[index];
-        return AppCard(
-          margin: const EdgeInsets.only(bottom: Spacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Product header with image
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(AppRadius.sm),
-                    child: SizedBox(
-                      width: 56,
-                      height: 56,
-                      child: AppImage(
-                        imagePath: product.imageUrl,
-                        placeholderIcon: Icons.inventory_2,
-                        placeholderIconSize: 24,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: Spacing.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          product.name,
-                          style: AppTypography.titleMediumBold(context),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Text(
-                          _categoryName(product.categoryId),
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                              ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: Spacing.sm),
-                  _buildStockStatusBadge(product),
-                ],
-              ),
-              const SizedBox(height: Spacing.sm),
-              // Stock info
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: _buildStockInfoColumn('Stock', '${product.stock}'),
-                  ),
-                  Expanded(
-                    child: _buildStockInfoColumn('Minimum', '${product.minStock}'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: Spacing.sm),
-              // Actions
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  _buildStockActions(
-                    product,
-                    canAddStock,
-                    canAdjustStock,
-                    canViewStock,
-                  ),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildStockInfoColumn(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildMenuItem(IconData icon, String label, Color color) {
+    return Row(
       children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 8),
         Text(
           label,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-        ),
-        Text(
-          value,
-          style: AppTypography.titleMediumBold(context),
+          style: TextStyle(
+            color: color,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ],
     );
   }
 
-  // ── Tablet stock list ──────────────────────────────────────────────
-
-  Widget _buildTabletStockList(
-    bool canAddStock,
-    bool canAdjustStock,
-    bool canViewStock,
-    double bottomClearance,
-  ) {
-    return ListView.builder(
-      padding: EdgeInsets.fromLTRB(
-        Spacing.lg,
-        Spacing.lg,
-        Spacing.lg,
-        Spacing.lg + bottomClearance,
-      ),
-      itemCount: _filteredProducts.length,
-      itemBuilder: (context, index) {
-        final product = _filteredProducts[index];
-        return AppCard(
-          margin: const EdgeInsets.only(bottom: Spacing.sm),
-          child: Row(
-            children: [
-              // Image
-              ClipRRect(
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-                child: SizedBox(
-                  width: 48,
-                  height: 48,
-                  child: AppImage(
-                    imagePath: product.imageUrl,
-                    placeholderIcon: Icons.inventory_2,
-                    placeholderIconSize: 20,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-              const SizedBox(width: Spacing.md),
-              // Product name + category
-              Expanded(
-                flex: 3,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      product.name,
-                      style: AppTypography.titleMediumBold(context),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Text(
-                      _categoryName(product.categoryId),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-              // Stock
-              SizedBox(
-                width: 80,
-                child: Text(
-                  '${product.stock}',
-                  style: AppTypography.titleMediumBold(context),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              // Minimum
-              SizedBox(
-                width: 80,
-                child: Text(
-                  '${product.minStock}',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              // Status badge
-              SizedBox(
-                width: 110,
-                child: _buildStockStatusBadge(product),
-              ),
-              // Actions
-              _buildStockActions(
-                product,
-                canAddStock,
-                canAdjustStock,
-                canViewStock,
-              ),
-            ],
-          ),
-        );
-      },
-    );
+  String _initials(String name) {
+    final buffer = StringBuffer();
+    final parts = name.trim().split(RegExp(r'\s+'));
+    for (final part in parts) {
+      if (part.isNotEmpty) {
+        buffer.write(part[0].toUpperCase());
+      }
+      if (buffer.length == 2) break;
+    }
+    return buffer.isEmpty ? '?' : buffer.toString();
   }
 
   // ── Product picker dialog (for FAB Add Stock) ──────────────────────
@@ -1044,20 +943,9 @@ class _StockScreenState extends ConsumerState<StockScreen> {
                 itemCount: _products.length,
                 itemBuilder: (context, index) {
                   final product = _products[index];
+                  final stockColor = _stockColor(product);
                   return ListTile(
-                    leading: ClipRRect(
-                      borderRadius: BorderRadius.circular(AppRadius.sm),
-                      child: SizedBox(
-                        width: 40,
-                        height: 40,
-                        child: AppImage(
-                          imagePath: product.imageUrl,
-                          placeholderIcon: Icons.inventory_2,
-                          placeholderIconSize: 18,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
+                    leading: _buildStockThumb(product),
                     title: Text(product.name),
                     subtitle: Text(
                       'Stock: ${product.stock} · ${_categoryName(product.categoryId)}',
@@ -1067,7 +955,7 @@ class _StockScreenState extends ConsumerState<StockScreen> {
                             : Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
-                    trailing: _buildStockStatusBadge(product),
+                    trailing: _buildStockPill('${product.stock} left', stockColor),
                     onTap: () => Navigator.pop(context, product),
                   );
                 },
@@ -1154,6 +1042,7 @@ class _StockOperationDialog extends StatelessWidget {
               AppTextFormField(
                 controller: quantityController,
                 label: isAdjust ? 'New Stock Quantity' : 'Quantity to Add',
+                hint: 'Enter quantity',
                 prefixIcon: Icons.inventory,
                 keyboardType: TextInputType.number,
                 validator: (value) {
@@ -1198,6 +1087,7 @@ class _StockOperationDialog extends StatelessWidget {
               AppTextFormField(
                 controller: reasonController,
                 label: 'Remarks (optional)',
+                hint: 'e.g. Restock / Adjustment',
                 prefixIcon: Icons.note,
                 maxLines: 2,
                 onChanged: (_) => state.markChanged(),
@@ -1406,7 +1296,7 @@ class _StockHistoryDialog extends StatelessWidget {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: history.length,
-                separatorBuilder: (_, _) => const Divider(height: 1),
+                separatorBuilder: (context, index) => const Divider(height: 1),
                 itemBuilder: (context, index) {
                   final entry = history[index];
                   final opColor = _operationColor(

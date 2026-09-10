@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/category.dart';
+import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/catalog_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
@@ -240,6 +241,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
       floatingActionButton: createFab,
       body: Column(
         children: [
+          _buildRoleChipBar(),
           if (_categories.isNotEmpty) ...[
             _buildStatsStrip(),
             _buildToolbar(toolbarAction),
@@ -262,6 +264,71 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
                         canToggleStatus,
                         bottomClearance,
                       ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRoleChipBar() {
+    final cs = Theme.of(context).colorScheme;
+    final user = ref.read(authStateProvider).user;
+    final isOwner = user?.role == UserRole.owner;
+    final roleColor = isOwner
+        ? AppSemanticColors.resolve(AppSemanticColors.info, Theme.of(context).brightness)
+        : AppSemanticColors.resolve(AppSemanticColors.success, Theme.of(context).brightness);
+
+    final label = isOwner ? 'Owner' : 'Staff';
+    final permText = isOwner
+        ? 'view/edit/delete/change category status'
+        : 'view and toggle category status';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        Spacing.lg,
+        Spacing.md,
+        Spacing.lg,
+        0,
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 5,
+            ),
+            decoration: BoxDecoration(
+              color: roleColor.withValues(alpha: 0.16),
+              border: Border.all(color: roleColor.withValues(alpha: 0.4)),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.person_outline,
+                  size: 12,
+                  color: roleColor,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: AppTypography.labelSmall(context).copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: roleColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: Spacing.sm),
+          Expanded(
+            child: Text(
+              permText,
+              style: AppTypography.bodySmall(context).copyWith(
+                color: cs.onSurfaceVariant,
+              ),
+            ),
           ),
         ],
       ),
@@ -454,30 +521,30 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
         ref.read(authStateProvider.notifier).hasPermission('view_categories');
     final count = _productCounts[category.id] ?? 0;
 
-    final actions = <AppListAction>[
+    final menuActions = <AppListMenuAction>[
       if (canView)
-        AppListAction(
+        AppListMenuAction(
           icon: Icons.visibility_outlined,
-          tooltip: 'View category',
+          label: 'View',
           onPressed: () => _showCategoryView(category, count),
         ),
       if (canEdit)
-        AppListAction(
+        AppListMenuAction(
           icon: Icons.edit,
-          tooltip: 'Edit category',
+          label: 'Edit',
           onPressed: () => _showCategoryDialog(category: category),
         ),
       if (canDelete)
-        AppListAction(
+        AppListMenuAction(
           icon: Icons.delete,
-          tooltip: 'Delete category',
+          label: 'Delete',
           color: cs.error,
           onPressed: () => _deleteCategory(category),
         ),
       if (!canEdit && canToggleStatus)
-        AppListAction(
+        AppListMenuAction(
           icon: category.isActive ? Icons.toggle_on : Icons.toggle_off,
-          tooltip: category.isActive ? 'Deactivate' : 'Activate',
+          label: category.isActive ? 'Deactivate' : 'Activate',
           color: statusColor,
           onPressed: () => _toggleCategoryStatus(category),
         ),
@@ -503,11 +570,9 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
         ),
         title: category.name,
         subtitle: '$count product${count == 1 ? '' : 's'}',
-        trailing: AppStatusChip(
-          label: category.isActive ? 'Active' : 'Inactive',
-          color: statusColor,
-        ),
-        actions: actions.isNotEmpty ? actions : null,
+        statusLabel: category.isActive ? 'Active' : 'Inactive',
+        statusColor: statusColor,
+        menuActions: menuActions.isNotEmpty ? menuActions : null,
         onTap: canView ? () => _showCategoryView(category, count) : null,
       ),
     );

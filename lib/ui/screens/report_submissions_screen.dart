@@ -20,6 +20,49 @@ import 'package:pinoy_pos/ui/widgets/responsive_create_action.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 
+String _formatFileSize(int? bytes) {
+  if (bytes == null) return '';
+  if (bytes < 1024) return '$bytes B';
+  if (bytes < 1024 * 1024) {
+    return '${(bytes / 1024).toStringAsFixed(1)} KB';
+  }
+  return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+}
+
+String _reportTitle(ExportHistory report) {
+  final start = report.dateRangeStart;
+  final end = report.dateRangeEnd;
+  if (start != null && end != null) {
+    final fmt = DateFormat('MMM d');
+    return 'Sales Report · ${fmt.format(start)} - ${fmt.format(end)}';
+  }
+  return 'Sales Report #${report.reportNumber ?? report.id}';
+}
+
+String _statusLabel(String status) {
+  return switch (status) {
+    ReportStatus.generated => 'Generated',
+    ReportStatus.submitted => 'Submitted',
+    ReportStatus.viewed => 'Reviewed',
+    ReportStatus.archived => 'Archived',
+    ReportStatus.imported => 'Imported',
+    _ => status,
+  };
+}
+
+Color _statusColor(String status, BuildContext context) {
+  final brightness = Theme.of(context).brightness;
+  return switch (status) {
+    ReportStatus.submitted =>
+      AppSemanticColors.resolve(AppSemanticColors.warning, brightness),
+    ReportStatus.viewed =>
+      AppSemanticColors.resolve(AppSemanticColors.success, brightness),
+    ReportStatus.archived =>
+      AppSemanticColors.resolve(AppSemanticColors.neutral, brightness),
+    _ => AppSemanticColors.resolve(AppSemanticColors.info, brightness),
+  };
+}
+
 /// Role-aware report screen.
 ///
 /// - `submissionsOnly: true` — Owner inbox ("Submitted Reports"): reports
@@ -50,11 +93,34 @@ class _ReportSubmissionsScreenState
   String? _error;
   List<ExportHistory> _reports = [];
   Map<int, String> _staffNames = {};
+  String _searchQuery = '';
+  String _selectedFilter = 'all';
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  List<ExportHistory> get _filteredReports {
+    final query = _searchQuery.trim().toLowerCase();
+    return _reports.where((report) {
+      if (_selectedFilter != 'all' && report.status != _selectedFilter) {
+        return false;
+      }
+      if (query.isEmpty) return true;
+
+      final staffName = _staffNames[report.createdBy] ?? '';
+      final searchable = [
+        _reportTitle(report).toLowerCase(),
+        staffName.toLowerCase(),
+        (report.reportNumber ?? '').toLowerCase(),
+        report.fileFormat.toLowerCase(),
+        report.status.toLowerCase(),
+        _formatFileSize(report.fileSize).toLowerCase(),
+      ].join(' ');
+      return searchable.contains(query);
+    }).toList();
   }
 
   Future<void> _load() async {
@@ -200,30 +266,106 @@ class _ReportSubmissionsScreenState
       );
     }
 
+    final reports = _filteredReports;
+
+    if (reports.isEmpty && (_searchQuery.isNotEmpty || _selectedFilter != 'all')) {
+      return EmptyState(
+        icon: Icons.search_off,
+        title: 'No matching reports',
+        message: 'Try a different search term or filter.',
+        action: FilledButton.icon(
+          onPressed: () => setState(() {
+            _searchQuery = '';
+            _selectedFilter = 'all';
+          }),
+          icon: const Icon(Icons.clear),
+          label: const Text('Clear filters'),
+        ),
+      );
+    }
+
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView.builder(
+      child: ListView(
         padding: EdgeInsets.fromLTRB(
           Spacing.md,
           Spacing.md,
           Spacing.md,
           Spacing.md + bottomClearance,
         ),
-        itemCount: _reports.length,
-        itemBuilder: (context, index) {
-          final report = _reports[index];
-          return Padding(
-            padding: const EdgeInsets.only(bottom: Spacing.sm),
-            child: _ReportCard(
-              report: report,
-              staffName: _staffNames[report.createdBy],
-              showStaffName: widget.submissionsOnly,
-              onTap: () => _openReport(context, report),
-            ),
-          );
-        },
+        children: [
+          _buildHeader(context),
+          ...reports.map((report) => Padding(
+                padding: const EdgeInsets.only(bottom: Spacing.sm),
+                child: _ReportCard(
+                  report: report,
+                  staffName: _staffNames[report.createdBy],
+                  showStaffName: widget.submissionsOnly,
+                  onTap: () => _openReport(context, report),
+                ),
+              )),
+        ],
       ),
     );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final filters = _filterOptions;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Spacing.sm),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            onChanged: (value) => setState(() => _searchQuery = value),
+            decoration: InputDecoration(
+              hintText: 'Search reports...',
+              prefixIcon: const Icon(Icons.search),
+              filled: true,
+              fillColor: cs.surfaceContainerHighest,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppRadius.control),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+          ),
+          const SizedBox(height: Spacing.sm),
+          Wrap(
+            spacing: 8,
+            children: filters.map((status) {
+              final selected = _selectedFilter == status;
+              return ChoiceChip(
+                label: Text(_filterLabel(status)),
+                selected: selected,
+                onSelected: (_) => setState(() => _selectedFilter = status),
+                backgroundColor: cs.surfaceContainerHighest,
+                selectedColor: cs.primaryContainer,
+                checkmarkColor: cs.onPrimaryContainer,
+                labelStyle: TextStyle(
+                  color: selected ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<String> get _filterOptions {
+    final statuses = _reports.map((r) => r.status).toSet().toList();
+    statuses.sort();
+    return ['all', ...statuses];
+  }
+
+  String _filterLabel(String status) {
+    if (status == 'all') return 'All';
+    return _statusLabel(status);
   }
 
   Future<void> _importReport() async {
@@ -238,7 +380,7 @@ class _ReportSubmissionsScreenState
 
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['pdf', 'xlsx', 'xls', 'csv'],
+      allowedExtensions: ['pdf', 'xlsx', 'xls'],
       withData: true,
     );
 
@@ -279,7 +421,7 @@ class _ReportSubmissionsScreenState
         context,
         title: 'Import Failed',
         message: 'The report could not be imported. '
-            'Supported formats are PDF, Excel, and CSV.',
+            'Supported formats are PDF and Excel.',
       );
     }
   }
@@ -299,7 +441,10 @@ class _ReportSubmissionsScreenState
       await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => ReportPreviewScreen(report: report),
+          builder: (_) => ReportPreviewScreen(
+            report: report,
+            staffName: _staffNames[report.createdBy],
+          ),
         ),
       );
       _load();
@@ -351,9 +496,7 @@ class _ReportCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      showStaffName
-                          ? 'Staff: ${staffName ?? 'Unknown'}'
-                          : 'Report #${report.reportNumber ?? report.id}',
+                      _subtitle(),
                       style: AppTypography.bodySmall(context).copyWith(
                         color: cs.onSurfaceVariant,
                       ),
@@ -391,38 +534,13 @@ class _ReportCard extends StatelessWidget {
     );
   }
 
-  String _reportTitle(ExportHistory report) {
-    final start = report.dateRangeStart;
-    final end = report.dateRangeEnd;
-    if (start != null && end != null) {
-      final fmt = DateFormat('MMM d');
-      return 'Sales Report · ${fmt.format(start)} - ${fmt.format(end)}';
-    }
-    return 'Sales Report #${report.reportNumber ?? report.id}';
-  }
-
-  String _statusLabel(String status) {
-    return switch (status) {
-      ReportStatus.generated => 'Generated',
-      ReportStatus.submitted => 'Submitted',
-      ReportStatus.viewed => 'Reviewed',
-      ReportStatus.archived => 'Archived',
-      ReportStatus.imported => 'Imported',
-      _ => status,
-    };
-  }
-
-  Color _statusColor(String status, BuildContext context) {
-    final brightness = Theme.of(context).brightness;
-    return switch (status) {
-      ReportStatus.submitted =>
-        AppSemanticColors.resolve(AppSemanticColors.warning, brightness),
-      ReportStatus.viewed =>
-        AppSemanticColors.resolve(AppSemanticColors.success, brightness),
-      ReportStatus.archived =>
-        AppSemanticColors.resolve(AppSemanticColors.neutral, brightness),
-      _ => AppSemanticColors.resolve(AppSemanticColors.info, brightness),
-    };
+  String _subtitle() {
+    final size = _formatFileSize(report.fileSize);
+    final base = showStaffName
+        ? 'by ${staffName ?? 'Unknown'}'
+        : 'Report #${report.reportNumber ?? report.id}';
+    if (size.isEmpty) return base;
+    return '$base · $size';
   }
 }
 
@@ -469,7 +587,7 @@ class _Thumbnail extends StatelessWidget {
   IconData _fileIcon(String format) {
     return switch (format.toLowerCase()) {
       'pdf' => Icons.picture_as_pdf,
-      'excel' || 'xlsx' || 'csv' => Icons.table_chart,
+      'excel' || 'xlsx' => Icons.table_chart,
       _ => Icons.insert_drive_file,
     };
   }

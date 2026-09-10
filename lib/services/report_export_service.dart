@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:csv/csv.dart';
 import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -28,28 +27,24 @@ import 'package:pinoy_pos/services/sales_service.dart';
 /// Supported report export formats.
 enum ExportFormat {
   pdf,
-  excel,
-  csv;
+  excel;
 
   /// The file extension to use when saving.
   String get fileExtension => switch (this) {
         pdf => 'pdf',
         excel => 'xlsx',
-        csv => 'csv',
       };
 
   /// The display name used in UI labels.
   String get displayName => switch (this) {
         pdf => 'PDF',
         excel => 'Excel',
-        csv => 'CSV',
       };
 
   /// The value recorded in [ReportService.recordExport].
   String get fileFormat => switch (this) {
         pdf => 'pdf',
         excel => 'excel',
-        csv => 'csv',
       };
 
   /// The MIME type used for browser downloads.
@@ -57,7 +52,6 @@ enum ExportFormat {
         pdf => 'application/pdf',
         excel =>
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        csv => 'text/csv',
       };
 }
 
@@ -73,29 +67,16 @@ class ExportSaleBundle {
   }) : itemCount = items.fold<int>(0, (sum, item) => sum + item.quantity);
 }
 
-/// Aggregated sales for a single product across all exported sales.
-class ProductExportSummary {
-  final String name;
-  final int quantity;
-  final double total;
-
-  const ProductExportSummary({
-    required this.name,
-    required this.quantity,
-    required this.total,
-  });
-}
-
 /// Centralized service for generating and saving sales report exports.
 ///
-/// Handles PDF, Excel, and CSV output for the sales analytics system,
+/// Handles PDF and Excel output for the sales analytics system,
 /// keeping all export logic out of the UI layer.
 class ReportExportService {
   final SaleItemRepository _saleItemRepository = SaleItemRepository();
   final UserRepository _userRepository = UserRepository();
   final SessionManager _sessionManager = SessionManager();
 
-  /// Exports the provided [analytics] as a PDF, Excel, or CSV report.
+  /// Exports the provided [analytics] as a PDF or Excel report.
   ///
   /// Returns the saved file path when the file was saved and the export was
   /// recorded, or `null` when the user cancelled the save dialog or the report
@@ -124,7 +105,6 @@ class ReportExportService {
       bytes = await switch (format) {
         ExportFormat.pdf => _buildPdf(analytics, store, bundles, userNames),
         ExportFormat.excel => _buildExcel(analytics, store, bundles, userNames),
-        ExportFormat.csv => _buildCsv(analytics, store, bundles, userNames),
       };
     } catch (e, st) {
       debugPrint('[ReportExportService] Failed to build report bytes: $e\n$st');
@@ -159,6 +139,19 @@ class ReportExportService {
         fileSize = await File(savePath).length();
       } catch (_) {
         fileSize = null;
+      }
+    }
+
+    // Generate an HTML companion preview for PDF and Excel exports.
+    if (!kIsWeb &&
+        (format == ExportFormat.pdf || format == ExportFormat.excel) &&
+        !savePath.startsWith('content://')) {
+      try {
+        final htmlBytes = _buildHtml(analytics, store, bundles, userNames);
+        final htmlPath = '${p.withoutExtension(savePath)}_preview.html';
+        await File(htmlPath).writeAsBytes(htmlBytes, flush: true);
+      } catch (e, st) {
+        debugPrint('[ReportExportService] HTML companion write failed: $e\n$st');
       }
     }
 
@@ -211,7 +204,6 @@ class ReportExportService {
       bytes = await switch (format) {
         ExportFormat.pdf => _buildPdf(analytics, store, bundles, userNames),
         ExportFormat.excel => _buildExcel(analytics, store, bundles, userNames),
-        ExportFormat.csv => _buildCsv(analytics, store, bundles, userNames),
       };
     } catch (e, st) {
       debugPrint('[ReportExportService] Failed to build report bytes: $e\n$st');
@@ -234,6 +226,17 @@ class ReportExportService {
 
       final file = File(filePath);
       await file.writeAsBytes(bytes, flush: true);
+
+      // Generate an HTML companion preview for PDF and Excel submissions.
+      if (format == ExportFormat.pdf || format == ExportFormat.excel) {
+        try {
+          final htmlBytes = _buildHtml(analytics, store, bundles, userNames);
+          final htmlPath = '${p.withoutExtension(filePath)}_preview.html';
+          await File(htmlPath).writeAsBytes(htmlBytes, flush: true);
+        } catch (e, st) {
+          debugPrint('[ReportExportService] HTML companion write failed: $e\n$st');
+        }
+      }
 
       // Store the relative path so backups can relocate the file directory.
       final storedPath = p.join('reports', fileName);
@@ -288,32 +291,6 @@ class ReportExportService {
     };
   }
 
-  List<ProductExportSummary> _buildProductSummaries(
-    List<ExportSaleBundle> bundles,
-  ) {
-    final map = <String, ProductExportSummary>{};
-    for (final bundle in bundles) {
-      for (final item in bundle.items) {
-        final name = item.productName ?? 'Product #${item.productId}';
-        final existing = map[name];
-        if (existing == null) {
-          map[name] = ProductExportSummary(
-            name: name,
-            quantity: item.quantity,
-            total: item.totalPrice,
-          );
-        } else {
-          map[name] = ProductExportSummary(
-            name: name,
-            quantity: existing.quantity + item.quantity,
-            total: existing.total + item.totalPrice,
-          );
-        }
-      }
-    }
-    return map.values.toList()..sort((a, b) => b.total.compareTo(a.total));
-  }
-
   Future<Uint8List> _buildPdf(
     SalesAnalytics analytics,
     Settings store,
@@ -342,13 +319,6 @@ class ReportExportService {
     final success = toPdfColor(AppSemanticColors.success);
     final successContainer = toPdfColor(AppSemanticColors.successContainer);
     final onSuccessContainer = toPdfColor(AppSemanticColors.onSuccessContainer);
-
-    String storeInitials(String name) {
-      final parts = name.trim().split(RegExp(r'\s+'));
-      final first = parts.isNotEmpty && parts.first.isNotEmpty ? parts.first[0] : '';
-      final second = parts.length > 1 && parts[1].isNotEmpty ? parts[1][0] : '';
-      return '$first$second'.toUpperCase();
-    }
 
     PdfColor methodTextColor(String method) {
       return switch (method.toLowerCase()) {
@@ -446,7 +416,7 @@ class ReportExportService {
                     ),
                     child: pw.Center(
                       child: buildText(
-                        storeInitials(store.storeName),
+                        _storeInitials(store.storeName),
                         fontSize: 20,
                         bold: true,
                         color: onPrimary,
@@ -464,15 +434,12 @@ class ReportExportService {
                           bold: true,
                           color: onSurface,
                         ),
-                        if (store.storeAddress.isNotEmpty)
+                        if (store.storeAddress.isNotEmpty || store.storePhone.isNotEmpty)
                           buildText(
-                            store.storeAddress,
-                            fontSize: 12,
-                            color: lightTextSecondary,
-                          ),
-                        if (store.storePhone.isNotEmpty)
-                          buildText(
-                            'Contact: ${store.storePhone}',
+                            [
+                              if (store.storeAddress.isNotEmpty) store.storeAddress,
+                              if (store.storePhone.isNotEmpty) 'Contact: ${store.storePhone}',
+                            ].join(' · '),
                             fontSize: 12,
                             color: lightTextSecondary,
                           ),
@@ -569,7 +536,7 @@ class ReportExportService {
               children: [
                 buildMetricCard(
                   'Total Sales',
-                  '$currency ${analytics.totalSales.toStringAsFixed(2)}',
+                  '$currency${analytics.totalSales.toStringAsFixed(2)}',
                   primaryCard: true,
                 ),
                 pw.SizedBox(width: 10),
@@ -581,7 +548,7 @@ class ReportExportService {
               children: [
                 buildMetricCard(
                   'Avg Transaction',
-                  '$currency ${analytics.averageTransaction.toStringAsFixed(2)}',
+                  '$currency${analytics.averageTransaction.toStringAsFixed(2)}',
                 ),
                 pw.SizedBox(width: 10),
                 buildMetricCard('Items Sold', '${analytics.itemsSold}'),
@@ -749,26 +716,27 @@ class ReportExportService {
     }
 
     final paymentRows = analytics.paymentBreakdown
-        .map((p) => [p.method, '${p.count}', '$currency ${p.total.toStringAsFixed(2)}'])
+        .map((p) => [p.method, '${p.count}', '$currency${p.total.toStringAsFixed(2)}'])
         .toList();
 
     final paymentGrandTotal = [
       'Total',
       '${analytics.transactionCount}',
-      '$currency ${analytics.totalSales.toStringAsFixed(2)}',
+      '$currency${analytics.totalSales.toStringAsFixed(2)}',
     ];
 
     final topProductRows = analytics.topProducts
-        .map((p) => [p.productName, '${p.totalQuantity}', '$currency ${p.revenue.toStringAsFixed(2)}'])
+        .take(3)
+        .map((p) => [p.productName, '${p.totalQuantity}', '$currency${p.revenue.toStringAsFixed(2)}'])
         .toList();
 
     final transactionRows = bundles
         .map((e) => [
               '${e.sale.receiptNumber ?? e.sale.id}',
               _formatShortDateTime(e.sale.createdAt),
-              e.sale.customerName ?? '',
+              e.sale.customerName ?? 'GUEST',
               '${e.itemCount}',
-              '$currency ${e.sale.totalAmount.toStringAsFixed(2)}',
+              '$currency${e.sale.totalAmount.toStringAsFixed(2)}',
             ])
         .toList();
 
@@ -853,17 +821,32 @@ class ReportExportService {
       };
     }
 
+    NumFormat currencyNumFormat() {
+      final safeCurrency = currency.replaceAll('"', '""');
+      return CustomNumericNumFormat(
+        formatCode: '"$safeCurrency"#,##0.00',
+      );
+    }
+
     CellStyle headerStyle() => CellStyle(
           backgroundColorHex: toExcelColor(primary),
           fontColorHex: toExcelColor(onPrimary),
           bold: true,
+          horizontalAlign: HorizontalAlign.Left,
+        );
+
+    CellStyle headerRightStyle() => CellStyle(
+          backgroundColorHex: toExcelColor(primary),
+          fontColorHex: toExcelColor(onPrimary),
+          bold: true,
+          horizontalAlign: HorizontalAlign.Right,
         );
 
     CellStyle totalStyle() => CellStyle(
           backgroundColorHex: toExcelColor(successContainer),
           fontColorHex: toExcelColor(success),
           bold: true,
-          numberFormat: NumFormat.standard_4,
+          numberFormat: currencyNumFormat(),
           horizontalAlign: HorizontalAlign.Right,
         );
 
@@ -872,7 +855,7 @@ class ReportExportService {
         );
 
     CellStyle currencyStyle() => CellStyle(
-          numberFormat: NumFormat.standard_4,
+          numberFormat: currencyNumFormat(),
           horizontalAlign: HorizontalAlign.Right,
         );
 
@@ -895,57 +878,35 @@ class ReportExportService {
       writeCell(sheet, row, col, TextCellValue(text), style: style);
     }
 
-    void writeHeaderRow(Sheet sheet, int row, List<String> headers) {
-      for (var i = 0; i < headers.length; i++) {
-        writeText(sheet, row, i, headers[i], style: headerStyle());
-      }
-    }
-
     final summary = excel['Summary'];
     excel.setDefaultSheet('Summary');
 
-    writeText(summary, 0, 0, store.storeName, style: CellStyle(bold: true));
-    if (store.storeAddress.isNotEmpty) {
-      writeText(summary, 1, 0, store.storeAddress);
-    }
-    if (store.storePhone.isNotEmpty) {
-      writeText(summary, 2, 0, 'Contact: ${store.storePhone}');
-    }
+    // Title row
     writeText(
       summary,
-      4,
+      0,
       0,
       '${store.storeName} - Sales Report',
-      style: CellStyle(bold: true),
+      style: headerStyle(),
     );
-    writeText(summary, 5, 0, 'Generated: ${_formatDateTime(DateTime.now())}');
-    writeText(
-      summary,
-      6,
-      0,
-      'Period: ${_formatPeriodLabel(analytics.bounds.start, analytics.bounds.end)}',
-    );
+    writeText(summary, 0, 1, '', style: headerStyle());
 
-    var row = 8;
-    writeText(summary, row, 0, 'Summary', style: CellStyle(bold: true));
-    row++;
-
-    final summaryRows = [
-      ['Total Sales', analytics.totalSales, true],
-      ['Transaction Count', analytics.transactionCount.toDouble(), false],
-      ['Average Transaction', analytics.averageTransaction, true],
-      ['Items Sold', analytics.itemsSold.toDouble(), false],
+    // Summary metrics
+    var row = 2;
+    final summaryMetrics = [
+      ('Total Sales', analytics.totalSales, true),
+      ('Transaction Count', analytics.transactionCount.toDouble(), false),
+      ('Average Transaction', analytics.averageTransaction, true),
+      ('Items Sold', analytics.itemsSold.toDouble(), false),
     ];
-
-    for (final entry in summaryRows) {
-      final isCurrency = entry[2] as bool;
-      writeText(summary, row, 0, entry[0] as String, style: CellStyle(bold: true));
-      if (isCurrency) {
+    for (final metric in summaryMetrics) {
+      writeText(summary, row, 0, metric.$1, style: CellStyle(bold: true));
+      if (metric.$3) {
         writeCell(
           summary,
           row,
           1,
-          DoubleCellValue(entry[1] as double),
+          DoubleCellValue(metric.$2),
           style: currencyStyle(),
         );
       } else {
@@ -953,18 +914,18 @@ class ReportExportService {
           summary,
           row,
           1,
-          IntCellValue((entry[1] as double).toInt()),
+          IntCellValue(metric.$2.toInt()),
           style: rightAlignStyle(),
         );
       }
       row++;
     }
 
+    // Payment breakdown
     if (analytics.paymentBreakdown.isNotEmpty) {
-      row += 2;
-      writeText(summary, row, 0, 'Payment Breakdown', style: CellStyle(bold: true));
       row++;
-      writeHeaderRow(summary, row, ['Method', 'Count', 'Total ($currency)']);
+      writeText(summary, row, 0, 'Payment Method', style: headerStyle());
+      writeText(summary, row, 1, 'Total', style: headerRightStyle());
       row++;
       for (final p in analytics.paymentBreakdown) {
         writeCell(
@@ -977,89 +938,55 @@ class ReportExportService {
             fontColorHex: methodColor(p.method),
           ),
         );
-        writeCell(summary, row, 1, IntCellValue(p.count), style: rightAlignStyle());
         writeCell(
           summary,
           row,
-          2,
+          1,
           DoubleCellValue(p.total),
           style: currencyStyle(),
         );
         row++;
       }
+      writeText(summary, row, 0, 'Grand Total', style: totalStyle());
+      writeCell(
+        summary,
+        row,
+        1,
+        DoubleCellValue(analytics.totalSales),
+        style: totalStyle(),
+      );
+      row++;
     }
 
-    if (analytics.trend.isNotEmpty) {
-      row += 2;
-      writeText(summary, row, 0, 'Trend', style: CellStyle(bold: true));
+    // Top products
+    if (analytics.topProducts.isNotEmpty) {
       row++;
-      writeHeaderRow(summary, row, ['Date/Time', 'Total ($currency)', 'Transactions']);
+      writeText(summary, row, 0, 'Product', style: headerStyle());
+      writeText(summary, row, 1, 'Revenue', style: headerRightStyle());
       row++;
-      for (final t in analytics.trend) {
-        writeText(summary, row, 0, _formatShortDateTime(t.date));
+      for (final p in analytics.topProducts.take(3)) {
+        writeText(summary, row, 0, p.productName);
         writeCell(
           summary,
           row,
           1,
-          DoubleCellValue(t.total),
-          style: currencyStyle(),
-        );
-        writeCell(summary, row, 2, IntCellValue(t.count), style: rightAlignStyle());
-        row++;
-      }
-    }
-
-    if (analytics.topProducts.isNotEmpty) {
-      row += 2;
-      writeText(summary, row, 0, 'Top Products', style: CellStyle(bold: true));
-      row++;
-      writeHeaderRow(summary, row, ['Product', 'Qty', 'Revenue ($currency)']);
-      row++;
-      for (final p in analytics.topProducts) {
-        writeText(summary, row, 0, p.productName);
-        writeCell(summary, row, 1, IntCellValue(p.totalQuantity), style: rightAlignStyle());
-        writeCell(
-          summary,
-          row,
-          2,
           DoubleCellValue(p.revenue),
           style: currencyStyle(),
         );
         row++;
       }
-    }
-
-    row += 2;
-    writeText(summary, row, 0, 'Sales by Product', style: CellStyle(bold: true));
-    row++;
-    writeHeaderRow(summary, row, ['Product', 'Qty', 'Revenue ($currency)']);
-    row++;
-
-    final productSales = _buildProductSummaries(bundles);
-    for (final p in productSales) {
-      writeText(summary, row, 0, p.name);
-      writeCell(summary, row, 1, IntCellValue(p.quantity), style: rightAlignStyle());
+      writeText(summary, row, 0, 'Grand Total', style: totalStyle());
       writeCell(
         summary,
         row,
-        2,
-        DoubleCellValue(p.total),
-        style: currencyStyle(),
+        1,
+        DoubleCellValue(analytics.totalSales),
+        style: totalStyle(),
       );
       row++;
     }
 
-    writeCell(summary, row, 0, TextCellValue('Grand Total'), style: totalStyle());
-    writeCell(summary, row, 1, TextCellValue(''), style: totalStyle());
-    writeCell(
-      summary,
-      row,
-      2,
-      DoubleCellValue(analytics.totalSales),
-      style: totalStyle(),
-    );
-
-    for (var i = 0; i < 3; i++) {
+    for (var i = 0; i < 2; i++) {
       summary.setColumnAutoFit(i);
     }
 
@@ -1069,12 +996,17 @@ class ReportExportService {
       'Date/Time',
       'Cashier',
       'Customer',
-      'Payment Method',
-      'Reference',
+      'Method',
       'Items',
-      'Total ($currency)',
+      'Total',
     ];
-    writeHeaderRow(salesSheet, 0, transactionHeaders);
+    writeText(salesSheet, 0, 0, transactionHeaders[0], style: headerStyle());
+    writeText(salesSheet, 0, 1, transactionHeaders[1], style: headerStyle());
+    writeText(salesSheet, 0, 2, transactionHeaders[2], style: headerStyle());
+    writeText(salesSheet, 0, 3, transactionHeaders[3], style: headerStyle());
+    writeText(salesSheet, 0, 4, transactionHeaders[4], style: headerStyle());
+    writeText(salesSheet, 0, 5, transactionHeaders[5], style: headerRightStyle());
+    writeText(salesSheet, 0, 6, transactionHeaders[6], style: headerRightStyle());
 
     var salesRow = 1;
     for (final bundle in bundles) {
@@ -1082,7 +1014,7 @@ class ReportExportService {
       writeText(salesSheet, salesRow, 0, '${s.receiptNumber ?? s.id}');
       writeText(salesSheet, salesRow, 1, _formatShortDateTime(s.createdAt));
       writeText(salesSheet, salesRow, 2, userNames[s.userId] ?? 'User ${s.userId}');
-      writeText(salesSheet, salesRow, 3, s.customerName ?? '');
+      writeText(salesSheet, salesRow, 3, s.customerName ?? 'GUEST');
       writeCell(
         salesSheet,
         salesRow,
@@ -1093,26 +1025,25 @@ class ReportExportService {
           fontColorHex: methodColor(s.paymentMethod),
         ),
       );
-      writeText(salesSheet, salesRow, 5, s.referenceNumber ?? '');
-      writeCell(salesSheet, salesRow, 6, IntCellValue(bundle.itemCount), style: rightAlignStyle());
+      writeCell(salesSheet, salesRow, 5, IntCellValue(bundle.itemCount), style: rightAlignStyle());
       writeCell(
         salesSheet,
         salesRow,
-        7,
+        6,
         DoubleCellValue(s.totalAmount),
         style: currencyStyle(),
       );
       salesRow++;
     }
 
-    writeCell(salesSheet, salesRow, 0, TextCellValue('Grand Total'), style: totalStyle());
-    for (var c = 1; c < 7; c++) {
-      writeCell(salesSheet, salesRow, c, TextCellValue(''), style: totalStyle());
+    writeText(salesSheet, salesRow, 0, 'Grand Total', style: totalStyle());
+    for (var c = 1; c < 6; c++) {
+      writeText(salesSheet, salesRow, c, '', style: totalStyle());
     }
     writeCell(
       salesSheet,
       salesRow,
-      7,
+      6,
       DoubleCellValue(analytics.totalSales),
       style: totalStyle(),
     );
@@ -1127,11 +1058,17 @@ class ReportExportService {
       'Date/Time',
       'Product',
       'Qty',
-      'Unit Price ($currency)',
-      'Line Total ($currency)',
+      'Unit Price',
+      'Line Total',
       'Payment Method',
     ];
-    writeHeaderRow(itemsSheet, 0, itemHeaders);
+    writeText(itemsSheet, 0, 0, itemHeaders[0], style: headerStyle());
+    writeText(itemsSheet, 0, 1, itemHeaders[1], style: headerStyle());
+    writeText(itemsSheet, 0, 2, itemHeaders[2], style: headerStyle());
+    writeText(itemsSheet, 0, 3, itemHeaders[3], style: headerRightStyle());
+    writeText(itemsSheet, 0, 4, itemHeaders[4], style: headerRightStyle());
+    writeText(itemsSheet, 0, 5, itemHeaders[5], style: headerRightStyle());
+    writeText(itemsSheet, 0, 6, itemHeaders[6], style: headerStyle());
 
     var itemRow = 1;
     for (final bundle in bundles) {
@@ -1169,17 +1106,20 @@ class ReportExportService {
       }
     }
 
-    writeCell(itemsSheet, itemRow, 0, TextCellValue('Grand Total'), style: totalStyle());
-    for (var c = 1; c < 5; c++) {
-      writeCell(itemsSheet, itemRow, c, TextCellValue(''), style: totalStyle());
+    writeText(itemsSheet, itemRow, 0, 'Grand Total', style: totalStyle());
+    for (var c = 1; c < 7; c++) {
+      if (c == 5) {
+        writeCell(
+          itemsSheet,
+          itemRow,
+          c,
+          DoubleCellValue(analytics.totalSales),
+          style: totalStyle(),
+        );
+      } else {
+        writeText(itemsSheet, itemRow, c, '', style: totalStyle());
+      }
     }
-    writeCell(
-      itemsSheet,
-      itemRow,
-      5,
-      DoubleCellValue(analytics.totalSales),
-      style: totalStyle(),
-    );
 
     for (var i = 0; i < itemHeaders.length; i++) {
       itemsSheet.setColumnAutoFit(i);
@@ -1192,155 +1132,193 @@ class ReportExportService {
     return Uint8List.fromList(bytes);
   }
 
-  Future<Uint8List> _buildCsv(
+
+
+  Uint8List _buildHtml(
     SalesAnalytics analytics,
     Settings store,
     List<ExportSaleBundle> bundles,
     Map<int, String> userNames,
-  ) async {
+  ) {
     final currency = store.currency;
-    final rows = <List<dynamic>>[];
+    final generated = _formatDateTime(DateTime.now());
+    final period = _formatPeriodLabel(analytics.bounds.start, analytics.bounds.end);
 
-    rows.add([store.storeName]);
-    if (store.storeAddress.isNotEmpty) rows.add([store.storeAddress]);
-    if (store.storePhone.isNotEmpty) {
-      rows.add(['Contact: ${store.storePhone}']);
-    }
-    rows.add([]);
-    rows.add(['${store.storeName} - Sales Report']);
-    rows.add(['Generated: ${_formatDateTime(DateTime.now())}']);
-    rows.add([
-      'Period: ${_formatPeriodLabel(analytics.bounds.start, analytics.bounds.end)}'
-    ]);
-    rows.add([]);
+    final primary = _colorToHex(AppColorTokens.primaryBlueStrong);
+    final primaryLight = _colorToHex(AppColorTokens.primaryBlueLight);
+    final primaryDark = _colorToHex(AppColorTokens.lightPrimary);
+    final surface = _colorToHex(AppColorTokens.lightBackground);
+    final surfaceSoft = _colorToHex(AppColorTokens.lightSurfaceSoft);
+    final border = _colorToHex(AppColorTokens.lightBorder);
+    final divider = _colorToHex(AppColorTokens.lightDivider);
+    final textPrimary = _colorToHex(AppColorTokens.lightTextPrimary);
+    final textSecondary = _colorToHex(AppColorTokens.lightTextSecondary);
+    final textMuted = _colorToHex(AppColorTokens.lightTextMuted);
+    final successContainer = _colorToHex(AppSemanticColors.successContainer);
+    final onSuccess = _colorToHex(AppSemanticColors.onSuccessContainer);
 
-    rows.add(['Summary']);
-    rows.add(['Metric', 'Value']);
-    rows.add(['Total Sales', analytics.totalSales.toStringAsFixed(2)]);
-    rows.add(['Transaction Count', analytics.transactionCount]);
-    rows.add([
-      'Average Transaction',
-      analytics.averageTransaction.toStringAsFixed(2)
-    ]);
-    rows.add(['Items Sold', analytics.itemsSold]);
-    rows.add([]);
-
-    if (analytics.paymentBreakdown.isNotEmpty) {
-      rows.add(['Payment Breakdown']);
-      rows.add(['Method', 'Count', 'Total ($currency)']);
-      for (final p in analytics.paymentBreakdown) {
-        rows.add([p.method, p.count, p.total.toStringAsFixed(2)]);
+    String badgeFor(String method) {
+      final lower = method.toLowerCase();
+      if (lower == 'gcash') {
+        return '<span class="badge" style="background:$successContainer;color:$onSuccess;">${_escapeHtml(method)}</span>';
       }
-      rows.add([]);
+      final textColor = switch (lower) {
+        'cash' => primary,
+        'card' => primaryDark,
+        _ => textSecondary,
+      };
+      return '<span class="badge" style="background:$surfaceSoft;color:$textColor;">${_escapeHtml(method)}</span>';
     }
 
+    final maxTrend = analytics.trend.fold<double>(
+      0,
+      (m, t) => t.total > m ? t.total : m,
+    );
+
+    final contactParts = <String>[
+      if (store.storeAddress.isNotEmpty) store.storeAddress,
+      if (store.storePhone.isNotEmpty) 'Contact: ${store.storePhone}',
+    ];
+
+    final b = StringBuffer()
+      ..write('<!DOCTYPE html>')
+      ..write('<html lang="en">')
+      ..write('<head>')
+      ..write('<meta charset="UTF-8">')
+      ..write('<meta name="viewport" content="width=device-width, initial-scale=1.0">')
+      ..write('<title>${_escapeHtml("${store.storeName} - Sales Report")}</title>')
+      ..write('<style>');
+
+    b.write('''
+:root { --primary: $primary; --primary-light: $primaryLight; --primary-dark: $primaryDark; --surface: $surface; --surface-soft: $surfaceSoft; --border: $border; --divider: $divider; --text: $textPrimary; --text-2: $textSecondary; --text-3: $textMuted; --success-bg: $successContainer; --success-text: $onSuccess; }
+* { box-sizing: border-box; }
+body { margin: 0; padding: 16px; font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; background: $surface; color: $textPrimary; }
+.page { max-width: 900px; margin: 0 auto; background: #FFFFFF; border: 1px solid $border; border-radius: 16px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+.store-header { display: flex; align-items: center; padding-bottom: 16px; border-bottom: 2px solid $primaryDark; margin-bottom: 16px; }
+.logo { width: 46px; height: 46px; border-radius: 12px; background: linear-gradient(135deg, $primary, $primaryDark); color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; margin-right: 12px; flex-shrink: 0; }
+.store-info h1 { margin: 0; font-size: 18px; color: $textPrimary; }
+.store-info .meta { margin: 4px 0 0; font-size: 12px; color: $textSecondary; }
+.title-row { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 16px; }
+.title h2 { margin: 0; font-size: 22px; color: $primaryDark; }
+.title .generated { margin: 4px 0 0; font-size: 12px; color: $textSecondary; }
+.period { text-align: right; font-size: 12px; color: $textSecondary; }
+.period strong { display: block; font-size: 14px; color: $textPrimary; font-weight: 700; }
+.metric-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+.metric-card { border: 0.5px solid $border; border-radius: 12px; padding: 12px; background: $surfaceSoft; }
+.metric-card.primary { border-color: $primaryLight; }
+.metric-value { font-size: 17px; font-weight: 700; color: $textPrimary; }
+.metric-card.primary .metric-value { color: $primaryDark; }
+.metric-label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: $textSecondary; margin-top: 6px; letter-spacing: 0.4px; }
+.section-title { font-size: 13px; font-weight: 700; text-transform: uppercase; color: $primaryDark; margin: 16px 0 8px; letter-spacing: 0.4px; }
+.chart { background: $surfaceSoft; border: 0.5px solid $border; border-radius: 12px; padding: 12px; display: flex; align-items: flex-end; gap: 8px; height: 120px; }
+.bar-wrapper { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; min-width: 0; }
+.bar { width: 100%; max-width: 24px; border-radius: 4px 4px 0 0; background: linear-gradient(to top, $primaryDark, $primaryLight); }
+.bar-label { font-size: 9px; color: $textSecondary; margin-top: 4px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; padding: 10px 12px; background: $primaryDark; color: #FFFFFF; font-weight: 700; }
+td { padding: 10px 12px; border-bottom: 1px solid $divider; color: $textPrimary; }
+.right { text-align: right; }
+.total-row { background: $successContainer !important; color: $onSuccess; font-weight: 700; }
+.total-row td { color: $onSuccess; border-bottom: none; }
+.badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-weight: 700; font-size: 10.5px; }
+@media (max-width: 600px) { .page { padding: 16px; } .metric-grid { grid-template-columns: 1fr; } .title-row { flex-direction: column; align-items: flex-start; gap: 8px; } .period { text-align: left; } }
+''');
+
+    b
+      ..write('</style>')
+      ..write('</head>')
+      ..write('<body>')
+      ..write('<div class="page">');
+
+    // Store header
+    b.write('<div class="store-header">');
+    b.write('<div class="logo">${_escapeHtml(_storeInitials(store.storeName))}</div>');
+    b.write('<div class="store-info">');
+    b.write('<h1>${_escapeHtml(store.storeName)}</h1>');
+    if (contactParts.isNotEmpty) {
+      b.write('<p class="meta">${_escapeHtml(contactParts.join(' · '))}</p>');
+    }
+    b.write('</div></div>');
+
+    // Title row
+    b.write('<div class="title-row">');
+    b.write('<div class="title"><h2>Sales Summary</h2>');
+    b.write('<p class="generated">Generated: ${_escapeHtml(generated)}</p></div>');
+    b.write('<div class="period">Period<br><strong>${_escapeHtml(period)}</strong></div>');
+    b.write('</div>');
+
+    // Metrics
+    b.write('<div class="metric-grid">');
+    b.write('<div class="metric-card primary"><div class="metric-value">${_escapeHtml(currency)}${analytics.totalSales.toStringAsFixed(2)}</div><div class="metric-label">Total Sales</div></div>');
+    b.write('<div class="metric-card"><div class="metric-value">${analytics.transactionCount}</div><div class="metric-label">Transactions</div></div>');
+    b.write('<div class="metric-card"><div class="metric-value">${_escapeHtml(currency)}${analytics.averageTransaction.toStringAsFixed(2)}</div><div class="metric-label">Average Transaction</div></div>');
+    b.write('<div class="metric-card"><div class="metric-value">${analytics.itemsSold}</div><div class="metric-label">Items Sold</div></div>');
+    b.write('</div>');
+
+    // Trend
     if (analytics.trend.isNotEmpty) {
-      rows.add(['Trend']);
-      rows.add(['Date/Time', 'Total ($currency)', 'Transactions']);
+      b.write('<div class="section-title">Sales Trend</div>');
+      b.write('<div class="chart">');
       for (final t in analytics.trend) {
-        rows.add([
-          _formatShortDateTime(t.date),
-          t.total.toStringAsFixed(2),
-          t.count,
-        ]);
+        final ratio = maxTrend == 0 ? 0.05 : t.total / maxTrend;
+        final height = (90 * ratio).toStringAsFixed(1);
+        final label = DateFormat('MMM d').format(t.date.toLocal());
+        b.write('<div class="bar-wrapper"><div class="bar" style="height:${height}px"></div><div class="bar-label">${_escapeHtml(label)}</div></div>');
       }
-      rows.add([]);
+      b.write('</div>');
     }
 
+    // Payment breakdown
+    if (analytics.paymentBreakdown.isNotEmpty) {
+      b.write('<div class="section-title">Payment Breakdown</div>');
+      b.write('<div class="table-wrap"><table><thead><tr><th>Method</th><th class="right">Count</th><th class="right">Total</th></tr></thead><tbody>');
+      for (final p in analytics.paymentBreakdown) {
+        b.write('<tr><td>${badgeFor(p.method)}</td><td class="right">${p.count}</td><td class="right">${_escapeHtml(currency)}${p.total.toStringAsFixed(2)}</td></tr>');
+      }
+      b.write('<tr class="total-row"><td>Total</td><td class="right">${analytics.transactionCount}</td><td class="right">${_escapeHtml(currency)}${analytics.totalSales.toStringAsFixed(2)}</td></tr>');
+      b.write('</tbody></table></div>');
+    }
+
+    // Top products
     if (analytics.topProducts.isNotEmpty) {
-      rows.add(['Top Products']);
-      rows.add(['Product', 'Qty', 'Revenue ($currency)']);
-      for (final p in analytics.topProducts) {
-        rows.add(
-            [p.productName, p.totalQuantity, p.revenue.toStringAsFixed(2)]);
+      b.write('<div class="section-title">Top Products</div>');
+      b.write('<div class="table-wrap"><table><thead><tr><th>Product</th><th class="right">Qty</th><th class="right">Revenue</th></tr></thead><tbody>');
+      for (final p in analytics.topProducts.take(3)) {
+        b.write('<tr><td>${_escapeHtml(p.productName)}</td><td class="right">${p.totalQuantity}</td><td class="right">${_escapeHtml(currency)}${p.revenue.toStringAsFixed(2)}</td></tr>');
       }
-      rows.add([]);
+      b.write('</tbody></table></div>');
     }
 
-    rows.add(['Sales Transactions']);
-    rows.add([
-      'Receipt #',
-      'Date/Time',
-      'Cashier',
-      'Customer',
-      'Payment Method',
-      'Reference',
-      'Items',
-      'Total ($currency)',
-    ]);
-
-    for (final bundle in bundles) {
-      final s = bundle.sale;
-      rows.add([
-        '${s.receiptNumber ?? s.id}',
-        _formatShortDateTime(s.createdAt),
-        userNames[s.userId] ?? 'User ${s.userId}',
-        s.customerName ?? '',
-        s.paymentMethod,
-        s.referenceNumber ?? '',
-        bundle.itemCount,
-        s.totalAmount.toStringAsFixed(2),
-      ]);
-    }
-    rows.add([
-      'Grand Total',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      analytics.totalSales.toStringAsFixed(2)
-    ]);
-    rows.add([]);
-
-    rows.add(['Line Items']);
-    rows.add([
-      'Receipt #',
-      'Date/Time',
-      'Product',
-      'Qty',
-      'Unit Price ($currency)',
-      'Line Total ($currency)',
-      'Payment Method',
-    ]);
-
-    for (final bundle in bundles) {
-      final s = bundle.sale;
-      for (final item in bundle.items) {
-        rows.add([
-          '${s.receiptNumber ?? s.id}',
-          _formatShortDateTime(s.createdAt),
-          item.productName ?? 'Product #${item.productId}',
-          item.quantity,
-          item.unitPrice.toStringAsFixed(2),
-          item.totalPrice.toStringAsFixed(2),
-          s.paymentMethod,
-        ]);
+    // Transactions
+    if (bundles.isNotEmpty) {
+      b.write('<div class="section-title">Transactions</div>');
+      b.write('<div class="table-wrap"><table><thead><tr>');
+      b.write('<th>Receipt</th>');
+      b.write('<th>Date/Time</th>');
+      b.write('<th>Customer</th>');
+      b.write('<th class="right">Items</th>');
+      b.write('<th class="right">Total</th>');
+      b.write('</tr></thead><tbody>');
+      for (final bundle in bundles) {
+        final s = bundle.sale;
+        b.write('<tr>');
+        b.write('<td>${_escapeHtml('${s.receiptNumber ?? s.id}')}</td>');
+        b.write('<td>${_escapeHtml(_formatShortDateTime(s.createdAt))}</td>');
+        b.write('<td>${_escapeHtml(s.customerName ?? 'GUEST')}</td>');
+        b.write('<td class="right">${bundle.itemCount}</td>');
+        b.write('<td class="right">${_escapeHtml(currency)}${s.totalAmount.toStringAsFixed(2)}</td>');
+        b.write('</tr>');
       }
+      b.write('</tbody></table></div>');
     }
-    rows.add([
-      'Grand Total',
-      '',
-      '',
-      '',
-      '',
-      '',
-      analytics.totalSales.toStringAsFixed(2)
-    ]);
-    rows.add([]);
 
-    rows.add(['Sales by Product']);
-    rows.add(['Product', 'Qty', 'Revenue ($currency)']);
-    final productSales = _buildProductSummaries(bundles);
-    for (final p in productSales) {
-      rows.add([p.name, p.quantity, p.total.toStringAsFixed(2)]);
-    }
-    rows.add(['Grand Total', '', analytics.totalSales.toStringAsFixed(2)]);
+    b.write('</div>');
+    b.write('</body></html>');
 
-    final csvString = const ListToCsvConverter().convert(rows);
-    return Uint8List.fromList(utf8.encode(csvString));
+    return Uint8List.fromList(utf8.encode(b.toString()));
   }
+
 }
 
 String _formatPeriodLabel(DateTime? start, DateTime? end) {
@@ -1373,4 +1351,17 @@ String _formatShortDateTime(DateTime dt) {
           : hour;
   final minute = local.minute.toString().padLeft(2, '0');
   return '${DateFormat('MMM d').format(local)} $displayHour:$minute $period';
+}
+
+String _colorToHex(Color color) =>
+    '#${(color.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}';
+
+String _escapeHtml(String text) =>
+    const HtmlEscape(HtmlEscapeMode.element).convert(text);
+
+String _storeInitials(String name) {
+  final parts = name.trim().split(RegExp(r'\s+'));
+  final first = parts.isNotEmpty && parts.first.isNotEmpty ? parts.first[0] : '';
+  final second = parts.length > 1 && parts[1].isNotEmpty ? parts[1][0] : '';
+  return '$first$second'.toUpperCase();
 }

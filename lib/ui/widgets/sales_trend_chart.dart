@@ -35,19 +35,30 @@ class SalesTrendChart extends StatelessWidget {
 
     final points = trend.map(_toBarPoint).toList();
     final highlightIndex = _highlightIndex(points);
+    final chart = points.length <= 12
+        ? MiniBarChart(
+            points: points,
+            valuePrefix: valuePrefix,
+            highlightIndex: highlightIndex,
+          )
+        : _ScrollableBarChart(
+            points: points,
+            valuePrefix: valuePrefix,
+            highlightIndex: highlightIndex,
+          );
 
-    if (points.length <= 12) {
-      return MiniBarChart(
-        points: points,
-        valuePrefix: valuePrefix,
-        highlightIndex: highlightIndex,
-      );
-    }
-
-    return _ScrollableBarChart(
-      points: points,
-      valuePrefix: valuePrefix,
-      highlightIndex: highlightIndex,
+    final cs = Theme.of(context).colorScheme;
+    final b = Theme.of(context).brightness;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        chart,
+        const SizedBox(height: Spacing.sm),
+        TrendChartLegend(
+          normalColor: cs.primary,
+          highlightColor: AppSemanticColors.resolve(AppSemanticColors.info, b),
+        ),
+      ],
     );
   }
 
@@ -89,7 +100,7 @@ class SalesTrendChart extends StatelessWidget {
           return _weekdayShort(date.weekday);
         case SalesPeriod.monthly:
           final week = ((date.day - 1) / 7).floor() + 1;
-          return 'W$week';
+          return 'Week $week';
         case SalesPeriod.custom:
           return '${date.month}/${date.day}';
       }
@@ -106,7 +117,7 @@ class SalesTrendChart extends StatelessWidget {
 
   String _weekdayShort(int weekday) {
     // Sunday = 7 in Dart, so map Sunday -> 0, Monday -> 1, ... Saturday -> 6.
-    const names = ['Su', 'M', 'T', 'W', 'Th', 'F', 'Sa'];
+    const names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     return names[weekday % 7];
   }
 

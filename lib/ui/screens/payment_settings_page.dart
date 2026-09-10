@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
 import 'package:pinoy_pos/providers/payment_settings_provider.dart';
@@ -322,6 +323,7 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
           controller: _storeNameController,
           label: 'Store Name',
           prefixIcon: Icons.store_outlined,
+          hint: 'Your store name',
           helperText: 'Shown to customers on the GCash payment screen.',
           textCapitalization: TextCapitalization.words,
           enabled: !widget.isLoading,
@@ -331,6 +333,7 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
           controller: _storePhoneController,
           label: 'GCash Mobile Number',
           prefixIcon: Icons.phone_outlined,
+          hint: '09XX XXX XXXX',
           helperText: 'The mobile number linked to the GCash account.',
           keyboardType: TextInputType.phone,
           enabled: !widget.isLoading,
@@ -390,28 +393,47 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
             ),
           ],
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: AppButton.filled(
-                  isLoading: widget.isLoading,
-                  onPressed: widget.isLoading ? null : widget.onUploadGcashQr,
-                  icon: Icons.upload,
-                  label: hasImage ? 'Change QR Image' : 'Upload QR Image',
-                ),
-              ),
-              if (hasImage) ...[
-                const SizedBox(width: 12),
-                Expanded(
-                  child: AppButton.destructive(
-                    isLoading: widget.isLoading,
-                    onPressed: widget.isLoading ? null : widget.onClearGcashQr,
-                    icon: Icons.delete_outline,
-                    label: 'Remove',
-                  ),
-                ),
-              ],
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = layoutClassFor(constraints.maxWidth).isCompact;
+              final uploadButton = AppButton.filled(
+                isLoading: widget.isLoading,
+                onPressed: widget.isLoading ? null : widget.onUploadGcashQr,
+                icon: Icons.upload,
+                label: hasImage ? 'Change QR Image' : 'Upload QR Image',
+                fullWidth: isCompact,
+              );
+              final removeButton = AppButton.destructive(
+                isLoading: widget.isLoading,
+                onPressed: widget.isLoading ? null : widget.onClearGcashQr,
+                icon: Icons.delete_outline,
+                label: 'Remove',
+                fullWidth: isCompact,
+              );
+
+              if (isCompact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    uploadButton,
+                    if (hasImage) ...[
+                      const SizedBox(height: 12),
+                      removeButton,
+                    ],
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(child: uploadButton),
+                  if (hasImage) ...[
+                    const SizedBox(width: 12),
+                    Expanded(child: removeButton),
+                  ],
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -520,6 +542,7 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
                     width: 80,
                     child: AppTextFormField(
                       initialValue: _referenceMinLength.toString(),
+                      hint: '1-50',
                       keyboardType: TextInputType.number,
                       enabled: !widget.isLoading,
                       onChanged: (value) {

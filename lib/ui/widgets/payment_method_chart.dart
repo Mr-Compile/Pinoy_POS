@@ -19,7 +19,7 @@ class PaymentMethodChart extends StatelessWidget {
     required this.breakdown,
     this.grandTotal,
     this.valuePrefix,
-    this.size = 140,
+    this.size = 130,
   });
 
   @override
@@ -82,7 +82,7 @@ class PaymentMethodChart extends StatelessWidget {
           child: PieChart(
             PieChartData(
               sectionsSpace: 2,
-              centerSpaceRadius: size * 0.25,
+              centerSpaceRadius: 35,
               sections: sections,
               pieTouchData: PieTouchData(enabled: false),
             ),
@@ -98,6 +98,7 @@ class PaymentMethodChart extends StatelessWidget {
                 _LegendItem(
                   color: colors[i % colors.length],
                   label: active[i].method,
+                  count: active[i].count,
                   value: _formatMoney(active[i].total),
                 ),
               ],
@@ -124,11 +125,13 @@ class PaymentMethodChart extends StatelessWidget {
 class _LegendItem extends StatelessWidget {
   final Color color;
   final String label;
+  final int count;
   final String value;
 
   const _LegendItem({
     required this.color,
     required this.label,
+    required this.count,
     required this.value,
   });
 
@@ -158,6 +161,13 @@ class _LegendItem extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            count.toString(),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
           ),
           const SizedBox(width: 8),
           Text(

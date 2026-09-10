@@ -10,7 +10,8 @@ import 'package:pinoy_pos/ui/screens/ai_advisor_screen.dart';
 /// Floating, draggable AI chat head inspired by modern messaging apps.
 ///
 /// Shows a circular button that the Owner can drag to any position on
-/// screen. Tapping (without dragging) opens the full AI Advisor screen.
+/// screen. A clean tap opens the full AI Advisor screen; dragging moves
+/// the head and snaps it to the nearest horizontal edge on release.
 ///
 /// Position persistence:
 /// - The last valid position is stored in SharedPreferences keyed by
@@ -26,8 +27,13 @@ import 'package:pinoy_pos/ui/screens/ai_advisor_screen.dart';
 /// - Gentle edge snapping after drag ends
 class AIChatHead extends ConsumerStatefulWidget {
   final int userId;
+  final GlobalKey<NavigatorState> navigatorKey;
 
-  const AIChatHead({super.key, required this.userId});
+  const AIChatHead({
+    super.key,
+    required this.userId,
+    required this.navigatorKey,
+  });
 
   @override
   ConsumerState<AIChatHead> createState() => _AIChatHeadState();
@@ -118,6 +124,14 @@ class _AIChatHeadState extends ConsumerState<AIChatHead> {
     return Offset(snappedX, pos.dy.clamp(bounds.top, bounds.bottom));
   }
 
+  void _openAdvisor() {
+    SafeNavigator.pushUniqueWithKey<void>(
+      widget.navigatorKey,
+      const AIAdvisorScreen(),
+      routeName: 'ai_advisor',
+    );
+  }
+
   void _onPanStart(DragStartDetails details) {
     _totalDragDistance = 0;
     _isDragging = false;
@@ -142,22 +156,17 @@ class _AIChatHeadState extends ConsumerState<AIChatHead> {
 
   void _onPanEnd(DragEndDetails details) {
     if (_isDragging) {
-      // Snap to nearest horizontal edge.
+      // Snap to nearest horizontal edge after a real drag.
       final bounds = _safeAreaBounds();
       final snapped = _snapToNearestEdge(_position, bounds);
       setState(() {
         _position = snapped;
       });
       _savePosition(snapped);
-    } else {
-      // It was a tap, not a drag — open the full AI Advisor screen.
-      // Use the explicit route name so the global overlay can hide while
-      // the full-screen advisor is visible and avoid stacking duplicates.
-      SafeNavigator.pushUnique<void>(
-        context,
-        const AIAdvisorScreen(),
-        routeName: 'ai_advisor',
-      );
+    } else if (_totalDragDistance > 0) {
+      // The pan recognizer won but the pointer barely moved; treat it
+      // as a tap so the head still opens.
+      _openAdvisor();
     }
     _isDragging = false;
     _totalDragDistance = 0;
@@ -182,6 +191,7 @@ class _AIChatHeadState extends ConsumerState<AIChatHead> {
       left: _position.dx,
       top: _position.dy,
       child: GestureDetector(
+        onTap: _openAdvisor,
         onPanStart: _onPanStart,
         onPanUpdate: _onPanUpdate,
         onPanEnd: _onPanEnd,

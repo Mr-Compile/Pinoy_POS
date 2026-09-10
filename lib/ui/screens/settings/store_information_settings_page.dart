@@ -191,6 +191,7 @@ class _StoreInformationSettingsPageState
   Future<ModalResult<String>?> _showTextEditDialog({
     required String title,
     required String label,
+    String? hint,
     required String initialValue,
     int maxLines = 1,
     IconData? prefixIcon,
@@ -207,6 +208,7 @@ class _StoreInformationSettingsPageState
           return AppTextFormField(
             controller: controller,
             label: label,
+            hint: hint,
             prefixIcon: prefixIcon,
             maxLines: maxLines,
           );
@@ -236,6 +238,7 @@ class _StoreInformationSettingsPageState
     final result = await _showTextEditDialog(
       title: 'Store Name',
       label: 'Store Name',
+      hint: 'Your store name',
       initialValue: settings.storeName,
       prefixIcon: Icons.storefront_outlined,
     );
@@ -294,9 +297,17 @@ class _StoreInformationSettingsPageState
       _ => null,
     };
 
+    final hint = switch (fieldKey) {
+      'store_address' => 'Store address',
+      'store_phone' => '09XX XXX XXXX',
+      'receipt_footer' => 'Thank you for your purchase!',
+      _ => null,
+    };
+
     final result = await _showTextEditDialog(
       title: label,
       label: label,
+      hint: hint,
       initialValue: currentValue,
       maxLines: fieldKey == 'receipt_footer' ? 2 : 1,
       prefixIcon: prefixIcon,

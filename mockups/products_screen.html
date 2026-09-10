@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinoy POS — Products Screen (lib/ui/screens/products_screen.dart)</title>
+<link rel="stylesheet" href="mockup.css">
+<style>
+  .role-switcher { display: flex; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 4px; }
+  .role-switcher button { border: none; background: transparent; color: var(--text-3); border-radius: 20px; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .role-switcher button.on { background: var(--primary); color: #fff; }
+  .role-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; border: 1px solid var(--border); }
+  .role-owner { background: rgba(75,130,233,.16); color: var(--info); border-color: rgba(75,130,233,.4); }
+  .role-staff { background: rgba(22,163,74,.16); color: var(--success); border-color: rgba(22,163,74,.4); }
+  .frames-legend { max-width: 900px; margin: 0 auto 24px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; color: var(--text-2); font-size: 13px; }
+
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 12px 10px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+  .stat .num { font-size: 20px; font-weight: 800; color: var(--text); line-height: 1; }
+  .stat .lbl { font-size: 10.5px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: .4px; }
+
+  .toolbar { display: flex; gap: 8px; }
+  .search { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; display: flex; align-items: center; gap: 8px; color: var(--text-3); font-size: 13px; }
+  .filterbtn { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 0 12px; display: flex; align-items: center; gap: 6px; color: var(--text-2); font-size: 12.5px; font-weight: 600; }
+
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { padding: 7px 14px; border-radius: 20px; font-size: 12.5px; font-weight: 600; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); cursor: pointer; }
+  .chip.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+  .product-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; }
+  .product-row + .product-row { border-top: 1px solid var(--divider); }
+  .product-row .thumb { width: 48px; height: 48px; border-radius: 12px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 22px; border: 1px solid var(--border); background: var(--surface-elev); }
+  .product-row .grow { flex: 1; min-width: 0; }
+  .product-row .name { font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .product-row .sub { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+  .product-row .price { font-size: 15px; font-weight: 800; color: var(--primary); white-space: nowrap; }
+  .product-row .actions { display: flex; gap: 4px; }
+  .product-row .actions .aicon { width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .product-row .actions .aicon:hover { background: var(--surface-elev); }
+  .product-row .actions svg { width: 18px; height: 18px; fill: var(--text-3); }
+  .product-row .actions .del svg { fill: var(--error); }
+
+  .fab { display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #2C68D7, #2563C7); color: #fff; font-size: 13.5px; font-weight: 700; padding: 13px 20px; border-radius: 16px; box-shadow: 0 8px 20px rgba(44,104,215,.4); cursor: pointer; }
+  .fabzone { display: flex; justify-content: flex-end; padding-right: 4px; margin-top: auto; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M12 21l3.5-4.5c-.97-.74-2.18-1.16-3.5-1.16s-2.53.42-3.5 1.16L12 21zM12 3C7.31 3 3.07 4.69 0 7.55l1.93 2.43C4.48 7.9 8.01 6.4 12 6.4s7.52 1.5 10.07 3.58L24 7.55C20.93 4.69 16.69 3 12 3z"/></symbol>
+  <symbol id="i-batt" viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></symbol>
+  <symbol id="i-dash" viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></symbol>
+  <symbol id="i-cart" viewBox="0 0 24 24"><path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.13.12-.27.12-.42 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/></symbol>
+  <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M19.5 3.5 18 2l-1.5 1.5L15 2l-1.5 1.5L12 2l-1.5 1.5L9 2 7.5 3.5 6 2 4.5 3.5 3 2v20l1.5-1.5L6 22l1.5-1.5L9 22l1.5-1.5L12 22l1.5-1.5L15 22l1.5-1.5L18 22l1.5-1.5L21 22V2l-1.5 1.5zM19 19.09H5V4.91h14v14.18z"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="M20 2H4c-1 0-2 .9-2 2v3.01c0 .72.43 1.34 1 1.69V20c0 1.1 1.1 2 2 2h14c.9 0 2-.9 2-2V8.7c.57-.35 1-.97 1-1.69V4c0-1.1-1-2-2-2zm-5 12H9v-2h6v2zm5-7H4V4h16v3z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24"><path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></symbol>
+  <symbol id="i-del" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 5.99 19.53 19H4.47L12 5.99M12 2 1 21h22L12 2zm1 14h-2v2h2v-2zm0-6h-2v4h2v-4z"/></symbol>
+</svg>
+
+<div class="page-head">
+  <div>
+    <h1>Products — lib/ui/screens/products_screen.dart</h1>
+    <p>Product catalog with search, category filter, stock summary, and role-gated CRUD actions.</p>
+  </div>
+  <div class="role-switcher">
+    <button class="on" data-role="owner" onclick="setRole('owner')">Owner</button>
+    <button data-role="staff" onclick="setRole('staff')">Staff</button>
+  </div>
+  <button class="theme-toggle" onclick="toggleTheme()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
+    <span id="themeLabel">Light mode</span>
+  </button>
+</div>
+
+<div class="frames-legend">
+  <span class="role-chip role-owner" id="roleChip">Owner</span>
+  <span id="legendText">Owner has add/edit/delete product actions. Staff is view-only via view_products.</span>
+</div>
+
+<div class="frames">
+  <div class="frame-wrap">
+    <div class="frame-label" id="frameLabel">Products — Owner</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="appbar">
+        <div class="title"><h2>Products</h2><div class="sub" id="roleSubtitle">Owner</div></div>
+        <div class="act" onclick="showToast('Refresh products', 'info')"><svg><use href="#i-more"/></svg></div>
+        <div class="avatar" id="avatar">OW</div>
+      </div>
+      <div class="screen">
+        <div class="screen-body">
+          <div class="stats" id="statsRow">
+            <div class="stat"><div class="num">24</div><div class="lbl">Products</div></div>
+            <div class="stat"><div class="num" style="color:var(--warning)">3</div><div class="lbl">Low stock</div></div>
+            <div class="stat"><div class="num" style="color:var(--error)">1</div><div class="lbl">Out of stock</div></div>
+          </div>
+          <div class="toolbar">
+            <div class="search"><svg><use href="#i-search"/></svg>Search products</div>
+            <div class="filterbtn"><svg><use href="#i-filter"/></svg>All</div>
+          </div>
+          <div class="chips" id="chipRow" onclick="selectChip(event.target, 'stock')">
+            <div class="chip on" data-group="stock">All</div>
+            <div class="chip" data-group="stock">Low stock</div>
+            <div class="chip" data-group="stock">Out of stock</div>
+          </div>
+          <div class="card" id="productList">
+            <div class="product-row" data-visible="owner staff">
+              <div class="thumb">🍗</div>
+              <div class="grow"><div class="name">Chicken Adobo Rice</div><div class="sub"><span class="pill pill-blue">Meals</span> Stock: 18</div></div>
+              <div class="price">₱80.00</div>
+              <div class="actions owner-actions"><div class="aicon" onclick="showToast('Edit', 'info')"><svg><use href="#i-edit"/></svg></div><div class="aicon del" onclick="showToast('Delete', 'error')"><svg><use href="#i-del"/></svg></div></div>
+            </div>
+            <div class="product-row" data-visible="owner staff">
+              <div class="thumb">🍚</div>
+              <div class="grow"><div class="name">Pastil</div><div class="sub"><span class="pill pill-blue">Snacks</span> Stock: 45</div></div>
+              <div class="price">₱10.00</div>
+              <div class="actions owner-actions"><div class="aicon" onclick="showToast('Edit', 'info')"><svg><use href="#i-edit"/></svg></div><div class="aicon del" onclick="showToast('Delete', 'error')"><svg><use href="#i-del"/></svg></div></div>
+            </div>
+            <div class="product-row" data-visible="owner staff">
+              <div class="thumb">🥤</div>
+              <div class="grow"><div class="name">Iced Tea</div><div class="sub"><span class="pill pill-blue">Drinks</span> Stock: 32</div></div>
+              <div class="price">₱25.00</div>
+              <div class="actions owner-actions"><div class="aicon" onclick="showToast('Edit', 'info')"><svg><use href="#i-edit"/></svg></div><div class="aicon del" onclick="showToast('Delete', 'error')"><svg><use href="#i-del"/></svg></div></div>
+            </div>
+            <div class="product-row" data-visible="owner staff">
+              <div class="thumb">🍌</div>
+              <div class="grow"><div class="name">Banana Cue</div><div class="sub"><span class="pill pill-blue">Snacks</span> <span style="color:var(--error)">Stock: 0</span></div></div>
+              <div class="price">₱15.00</div>
+              <div class="actions owner-actions"><div class="aicon" onclick="showToast('Edit', 'info')"><svg><use href="#i-edit"/></svg></div><div class="aicon del" onclick="showToast('Delete', 'error')"><svg><use href="#i-del"/></svg></div></div>
+            </div>
+          </div>
+          <div class="fabzone" id="fabZone"><div class="fab" onclick="showToast('Add Product dialog', 'success')"><svg><use href="#i-plus"/></svg>Add Product</div></div>
+        </div>
+      </div>
+      <div class="bottomnav" id="bottomNav">
+        <div class="navitem"><span class="navicon"><svg><use href="#i-dash"/></svg></span><span class="navlbl">Dashboard</span></div>
+        <div class="navitem"><span class="navicon"><svg><use href="#i-cart"/></svg></span><span class="navlbl">POS</span></div>
+        <div class="navitem sel"><span class="navicon"><svg><use href="#i-box"/></svg></span><span class="navlbl">Products</span></div>
+        <div class="navitem"><span class="navicon"><svg><use href="#i-receipt"/></svg></span><span class="navlbl">Sales</span></div>
+        <div class="navitem"><span class="navicon"><svg><use href="#i-more"/></svg></span><span class="navlbl">More</span></div>
+      </div>
+    </div>
+    <div class="frame-notes" id="frameNotes">Owner has edit_products and delete_products. Staff only has view_products, so row actions and the Add Product button are hidden.</div>
+  </div>
+</div>
+
+<script src="mockup.js"></script>
+<script>
+const roleData = {
+  owner: {
+    chipClass: 'role-owner',
+    text: 'Owner has add/edit/delete product actions. Staff is view-only via view_products.',
+    subtitle: 'Owner',
+    avatar: 'OW',
+    notes: 'Owner has edit_products and delete_products. Staff only has view_products, so row actions and the Add Product button are hidden.',
+    nav: [
+      { icon: '#i-dash', label: 'Dashboard' },
+      { icon: '#i-cart', label: 'POS' },
+      { icon: '#i-box', label: 'Products', sel: true },
+      { icon: '#i-receipt', label: 'Sales' },
+      { icon: '#i-more', label: 'More' }
+    ]
+  },
+  staff: {
+    chipClass: 'role-staff',
+    text: 'Staff views products, stock, and prices. Add/Edit/Delete are not available.',
+    subtitle: 'Staff',
+    avatar: 'ST',
+    notes: 'Staff sees the same product list but with no row actions and no Add Product button. Stock counts are visible for POS reference.',
+    nav: [
+      { icon: '#i-dash', label: 'Dashboard' },
+      { icon: '#i-cart', label: 'POS' },
+      { icon: '#i-box', label: 'Products', sel: true },
+      { icon: '#i-receipt', label: 'My Sales' },
+      { icon: '#i-more', label: 'More' }
+    ]
+  }
+};
+
+function setRole(role) {
+  const data = roleData[role];
+  if (!data) return;
+  document.querySelectorAll('.role-switcher button').forEach(b => b.classList.toggle('on', b.dataset.role === role));
+  const chip = document.getElementById('roleChip');
+  chip.className = 'role-chip ' + data.chipClass;
+  chip.textContent = role.charAt(0).toUpperCase() + role.slice(1);
+  document.getElementById('legendText').textContent = data.text;
+  document.getElementById('frameLabel').textContent = 'Products — ' + data.subtitle;
+  document.getElementById('roleSubtitle').textContent = data.subtitle;
+  document.getElementById('avatar').textContent = data.avatar;
+  document.getElementById('frameNotes').textContent = data.notes;
+  document.getElementById('fabZone').style.display = role === 'owner' ? 'flex' : 'none';
+
+  document.querySelectorAll('.owner-actions').forEach(el => {
+    el.style.display = role === 'owner' ? 'flex' : 'none';
+  });
+
+  const nav = document.getElementById('bottomNav');
+  nav.innerHTML = data.nav.map(item => `
+    <div class="navitem ${item.sel ? 'sel' : ''}">
+      <span class="navicon"><svg><use href="${item.icon}"/></svg></span>
+      <span class="navlbl">${item.label}</span>
+    </div>
+  `).join('');
+}
+
+function selectChip(el, group) {
+  if (!el.dataset.group) return;
+  document.querySelectorAll(`[data-group="${group}"]`).forEach(c => c.classList.remove('on'));
+  el.classList.add('on');
+}
+
+setRole('owner');
+</script>
+</body>
+</html>

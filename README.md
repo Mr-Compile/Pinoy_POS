@@ -12,7 +12,7 @@ Currency defaults to PHP. A built-in AI Advisor analyzes sales and inventory usi
 - **Products** — full CRUD with category assignment, low-stock thresholds, product images.
 - **Categories** — full CRUD with active/inactive status.
 - **Stock** — add stock and adjustments, full stock history per product.
-- **Reports** — sales summaries with PDF and CSV export to the device.
+- **Reports** — sales summaries with PDF and Excel export to the device.
 - **Announcements** — pinned, expiring store-wide notices.
 - **AI Advisor** — natural-language analysis of sales and inventory via Groq, capped at 10 queries per user per day.
 - **Users** — admin-managed accounts with role assignment, activation, password reset, and soft delete.
