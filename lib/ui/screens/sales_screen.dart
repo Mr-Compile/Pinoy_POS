@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
@@ -19,6 +22,7 @@ import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_icon_button.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
+import 'package:pinoy_pos/ui/widgets/pagination_bar.dart';
 import 'package:pinoy_pos/ui/widgets/summary_stat_card.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
@@ -47,6 +51,13 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
 
   final _searchController = TextEditingController();
 
+  /// Client-side pagination. The sales list is fetched as a filtered slice
+  /// (limit 500) and then paged locally so the UI stays responsive.
+  int _currentPage = 1;
+  static const int _pageSize = 10;
+
+  Timer? _searchDebounce;
+
   /// Quick-filter payment methods shown as chips below the search bar.
   static const _paymentMethods = ['GCash', 'Cash'];
 
@@ -66,6 +77,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -95,8 +107,12 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
       );
 
       if (mounted) {
+        final totalPages = (sales.length / _pageSize).ceil();
         setState(() {
           _sales = sales;
+          _currentPage = sales.isEmpty
+              ? 1
+              : math.min(_currentPage, math.max(totalPages, 1));
           _isLoading = false;
         });
       }
@@ -115,6 +131,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
       _selectedPeriod = ReportingPeriod.custom;
       _customStart = range.start;
       _customEnd = range.end;
+      _currentPage = 1;
     });
     _loadSales();
   }
@@ -167,9 +184,42 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
   }
 
   void _clearSearch() {
+    _searchDebounce?.cancel();
     _searchController.clear();
-    setState(() => _searchQuery = '');
+    setState(() {
+      _searchQuery = '';
+      _currentPage = 1;
+    });
     _loadSales();
+  }
+
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    setState(() {
+      _searchQuery = value;
+      _currentPage = 1;
+    });
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) _loadSales();
+    });
+  }
+
+  void _goToPage(int page) {
+    final totalPages = (_sales.length / _pageSize).ceil();
+    if (page < 1 || page > totalPages) return;
+    setState(() => _currentPage = page);
+  }
+
+  Widget _buildPager(BuildContext context, int totalCount) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(Spacing.md, 0, Spacing.md, Spacing.lg),
+      child: PaginationBar(
+        totalItems: totalCount,
+        currentPage: _currentPage,
+        pageSize: _pageSize,
+        onPageChanged: _goToPage,
+      ),
+    );
   }
 
   Future<void> _showFilterDialog() async {
@@ -260,6 +310,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
       setState(() {
         _selectedPaymentMethod = result.paymentMethod;
         _selectedPaymentStatus = result.paymentStatus;
+        _currentPage = 1;
       });
       await _loadSales();
     }
@@ -273,6 +324,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
       _selectedPeriod = ReportingPeriod.thisMonth;
       _customStart = null;
       _customEnd = null;
+      _currentPage = 1;
     });
     _loadSales();
   }
@@ -391,7 +443,11 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
         _searchQuery.isNotEmpty ||
         _selectedPeriod != ReportingPeriod.thisMonth;
 
-    final grouped = _groupByDate(_sales);
+    final pageItems = _sales
+        .skip((_currentPage - 1) * _pageSize)
+        .take(_pageSize)
+        .toList();
+    final grouped = _groupByDate(pageItems);
     final totalAmount = _sales.fold<double>(
       0,
       (sum, sale) => sum + sale.totalAmount,
@@ -440,6 +496,10 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                         return _buildGroup(context, group, canVoid);
                       }, childCount: grouped.length),
                     ),
+                  ),
+                if (_sales.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: _buildPager(context, _sales.length),
                   ),
               ],
             ),
@@ -522,7 +582,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
           child: AppSearchField(
             controller: _searchController,
             hint: 'Search receipt, customer, or reference...',
-            onChanged: (value) => setState(() => _searchQuery = value),
+            onChanged: _onSearchChanged,
             onSubmitted: (_) => _loadSales(),
             onClear: _clearSearch,
           ),
@@ -613,7 +673,10 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
 
   void _onMethodSelected(String? method) {
     if (method == _selectedPaymentMethod) return;
-    setState(() => _selectedPaymentMethod = method);
+    setState(() {
+      _selectedPaymentMethod = method;
+      _currentPage = 1;
+    });
     _loadSales();
   }
 
@@ -629,6 +692,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
       _selectedPeriod = period;
       _customStart = null;
       _customEnd = null;
+      _currentPage = 1;
     });
     _loadSales();
   }
