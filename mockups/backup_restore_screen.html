@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinoy POS — Backup &amp; Restore Screen (lib/ui/screens/backup_restore_screen.dart)</title>
+<link rel="stylesheet" href="mockup.css">
+<style>
+  .frames-legend { max-width: 900px; margin: 0 auto 24px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; color: var(--text-2); font-size: 13px; }
+  .role-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; border: 1px solid var(--border); background: rgba(139,92,246,.16); color: var(--purple); border-color: rgba(139,92,246,.4); }
+  .page-sub { font-size: 13.5px; color: var(--text-3); line-height: 1.5; }
+  .card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .card-head h3 { flex: 1; font-size: 14.5px; font-weight: 700; color: var(--text); }
+  .pathbox { background: var(--surface-elev); border-radius: 12px; padding: 10px 12px; font-size: 12px; color: var(--text-3); margin: 10px 0; word-break: break-all; }
+  .pathbox svg { width: 15px; height: 15px; fill: var(--text-3); vertical-align: middle; margin-right: 6px; }
+  .quick { display: flex; flex-direction: column; gap: 10px; }
+  .quick-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 14px; cursor: pointer; transition: background .12s; }
+  .quick-card:hover { background: var(--surface-elev); }
+  .quick-card .top { display: flex; align-items: center; gap: 10px; }
+  .quick-card .top h4 { font-size: 14.5px; font-weight: 700; color: var(--text); }
+  .quick-card p { font-size: 12.5px; color: var(--text-3); margin-top: 4px; line-height: 1.4; }
+  .backup-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 14px; margin-bottom: 10px; }
+  .backup-card .head { display: flex; align-items: center; gap: 10px; }
+  .backup-card .head .grow { flex: 1; min-width: 0; }
+  .backup-card .head .name { font-size: 14.5px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .backup-card .head .sub { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+  .backup-card .meta { display: flex; gap: 16px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--divider); flex-wrap: wrap; }
+  .backup-card .meta span { font-size: 12px; color: var(--text-3); display: flex; align-items: center; gap: 5px; }
+  .backup-card .meta svg { width: 14px; height: 14px; fill: var(--text-3); }
+  .more-btn { width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .more-btn:hover { background: var(--surface-elev); }
+  .more-btn svg { width: 18px; height: 18px; fill: var(--text-3); }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M12 21l3.5-4.5c-.97-.74-2.18-1.16-3.5-1.16s-2.53.42-3.5 1.16L12 21zM12 3C7.31 3 3.07 4.69 0 7.55l1.93 2.43C4.48 7.9 8.01 6.4 12 6.4s7.52 1.5 10.07 3.58L24 7.55C20.93 4.69 16.69 3 12 3z"/></symbol>
+  <symbol id="i-batt" viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></symbol>
+  <symbol id="i-archive" viewBox="0 0 24 24"><path d="M20.54 5.23l-1.39-2.32C18.88 2.39 18.31 2 17.66 2H6.34c-.65 0-1.22.39-1.59 1.01L3.46 5.23C2.71 6.44 3.22 7.94 4.5 8.5v9c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2v-9c1.28-.56 1.79-2.06 1.04-3.27zM12 17.5 6.5 13H10v-2h4v2h3.5L12 17.5zM5.12 5l.81-1h12.14l.81 1H5.12z"/></symbol>
+  <symbol id="i-restore" viewBox="0 0 24 24"><path d="M14 12c0-1.1-.9-2-2-2s-2 .9-2 2 .9 2 2 2 2-.9 2-2zm-2-9c-4.97 0-9 4.03-9 9H0l4 4 4-4H5c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.78-4.95-2.05L8.05 20.3C9.55 21.8 11.62 22.8 14 22.8c4.97 0 9-4.03 9-9s-4.03-9-9-9z"/></symbol>
+  <symbol id="i-delete" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 2c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6H6zm7 7V3.5L18.5 9H13z"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></symbol>
+</svg>
+
+<div class="page-head">
+  <div>
+    <h1>Backup &amp; Restore — lib/ui/screens/backup_restore_screen.dart</h1>
+    <p>Admin-only backup destination, export, import, and recent backups.</p>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <span class="role-chip">Admin</span>
+    <button class="theme-toggle" onclick="toggleTheme()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
+      <span id="themeLabel">Light mode</span>
+    </button>
+  </div>
+</div>
+
+<div class="frames">
+  <div class="frame-wrap">
+    <div class="frame-label">Backup &amp; Restore</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="appbar">
+        <div class="back"><svg><use href="#i-back"/></svg></div>
+        <div class="title"><h2>Backup &amp; Restore</h2></div>
+        <div class="act" onclick="showToast('Refreshed backup history','info')"><svg><use href="#i-refresh"/></svg></div>
+      </div>
+      <div class="screen">
+        <div class="screen-body">
+          <div class="page-sub">Protect your business data and recover it when needed.</div>
+
+          <div class="card pad">
+            <div class="card-head">
+              <div class="isquare c-blue"><svg><use href="#i-folder"/></svg></div>
+              <h3>Backup Destination</h3>
+            </div>
+            <div class="row" style="padding:0 0 8px; border:none;">
+              <div class="icircle c-green" style="width:28px; height:28px;"><svg style="width:15px; height:15px; fill:var(--success);"><use href="#i-check"/></svg></div>
+              <div class="grow">
+                <div class="name">Backups will be saved here automatically.</div>
+              </div>
+            </div>
+            <div class="pathbox">
+              <svg><use href="#i-folder"/></svg>
+              /Documents/PinoyPOS/backups
+            </div>
+            <button class="btn btn-outlined" onclick="showToast('Choose a new backup location','info')">
+              <svg><use href="#i-folder"/></svg>
+              Change Location
+            </button>
+          </div>
+
+          <div class="section-title">Quick Actions</div>
+          <div class="quick">
+            <div class="quick-card" onclick="showToast('Backup exported','success')">
+              <div class="top">
+                <div class="isquare c-blue"><svg><use href="#i-upload"/></svg></div>
+                <h4>Export Backup</h4>
+              </div>
+              <p>Save a Pinoy POS database backup (.db)</p>
+            </div>
+            <div class="quick-card" onclick="showToast('Import a backup file','info')">
+              <div class="top">
+                <div class="isquare c-green"><svg><use href="#i-download"/></svg></div>
+                <h4>Import Backup</h4>
+              </div>
+              <p>Restore from a Pinoy POS .db backup</p>
+            </div>
+          </div>
+
+          <div class="section-title">Recent Backups</div>
+          <div class="backup-card">
+            <div class="head">
+              <div class="isquare c-blue"><svg><use href="#i-archive"/></svg></div>
+              <div class="grow">
+                <div class="name">pinoy_pos.db</div>
+                <div class="sub">/Documents/PinoyPOS/backups</div>
+              </div>
+              <div class="more-btn" onclick="backupMenu(event)"><svg><use href="#i-more"/></svg></div>
+            </div>
+            <div class="meta">
+              <span><svg><use href="#i-file"/></svg>2.4 MB</span>
+              <span><svg><use href="#i-clock"/></svg>Sep 9, 2026 · 8:05 AM</span>
+            </div>
+          </div>
+          <div class="backup-card">
+            <div class="head">
+              <div class="isquare c-blue"><svg><use href="#i-archive"/></svg></div>
+              <div class="grow">
+                <div class="name">pinoy_pos_20260908_204522.db</div>
+                <div class="sub">/Documents/PinoyPOS/backups</div>
+              </div>
+              <div class="more-btn" onclick="backupMenu(event)"><svg><use href="#i-more"/></svg></div>
+            </div>
+            <div class="meta">
+              <span><svg><use href="#i-file"/></svg>2.3 MB</span>
+              <span><svg><use href="#i-clock"/></svg>Sep 8, 2026 · 8:45 PM</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes">
+      Admin-only. Destination card with status, path, and change action; two quick-action cards (export/import) with semantic icon badges and subtitles; backup cards show archive icon, filename, location, file size, and timestamp; more-options menu on each backup row for restore or delete. Empty state prompts to export the first backup.
+    </div>
+  </div>
+</div>
+
+<script src="mockup.js"></script>
+<script>
+  function backupMenu(event) {
+    const restoreAction = "openDialog({title:'Restore this backup?', message:'This will replace the current Pinoy POS data.', confirmLabel:'Restore', onConfirm:()=>showToast('Backup restored','success')})";
+    const deleteAction = "openDialog({title:'Delete this backup?', message:'This backup will be permanently deleted.', confirmLabel:'Delete', destructive:true, onConfirm:()=>showToast('Backup deleted','info')})";
+    showMenu(event, [
+      { label: 'Restore', icon: '<svg viewBox=\"0 0 24 24\" width=\"17\" height=\"17\" style=\"fill:var(--success)\"><use href=\"#i-restore\" /></svg>', action: restoreAction },
+      { label: 'Delete', cls: 'del', icon: '<svg viewBox=\"0 0 24 24\" width=\"17\" height=\"17\" style=\"fill:var(--error)\"><use href=\"#i-delete\" /></svg>', action: deleteAction }
+    ]);
+  }
+</script>
+</body>
+</html>

@@ -129,3 +129,37 @@ function selectChip(el, group) {
   document.querySelectorAll(`[data-group="${group}"]`).forEach(c => c.classList.remove('on'));
   el.classList.add('on');
 }
+
+let openMenu = null;
+
+function showMenu(event, items) {
+  event.stopPropagation();
+  closeMenu();
+
+  const btn = event.currentTarget;
+  const rect = btn.getBoundingClientRect();
+  const menu = document.createElement('div');
+  menu.className = 'menu';
+  menu.innerHTML = items.map(item =>
+    `<div class="menu-item ${item.cls || ''}" onclick="event.stopPropagation();${item.action};closeMenu()">${item.icon || ''}${escapeHtml(item.label)}</div>`
+  ).join('');
+  document.body.appendChild(menu);
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'menu-backdrop';
+  backdrop.onclick = closeMenu;
+  document.body.appendChild(backdrop);
+  openMenu = menu;
+
+  // Position under the button, flip up if it would overflow.
+  menu.style.left = rect.left + 'px';
+  menu.style.top = (rect.bottom + 6) + 'px';
+  const m = menu.getBoundingClientRect();
+  if (m.bottom > window.innerHeight) menu.style.top = (rect.top - m.height - 6) + 'px';
+  if (m.right > window.innerWidth) { menu.style.left = 'auto'; menu.style.right = (window.innerWidth - rect.right) + 'px'; }
+}
+
+function closeMenu() {
+  if (openMenu) { openMenu.remove(); openMenu = null; }
+  document.querySelectorAll('.menu-backdrop').forEach(b => b.remove());
+}

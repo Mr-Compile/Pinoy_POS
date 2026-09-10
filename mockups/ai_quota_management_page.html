@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinoy POS — AI Quota Management (lib/ui/screens/ai_quota_management_page.dart)</title>
+<link rel="stylesheet" href="mockup.css">
+<style>
+  .frames-legend { max-width: 900px; margin: 0 auto 24px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; color: var(--text-2); font-size: 13px; }
+  .role-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; border: 1px solid var(--border); background: rgba(139,92,246,.16); color: var(--purple); border-color: rgba(139,92,246,.4); }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M12 21l3.5-4.5c-.97-.74-2.18-1.16-3.5-1.16s-2.53.42-3.5 1.16L12 21zM12 3C7.31 3 3.07 4.69 0 7.55l1.93 2.43C4.48 7.9 8.01 6.4 12 6.4s7.52 1.5 10.07 3.58L24 7.55C20.93 4.69 16.69 3 12 3z"/></symbol>
+  <symbol id="i-batt" viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></symbol>
+  <symbol id="i-psych" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></symbol>
+  <symbol id="i-people" viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></symbol>
+  <symbol id="i-hourglass" viewBox="0 0 24 24"><path d="M6 2v6h.01l-2.14 2.14c-.81.81-.81 2.13 0 2.94l2.14 2.14H6V22h12v-6.64h.01l2.14-2.14c.81-.81.81-2.13 0-2.94L18.01 8H18V2H6zm10 14.5V20H8v-3.5l-2.14-2.14c-.31-.31-.31-.81 0-1.12L8 11.5V4h8v7.5l2.14 2.14c.31.31.31.81 0 1.12L16 16.5z"/></symbol>
+  <symbol id="i-restart" viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></symbol>
+</svg>
+
+<div class="page-head">
+  <div>
+    <h1>AI Quota Management — lib/ui/screens/ai_quota_management_page.dart</h1>
+    <p>SuperAdmin page for default and per-user daily AI usage quotas.</p>
+  </div>
+  <button class="theme-toggle" onclick="toggleTheme()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
+    <span id="themeLabel">Light mode</span>
+  </button>
+</div>
+
+<div class="frames-legend">
+  <span class="role-chip">SuperAdmin</span>
+  <span>Requires SuperAdmin password. Edit default quota and per-user limits; reset today's usage.</span>
+</div>
+
+<div class="frames">
+  <div class="frame-wrap">
+    <div class="frame-label">AI Quota Management</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="appbar">
+        <div class="back"><svg><use href="#i-back"/></svg></div>
+        <div class="title"><h2>AI Quota Management</h2></div>
+        <div class="act"><svg><use href="#i-psych"/></svg></div>
+      </div>
+      <div class="screen">
+        <div class="screen-body">
+          <div class="stats">
+            <div class="stat"><div class="icircle c-blue"><svg><use href="#i-psych"/></svg></div><div class="num">100</div><div class="lbl">Default Quota</div></div>
+            <div class="stat"><div class="icircle c-green"><svg><use href="#i-people"/></svg></div><div class="num">5</div><div class="lbl">Total Users</div></div>
+            <div class="stat"><div class="icircle c-amber"><svg><use href="#i-hourglass"/></svg></div><div class="num">342</div><div class="lbl">Remaining Today</div></div>
+          </div>
+
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-primary" style="flex:1;" onclick="showToast('Default quota updated', 'success')">Change Default Quota</button>
+            <button class="btn btn-warn" style="flex:1;" onclick="showToast('All usage reset', 'info')">Reset All Usage</button>
+          </div>
+
+          <div class="section-title">Per-user quotas</div>
+          <div class="card" style="display:flex;align-items:center;gap:12px;padding:14px;">
+            <div class="icircle solid-blue">J</div>
+            <div class="grow"><div class="name">Juan Dela Cruz</div><div class="sub">Owner · 80 / 100 remaining</div></div>
+            <div class="aicon"><svg><use href="#i-edit"/></svg></div>
+            <div class="aicon"><svg><use href="#i-restart"/></svg></div>
+          </div>
+          <div class="card" style="display:flex;align-items:center;gap:12px;padding:14px;margin-top:10px;">
+            <div class="icircle solid-purple">A</div>
+            <div class="grow"><div class="name">Ana Santos</div><div class="sub">Admin · 45 / 100 remaining</div></div>
+            <div class="aicon"><svg><use href="#i-edit"/></svg></div>
+            <div class="aicon"><svg><use href="#i-restart"/></svg></div>
+          </div>
+          <div class="card" style="display:flex;align-items:center;gap:12px;padding:14px;margin-top:10px;">
+            <div class="icircle solid-green">M</div>
+            <div class="grow"><div class="name">Miguel Cruz</div><div class="sub">Staff · 92 / 100 remaining</div></div>
+            <div class="aicon"><svg><use href="#i-edit"/></svg></div>
+            <div class="aicon"><svg><use href="#i-restart"/></svg></div>
+          </div>
+        </div>
+      </div>
+      <button class="fab" style="position:absolute;bottom:16px;right:16px;" onclick="showToast('All usage reset', 'info')"><svg><use href="#i-restart"/></svg> Reset All Usage</button>
+    </div>
+    <div class="frame-notes">Top stat cards, Change Default Quota button, per-user list with edit and reset actions. FAB mirrors the Reset All Usage action on portrait mobile.</div>
+  </div>
+</div>
+
+<script src="mockup.js"></script>
+</body>
+</html>

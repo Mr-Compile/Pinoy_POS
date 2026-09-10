@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinoy POS — Categories Screen (lib/ui/screens/categories_screen.dart)</title>
+<link rel="stylesheet" href="mockup.css">
+<style>
+  .role-switcher { display: flex; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 4px; }
+  .role-switcher button { border: none; background: transparent; color: var(--text-3); border-radius: 20px; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .role-switcher button.on { background: var(--primary); color: #fff; }
+  .role-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; border: 1px solid var(--border); }
+  .role-owner { background: rgba(75,130,233,.16); color: var(--info); border-color: rgba(75,130,233,.4); }
+  .role-staff { background: rgba(22,163,74,.16); color: var(--success); border-color: rgba(22,163,74,.4); }
+  .frames-legend { max-width: 900px; margin: 0 auto 24px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; color: var(--text-2); font-size: 13px; }
+
+  .stats-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 12px 10px; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; }
+  .stat-card.sel { border-color: var(--primary); }
+  .stat-card .num { font-size: 18px; font-weight: 800; color: var(--text); }
+  .stat-card .lbl { font-size: 10.5px; font-weight: 600; color: var(--text-3); text-transform: uppercase; }
+
+  .toolbar { display: flex; gap: 8px; align-items: center; }
+  .search { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; display: flex; align-items: center; gap: 8px; }
+  .search svg { width: 16px; height: 16px; fill: var(--text-3); }
+  .search input { flex: 1; background: transparent; border: none; color: var(--text); font-size: 13px; outline: none; min-width: 0; }
+  .search input::placeholder { color: var(--text-3); }
+
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { padding: 7px 14px; border-radius: 20px; font-size: 12.5px; font-weight: 600; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); cursor: pointer; }
+  .chip.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+  .category-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 12px 14px; display: flex; align-items: center; gap: 12px; cursor: pointer; }
+  .category-card + .category-card { margin-top: 10px; }
+  .category-card .isquare { width: 46px; height: 46px; border-radius: 13px; }
+  .category-card .isquare svg { width: 23px; height: 23px; }
+  .category-card .grow { flex: 1; min-width: 0; }
+  .category-card .name { font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .category-card .sub { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+  .category-card .status { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px; }
+  .category-card .status.active { background: rgba(22,163,74,.16); color: var(--success); }
+  .category-card .status.inactive { background: rgba(140,154,184,.18); color: var(--text-3); }
+  .category-card .actions { display: flex; gap: 4px; }
+  .category-card .actions .aicon { width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .category-card .actions .aicon:hover { background: var(--surface-elev); }
+  .category-card .actions svg { width: 18px; height: 18px; fill: var(--text-3); }
+
+  .fab { display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #2C68D7, #2563C7); color: #fff; font-size: 13.5px; font-weight: 700; padding: 13px 20px; border-radius: 16px; box-shadow: 0 8px 20px rgba(44,104,215,.4); cursor: pointer; }
+  .fabzone { display: flex; justify-content: flex-end; padding-right: 4px; margin-top: auto; }
+
+  .dialog-overlay { position: absolute; inset: 0; top: 30px; background: rgba(0,0,0,.55); z-index: 50; display: none; align-items: center; justify-content: center; padding: 16px; }
+  .dialog-overlay.open { display: flex; }
+  .dialog { background: var(--surface); border: 1px solid var(--border); border-radius: 22px; width: 100%; max-width: 310px; max-height: 520px; overflow-y: auto; box-shadow: 0 24px 64px rgba(0,0,0,.45); display: flex; flex-direction: column; }
+  .dialog-header { padding: 20px 20px 12px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .dialog-header h3 { font-size: 18px; font-weight: 800; color: var(--text); }
+  .dialog-header p { font-size: 13px; color: var(--text-3); line-height: 1.4; }
+  .dialog-body { padding: 0 20px; }
+  .dialog-actions { padding: 16px 20px 20px; display: flex; gap: 10px; }
+  .dialog-actions .btn { flex: 1; }
+  .view-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--divider); }
+  .view-row:last-child { border-bottom: none; }
+  .view-row .lead { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
+  .view-row .lead .isquare { width: 30px; height: 30px; border-radius: 9px; }
+  .view-row .lead .isquare svg { width: 15px; height: 15px; }
+  .view-row .label { font-size: 13px; color: var(--text-2); }
+  .view-row .value { font-size: 13px; font-weight: 700; color: var(--text); text-align: right; }
+  .field-icon { position: absolute; left: 12px; width: 18px; height: 18px; fill: var(--text-3); pointer-events: none; }
+  .field-icon.input-icon { bottom: 12px; }
+  .field-icon.textarea-icon { top: 36px; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M12 21l3.5-4.5c-.97-.74-2.18-1.16-3.5-1.16s-2.53.42-3.5 1.16L12 21zM12 3C7.31 3 3.07 4.69 0 7.55l1.93 2.43C4.48 7.9 8.01 6.4 12 6.4s7.52 1.5 10.07 3.58L24 7.55C20.93 4.69 16.69 3 12 3z"/></symbol>
+  <symbol id="i-batt" viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></symbol>
+  <symbol id="i-dash" viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></symbol>
+  <symbol id="i-cart" viewBox="0 0 24 24"><path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.13.12-.27.12-.42 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/></symbol>
+  <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M19.5 3.5 18 2l-1.5 1.5L15 2l-1.5 1.5L12 2l-1.5 1.5L9 2 7.5 3.5 6 2 4.5 3.5 3 2v20l1.5-1.5L6 22l1.5-1.5L9 22l1.5-1.5L12 22l1.5-1.5L15 22l1.5-1.5L18 22l1.5-1.5L21 22V2l-1.5 1.5zM19 19.09H5V4.91h14v14.18z"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="M20 2H4c-1 0-2 .9-2 2v3.01c0 .72.43 1.34 1 1.69V20c0 1.1 1.1 2 2 2h14c.9 0 2-.9 2-2V8.7c.57-.35 1-.97 1-1.69V4c0-1.1-1-2-2-2zm-5 12H9v-2h6v2zm5-7H4V4h16v3z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24"><path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></symbol>
+  <symbol id="i-del" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></symbol>
+  <symbol id="i-toggle-on" viewBox="0 0 24 24"><path d="M17 7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h10c2.76 0 5-2.24 5-5s-2.24-5-5-5zm0 8c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zM7 15c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3z"/></symbol>
+  <symbol id="i-toggle-off" viewBox="0 0 24 24"><path d="M17 7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h10c2.76 0 5-2.24 5-5s-2.24-5-5-5zM7 15c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3z"/></symbol>
+  <symbol id="i-food" viewBox="0 0 24 24"><path d="M18.06 22.99h1.66c.84 0 1.53-.64 1.63-1.46L23 5.05h-5V1h-1.97v4.05h-4.97l.3 2.34c1.71.47 3.31 1.32 4.27 2.26 1.44 1.42 2.43 2.89 2.43 5.79v7.55zM1 21.99V21h15.03v.99c0 .55-.45 1-1.01 1H2.01c-.56 0-1.01-.45-1.01-1zm15.03-7c0-8-15.03-8-15.03 0h15.03zM1.02 17h15v2h-15z"/></symbol>
+  <symbol id="i-drink" viewBox="0 0 24 24"><path d="M3 2l2.01 18.23C5.13 21.23 5.97 22 7 22h10c1.03 0 1.87-.77 1.99-1.77L21 2H3zm9 17c-1.66 0-3-1.34-3-3 0-2 3-5.4 3-5.4s3 3.4 3 5.4c0 1.66-1.34 3-3 3z"/></symbol>
+  <symbol id="i-cake" viewBox="0 0 24 24"><path d="M12 6c1.11 0 2-.9 2-2 0-.38-.1-.73-.29-1.03L12 0l-1.71 2.97c-.19.3-.29.65-.29 1.03 0 1.1.9 2 2 2zm4.6 9.99-1.07-1.07-1.08 1.07c-1.3 1.3-3.58 1.31-4.89 0l-1.07-1.07-1.09 1.07C6.75 16.64 5.88 17 4.96 17c-.73 0-1.4-.23-1.96-.61V21c0 .55.45 1 1 1h16c.55 0 1-.45 1-1v-4.61c-.56.38-1.23.61-1.96.61-.92 0-1.79-.36-2.44-1.01zM18 9h-5V7h-2v2H6c-1.66 0-3 1.34-3 3v1.54c0 1.08.88 1.96 1.96 1.96.52 0 1.02-.2 1.38-.57l2.14-2.13 2.13 2.13c.74.74 2.03.74 2.77 0l2.14-2.13 2.13 2.13c.37.36.87.57 1.39.57 1.08 0 1.96-.88 1.96-1.96V12C21 10.34 19.66 9 18 9z"/></symbol>
+  <symbol id="i-coffee" viewBox="0 0 24 24"><path d="M20 3H4v10c0 2.21 1.79 4 4 4h6c2.21 0 4-1.79 4-4v-3h2c1.11 0 2-.89 2-2V5c0-1.11-.89-2-2-2zm0 5h-2V5h2v3zM2 21h18v-2H2v2z"/></symbol>
+  <symbol id="i-tag" viewBox="0 0 24 24"><path d="m21.41 11.58-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58s1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41s-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/></symbol>
+</svg>
+
+<div class="page-head">
+  <div>
+    <h1>Categories — lib/ui/screens/categories_screen.dart</h1>
+    <p>Category list with status chips, product counts, and role-gated add/edit/delete/activate actions.</p>
+  </div>
+  <div class="role-switcher">
+    <button class="on" data-role="owner" onclick="setRole('owner')">Owner</button>
+    <button data-role="staff" onclick="setRole('staff')">Staff</button>
+  </div>
+  <button class="theme-toggle" onclick="toggleTheme()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
+    <span id="themeLabel">Light mode</span>
+  </button>
+</div>
+
+<div class="frames-legend">
+  <span class="role-chip role-owner" id="roleChip">Owner</span>
+  <span id="legendText">Owner can add, edit, delete, and activate/deactivate. Staff can view and activate/deactivate. Deactivation is blocked while products are assigned.</span>
+</div>
+
+<div class="frames">
+  <div class="frame-wrap">
+    <div class="frame-label" id="frameLabel">Categories — Owner</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="appbar">
+        <div class="back" onclick="history.back()" aria-label="Back"><svg><use href="#i-back"/></svg></div>
+        <div class="title"><h2>Categories</h2><div class="sub" id="roleSubtitle">Owner</div></div>
+        <div class="act" onclick="renderCategories()"><svg><use href="#i-more"/></svg></div>
+        <div class="avatar" id="avatar">OW</div>
+      </div>
+      <div class="screen">
+        <div class="screen-body">
+          <div class="stats-strip" id="statsStrip" onclick="selectStat(event)">
+            <div class="stat-card sel" data-stat="all"><svg width="18" height="18" style="fill:var(--primary)"><use href="#i-tag"/></svg><div class="num" id="statTotal">4</div><div class="lbl">Total</div></div>
+            <div class="stat-card" data-stat="active"><svg width="18" height="18" style="fill:var(--success)"><use href="#i-toggle-on"/></svg><div class="num" id="statActive">3</div><div class="lbl">Active</div></div>
+            <div class="stat-card" data-stat="inactive"><svg width="18" height="18" style="fill:var(--text-3)"><use href="#i-toggle-off"/></svg><div class="num" id="statInactive">1</div><div class="lbl">Inactive</div></div>
+          </div>
+
+          <div class="toolbar">
+            <div class="search"><svg><use href="#i-search"/></svg><input type="text" id="searchInput" placeholder="Search categories" oninput="renderCategories()"></div>
+            <div class="filterbtn">
+              <svg><use href="#i-filter"/></svg><select class="select" id="statusFilter" onchange="setStatus(this.value)" style="width:88px;border:0;background:transparent;padding:8px 0;color:var(--text-2);font-weight:600;font-size:12.5px;cursor:pointer;">
+                <option value="all">All</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="chips" id="chipRow" onclick="selectChip(event.target, 'status')">
+            <div class="chip on" data-group="status" data-value="all">All</div>
+            <div class="chip" data-group="status" data-value="active">Active</div>
+            <div class="chip" data-group="status" data-value="inactive">Inactive</div>
+          </div>
+
+          <div id="categoryList"></div>
+
+          <div class="fabzone" id="fabZone"><div class="fab" onclick="openCategoryModal()"><svg><use href="#i-plus"/></svg>Add Category</div></div>
+        </div>
+      </div>
+
+      <!-- Add/Edit Category dialog -->
+      <div class="dialog-overlay" id="categoryDialog" onclick="if(event.target===this)closeCategoryModal()">
+        <div class="dialog" onclick="event.stopPropagation()">
+          <div class="dialog-header">
+            <div class="icircle c-purple" id="categoryDialogIcon"><svg width="20" height="20"><use href="#i-plus"/></svg></div>
+            <h3 id="categoryDialogTitle">Add Category</h3>
+            <p id="categoryDialogHint">Enter the category name and tap Save.</p>
+          </div>
+          <div class="dialog-body">
+            <div class="field has-icon" style="margin-top:0">
+              <label>Category Name</label>
+              <svg class="field-icon input-icon"><use href="#i-tag"/></svg>
+              <input class="input" type="text" id="categoryName" placeholder="e.g. Desserts">
+            </div>
+          </div>
+          <div class="dialog-actions">
+            <button class="btn btn-outlined" onclick="closeCategoryModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="saveCategory()">Save</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- View Category dialog -->
+      <div class="dialog-overlay" id="viewDialog" onclick="if(event.target===this)closeViewModal()">
+        <div class="dialog" onclick="event.stopPropagation()">
+          <div class="dialog-header">
+            <div class="icircle c-blue" id="viewDialogIcon"><svg width="20" height="20"><use href="#i-tag"/></svg></div>
+            <h3 id="viewDialogTitle">Category</h3>
+          </div>
+          <div class="dialog-body">
+            <div class="view-row"><div class="lead"><div class="isquare c-neutral" id="viewNameIcon"><svg><use href="#i-tag"/></svg></div><span class="label">Name</span></div><span class="value" id="viewName"></span></div>
+            <div class="view-row"><div class="lead"><div class="isquare c-blue"><svg><use href="#i-box"/></svg></div><span class="label">Products</span></div><span class="value" id="viewCount"></span></div>
+            <div class="view-row"><div class="lead"><div class="isquare c-green" id="viewStatusIcon"><svg><use href="#i-toggle-on"/></svg></div><span class="label">Status</span></div><span class="value" id="viewStatus"></span></div>
+          </div>
+          <div class="dialog-actions">
+            <button class="btn btn-outlined" onclick="closeViewModal()">Close</button>
+            <button class="btn btn-primary" id="viewEditBtn" onclick="editViewedCategory()">Edit</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Delete dialog -->
+      <div class="dialog-overlay" id="deleteDialog" onclick="if(event.target===this)closeDeleteModal()">
+        <div class="dialog" onclick="event.stopPropagation()">
+          <div class="dialog-header">
+            <div class="icircle c-red"><svg width="20" height="20" style="fill:var(--error)"><use href="#i-del"/></svg></div>
+            <h3>Delete category</h3>
+            <p id="deleteDialogMsg">Delete this category?</p>
+          </div>
+          <div class="dialog-body"></div>
+          <div class="dialog-actions">
+            <button class="btn btn-outlined" onclick="closeDeleteModal()">Cancel</button>
+            <button class="btn btn-error" onclick="confirmDeleteCategory()">Delete</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Toggle status dialog -->
+      <div class="dialog-overlay" id="toggleDialog" onclick="if(event.target===this)closeToggleModal()">
+        <div class="dialog" onclick="event.stopPropagation()">
+          <div class="dialog-header">
+            <div class="icircle c-amber"><svg width="20" height="20"><use href="#i-toggle-off"/></svg></div>
+            <h3 id="toggleDialogTitle">Deactivate Category</h3>
+            <p id="toggleDialogMsg">Deactivate this category?</p>
+          </div>
+          <div class="dialog-body"></div>
+          <div class="dialog-actions">
+            <button class="btn btn-outlined" onclick="closeToggleModal()">Cancel</button>
+            <button class="btn btn-primary" id="toggleConfirmBtn" onclick="confirmToggleCategory()">Confirm</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes" id="frameNotes">Owner can edit, delete, and activate/deactivate categories. Staff can view and activate/deactivate. Deactivation is blocked when products are still assigned.</div>
+  </div>
+</div>
+
+<script src="mockup.js"></script>
+<script>
+let currentRole = 'owner';
+let categoryIdCounter = 5;
+let editingCategoryId = null;
+let deleteCategoryId = null;
+let viewingCategoryId = null;
+let selectedStatus = 'all';
+
+let categories = [
+  {id:1, name:'Meals', count:12, active:true},
+  {id:2, name:'Drinks', count:6, active:true},
+  {id:3, name:'Snacks', count:4, active:true},
+  {id:4, name:'Coffee', count:2, active:false},
+  {id:5, name:'Dessert', count:0, active:true}
+];
+
+const categoryMeta = {
+  'Meals':{icon:'#i-food', color:'c-amber'},
+  'Drinks':{icon:'#i-drink', color:'c-teal'},
+  'Snacks':{icon:'#i-cake', color:'c-pink'},
+  'Coffee':{icon:'#i-coffee', color:'c-amber'},
+  'default':{icon:'#i-tag', color:'c-blue'}
+};
+
+function setRole(role) {
+  currentRole = role;
+  document.querySelectorAll('.role-switcher button').forEach(b => b.classList.toggle('on', b.dataset.role === role));
+  const chip = document.getElementById('roleChip');
+  chip.className = 'role-chip ' + (role === 'owner' ? 'role-owner' : 'role-staff');
+  chip.textContent = role.charAt(0).toUpperCase() + role.slice(1);
+  document.getElementById('legendText').textContent = role === 'owner'
+    ? 'Owner can add, edit, delete, and activate/deactivate. Deactivation is blocked while products are assigned.'
+    : 'Staff can view categories and activate/deactivate. Deactivation is blocked while products are assigned.';
+  document.getElementById('frameLabel').textContent = 'Categories — ' + (role === 'owner' ? 'Owner' : 'Staff');
+  document.getElementById('roleSubtitle').textContent = role === 'owner' ? 'Owner' : 'Staff';
+  document.getElementById('avatar').textContent = role === 'owner' ? 'OW' : 'ST';
+  document.getElementById('frameNotes').textContent = role === 'owner'
+    ? 'Owner can edit, delete, and activate/deactivate categories. Deactivation is blocked while products are assigned.'
+    : 'Staff can view and activate/deactivate categories. Deactivation is blocked while products are assigned.';
+
+  document.getElementById('fabZone').style.display = role === 'owner' ? 'flex' : 'none';
+  renderCategories();
+}
+
+function setStatus(val) {
+  selectedStatus = val;
+  document.getElementById('statusFilter').value = val;
+  document.querySelectorAll('#chipRow .chip').forEach(c => c.classList.toggle('on', c.dataset.value === val));
+  document.querySelectorAll('.stat-card').forEach(c => c.classList.toggle('sel', c.dataset.stat === val));
+  renderCategories();
+}
+
+function selectChip(el, group) {
+  if (!el.dataset.group) return;
+  setStatus(el.dataset.value);
+}
+
+function selectStat(e) {
+  const card = e.target.closest('.stat-card');
+  if (!card) return;
+  setStatus(card.dataset.stat);
+}
+
+function syncStatsToChip(val) {
+  document.querySelectorAll('.stat-card').forEach(c => c.classList.toggle('sel', c.dataset.stat === val));
+}
+
+function metaFor(name) {
+  const n = name.toLowerCase();
+  if (n.includes('meal') || n.includes('rice') || n.includes('ulam') || n.includes('food')) return categoryMeta['Meals'];
+  if (n.includes('drink') || n.includes('beverage') || n.includes('juice') || n.includes('tea') || n.includes('iced') || n.includes('soda')) return categoryMeta['Drinks'];
+  if (n.includes('snack') || n.includes('merienda') || n.includes('cake') || n.includes('dessert') || n.includes('bread')) return categoryMeta['Snacks'];
+  if (n.includes('coffee')) return categoryMeta['Coffee'];
+  return categoryMeta['default'];
+}
+
+function updateStats() {
+  const total = categories.length;
+  const active = categories.filter(c => c.active).length;
+  const inactive = total - active;
+  document.getElementById('statTotal').textContent = total;
+  document.getElementById('statActive').textContent = active;
+  document.getElementById('statInactive').textContent = inactive;
+}
+
+function filteredCategories() {
+  const query = document.getElementById('searchInput').value.trim().toLowerCase();
+  return categories.filter(c => {
+    if (query && !c.name.toLowerCase().includes(query)) return false;
+    if (selectedStatus === 'active') return c.active;
+    if (selectedStatus === 'inactive') return !c.active;
+    return true;
+  });
+}
+
+function renderCategories() {
+  const list = filteredCategories();
+  const container = document.getElementById('categoryList');
+  if (list.length === 0) {
+    container.innerHTML = `<div class="card" style="padding:28px 14px"><div class="center-screen" style="min-height:120px"><div class="icon-lg"><svg><use href="#i-tag"/></svg></div><div class="title">No categories found</div><div class="msg">Try a different search or filter.</div></div></div>`;
+    updateStats();
+    return;
+  }
+  container.innerHTML = list.map(c => {
+    const m = metaFor(c.name);
+    return `<div class="category-card" onclick="openViewModal(${c.id})">
+      <div class="isquare ${m.color}"><svg><use href="${m.icon}"/></svg></div>
+      <div class="grow">
+        <div class="name">${escapeHtml(c.name)}</div>
+        <div class="sub">${c.count} product${c.count === 1 ? '' : 's'}</div>
+      </div>
+      <span class="status ${c.active ? 'active' : 'inactive'}">${c.active ? 'Active' : 'Inactive'}</span>
+      <div class="actions" style="display:flex;">
+        <div class="aicon" onclick="categoryMenu(event, ${c.id})" title="Category options" style="width:34px;height:34px;"><svg style="width:18px;height:18px"><use href="#i-more"/></svg></div>
+      </div>
+    </div>`;
+  }).join('');
+  updateStats();
+}
+
+function categoryMenu(e, id) {
+  const c = categories.find(x => x.id === id);
+  const canEdit = currentRole === 'owner';
+  const canDelete = currentRole === 'owner';
+  const canToggle = true; // owner and staff can toggle
+  const items = [
+    { label: 'View', icon: '<svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>', action: `openViewModal(${id})` },
+    ...(canEdit ? [{ label: 'Edit', icon: '<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>', action: `openCategoryModal(${id})` }] : []),
+    ...(canToggle ? [{ label: c.active ? 'Deactivate' : 'Activate', icon: `<svg viewBox="0 0 24 24"><path d="M17 7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h10c2.76 0 5-2.24 5-5s-2.24-5-5-5zm0 8c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zM7 15c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3z"/></svg>`, action: `toggleCategoryStatus(${id})` }] : []),
+    ...(canDelete ? [{ label: 'Delete', icon: '<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>', cls: 'del', action: `openDeleteModal(${id})` }] : [])
+  ];
+  showMenu(e, items);
+}
+
+function openCategoryModal(id) {
+  editingCategoryId = id || null;
+  const title = document.getElementById('categoryDialogTitle');
+  const icon = document.getElementById('categoryDialogIcon');
+  const hint = document.getElementById('categoryDialogHint');
+  title.textContent = id ? 'Edit Category' : 'Add Category';
+  hint.textContent = id ? 'Update the name and tap Save.' : 'Enter the category name and tap Save.';
+  icon.innerHTML = '<svg width="20" height="20"><use href="#' + (id ? 'i-edit' : 'i-plus') + '"/></svg>';
+  icon.className = 'icircle c-' + (id ? 'green' : 'purple');
+  const c = id ? categories.find(x => x.id === id) : null;
+  document.getElementById('categoryName').value = c ? c.name : '';
+  document.getElementById('categoryDialog').classList.add('open');
+}
+
+function closeCategoryModal() {
+  document.getElementById('categoryDialog').classList.remove('open');
+  editingCategoryId = null;
+}
+
+function saveCategory() {
+  const name = document.getElementById('categoryName').value.trim();
+  if (!name) { showToast('Category name is required', 'error'); return; }
+  const existing = categories.find(c => c.name.toLowerCase() === name.toLowerCase() && c.id !== editingCategoryId);
+  if (existing) { showToast('A category with this name already exists.', 'error'); return; }
+  if (editingCategoryId) {
+    const c = categories.find(x => x.id === editingCategoryId);
+    c.name = name;
+    showToast('Category updated', 'success');
+  } else {
+    categories.unshift({id: categoryIdCounter++, name, count: 0, active: true});
+    showToast('Category created', 'success');
+  }
+  closeCategoryModal();
+  renderCategories();
+}
+
+function openViewModal(id) {
+  viewingCategoryId = id;
+  const c = categories.find(x => x.id === id);
+  const m = metaFor(c.name);
+  document.getElementById('viewDialogTitle').textContent = c.name;
+  document.getElementById('viewName').textContent = c.name;
+  document.getElementById('viewCount').textContent = c.count + ' product' + (c.count === 1 ? '' : 's');
+  document.getElementById('viewStatus').textContent = c.active ? 'Active' : 'Inactive';
+  const icon = document.getElementById('viewDialogIcon');
+  icon.className = 'icircle ' + m.color;
+  icon.innerHTML = '<svg width="20" height="20"><use href="' + m.icon + '"/></svg>';
+  const nameIcon = document.getElementById('viewNameIcon');
+  nameIcon.className = 'isquare ' + m.color;
+  nameIcon.innerHTML = '<svg><use href="' + m.icon + '"/></svg>';
+  const statusIcon = document.getElementById('viewStatusIcon');
+  statusIcon.className = 'isquare ' + (c.active ? 'c-green' : 'c-neutral');
+  statusIcon.innerHTML = '<svg><use href="#i-toggle-' + (c.active ? 'on' : 'off') + '"/></svg>';
+  document.getElementById('viewEditBtn').style.display = currentRole === 'owner' ? '' : 'none';
+  document.getElementById('viewDialog').classList.add('open');
+}
+
+function closeViewModal() {
+  document.getElementById('viewDialog').classList.remove('open');
+  viewingCategoryId = null;
+}
+
+function editViewedCategory() {
+  const id = viewingCategoryId;
+  closeViewModal();
+  openCategoryModal(id);
+}
+
+let pendingToggleId = null;
+
+function toggleCategoryStatus(id) {
+  const c = categories.find(x => x.id === id);
+  if (!c) return;
+
+  if (c.active && c.count > 0) {
+    showToast(`Cannot deactivate "${c.name}": it still has ${c.count} product${c.count === 1 ? '' : 's'}.`, 'error');
+    return;
+  }
+
+  pendingToggleId = id;
+  const title = document.getElementById('toggleDialogTitle');
+  const msg = document.getElementById('toggleDialogMsg');
+  title.textContent = c.active ? 'Deactivate Category' : 'Activate Category';
+  msg.innerHTML = c.active
+    ? `Deactivate <b>${escapeHtml(c.name)}</b>? It will be hidden from POS but keep its products.`
+    : `Activate <b>${escapeHtml(c.name)}</b>? It will be visible in POS again.`;
+  document.getElementById('toggleDialog').classList.add('open');
+}
+
+function closeToggleModal() {
+  document.getElementById('toggleDialog').classList.remove('open');
+  pendingToggleId = null;
+}
+
+function confirmToggleCategory() {
+  if (pendingToggleId == null) return;
+  const c = categories.find(x => x.id === pendingToggleId);
+  if (c) {
+    c.active = !c.active;
+    showToast(`Category ${c.active ? 'activated' : 'deactivated'}`, c.active ? 'success' : 'info');
+    renderCategories();
+  }
+  closeToggleModal();
+}
+
+function openDeleteModal(id) {
+  deleteCategoryId = id;
+  const c = categories.find(x => x.id === id);
+  document.getElementById('deleteDialogMsg').innerHTML = `Delete <b>${escapeHtml(c.name)}</b>? Products in this category will become uncategorized.`;
+  document.getElementById('deleteDialog').classList.add('open');
+}
+
+function closeDeleteModal() {
+  document.getElementById('deleteDialog').classList.remove('open');
+  deleteCategoryId = null;
+}
+
+function confirmDeleteCategory() {
+  if (deleteCategoryId) {
+    categories = categories.filter(c => c.id !== deleteCategoryId);
+    showToast('Category deleted', 'success');
+    renderCategories();
+  }
+  closeDeleteModal();
+}
+
+setRole('owner');
+</script>
+</body>
+</html>

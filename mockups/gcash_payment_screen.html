@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinoy POS — GCash Payment Screen (lib/ui/screens/gcash_payment_screen.dart)</title>
+<link rel="stylesheet" href="mockup.css">
+<style>
+  .frames-legend { max-width: 900px; margin: 0 auto 24px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; color: var(--text-2); font-size: 13px; }
+  .qr { width: 140px; height: 140px; background: #fff; border-radius: 14px; margin: 16px auto; display: flex; align-items: center; justify-content: center; color: #000; font-size: 12px; text-align: center; padding: 8px; }
+  .summary-line { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--divider); }
+  .summary-line.total { border-bottom: 0; font-size: 18px; font-weight: 800; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M12 21l3.5-4.5c-.97-.74-2.18-1.16-3.5-1.16s-2.53.42-3.5 1.16L12 21zM12 3C7.31 3 3.07 4.69 0 7.55l1.93 2.43C4.48 7.9 8.01 6.4 12 6.4s7.52 1.5 10.07 3.58L24 7.55C20.93 4.69 16.69 3 12 3z"/></symbol>
+  <symbol id="i-batt" viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></symbol>
+  <symbol id="i-qr" viewBox="0 0 24 24"><path d="M3 11h8V3H3v8zm2-6h4v4H5V5zM3 21h8v-8H3v8zm2-6h4v4H5v-4zM13 3v8h8V3h-8zm6 6h-4V5h4v4zM13 13h2v2h-2zM15 15h2v2h-2zM13 17h2v2h-2zM17 13h2v2h-2zM19 15h2v2h-2zM17 17h2v2h-2zM15 19h2v2h-2zM19 19h2v2h-2z"/></symbol>
+  <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M19.5 3.5 18 2l-1.5 1.5L15 2l-1.5 1.5L12 2l-1.5 1.5L9 2 7.5 3.5 6 2 4.5 3.5 3 2v20l1.5-1.5L6 22l1.5-1.5L9 22l1.5-1.5L12 22l1.5-1.5L15 22l1.5-1.5L18 22l1.5-1.5L21 22V2l-1.5 1.5zM19 19.09H5V4.91h14v14.18z"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></symbol>
+</svg>
+
+<div class="page-head">
+  <div>
+    <h1>GCash Payment — lib/ui/screens/gcash_payment_screen.dart</h1>
+    <p>GCash QR payment flow: amount, QR code, customer info, reference, payment proof, review, and confirmation.</p>
+  </div>
+  <button class="theme-toggle" onclick="toggleTheme()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
+    <span id="themeLabel">Light mode</span>
+  </button>
+</div>
+
+<div class="frames">
+  <div class="frame-wrap">
+    <div class="frame-label">GCash Payment</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="appbar">
+        <div class="back"><svg><use href="#i-back"/></svg></div>
+        <div class="title"><h2>GCash Payment</h2></div>
+      </div>
+      <div class="screen">
+        <div class="screen-body">
+          <div class="card" style="text-align:center;">
+            <div style="font-size:14px;color:var(--text-2);">Total amount</div>
+            <div style="font-size:34px;font-weight:800;">₱210.00</div>
+            <div class="qr"><svg width="80" height="80" fill="#000"><use href="#i-qr"/></svg><br>GCash QR</div>
+            <div style="font-size:12px;color:var(--text-2);">Scan the QR code to pay via GCash.</div>
+          </div>
+
+          <div class="card">
+            <div class="field"><label>Customer Name</label><input class="input" type="text" placeholder="Enter customer name"></div>
+            <div class="field" style="margin-top:12px;"><label>GCash Reference Number</label><input class="input" type="text" placeholder="e.g. 1234567890"></div>
+          </div>
+
+          <div class="card" style="display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="showToast('Payment proof attached', 'info')">
+            <div class="isquare c-blue"><svg><use href="#i-image"/></svg></div>
+            <div class="grow"><div class="name">Attach payment proof</div><div class="sub">Optional depending on settings</div></div>
+            <div class="trailing"><svg><use href="#i-image"/></svg></div>
+          </div>
+
+          <div class="card">
+            <div class="summary-line"><span>Subtotal</span><span>₱210.00</span></div>
+            <div class="summary-line total"><span>Total</span><span>₱210.00</span></div>
+          </div>
+
+          <button class="btn btn-primary" onclick="showToast('Review payment', 'info')">Review Payment</button>
+          <div style="font-size:11px;color:var(--text-3);text-align:center;margin-top:12px;">Staff GCash payments may require owner verification.</div>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes">Phone portrait layout with total, QR, customer/reference fields, proof attachment, order summary, and review. Wide layout splits QR and details into two columns.</div>
+  </div>
+</div>
+
+<script src="mockup.js"></script>
+</body>
+</html>

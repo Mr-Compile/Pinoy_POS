@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinoy POS — Sales Analytics / Reports Screen (lib/ui/screens/sales_analytics_screen.dart)</title>
+<link rel="stylesheet" href="mockup.css">
+<style>
+  .frames-legend { max-width: 900px; margin: 0 auto 24px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; color: var(--text-2); font-size: 13px; }
+  .stat { padding: 14px 10px; }
+  .mini-bars { display: flex; align-items: flex-end; gap: 6px; height: 90px; padding: 6px 0; }
+  .bar { flex: 1; border-radius: 4px 4px 0 0; background: var(--primary); }
+  .progress-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; }
+  .progress-track { flex: 1; height: 6px; border-radius: 3px; background: var(--surface-elev); overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 3px; background: var(--info); }
+  .progress-row .pct { font-size: 11px; font-weight: 700; color: var(--info); min-width: 34px; text-align: right; }
+  .transaction + .transaction { border-top: 1px solid var(--divider); }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M12 21l3.5-4.5c-.97-.74-2.18-1.16-3.5-1.16s-2.53.42-3.5 1.16L12 21zM12 3C7.31 3 3.07 4.69 0 7.55l1.93 2.43C4.48 7.9 8.01 6.4 12 6.4s7.52 1.5 10.07 3.58L24 7.55C20.93 4.69 16.69 3 12 3z"/></symbol>
+  <symbol id="i-batt" viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></symbol>
+  <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M19.5 3.5 18 2l-1.5 1.5L15 2l-1.5 1.5L12 2l-1.5 1.5L9 2 7.5 3.5 6 2 4.5 3.5 3 2v20l1.5-1.5L6 22l1.5-1.5L9 22l1.5-1.5L12 22l1.5-1.5L15 22l1.5-1.5L18 22l1.5-1.5L21 22V2l-1.5 1.5zM19 19.09H5V4.91h14v14.18z"/></symbol>
+</svg>
+
+<div class="page-head">
+  <div>
+    <h1>Reports — lib/ui/screens/sales_analytics_screen.dart</h1>
+    <p>Sales analytics hub: summary cards, period filters, trend chart, payment breakdown, top products, categories, staff, and recent transactions.</p>
+  </div>
+  <button class="theme-toggle" onclick="toggleTheme()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
+    <span id="themeLabel">Light mode</span>
+  </button>
+</div>
+
+<div class="frames">
+  <div class="frame-wrap">
+    <div class="frame-label">Sales Analytics / Reports</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="appbar">
+        <div class="title"><h2>Reports</h2></div>
+        <div class="act"><svg><use href="#i-refresh"/></svg></div>
+        <div class="act"><svg><use href="#i-download"/></svg></div>
+      </div>
+      <div class="screen">
+        <div class="screen-body">
+          <div class="stats">
+            <div class="stat"><div class="num">₱12,450</div><div class="lbl">Total Sales</div></div>
+            <div class="stat"><div class="num">24</div><div class="lbl">Transactions</div></div>
+            <div class="stat"><div class="num">₱519</div><div class="lbl">Avg Sale</div></div>
+          </div>
+
+          <div class="chips">
+            <div class="chip on" data-group="period" onclick="selectChip(this, 'period')">Today</div>
+            <div class="chip" data-group="period" onclick="selectChip(this, 'period')">Yesterday</div>
+            <div class="chip" data-group="period" onclick="selectChip(this, 'period')">This Week</div>
+            <div class="chip" data-group="period" onclick="selectChip(this, 'period')">This Month</div>
+          </div>
+
+          <div class="card"><h3 style="font-size:14px;margin-bottom:12px;">Sales Trend</h3><div class="mini-bars"><div class="bar" style="height:40%"></div><div class="bar" style="height:60%"></div><div class="bar" style="height:30%"></div><div class="bar" style="height:80%"></div><div class="bar" style="height:55%"></div><div class="bar" style="height:90%"></div><div class="bar" style="height:70%"></div></div></div>
+
+          <div class="card"><h3 style="font-size:14px;margin-bottom:12px;">Payment Methods</h3>
+            <div class="progress-row"><div class="grow"><div class="pay-name" style="font-size:13px;font-weight:600;">Cash</div><div class="progress-track"><div class="progress-fill" style="width:45%"></div></div></div><div class="pct">45%</div></div>
+            <div class="progress-row"><div class="grow"><div class="pay-name" style="font-size:13px;font-weight:600;">GCash</div><div class="progress-track"><div class="progress-fill" style="width:35%"></div></div></div><div class="pct">35%</div></div>
+            <div class="progress-row"><div class="grow"><div class="pay-name" style="font-size:13px;font-weight:600;">Card</div><div class="progress-track"><div class="progress-fill" style="width:20%"></div></div></div><div class="pct">20%</div></div>
+          </div>
+
+          <div class="card"><h3 style="font-size:14px;margin-bottom:12px;">Top Products</h3>
+            <div class="transaction"><div class="row" style="padding:10px 0;"><div class="thumb">🍗</div><div class="grow"><div class="name">Chicken Adobo Rice</div><div class="sub">45 sold</div></div><div>₱3,600</div></div></div>
+            <div class="transaction"><div class="row" style="padding:10px 0;"><div class="thumb">🥤</div><div class="grow"><div class="name">Iced Tea</div><div class="sub">32 sold</div></div><div>₱800</div></div></div>
+          </div>
+
+          <div class="card"><h3 style="font-size:14px;margin-bottom:12px;">Recent Transactions</h3>
+            <div class="transaction"><div class="row" style="padding:10px 0;"><div class="grow"><div class="name">20260910-0008</div><div class="sub">09:42 AM · Maria Reyes</div></div><div class="name">₱210</div><span class="pill pill-green">Paid</span></div></div>
+            <div class="transaction"><div class="row" style="padding:10px 0;"><div class="grow"><div class="name">20260910-0007</div><div class="sub">09:35 AM · Walk-in</div></div><div class="name">₱95</div><span class="pill pill-blue">GCash</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes">Reports hub with summary cards, period chips, sales trend, payment breakdown, top products, categories, staff performance, and recent transactions. Export action in app bar.</div>
+  </div>
+</div>
+
+<script src="mockup.js"></script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinoy POS — Profile Screen (lib/ui/screens/profile_screen.dart)</title>
+<link rel="stylesheet" href="mockup.css">
+<style>
+  .frames-legend { max-width: 900px; margin: 0 auto 24px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; color: var(--text-2); font-size: 13px; }
+  .profile-head { text-align: center; padding: 24px 18px; }
+  .tile { display: flex; align-items: center; gap: 12px; padding: 12px 0; }
+  .tile + .tile { border-top: 1px solid var(--divider); }
+  .tile .grow { flex: 1; }
+  .pill { background: rgba(22,163,74,.16); color: var(--success); border-color: rgba(22,163,74,.4); }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M12 21l3.5-4.5c-.97-.74-2.18-1.16-3.5-1.16s-2.53.42-3.5 1.16L12 21zM12 3C7.31 3 3.07 4.69 0 7.55l1.93 2.43C4.48 7.9 8.01 6.4 12 6.4s7.52 1.5 10.07 3.58L24 7.55C20.93 4.69 16.69 3 12 3z"/></symbol>
+  <symbol id="i-batt" viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></symbol>
+  <symbol id="i-person" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></symbol>
+  <symbol id="i-at" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm5-8c0 2.76-2.24 5-5 5s-5-2.24-5-5 2.24-5 5-5 5 2.24 5 5zm-5-3c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 1 3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM9 10H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z"/></symbol>
+  <symbol id="i-login" viewBox="0 0 24 24"><path d="M11 7 9.6 8.4l2.6 2.6H2v2h10.2l-2.6 2.6L11 17l5-5-5-5zM20 19h-8v2h8c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-8v2h8v14z"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M8.59 16.59 13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></symbol>
+</svg>
+
+<div class="page-head">
+  <div>
+    <h1>Profile — lib/ui/screens/profile_screen.dart</h1>
+    <p>Authenticated user profile with edit action and read-only account information.</p>
+  </div>
+  <button class="theme-toggle" onclick="toggleTheme()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
+    <span id="themeLabel">Light mode</span>
+  </button>
+</div>
+
+<div class="frames">
+  <div class="frame-wrap">
+    <div class="frame-label">Profile</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="appbar">
+        <div class="back"><svg><use href="#i-back"/></svg></div>
+        <div class="title"><h2>Profile</h2></div>
+      </div>
+      <div class="screen">
+        <div class="screen-body">
+          <div class="card profile-head">
+            <div class="avatar" style="width:90px;height:90px;font-size:34px;margin:0 auto 14px;">J</div>
+            <div style="font-size:22px;font-weight:800;">Juan Dela Cruz</div>
+            <div style="font-size:13px;color:var(--text-2);">@juan</div>
+            <span class="pill" style="margin-top:10px;">Owner</span>
+          </div>
+
+          <button class="btn btn-primary" style="background:linear-gradient(135deg,var(--primary),var(--info));" onclick="showToast('Edit profile', 'info')">Edit Profile</button>
+
+          <div class="section-title">Account Information</div>
+          <div class="card">
+            <div class="tile"><div class="isquare c-blue"><svg><use href="#i-person"/></svg></div><div class="grow"><div class="name">Full Name</div><div class="sub">Juan Dela Cruz</div></div><svg><use href="#i-chevron"/></svg></div>
+            <div class="tile"><div class="isquare c-purple"><svg><use href="#i-at"/></svg></div><div class="grow"><div class="name">Username</div><div class="sub">juan</div></div><svg><use href="#i-chevron"/></svg></div>
+            <div class="tile"><div class="isquare c-green"><svg><use href="#i-shield"/></svg></div><div class="grow"><div class="name">Role</div><div class="sub">Owner</div></div></div>
+            <div class="tile"><div class="isquare c-amber"><svg><use href="#i-calendar"/></svg></div><div class="grow"><div class="name">Member Since</div><div class="sub">Sep 1, 2025</div></div></div>
+            <div class="tile"><div class="isquare c-teal"><svg><use href="#i-login"/></svg></div><div class="grow"><div class="name">Last Login</div><div class="sub">Sep 10, 2026 · 09:30 AM</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes">Profile card with avatar, name, username, role pill, Edit Profile action, and account information rows. Password/PIN management moved to Settings hub.</div>
+  </div>
+</div>
+
+<script src="mockup.js"></script>
+</body>
+</html>

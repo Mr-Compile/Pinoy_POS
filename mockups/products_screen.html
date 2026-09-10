@@ -21,6 +21,9 @@
 
   .toolbar { display: flex; gap: 8px; }
   .search { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; display: flex; align-items: center; gap: 8px; color: var(--text-3); font-size: 13px; }
+  .search svg { width: 16px; height: 16px; fill: var(--text-3); }
+  .search input { flex: 1; background: transparent; border: none; color: var(--text); font-size: 13px; outline: none; min-width: 0; padding: 0; }
+  .search input::placeholder { color: var(--text-3); }
   .filterbtn { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 0 12px; display: flex; align-items: center; gap: 6px; color: var(--text-2); font-size: 12.5px; font-weight: 600; }
 
   .chips { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -42,6 +45,32 @@
 
   .fab { display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #2C68D7, #2563C7); color: #fff; font-size: 13.5px; font-weight: 700; padding: 13px 20px; border-radius: 16px; box-shadow: 0 8px 20px rgba(44,104,215,.4); cursor: pointer; }
   .fabzone { display: flex; justify-content: flex-end; padding-right: 4px; margin-top: auto; }
+
+  .dialog-overlay { position: absolute; inset: 0; top: 30px; background: rgba(0,0,0,.55); z-index: 50; display: none; align-items: center; justify-content: center; padding: 16px; }
+  .dialog-overlay.open { display: flex; }
+  .dialog { background: var(--surface); border: 1px solid var(--border); border-radius: 22px; width: 100%; max-width: 310px; max-height: 520px; overflow-y: auto; box-shadow: 0 24px 64px rgba(0,0,0,.45); display: flex; flex-direction: column; }
+  .dialog-header { padding: 20px 20px 12px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .dialog-header .icircle { background: var(--surface-elev); }
+  .dialog-header h3 { font-size: 18px; font-weight: 800; color: var(--text); }
+  .dialog-header p { font-size: 13px; color: var(--text-3); line-height: 1.4; }
+  .dialog-body { padding: 0 20px; }
+  .dialog-actions { padding: 16px 20px 20px; display: flex; gap: 10px; }
+  .dialog-actions .btn { flex: 1; }
+  .view-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--divider); }
+  .view-row:last-child { border-bottom: none; }
+  .view-row .lead { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
+  .view-row .lead .isquare { width: 30px; height: 30px; border-radius: 9px; }
+  .view-row .lead .isquare svg { width: 15px; height: 15px; }
+  .view-row .label { font-size: 13px; color: var(--text-2); }
+  .view-row .value { font-size: 13px; font-weight: 700; color: var(--text); text-align: right; }
+  .img-picker { width: 120px; height: 120px; margin: 0 auto 16px; border-radius: 14px; border: 1px dashed var(--border); background: var(--surface-elev); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: var(--text-2); font-size: 12px; font-weight: 600; cursor: pointer; position: relative; overflow: hidden; }
+  .img-picker .emoji { font-size: 42px; line-height: 1; }
+  .img-picker .cam { position: absolute; bottom: 6px; right: 6px; width: 26px; height: 26px; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+  .img-picker .cam svg { width: 14px; height: 14px; fill: #fff; }
+  .helper { font-size: 11.5px; color: var(--text-3); margin-top: 4px; }
+  .field-icon { position: absolute; left: 12px; width: 18px; height: 18px; fill: var(--text-3); pointer-events: none; }
+  .field-icon.input-icon { bottom: 12px; }
+  .field-icon.textarea-icon { top: 36px; }
 </style>
 </head>
 <body>
@@ -62,6 +91,12 @@
   <symbol id="i-del" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></symbol>
   <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 5.99 19.53 19H4.47L12 5.99M12 2 1 21h22L12 2zm1 14h-2v2h2v-2zm0-6h-2v4h2v-4z"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/><path d="M20 4h-3.17L15 2H9L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-5 11.5V13H9.5v2.5H7V13h-2.5v-2H7V8.5h2.5V11H13V8.5h2.5V11H17c.55 0 1 .45 1 1v2.5h-3.5V13z"/></symbol>
+  <symbol id="i-category" viewBox="0 0 24 24"><path d="m21.41 11.58-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58s1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41s-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/></symbol>
+  <symbol id="i-cash" viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.89 2.4 1.88H17c.05-1.98-1.52-3.31-3.9-3.49V4h-3v2.18C8.14 6.54 6.5 7.73 6.5 9.64c0 2.26 2.02 3.19 4.5 3.82 2.61.68 3 .98 3 1.79 0 .77-.7 1.49-2.55 1.49-1.69 0-2.73-.65-2.73-1.65H6c.05 2.03 1.66 3.41 4.05 3.56V21h3v-2.15c2.28-.24 3.77-1.48 3.77-3.1 0-2.36-2.05-3.35-4.02-3.92z"/></symbol>
+  <symbol id="i-inventory" viewBox="0 0 24 24"><path d="M20 2H4c-1 0-2 .9-2 2v3.01c0 .72.43 1.34 1 1.69V20c0 1.1 1.1 2 2 2h14c.9 0 2-.9 2-2V8.7c.57-.35 1-.97 1-1.69V4c0-1.1-1-2-2-2zm-5 12H9v-2h6v2zm5-7H4V4h16v3z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></symbol>
+  <symbol id="i-error" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></symbol>
 </svg>
 
 <div class="page-head">
@@ -91,52 +126,34 @@
       <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
       <div class="appbar">
         <div class="title"><h2>Products</h2><div class="sub" id="roleSubtitle">Owner</div></div>
-        <div class="act" onclick="showToast('Refresh products', 'info')"><svg><use href="#i-more"/></svg></div>
+        <div class="act" onclick="renderProducts()"><svg><use href="#i-more"/></svg></div>
         <div class="avatar" id="avatar">OW</div>
       </div>
       <div class="screen">
         <div class="screen-body">
           <div class="stats" id="statsRow">
-            <div class="stat"><div class="num">24</div><div class="lbl">Products</div></div>
-            <div class="stat"><div class="num" style="color:var(--warning)">3</div><div class="lbl">Low stock</div></div>
-            <div class="stat"><div class="num" style="color:var(--error)">1</div><div class="lbl">Out of stock</div></div>
+            <div class="stat"><div class="num" id="statTotal">24</div><div class="lbl">Products</div></div>
+            <div class="stat"><div class="num" style="color:var(--warning)" id="statLow">3</div><div class="lbl">Low stock</div></div>
+            <div class="stat"><div class="num" style="color:var(--error)" id="statOut">1</div><div class="lbl">Out of stock</div></div>
           </div>
           <div class="toolbar">
-            <div class="search"><svg><use href="#i-search"/></svg>Search products</div>
-            <div class="filterbtn"><svg><use href="#i-filter"/></svg>All</div>
+            <div class="search"><svg><use href="#i-search"/></svg><input type="text" id="searchInput" placeholder="Search products" oninput="renderProducts()"></div>
+            <div class="filterbtn"><svg><use href="#i-filter"/></svg><select class="select" id="categoryFilter" onchange="setCategory(this.value)" style="width:92px;border:0;background:transparent;padding:8px 0;color:var(--text-2);font-weight:600;font-size:12.5px;cursor:pointer;"><option value="All">All</option><option value="Meals">Meals</option><option value="Drinks">Drinks</option><option value="Snacks">Snacks</option><option value="Coffee">Coffee</option><option value="Dessert">Dessert</option></select></div>
           </div>
           <div class="chips" id="chipRow" onclick="selectChip(event.target, 'stock')">
             <div class="chip on" data-group="stock">All</div>
             <div class="chip" data-group="stock">Low stock</div>
             <div class="chip" data-group="stock">Out of stock</div>
           </div>
-          <div class="card" id="productList">
-            <div class="product-row" data-visible="owner staff">
-              <div class="thumb">🍗</div>
-              <div class="grow"><div class="name">Chicken Adobo Rice</div><div class="sub"><span class="pill pill-blue">Meals</span> Stock: 18</div></div>
-              <div class="price">₱80.00</div>
-              <div class="actions owner-actions"><div class="aicon" onclick="showToast('Edit', 'info')"><svg><use href="#i-edit"/></svg></div><div class="aicon del" onclick="showToast('Delete', 'error')"><svg><use href="#i-del"/></svg></div></div>
+          <div class="card" id="productListCard">
+            <div class="card-head" style="padding: 14px 14px 0;">
+              <div class="isquare c-purple" id="cardIcon"><svg><use href="#i-box"/></svg></div>
+              <h3>All Products</h3>
+              <span class="pill pill-blue" id="productCountPill">4 items</span>
             </div>
-            <div class="product-row" data-visible="owner staff">
-              <div class="thumb">🍚</div>
-              <div class="grow"><div class="name">Pastil</div><div class="sub"><span class="pill pill-blue">Snacks</span> Stock: 45</div></div>
-              <div class="price">₱10.00</div>
-              <div class="actions owner-actions"><div class="aicon" onclick="showToast('Edit', 'info')"><svg><use href="#i-edit"/></svg></div><div class="aicon del" onclick="showToast('Delete', 'error')"><svg><use href="#i-del"/></svg></div></div>
-            </div>
-            <div class="product-row" data-visible="owner staff">
-              <div class="thumb">🥤</div>
-              <div class="grow"><div class="name">Iced Tea</div><div class="sub"><span class="pill pill-blue">Drinks</span> Stock: 32</div></div>
-              <div class="price">₱25.00</div>
-              <div class="actions owner-actions"><div class="aicon" onclick="showToast('Edit', 'info')"><svg><use href="#i-edit"/></svg></div><div class="aicon del" onclick="showToast('Delete', 'error')"><svg><use href="#i-del"/></svg></div></div>
-            </div>
-            <div class="product-row" data-visible="owner staff">
-              <div class="thumb">🍌</div>
-              <div class="grow"><div class="name">Banana Cue</div><div class="sub"><span class="pill pill-blue">Snacks</span> <span style="color:var(--error)">Stock: 0</span></div></div>
-              <div class="price">₱15.00</div>
-              <div class="actions owner-actions"><div class="aicon" onclick="showToast('Edit', 'info')"><svg><use href="#i-edit"/></svg></div><div class="aicon del" onclick="showToast('Delete', 'error')"><svg><use href="#i-del"/></svg></div></div>
-            </div>
+            <div id="productList" style="padding: 0 14px 14px;"></div>
           </div>
-          <div class="fabzone" id="fabZone"><div class="fab" onclick="showToast('Add Product dialog', 'success')"><svg><use href="#i-plus"/></svg>Add Product</div></div>
+          <div class="fabzone" id="fabZone"><div class="fab" onclick="openProductModal()"><svg><use href="#i-plus"/></svg>Add Product</div></div>
         </div>
       </div>
       <div class="bottomnav" id="bottomNav">
@@ -146,6 +163,94 @@
         <div class="navitem"><span class="navicon"><svg><use href="#i-receipt"/></svg></span><span class="navlbl">Sales</span></div>
         <div class="navitem"><span class="navicon"><svg><use href="#i-more"/></svg></span><span class="navlbl">More</span></div>
       </div>
+
+      <!-- Product dialog -->
+      <div class="dialog-overlay" id="productDialog" onclick="if(event.target===this)closeProductModal()">
+        <div class="dialog" onclick="event.stopPropagation()">
+          <div class="dialog-header">
+            <div class="icircle c-blue" id="productDialogIcon"><svg width="20" height="20"><use href="#i-plus"/></svg></div>
+            <h3 id="productDialogTitle">Add Product</h3>
+            <p id="productDialogHint">Enter the details and tap Save.</p>
+          </div>
+          <div class="dialog-body">
+            <div class="img-picker" id="imgPicker" onclick="cycleProductEmoji()">
+              <div class="emoji" id="productEmoji">🍗</div>
+              <div>Tap to change image</div>
+              <div class="cam"><svg><use href="#i-camera"/></svg></div>
+            </div>
+            <div class="field has-icon" style="margin-top:0">
+              <label>Product Name</label>
+              <svg class="field-icon input-icon"><use href="#i-box"/></svg>
+              <input class="input" type="text" id="productName" placeholder="e.g. Pastil">
+            </div>
+            <div class="field has-icon">
+              <label>Price</label>
+              <svg class="field-icon input-icon"><use href="#i-cash"/></svg>
+              <input class="input" type="number" id="productPrice" placeholder="0.00" step="0.01" min="0">
+            </div>
+            <div class="field has-icon">
+              <label>Stock</label>
+              <svg class="field-icon input-icon"><use href="#i-inventory"/></svg>
+              <input class="input" type="number" id="productStock" placeholder="Enter quantity" min="0">
+            </div>
+            <div class="field has-icon">
+              <label>Category</label>
+              <svg class="field-icon input-icon"><use href="#i-category"/></svg>
+              <select class="select" id="productCategory">
+                <option value="" disabled selected>Select category</option>
+                <option value="Meals">Meals</option>
+                <option value="Drinks">Drinks</option>
+                <option value="Snacks">Snacks</option>
+                <option value="Coffee">Coffee</option>
+                <option value="Dessert">Dessert</option>
+              </select>
+            </div>
+          </div>
+          <div class="dialog-actions">
+            <button class="btn btn-outlined" onclick="closeProductModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="saveProduct()">Save</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- View Product dialog -->
+      <div class="dialog-overlay" id="viewDialog" onclick="if(event.target===this)closeViewModal()">
+        <div class="dialog" onclick="event.stopPropagation()">
+          <div class="dialog-header">
+            <div class="icircle c-blue"><svg width="20" height="20"><use href="#i-eye"/></svg></div>
+            <h3 id="viewDialogTitle">Product</h3>
+            <p>Product details</p>
+          </div>
+          <div class="dialog-body">
+            <div style="text-align:center;font-size:42px;line-height:1;margin-bottom:12px" id="viewEmoji">📦</div>
+            <div class="view-row"><div class="lead"><div class="isquare c-neutral"><svg><use href="#i-box"/></svg></div><span class="label">Name</span></div><span class="value" id="viewName"></span></div>
+            <div class="view-row"><div class="lead"><div class="isquare c-blue"><svg><use href="#i-category"/></svg></div><span class="label">Category</span></div><span class="value" id="viewCategory"></span></div>
+            <div class="view-row"><div class="lead"><div class="isquare c-green"><svg><use href="#i-cash"/></svg></div><span class="label">Price</span></div><span class="value" id="viewPrice"></span></div>
+            <div class="view-row"><div class="lead"><div class="isquare" id="viewStockIcon"><svg><use href="#i-inventory"/></svg></div><span class="label">Stock</span></div><span class="value" id="viewStock"></span></div>
+            <div class="view-row"><div class="lead"><div class="isquare" id="viewStatusIcon"><svg><use href="#i-check"/></svg></div><span class="label">Status</span></div><span class="value" id="viewStatus"></span></div>
+          </div>
+          <div class="dialog-actions">
+            <button class="btn btn-outlined" onclick="closeViewModal()">Close</button>
+            <button class="btn btn-primary" id="viewEditBtn" onclick="editViewedProduct()">Edit</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Delete dialog -->
+      <div class="dialog-overlay" id="deleteDialog" onclick="if(event.target===this)closeDeleteModal()">
+        <div class="dialog" onclick="event.stopPropagation()">
+          <div class="dialog-header">
+            <div class="icircle c-red"><svg width="20" height="20" style="fill:var(--error)"><use href="#i-del"/></svg></div>
+            <h3>Delete product</h3>
+            <p id="deleteDialogMsg">Move this product to Trash?</p>
+          </div>
+          <div class="dialog-body"></div>
+          <div class="dialog-actions">
+            <button class="btn btn-outlined" onclick="closeDeleteModal()">Cancel</button>
+            <button class="btn btn-error" onclick="confirmDeleteProduct()">Delete</button>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="frame-notes" id="frameNotes">Owner has edit_products and delete_products. Staff only has view_products, so row actions and the Add Product button are hidden.</div>
   </div>
@@ -153,68 +258,233 @@
 
 <script src="mockup.js"></script>
 <script>
-const roleData = {
-  owner: {
-    chipClass: 'role-owner',
-    text: 'Owner has add/edit/delete product actions. Staff is view-only via view_products.',
-    subtitle: 'Owner',
-    avatar: 'OW',
-    notes: 'Owner has edit_products and delete_products. Staff only has view_products, so row actions and the Add Product button are hidden.',
-    nav: [
-      { icon: '#i-dash', label: 'Dashboard' },
-      { icon: '#i-cart', label: 'POS' },
-      { icon: '#i-box', label: 'Products', sel: true },
-      { icon: '#i-receipt', label: 'Sales' },
-      { icon: '#i-more', label: 'More' }
-    ]
-  },
-  staff: {
-    chipClass: 'role-staff',
-    text: 'Staff views products, stock, and prices. Add/Edit/Delete are not available.',
-    subtitle: 'Staff',
-    avatar: 'ST',
-    notes: 'Staff sees the same product list but with no row actions and no Add Product button. Stock counts are visible for POS reference.',
-    nav: [
-      { icon: '#i-dash', label: 'Dashboard' },
-      { icon: '#i-cart', label: 'POS' },
-      { icon: '#i-box', label: 'Products', sel: true },
-      { icon: '#i-receipt', label: 'My Sales' },
-      { icon: '#i-more', label: 'More' }
-    ]
-  }
+let currentRole = 'owner';
+let productIdCounter = 5;
+let editingProductId = null;
+let deleteProductId = null;
+let viewingProductId = null;
+let selectedCategory = 'All';
+
+const emojis = ['🍗','🍚','🥤','🍌','🍰','☕','🥐','🍔','🍕','🍜','🍩','🥧'];
+let productEmojis = {1:'🍗',2:'🍚',3:'🥤',4:'🍌'};
+
+const categoryColor = {
+  'Meals':'pill-amber','Drinks':'pill-teal','Snacks':'pill-pink','Coffee':'pill-blue'
 };
 
+let products = [
+  {id:1, name:'Chicken Adobo Rice', category:'Meals', price:80, stock:18},
+  {id:2, name:'Pastil', category:'Snacks', price:10, stock:45},
+  {id:3, name:'Iced Tea', category:'Drinks', price:25, stock:32},
+  {id:4, name:'Banana Cue', category:'Snacks', price:15, stock:0}
+];
+
 function setRole(role) {
-  const data = roleData[role];
-  if (!data) return;
+  currentRole = role;
   document.querySelectorAll('.role-switcher button').forEach(b => b.classList.toggle('on', b.dataset.role === role));
   const chip = document.getElementById('roleChip');
-  chip.className = 'role-chip ' + data.chipClass;
+  chip.className = 'role-chip ' + (role === 'owner' ? 'role-owner' : 'role-staff');
   chip.textContent = role.charAt(0).toUpperCase() + role.slice(1);
-  document.getElementById('legendText').textContent = data.text;
-  document.getElementById('frameLabel').textContent = 'Products — ' + data.subtitle;
-  document.getElementById('roleSubtitle').textContent = data.subtitle;
-  document.getElementById('avatar').textContent = data.avatar;
-  document.getElementById('frameNotes').textContent = data.notes;
+  document.getElementById('legendText').textContent = role === 'owner'
+    ? 'Owner has add/edit/delete product actions. Staff is view-only via view_products.'
+    : 'Staff views products, stock, and prices. Add/Edit/Delete are not available.';
+  document.getElementById('frameLabel').textContent = 'Products — ' + (role === 'owner' ? 'Owner' : 'Staff');
+  document.getElementById('roleSubtitle').textContent = role === 'owner' ? 'Owner' : 'Staff';
+  document.getElementById('avatar').textContent = role === 'owner' ? 'OW' : 'ST';
+  document.getElementById('frameNotes').textContent = role === 'owner'
+    ? 'Owner has edit_products and delete_products. Staff only has view_products, so row actions and the Add Product button are hidden.'
+    : 'Staff sees the same product list but with no row actions and no Add Product button. Stock counts are visible for POS reference.';
+
   document.getElementById('fabZone').style.display = role === 'owner' ? 'flex' : 'none';
-
-  document.querySelectorAll('.owner-actions').forEach(el => {
-    el.style.display = role === 'owner' ? 'flex' : 'none';
-  });
-
-  const nav = document.getElementById('bottomNav');
-  nav.innerHTML = data.nav.map(item => `
-    <div class="navitem ${item.sel ? 'sel' : ''}">
-      <span class="navicon"><svg><use href="${item.icon}"/></svg></span>
-      <span class="navlbl">${item.label}</span>
-    </div>
-  `).join('');
+  renderProducts();
 }
 
 function selectChip(el, group) {
   if (!el.dataset.group) return;
   document.querySelectorAll(`[data-group="${group}"]`).forEach(c => c.classList.remove('on'));
   el.classList.add('on');
+  renderProducts();
+}
+
+function formatPeso(n) {
+  return '₱' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+function computeStats() {
+  const total = products.length;
+  const out = products.filter(p => p.stock <= 0).length;
+  const low = products.filter(p => p.stock > 0 && p.stock <= 5).length;
+  document.getElementById('statTotal').textContent = total;
+  document.getElementById('statLow').textContent = low;
+  document.getElementById('statOut').textContent = out;
+}
+
+function setCategory(cat) {
+  selectedCategory = cat;
+  renderProducts();
+}
+
+function filteredProducts() {
+  const query = document.getElementById('searchInput').value.trim().toLowerCase();
+  const chip = document.querySelector('#chipRow .chip.on');
+  const filter = chip ? chip.textContent : 'All';
+  return products.filter(p => {
+    if (query && !p.name.toLowerCase().includes(query) && !p.category.toLowerCase().includes(query)) return false;
+    if (selectedCategory !== 'All' && p.category !== selectedCategory) return false;
+    if (filter === 'Low stock') return p.stock > 0 && p.stock <= 5;
+    if (filter === 'Out of stock') return p.stock <= 0;
+    return true;
+  });
+}
+
+function renderProducts() {
+  const list = filteredProducts();
+  document.getElementById('productCountPill').textContent = list.length + ' item' + (list.length === 1 ? '' : 's');
+  const container = document.getElementById('productList');
+  if (list.length === 0) {
+    container.innerHTML = `<div class="center-screen" style="padding:28px 0;min-height:140px"><div class="icon-lg"><svg><use href="#i-box"/></svg></div><div class="title">No products found</div><div class="msg">Try a different search or filter.</div></div>`;
+    computeStats();
+    return;
+  }
+  container.innerHTML = list.map(p => {
+    const stockColor = p.stock <= 0 ? 'var(--error)' : (p.stock <= 5 ? 'var(--warning)' : 'var(--text-3)');
+    const stockText = p.stock <= 0 ? `Stock: <span style="color:var(--error)">0</span>` : `Stock: ${p.stock}`;
+    return `<div class="product-row" data-id="${p.id}" onclick="openViewModal(${p.id})" style="cursor:pointer">
+      <div class="thumb">${productEmojis[p.id] || '📦'}</div>
+      <div class="grow"><div class="name">${escapeHtml(p.name)}</div><div class="sub"><span class="pill ${categoryColor[p.category] || 'pill-blue'}">${p.category}</span> ${stockText}</div></div>
+      <div class="price">${formatPeso(p.price)}</div>
+      <div class="actions" style="display:flex;">
+        <div class="aicon" onclick="productMenu(event, ${p.id})" title="Product options" style="width:34px;height:34px;"><svg style="width:18px;height:18px" id="moreDots"><use href="#i-more"/></svg></div>
+      </div>
+    </div>`;
+  }).join('');
+  computeStats();
+}
+
+function productMenu(e, id) {
+  const p = products.find(x => x.id === id);
+  const canEdit = currentRole === 'owner';
+  const canDelete = currentRole === 'owner';
+  const items = [
+    { label: 'View', icon: '<svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>', action: `openViewModal(${id})` },
+    ...(canEdit ? [{ label: 'Edit', icon: '<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>', action: `openProductModal(${id})` }] : []),
+    ...(canDelete ? [{ label: 'Delete', icon: '<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>', cls: 'del', action: `openDeleteModal(${id})` }] : [])
+  ];
+  showMenu(e, items);
+}
+
+function cycleProductEmoji() {
+  const current = document.getElementById('productEmoji').textContent;
+  let idx = emojis.indexOf(current);
+  idx = (idx + 1) % emojis.length;
+  document.getElementById('productEmoji').textContent = emojis[idx];
+}
+
+function openProductModal(id) {
+  editingProductId = id || null;
+  const title = document.getElementById('productDialogTitle');
+  const icon = document.getElementById('productDialogIcon');
+  const hint = document.getElementById('productDialogHint');
+  title.textContent = id ? 'Edit Product' : 'Add Product';
+  hint.textContent = id ? 'Update the details and tap Save.' : 'Enter the details and tap Save.';
+  icon.innerHTML = '<svg width="20" height="20"><use href="#' + (id ? 'i-edit' : 'i-plus') + '"/></svg>';
+  icon.className = 'icircle c-' + (id ? 'green' : 'blue');
+
+  const p = id ? products.find(x => x.id === id) : null;
+  document.getElementById('productName').value = p ? p.name : '';
+  document.getElementById('productPrice').value = p ? p.price : '';
+  document.getElementById('productStock').value = p ? p.stock : '';
+  document.getElementById('productCategory').value = p ? p.category : '';
+  document.getElementById('productEmoji').textContent = p ? (productEmojis[p.id] || '📦') : '📦';
+
+  document.getElementById('productDialog').classList.add('open');
+}
+
+function closeProductModal() {
+  document.getElementById('productDialog').classList.remove('open');
+  editingProductId = null;
+}
+
+function openViewModal(id) {
+  viewingProductId = id;
+  const p = products.find(x => x.id === id);
+  const status = p.stock <= 0 ? 'Out of stock' : p.stock <= 5 ? 'Low stock' : 'In stock';
+  const statusColor = p.stock <= 0 ? 'var(--error)' : p.stock <= 5 ? 'var(--warning)' : 'var(--success)';
+  const statusCls = p.stock <= 0 ? 'c-red' : p.stock <= 5 ? 'c-amber' : 'c-green';
+  const statusIco = p.stock <= 0 ? 'i-error' : p.stock <= 5 ? 'i-warn' : 'i-check';
+  const stockIcon = document.getElementById('viewStockIcon');
+  stockIcon.className = 'isquare ' + statusCls;
+  const statusIcon = document.getElementById('viewStatusIcon');
+  statusIcon.className = 'isquare ' + statusCls;
+  statusIcon.innerHTML = '<svg><use href="#' + statusIco + '"/></svg>';
+  document.getElementById('viewDialogTitle').textContent = p.name;
+  document.getElementById('viewEmoji').textContent = productEmojis[p.id] || '📦';
+  document.getElementById('viewName').textContent = p.name;
+  document.getElementById('viewCategory').textContent = p.category;
+  document.getElementById('viewPrice').textContent = formatPeso(p.price);
+  document.getElementById('viewStock').textContent = p.stock + ' units';
+  const s = document.getElementById('viewStatus');
+  s.textContent = status;
+  s.style.color = statusColor;
+  document.getElementById('viewEditBtn').style.display = currentRole === 'owner' ? '' : 'none';
+  document.getElementById('viewDialog').classList.add('open');
+}
+
+function closeViewModal() {
+  document.getElementById('viewDialog').classList.remove('open');
+  viewingProductId = null;
+}
+
+function editViewedProduct() {
+  const id = viewingProductId;
+  closeViewModal();
+  openProductModal(id);
+}
+
+function saveProduct() {
+  const name = document.getElementById('productName').value.trim();
+  const price = parseFloat(document.getElementById('productPrice').value);
+  const stock = parseInt(document.getElementById('productStock').value, 10);
+  const category = document.getElementById('productCategory').value;
+  if (!name || isNaN(price) || price <= 0 || isNaN(stock) || stock < 0 || !category) {
+    showToast('Please fill in all required fields correctly', 'error');
+    return;
+  }
+  const emoji = document.getElementById('productEmoji').textContent;
+  if (editingProductId) {
+    const p = products.find(x => x.id === editingProductId);
+    p.name = name; p.price = price; p.stock = stock; p.category = category;
+    productEmojis[p.id] = emoji;
+    showToast('Product updated', 'success');
+  } else {
+    const newId = productIdCounter++;
+    products.unshift({id: newId, name, category, price, stock});
+    productEmojis[newId] = emoji;
+    showToast('Product added', 'success');
+  }
+  closeProductModal();
+  renderProducts();
+}
+
+function openDeleteModal(id) {
+  deleteProductId = id;
+  const p = products.find(x => x.id === id);
+  document.getElementById('deleteDialogMsg').innerHTML = `Move <b>${escapeHtml(p.name)}</b> to Trash? You can restore it later.`;
+  document.getElementById('deleteDialog').classList.add('open');
+}
+
+function closeDeleteModal() {
+  document.getElementById('deleteDialog').classList.remove('open');
+  deleteProductId = null;
+}
+
+function confirmDeleteProduct() {
+  if (deleteProductId) {
+    products = products.filter(p => p.id !== deleteProductId);
+    showToast('Product moved to Trash', 'success');
+    renderProducts();
+  }
+  closeDeleteModal();
 }
 
 setRole('owner');

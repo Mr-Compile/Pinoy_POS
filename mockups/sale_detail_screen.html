@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinoy POS — Sale Detail Screen (lib/ui/screens/sale_detail_screen.dart)</title>
+<link rel="stylesheet" href="mockup.css">
+<style>
+  .frames-legend { max-width: 900px; margin: 0 auto 24px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; color: var(--text-2); font-size: 13px; }
+  .receipt-card { padding: 18px; }
+  .item-line { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--divider); }
+  .item-line .name { font-weight: 600; }
+  .item-line .sub { font-size: 12px; color: var(--text-3); }
+  .total-row { display: flex; justify-content: space-between; padding: 10px 0; font-size: 16px; font-weight: 800; border-top: 1px solid var(--border); margin-top: 8px; }
+  .detail-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 13px; }
+  .detail-row .label { color: var(--text-3); }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M12 21l3.5-4.5c-.97-.74-2.18-1.16-3.5-1.16s-2.53.42-3.5 1.16L12 21zM12 3C7.31 3 3.07 4.69 0 7.55l1.93 2.43C4.48 7.9 8.01 6.4 12 6.4s7.52 1.5 10.07 3.58L24 7.55C20.93 4.69 16.69 3 12 3z"/></symbol>
+  <symbol id="i-batt" viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></symbol>
+  <symbol id="i-print" viewBox="0 0 24 24"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h3v4h12v-4h3v-6c0-1.66-1.34-3-3-3zm-2 10H7v-5h10v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V2z"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></symbol>
+  <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M19.5 3.5 18 2l-1.5 1.5L15 2l-1.5 1.5L12 2l-1.5 1.5L9 2 7.5 3.5 6 2 4.5 3.5 3 2v20l1.5-1.5L6 22l1.5-1.5L9 22l1.5-1.5L12 22l1.5-1.5L15 22l1.5-1.5L18 22l1.5-1.5L21 22V2l-1.5 1.5zM19 19.09H5V4.91h14v14.18z"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></symbol>
+</svg>
+
+<div class="page-head">
+  <div>
+    <h1>Sale Details — lib/ui/screens/sale_detail_screen.dart</h1>
+    <p>Receipt-style sale detail with items, payment info, status banner, and print/download actions.</p>
+  </div>
+  <button class="theme-toggle" onclick="toggleTheme()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
+    <span id="themeLabel">Light mode</span>
+  </button>
+</div>
+
+<div class="frames">
+  <div class="frame-wrap">
+    <div class="frame-label">Sale Details</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="appbar">
+        <div class="back"><svg><use href="#i-back"/></svg></div>
+        <div class="title"><h2>Sale #20260910-0008</h2><div class="sub">Sep 10, 2026 · 09:42 AM</div></div>
+        <div class="act"><svg><use href="#i-print"/></svg></div>
+        <div class="act"><svg><use href="#i-download"/></svg></div>
+      </div>
+      <div class="screen">
+        <div class="screen-body">
+          <div class="card receipt-card">
+            <div style="text-align:center;margin-bottom:12px;">
+              <div class="brand" style="font-size:16px;font-weight:800;">Pinoy POS Store</div>
+              <div class="muted" style="font-size:12px;">123 Mabini St, Manila</div>
+            </div>
+            <div class="item-line"><div><div class="name">Chicken Adobo Rice</div><div class="sub">₱80.00 x 2</div></div><div class="name">₱160.00</div></div>
+            <div class="item-line"><div><div class="name">Iced Tea</div><div class="sub">₱25.00 x 1</div></div><div class="name">₱25.00</div></div>
+            <div class="total-row"><span>Total</span><span>₱210.00</span></div>
+          </div>
+
+          <div class="card">
+            <div class="detail-row"><span class="label">Payment</span><span>Cash</span></div>
+            <div class="detail-row"><span class="label">Amount tendered</span><span>₱250.00</span></div>
+            <div class="detail-row"><span class="label">Change</span><span>₱40.00</span></div>
+            <div class="detail-row"><span class="label">Customer</span><span>Maria Reyes</span></div>
+            <div class="detail-row"><span class="label">Cashier</span><span>Juan Dela Cruz</span></div>
+            <div class="detail-row"><span class="label">Status</span><span class="pill pill-green">Completed</span></div>
+          </div>
+
+          <div class="card" style="display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="showToast('Viewing payment proof', 'info')">
+            <div class="isquare c-blue"><svg><use href="#i-image"/></svg></div>
+            <div class="grow"><div class="name">Payment proof attached</div><div class="sub">Tap to view GCash screenshot</div></div>
+            <div class="trailing"><svg><use href="#i-receipt"/></svg></div>
+          </div>
+
+          <button class="btn btn-warn" onclick="showToast('GCash payment confirmed', 'success')">Confirm GCash Payment</button>
+          <button class="btn btn-error" onclick="showToast('Payment rejected', 'error')">Reject GCash Payment</button>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes">Receipt-style card, payment summary, status actions. Confirm/Reject shown for pending GCash when user has verify_payments permission. Print and download PDF in app bar.</div>
+  </div>
+</div>
+
+<script src="mockup.js"></script>
+</body>
+</html>

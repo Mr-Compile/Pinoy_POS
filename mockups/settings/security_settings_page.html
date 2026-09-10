@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinoy POS — Security Settings (lib/ui/screens/settings/security_settings_page.dart)</title>
+<link rel="stylesheet" href="../mockup.css">
+<style>
+  .frames-legend { max-width: 900px; margin: 0 auto 24px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; color: var(--text-2); font-size: 13px; }
+  .role-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; border: 1px solid var(--border); background: rgba(75,130,233,.16); color: var(--info); border-color: rgba(75,130,233,.4); }
+  .role-chip-purple { background: rgba(139,92,246,.16); color: var(--purple); border-color: rgba(139,92,246,.4); }
+  .tile { display: flex; align-items: center; gap: 12px; padding: 12px 0; }
+  .tile + .tile { border-top: 1px solid var(--divider); }
+  .tile .grow { flex: 1; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M12 21l3.5-4.5c-.97-.74-2.18-1.16-3.5-1.16s-2.53.42-3.5 1.16L12 21zM12 3C7.31 3 3.07 4.69 0 7.55l1.93 2.43C4.48 7.9 8.01 6.4 12 6.4s7.52 1.5 10.07 3.58L24 7.55C20.93 4.69 16.69 3 12 3z"/></symbol>
+  <symbol id="i-batt" viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></symbol>
+  <symbol id="i-timer" viewBox="0 0 24 24"><path d="M15 1H9v2h6V1zm-4 13h2V7h-2v7zm8.03-6.61 1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42C16.07 4.74 14.12 4 12 4c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-2.12-.74-4.07-1.97-5.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></symbol>
+  <symbol id="i-notify" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M8.59 16.59 13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></symbol>
+</svg>
+
+<div class="page-head">
+  <div>
+    <h1>Security — lib/ui/screens/settings/security_settings_page.dart</h1>
+    <p>Change your own password. Session inactivity timeout and warning are visible to users with manage_session_settings permission.</p>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <span class="role-chip">All users</span>
+    <span class="role-chip role-chip-purple">System Admin</span>
+  </div>
+  <button class="theme-toggle" onclick="toggleTheme()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
+    <span id="themeLabel">Light mode</span>
+  </button>
+</div>
+
+<div class="frames">
+  <div class="frame-wrap">
+    <div class="frame-label">Security</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="appbar">
+        <div class="back"><svg><use href="#i-back"/></svg></div>
+        <div class="title"><h2>Security</h2></div>
+      </div>
+      <div class="screen">
+        <div class="screen-body">
+          <div class="section-title">Password</div>
+          <p class="section-desc">Change your account password. You will need to enter your current password.</p>
+          <div class="card">
+            <div class="tile" onclick="showToast('Change password', 'info')">
+              <div class="isquare c-blue"><svg><use href="#i-lock"/></svg></div>
+              <div class="grow"><div class="name">Change Password</div><div class="sub">Update your login password</div></div>
+              <svg><use href="#i-chevron"/></svg>
+            </div>
+          </div>
+
+          <div class="section-title">Session</div>
+          <p class="section-desc">How long the app waits before ending the session, and how early the expiry warning appears.</p>
+          <div class="card">
+            <div class="tile">
+              <div class="isquare c-amber"><svg><use href="#i-timer"/></svg></div>
+              <div class="grow"><div class="name">Inactivity timeout</div><div class="sub">15 minutes</div></div>
+              <svg><use href="#i-chevron"/></svg>
+            </div>
+            <div class="tile">
+              <div class="isquare c-amber"><svg><use href="#i-notify"/></svg></div>
+              <div class="grow"><div class="name">Session warning</div><div class="sub">Warn 30 seconds before logout</div></div>
+              <svg><use href="#i-chevron"/></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes">Password change is available to all. Session settings only visible with manage_session_settings permission. Dialogs include current, new, and confirm password with strength meter.</div>
+  </div>
+</div>
+
+<script src="../mockup.js"></script>
+</body>
+</html>

@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinoy POS — Notifications Screen (lib/ui/screens/notifications_screen.dart)</title>
+<link rel="stylesheet" href="mockup.css">
+<style>
+  .frames-legend { max-width: 900px; margin: 0 auto 24px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; color: var(--text-2); font-size: 13px; }
+  .role-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; border: 1px solid var(--border); }
+  .role-owner { background: rgba(75,130,233,.16); color: var(--info); border-color: rgba(75,130,233,.4); }
+  .role-staff { background: rgba(148,163,184,.16); color: var(--text-2); border-color: rgba(148,163,184,.4); }
+  .notif-section + .notif-section { border-top: 1px solid var(--divider); }
+  .notif { display: flex; gap: 12px; align-items: flex-start; padding: 14px; cursor: pointer; transition: background .12s; }
+  .notif + .notif { border-top: 1px solid var(--divider); }
+  .notif:hover { background: var(--surface-elev); }
+  .notif.unread { border-left: 3px solid var(--error); padding-left: 11px; }
+  .notif .ic { flex-shrink: 0; margin-top: 1px; }
+  .notif .grow { flex: 1; min-width: 0; }
+  .notif .title { font-size: 14px; font-weight: 700; color: var(--text); }
+  .notif .body { font-size: 12px; color: var(--text-2); margin-top: 2px; line-height: 1.45; }
+  .notif .meta { font-size: 11px; color: var(--text-3); margin-top: 4px; }
+  .notif .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--error); margin-top: 6px; flex-shrink: 0; }
+  .notif .dot.read { background: transparent; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M12 21l3.5-4.5c-.97-.74-2.18-1.16-3.5-1.16s-2.53.42-3.5 1.16L12 21zM12 3C7.31 3 3.07 4.69 0 7.55l1.93 2.43C4.48 7.9 8.01 6.4 12 6.4s7.52 1.5 10.07 3.58L24 7.55C20.93 4.69 16.69 3 12 3z"/></symbol>
+  <symbol id="i-batt" viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></symbol>
+  <symbol id="i-done" viewBox="0 0 24 24"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></symbol>
+  <symbol id="i-warning" viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></symbol>
+  <symbol id="i-announcement" viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-7 12h-2v-2h2v2zm0-4h-2V6h2v4z"/></symbol>
+  <symbol id="i-backup" viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H8l4-4 4 4h-2z"/></symbol>
+  <symbol id="i-bar" viewBox="0 0 24 24"><path d="M5 15h4v6H5zM10 10h4v11h-4zM15 5h4v16h-4z"/></symbol>
+  <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M19.5 3.5 18 2l-1.5 1.5L15 2l-1.5 1.5L12 2l-1.5 1.5L9 2 7.5 3.5 6 2 4.5 3.5 3 2v20l1.5-1.5L6 22l1.5-1.5L9 22l1.5-1.5L12 22l1.5-1.5L15 22l1.5-1.5L18 22l1.5-1.5L21 22V2l-1.5 1.5zM19 19.09H5V4.91h14v14.18z"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="M20 2H4c-1 0-2 .9-2 2v3.01c0 .72.43 1.34 1 1.69V20c0 1.1 1.1 2 2 2h14c.9 0 2-.9 2-2V8.7c.57-.35 1-.97 1-1.69V4c0-1.1-1-2-2-2zm-5 12H9v-2h6v2zm5-7H4V4h16v3z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84a.484.484 0 0 0-.48.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.488.488 0 0 0-.59.22L2.74 8.87c-.12.22 0 .49.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.39.3.61.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.29.41.48.41h3.84c.24 0 .48-.17.5-.41l.36-2.54c.59-.24 1.13-.58 1.62-.94l2.39.96c.22.08.49 0 .61-.22l1.92-3.32c.12-.22.07-.49-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></symbol>
+</svg>
+
+<div class="page-head">
+  <div>
+    <h1>Notifications — lib/ui/screens/notifications_screen.dart</h1>
+    <p>In-app notification center. Users see category, title, preview, timestamp, and read state. Tapping an item marks it as read.</p>
+  </div>
+  <button class="theme-toggle" onclick="toggleTheme()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
+    <span id="themeLabel">Light mode</span>
+  </button>
+</div>
+
+<div class="frames-legend">
+  <span class="role-chip role-owner">Owner</span>
+  <span class="role-chip role-staff">Staff</span>
+  <span>All authenticated users see the same layout; content is scoped to the current user.</span>
+</div>
+
+<div class="frames">
+
+  <div class="frame-wrap">
+    <div class="frame-label">Mixed list</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="appbar">
+        <div class="back"><svg><use href="#i-back"/></svg></div>
+        <div class="title"><h2>Notifications</h2></div>
+        <div class="act" onclick="showToast('Mark all as read','success')" title="Mark all as read"><svg><use href="#i-done"/></svg></div>
+        <div class="act" onclick="showToast('Refresh','info')" title="Refresh"><svg><use href="#i-refresh"/></svg></div>
+      </div>
+      <div class="screen">
+        <div class="screen-body">
+          <div class="chips">
+            <div class="chip on" data-group="filter">All</div>
+            <div class="chip" data-group="filter">Unread</div>
+            <div class="chip" data-group="filter">Alerts</div>
+            <div class="chip" data-group="filter">Announcements</div>
+          </div>
+          <div class="card">
+            <div class="notif-section">
+              <div class="section-title" style="padding:14px 14px 6px;">Today</div>
+              <div class="notif unread" onclick="this.classList.remove('unread'); this.querySelector('.dot').classList.add('read'); showToast('Marked as read','success')">
+                <div class="isquare c-amber ic"><svg><use href="#i-warning"/></svg></div>
+                <div class="grow">
+                  <div class="title">Low stock alert</div>
+                  <div class="body">Banana Cue stock is down to 5. Restock soon to avoid running out.</div>
+                  <div class="meta">10 minutes ago</div>
+                </div>
+                <div class="dot"></div>
+              </div>
+              <div class="notif unread" onclick="this.classList.remove('unread'); this.querySelector('.dot').classList.add('read'); showToast('Marked as read','success')">
+                <div class="isquare c-purple ic"><svg><use href="#i-announcement"/></svg></div>
+                <div class="grow">
+                  <div class="title">New announcement pinned</div>
+                  <div class="body">New GCash payment process for weekend shifts. Read the full announcement.</div>
+                  <div class="meta">1 hour ago</div>
+                </div>
+                <div class="dot"></div>
+              </div>
+            </div>
+            <div class="notif-section">
+              <div class="section-title" style="padding:14px 14px 6px;">Yesterday</div>
+              <div class="notif">
+                <div class="isquare c-green ic"><svg><use href="#i-backup"/></svg></div>
+                <div class="grow">
+                  <div class="title">Backup completed</div>
+                  <div class="body">Your 09:00 backup finished successfully. Size: 2.4 MB.</div>
+                  <div class="meta">3 hours ago</div>
+                </div>
+                <div class="dot read"></div>
+              </div>
+              <div class="notif">
+                <div class="isquare c-blue ic"><svg><use href="#i-bar"/></svg></div>
+                <div class="grow">
+                  <div class="title">Report submitted</div>
+                  <div class="body">Maria Reyes submitted the daily sales report for your review.</div>
+                  <div class="meta">5 hours ago</div>
+                </div>
+                <div class="dot read"></div>
+              </div>
+            </div>
+            <div class="notif-section">
+              <div class="section-title" style="padding:14px 14px 6px;">Earlier</div>
+              <div class="notif">
+                <div class="isquare c-teal ic"><svg><use href="#i-receipt"/></svg></div>
+                <div class="grow">
+                  <div class="title">Payment verified</div>
+                  <div class="body">GCash payment for receipt 20260908-0024 was verified.</div>
+                  <div class="meta">2 days ago</div>
+                </div>
+                <div class="dot read"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes">Default view with All filter selected. Unread items get a red left accent and dot. Category icons use semantic colors. Tapping a row marks it read in this prototype.</div>
+  </div>
+
+  <div class="frame-wrap">
+    <div class="frame-label">Unread only</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="appbar">
+        <div class="back"><svg><use href="#i-back"/></svg></div>
+        <div class="title"><h2>Notifications</h2></div>
+        <div class="act" title="Mark all as read"><svg><use href="#i-done"/></svg></div>
+        <div class="act" title="Refresh"><svg><use href="#i-refresh"/></svg></div>
+      </div>
+      <div class="screen">
+        <div class="screen-body">
+          <div class="chips">
+            <div class="chip" data-group="filter">All</div>
+            <div class="chip on" data-group="filter">Unread</div>
+            <div class="chip" data-group="filter">Alerts</div>
+            <div class="chip" data-group="filter">Announcements</div>
+          </div>
+          <div class="card">
+            <div class="notif unread">
+              <div class="isquare c-amber ic"><svg><use href="#i-warning"/></svg></div>
+              <div class="grow">
+                <div class="title">Low stock alert</div>
+                <div class="body">Banana Cue stock is down to 5. Restock soon to avoid running out.</div>
+                <div class="meta">10 minutes ago</div>
+              </div>
+              <div class="dot"></div>
+            </div>
+            <div class="notif unread">
+              <div class="isquare c-purple ic"><svg><use href="#i-announcement"/></svg></div>
+              <div class="grow">
+                <div class="title">New announcement pinned</div>
+                <div class="body">New GCash payment process for weekend shifts. Read the full announcement.</div>
+                <div class="meta">1 hour ago</div>
+              </div>
+              <div class="dot"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes">Unread filter narrows the list to items needing attention. Mark-all-as-read remains in the app bar.</div>
+  </div>
+
+  <div class="frame-wrap">
+    <div class="frame-label">All read</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="appbar">
+        <div class="back"><svg><use href="#i-back"/></svg></div>
+        <div class="title"><h2>Notifications</h2></div>
+        <div class="act" title="Refresh"><svg><use href="#i-refresh"/></svg></div>
+      </div>
+      <div class="screen">
+        <div class="screen-body">
+          <div class="chips">
+            <div class="chip on" data-group="filter">All</div>
+            <div class="chip" data-group="filter">Unread</div>
+            <div class="chip" data-group="filter">Alerts</div>
+            <div class="chip" data-group="filter">Announcements</div>
+          </div>
+          <div class="card">
+            <div class="notif-section">
+              <div class="section-title" style="padding:14px 14px 6px;">Today</div>
+              <div class="notif">
+                <div class="isquare c-amber ic"><svg><use href="#i-warning"/></svg></div>
+                <div class="grow">
+                  <div class="title">Low stock alert</div>
+                  <div class="body">Banana Cue stock is down to 5. Restock soon to avoid running out.</div>
+                  <div class="meta">10 minutes ago</div>
+                </div>
+                <div class="dot read"></div>
+              </div>
+              <div class="notif">
+                <div class="isquare c-purple ic"><svg><use href="#i-announcement"/></svg></div>
+                <div class="grow">
+                  <div class="title">New announcement pinned</div>
+                  <div class="body">New GCash payment process for weekend shifts. Read the full announcement.</div>
+                  <div class="meta">1 hour ago</div>
+                </div>
+                <div class="dot read"></div>
+              </div>
+            </div>
+            <div class="notif-section">
+              <div class="section-title" style="padding:14px 14px 6px;">Earlier</div>
+              <div class="notif">
+                <div class="isquare c-green ic"><svg><use href="#i-backup"/></svg></div>
+                <div class="grow">
+                  <div class="title">Backup completed</div>
+                  <div class="body">Your 09:00 backup finished successfully. Size: 2.4 MB.</div>
+                  <div class="meta">Yesterday</div>
+                </div>
+                <div class="dot read"></div>
+              </div>
+              <div class="notif">
+                <div class="isquare c-neutral ic"><svg><use href="#i-gear"/></svg></div>
+                <div class="grow">
+                  <div class="title">System maintenance</div>
+                  <div class="body">Pinoy POS will undergo maintenance on Sunday 2:00 AM. Expect brief downtime.</div>
+                  <div class="meta">3 days ago</div>
+                </div>
+                <div class="dot read"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes">When no unread items remain, the mark-all action is hidden. Notifications keep their category icons and timestamps for reference.</div>
+  </div>
+
+  <div class="frame-wrap">
+    <div class="frame-label">Empty state</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="appbar">
+        <div class="back"><svg><use href="#i-back"/></svg></div>
+        <div class="title"><h2>Notifications</h2></div>
+        <div class="act" title="Refresh"><svg><use href="#i-refresh"/></svg></div>
+      </div>
+      <div class="screen">
+        <div class="center-screen">
+          <div class="icon-lg"><svg><use href="#i-bell"/></svg></div>
+          <div class="title">No Notifications</div>
+          <div class="msg">You're all caught up! New alerts and announcements will appear here.</div>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes">Empty state uses the existing centered empty-state pattern with a bell icon and clear message.</div>
+  </div>
+
+  <div class="frame-wrap">
+    <div class="frame-label">Loading</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="appbar">
+        <div class="back"><svg><use href="#i-back"/></svg></div>
+        <div class="title"><h2>Notifications</h2></div>
+      </div>
+      <div class="screen">
+        <div class="center-screen">
+          <div class="spinner"></div>
+          <div class="msg" style="margin-top:14px;">Loading notifications...</div>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes">Loading state while notifications are fetched. The mark-all and refresh actions are hidden until the list is loaded.</div>
+  </div>
+
+</div>
+
+<script src="mockup.js"></script>
+</body>
+</html>

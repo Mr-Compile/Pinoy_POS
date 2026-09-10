@@ -11,7 +11,7 @@
   .mockup-list { display: grid; gap: 12px; margin-top: 12px; }
   .mockup-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 16px; display: flex; align-items: center; gap: 14px; transition: border-color .15s; }
   .mockup-card:hover { border-color: var(--primary); }
-  .mockup-card .isquare { width: 44px; height: 44px; border-radius: 12px; }
+  .mockup-card .isquare { width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0; }
   .mockup-card .isquare svg { width: 22px; height: 22px; }
   .mockup-card .grow { flex: 1; min-width: 0; }
   .mockup-card .name { font-size: 15px; font-weight: 700; color: var(--text); }
@@ -21,7 +21,8 @@
   .role-pill.owner { background: rgba(75,130,233,.16); color: var(--info); border-color: rgba(75,130,233,.4); }
   .role-pill.admin { background: rgba(139,92,246,.16); color: var(--purple); border-color: rgba(139,92,246,.4); }
   .role-pill.staff { background: rgba(22,163,74,.16); color: var(--success); border-color: rgba(22,163,74,.4); }
-  .mockup-card .arrow { width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+  .role-pill.all { background: rgba(148,163,184,.16); color: var(--text-2); border-color: rgba(148,163,184,.4); }
+  .mockup-card .arrow { width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .mockup-card .arrow svg { width: 18px; height: 18px; fill: var(--text-3); }
   .muted { color: var(--text-3); font-size: 13px; margin-top: 4px; }
   a { text-decoration: none; color: inherit; }
@@ -47,12 +48,18 @@
   <symbol id="i-campaign" viewBox="0 0 24 24"><path d="M18 2H6c-1.1 0-2 .9-2 2v4c0 1.1.9 2 2 2h1v8c0 1.1.9 2 2 2h2c1.1 0 2-.9 2-2V10h5c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM4 11h2v2H4v-2z"/></symbol>
   <symbol id="i-psych" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></symbol>
   <symbol id="i-lock" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 2c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 2 2h8l6-6V4c0-1.1-.9-2-2-2H6zm8 18V6l4 4h-4v10z"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></symbol>
+  <symbol id="i-history" viewBox="0 0 24 24"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></symbol>
+  <symbol id="i-qr" viewBox="0 0 24 24"><path d="M3 11h8V3H3v8zm2-6h4v4H5V5zM3 21h8v-8H3v8zm2-6h4v4H5v-4zM13 3v8h8V3h-8zm6 6h-4V5h4v4zM13 13h2v2h-2zM15 15h2v2h-2zM13 17h2v2h-2zM17 13h2v2h-2zM19 15h2v2h-2zM17 17h2v2h-2zM15 19h2v2h-2zM19 19h2v2h-2z"/></symbol>
+  <symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4c-.83 0-1.5-.67-1.5-1.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5S18.33 12 17.5 12z"/></symbol>
 </svg>
 
 <div class="page-head">
   <div>
     <h1>Pinoy POS — UI Mockup Hub</h1>
-    <p>Core-flow mockups renamed to match lib/ui/screens. Click a role pill inside each mockup to switch between Owner, Admin, and Staff.</p>
+    <p>HTML mockups mirroring every live screen in lib/ui/screens. Files follow the convention <code>&lt;dart_screen_name&gt;.html</code>.</p>
   </div>
   <button class="theme-toggle" onclick="toggleTheme()">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
@@ -61,130 +68,100 @@
 </div>
 
 <div class="hub">
-  <h2 class="section-head">Main navigation</h2>
-  <p class="muted">These screens mirror the live bottom/app tabs in lib/ui/app_shell.dart.</p>
-  <div class="mockup-list" id="mainNavList">
-    <a href="dashboard_screen.html" class="mockup-card">
-      <div class="isquare c-blue"><svg><use href="#i-dash"/></svg></div>
-      <div class="grow">
-        <div class="name">dashboard_screen.dart</div>
-        <div class="sub">Dashboard with role-specific greeting and KPIs.</div>
-      </div>
-      <div class="roles"><span class="role-pill owner">Owner</span><span class="role-pill admin">Admin</span><span class="role-pill staff">Staff</span></div>
-      <div class="arrow"><svg><use href="#i-chevron"/></svg></div>
-    </a>
-    <a href="pos_screen.html" class="mockup-card">
-      <div class="isquare c-blue"><svg><use href="#i-cart"/></svg></div>
-      <div class="grow">
-        <div class="name">pos_screen.dart</div>
-        <div class="sub">Point of sale — categories, products, cart, checkout.</div>
-      </div>
-      <div class="roles"><span class="role-pill owner">Owner</span><span class="role-pill staff">Staff</span></div>
-      <div class="arrow"><svg><use href="#i-chevron"/></svg></div>
-    </a>
-    <a href="products_screen.html" class="mockup-card">
-      <div class="isquare c-purple"><svg><use href="#i-box"/></svg></div>
-      <div class="grow">
-        <div class="name">products_screen.dart</div>
-        <div class="sub">Product list with CRUD toolbar and role-gated actions.</div>
-      </div>
-      <div class="roles"><span class="role-pill owner">Owner</span><span class="role-pill staff">Staff</span></div>
-      <div class="arrow"><svg><use href="#i-chevron"/></svg></div>
-    </a>
-    <a href="sales_screen.html" class="mockup-card">
-      <div class="isquare c-blue"><svg><use href="#i-receipt"/></svg></div>
-      <div class="grow">
-        <div class="name">sales_screen.dart</div>
-        <div class="sub">Sales / My Sales list scoped by role.</div>
-      </div>
-      <div class="roles"><span class="role-pill owner">Owner</span><span class="role-pill staff">Staff</span></div>
-      <div class="arrow"><svg><use href="#i-chevron"/></svg></div>
-    </a>
-    <a href="more_screen.html" class="mockup-card">
-      <div class="isquare c-blue"><svg><use href="#i-more"/></svg></div>
-      <div class="grow">
-        <div class="name">more_screen.dart</div>
-        <div class="sub">Role-filtered grid of secondary features.</div>
-      </div>
-      <div class="roles"><span class="role-pill owner">Owner</span><span class="role-pill admin">Admin</span><span class="role-pill staff">Staff</span></div>
-      <div class="arrow"><svg><use href="#i-chevron"/></svg></div>
-    </a>
+  <h2 class="section-head">Launch &amp; Authentication</h2>
+  <p class="muted">App startup, login, password flows, and PIN lock.</p>
+  <div class="mockup-list">
+    <a href="splash_screen.html" class="mockup-card"><div class="isquare c-blue"><svg><use href="#i-receipt"/></svg></div><div class="grow"><div class="name">splash_screen.dart</div><div class="sub">Launch screen with logo and auth restore.</div></div><div class="roles"><span class="role-pill all">All</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+    <a href="login_screen.html" class="mockup-card"><div class="isquare c-green"><svg><use href="#i-lock"/></svg></div><div class="grow"><div class="name">login_screen.dart</div><div class="sub">Username/password login and recovery.</div></div><div class="roles"><span class="role-pill all">All</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+    <a href="force_change_password_screen.html" class="mockup-card"><div class="isquare c-warn"><svg><use href="#i-lock"/></svg></div><div class="grow"><div class="name">force_change_password_screen.dart</div><div class="sub">Mandatory temporary-password change.</div></div><div class="roles"><span class="role-pill all">All</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+    <a href="pin_lock_screen.html" class="mockup-card"><div class="isquare c-purple"><svg><use href="#i-lock"/></svg></div><div class="grow"><div class="name">pin_lock_screen.dart</div><div class="sub">4-6 digit PIN quick login.</div></div><div class="roles"><span class="role-pill all">All</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
   </div>
 
-  <h2 class="section-head section-title">Core detail &amp; transaction screens</h2>
+  <h2 class="section-head section-title">Main App Shell</h2>
+  <p class="muted">Screens reachable from the bottom/tab navigation.</p>
   <div class="mockup-list">
-    <a href="receipt_screen.html" class="mockup-card">
-      <div class="isquare c-blue"><svg><use href="#i-receipt"/></svg></div>
-      <div class="grow">
-        <div class="name">receipt_screen.dart</div>
-        <div class="sub">Receipt preview and share/download actions.</div>
-      </div>
-      <div class="roles"><span class="role-pill owner">Owner</span><span class="role-pill staff">Staff</span></div>
-      <div class="arrow"><svg><use href="#i-chevron"/></svg></div>
-    </a>
-    <a href="trash_screen.html" class="mockup-card">
-      <div class="isquare c-red"><svg><use href="#i-inbox"/></svg></div>
-      <div class="grow">
-        <div class="name">trash_screen.dart</div>
-        <div class="sub">Unified trash list with restore / permanent delete.</div>
-      </div>
-      <div class="roles"><span class="role-pill owner">Owner</span><span class="role-pill admin">Admin</span></div>
-      <div class="arrow"><svg><use href="#i-chevron"/></svg></div>
-    </a>
-    <a href="settings_screen.html" class="mockup-card">
-      <div class="isquare c-grey"><svg><use href="#i-gear"/></svg></div>
-      <div class="grow">
-        <div class="name">settings_screen.dart</div>
-        <div class="sub">Settings hub with role-gated tiles.</div>
-      </div>
-      <div class="roles"><span class="role-pill owner">Owner</span><span class="role-pill admin">Admin</span><span class="role-pill staff">Staff</span></div>
-      <div class="arrow"><svg><use href="#i-chevron"/></svg></div>
-    </a>
-    <a href="login_screen.html" class="mockup-card">
-      <div class="isquare c-green"><svg><use href="#i-lock"/></svg></div>
-      <div class="grow">
-        <div class="name">login_screen.dart</div>
-        <div class="sub">Login and password recovery.</div>
-      </div>
-      <div class="roles"><span class="role-pill owner">Owner</span><span class="role-pill admin">Admin</span><span class="role-pill staff">Staff</span></div>
-      <div class="arrow"><svg><use href="#i-chevron"/></svg></div>
-    </a>
+    <a href="dashboard_screen.html" class="mockup-card"><div class="isquare c-blue"><svg><use href="#i-dash"/></svg></div><div class="grow"><div class="name">dashboard_screen.dart</div><div class="sub">Role-specific greeting and KPIs.</div></div><div class="roles"><span class="role-pill owner">Owner</span><span class="role-pill admin">Admin</span><span class="role-pill staff">Staff</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+    <a href="pos_screen.html" class="mockup-card"><div class="isquare c-blue"><svg><use href="#i-cart"/></svg></div><div class="grow"><div class="name">pos_screen.dart</div><div class="sub">Point of sale — categories, products, cart, checkout.</div></div><div class="roles"><span class="role-pill owner">Owner</span><span class="role-pill staff">Staff</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+    <a href="products_screen.html" class="mockup-card"><div class="isquare c-purple"><svg><use href="#i-box"/></svg></div><div class="grow"><div class="name">products_screen.dart</div><div class="sub">Product list with CRUD toolbar.</div></div><div class="roles"><span class="role-pill owner">Owner</span><span class="role-pill staff">Staff</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+    <a href="sales_screen.html" class="mockup-card"><div class="isquare c-blue"><svg><use href="#i-receipt"/></svg></div><div class="grow"><div class="name">sales_screen.dart</div><div class="sub">Sales / My Sales list scoped by role.</div></div><div class="roles"><span class="role-pill owner">Owner</span><span class="role-pill staff">Staff</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+    <a href="more_screen.html" class="mockup-card"><div class="isquare c-blue"><svg><use href="#i-more"/></svg></div><div class="grow"><div class="name">more_screen.dart</div><div class="sub">Role-filtered grid of secondary features.</div></div><div class="roles"><span class="role-pill owner">Owner</span><span class="role-pill admin">Admin</span><span class="role-pill staff">Staff</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+  </div>
+
+  <h2 class="section-head section-title">Transactions &amp; Payments</h2>
+  <p class="muted">Sale detail, receipts, payment flows, and success state.</p>
+  <div class="mockup-list">
+    <a href="sale_detail_screen.html" class="mockup-card"><div class="isquare c-blue"><svg><use href="#i-receipt"/></svg></div><div class="grow"><div class="name">sale_detail_screen.dart</div><div class="sub">Receipt-style sale detail with print/download.</div></div><div class="roles"><span class="role-pill owner">Owner</span><span class="role-pill staff">Staff</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+    <a href="receipt_screen.html" class="mockup-card"><div class="isquare c-blue"><svg><use href="#i-receipt"/></svg></div><div class="grow"><div class="name">receipt_screen.dart</div><div class="sub">Receipt preview and share/download actions.</div></div><div class="roles"><span class="role-pill owner">Owner</span><span class="role-pill staff">Staff</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+    <a href="gcash_payment_screen.html" class="mockup-card"><div class="isquare c-blue"><svg><use href="#i-qr"/></svg></div><div class="grow"><div class="name">gcash_payment_screen.dart</div><div class="sub">GCash QR payment details and review.</div></div><div class="roles"><span class="role-pill owner">Owner</span><span class="role-pill staff">Staff</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+    <a href="payment_success_screen.html" class="mockup-card"><div class="isquare c-green"><svg><use href="#i-receipt"/></svg></div><div class="grow"><div class="name">payment_success_screen.dart</div><div class="sub">Payment successful summary and actions.</div></div><div class="roles"><span class="role-pill owner">Owner</span><span class="role-pill staff">Staff</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+    <a href="payment_proof_viewer_screen.html" class="mockup-card"><div class="isquare c-blue"><svg><use href="#i-image"/></svg></div><div class="grow"><div class="name">payment_proof_viewer_screen.dart</div><div class="sub">GCash payment proof viewer.</div></div><div class="roles"><span class="role-pill owner">Owner</span><span class="role-pill admin">Admin</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+  </div>
+
+  <h2 class="section-head section-title">Catalog &amp; Inventory</h2>
+  <p class="muted">Products, categories, and stock management.</p>
+  <div class="mockup-list">
+    <a href="categories_screen.html" class="mockup-card"><div class="isquare c-purple"><svg><use href="#i-tag"/></svg></div><div class="grow"><div class="name">categories_screen.dart</div><div class="sub">Category list with search, filters, and CRUD.</div></div><div class="roles"><span class="role-pill owner">Owner</span><span class="role-pill staff">Staff</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+    <a href="stock_screen.html" class="mockup-card"><div class="isquare c-blue"><svg><use href="#i-box"/></svg></div><div class="grow"><div class="name">stock_screen.dart</div><div class="sub">Stock levels, search, filters, add/adjust.</div></div><div class="roles"><span class="role-pill owner">Owner</span><span class="role-pill staff">Staff</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+  </div>
+
+  <h2 class="section-head section-title">People</h2>
+  <p class="muted">Users, staff management, staff detail, and profile.</p>
+  <div class="mockup-list">
+    <a href="users_screen.html" class="mockup-card"><div class="isquare c-purple"><svg><use href="#i-people"/></svg></div><div class="grow"><div class="name">users_screen.dart</div><div class="sub">User management with roles and actions.</div></div><div class="roles"><span class="role-pill owner">Owner</span><span class="role-pill admin">Admin</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+    <a href="staff_management_screen.html" class="mockup-card"><div class="isquare c-blue"><svg><use href="#i-people"/></svg></div><div class="grow"><div class="name">staff_management_screen.dart</div><div class="sub">Owner staff list with search and add.</div></div><div class="roles"><span class="role-pill owner">Owner</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+    <a href="staff_detail_screen.html" class="mockup-card"><div class="isquare c-blue"><svg><use href="#i-person"/></svg></div><div class="grow"><div class="name">staff_detail_screen.dart</div><div class="sub">Staff profile, sales analytics, activity log.</div></div><div class="roles"><span class="role-pill owner">Owner</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+    <a href="profile_screen.html" class="mockup-card"><div class="isquare c-green"><svg><use href="#i-person"/></svg></div><div class="grow"><div class="name">profile_screen.dart</div><div class="sub">User profile and account information.</div></div><div class="roles"><span class="role-pill all">All</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+  </div>
+
+  <h2 class="section-head section-title">Reports &amp; Analytics</h2>
+  <p class="muted">Sales analytics, submitted reports, and preview.</p>
+  <div class="mockup-list">
+    <a href="sales_analytics_screen.html" class="mockup-card"><div class="isquare c-blue"><svg><use href="#i-bar"/></svg></div><div class="grow"><div class="name">sales_analytics_screen.dart</div><div class="sub">Reports hub with trends, breakdowns, transactions.</div></div><div class="roles"><span class="role-pill owner">Owner</span><span class="role-pill admin">Admin</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+    <a href="report_submissions_screen.html" class="mockup-card"><div class="isquare c-blue"><svg><use href="#i-file"/></svg></div><div class="grow"><div class="name">report_submissions_screen.dart</div><div class="sub">Submitted reports inbox / own reports.</div></div><div class="roles"><span class="role-pill owner">Owner</span><span class="role-pill admin">Admin</span><span class="role-pill staff">Staff</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+    <a href="report_preview_screen.html" class="mockup-card"><div class="isquare c-blue"><svg><use href="#i-file"/></svg></div><div class="grow"><div class="name">report_preview_screen.dart</div><div class="sub">Preview of submitted PDF/XLSX report.</div></div><div class="roles"><span class="role-pill owner">Owner</span><span class="role-pill admin">Admin</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+  </div>
+
+  <h2 class="section-head section-title">Communications</h2>
+  <p class="muted">Notifications and announcements.</p>
+  <div class="mockup-list">
+    <a href="notifications_screen.html" class="mockup-card"><div class="isquare c-blue"><svg><use href="#i-bell"/></svg></div><div class="grow"><div class="name">notifications_screen.dart</div><div class="sub">Notification list with read state.</div></div><div class="roles"><span class="role-pill all">All</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+    <a href="announcements_screen.html" class="mockup-card"><div class="isquare c-purple"><svg><use href="#i-campaign"/></svg></div><div class="grow"><div class="name">announcements_screen.dart</div><div class="sub">Announcements list with pin/edit/delete.</div></div><div class="roles"><span class="role-pill owner">Owner</span><span class="role-pill admin">Admin</span><span class="role-pill staff">Staff</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+  </div>
+
+  <h2 class="section-head section-title">AI &amp; Configuration</h2>
+  <p class="muted">AI advisor, Groq config, and quota management.</p>
+  <div class="mockup-list">
+    <a href="ai_advisor_screen.html" class="mockup-card"><div class="isquare c-purple"><svg><use href="#i-psych"/></svg></div><div class="grow"><div class="name">ai_advisor_screen.dart</div><div class="sub">Role-aware AI chat advisor.</div></div><div class="roles"><span class="role-pill owner">Owner</span><span class="role-pill admin">Admin</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+    <a href="ai_config_screen.html" class="mockup-card"><div class="isquare c-purple"><svg><use href="#i-psych"/></svg></div><div class="grow"><div class="name">ai_config_screen.dart</div><div class="sub">Groq API key and model configuration.</div></div><div class="roles"><span class="role-pill admin">Admin</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+    <a href="ai_quota_management_page.html" class="mockup-card"><div class="isquare c-purple"><svg><use href="#i-psych"/></svg></div><div class="grow"><div class="name">ai_quota_management_page.dart</div><div class="sub">Daily AI quota defaults and per-user limits.</div></div><div class="roles"><span class="role-pill admin">Admin</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+  </div>
+
+  <h2 class="section-head section-title">Admin &amp; Maintenance</h2>
+  <p class="muted">Activity logs, backup, trash, and access control.</p>
+  <div class="mockup-list">
+    <a href="activity_logs_screen.html" class="mockup-card"><div class="isquare c-blue"><svg><use href="#i-history"/></svg></div><div class="grow"><div class="name">activity_logs_screen.dart</div><div class="sub">Audit trail of sales, stock, user actions.</div></div><div class="roles"><span class="role-pill owner">Owner</span><span class="role-pill admin">Admin</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+    <a href="backup_restore_screen.html" class="mockup-card"><div class="isquare c-blue"><svg><use href="#i-backup"/></svg></div><div class="grow"><div class="name">backup_restore_screen.dart</div><div class="sub">Backup location, export/import, restore.</div></div><div class="roles"><span class="role-pill admin">Admin</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+    <a href="trash_screen.html" class="mockup-card"><div class="isquare c-red"><svg><use href="#i-inbox"/></svg></div><div class="grow"><div class="name">trash_screen.dart</div><div class="sub">Unified trash list with restore / permanent delete.</div></div><div class="roles"><span class="role-pill owner">Owner</span><span class="role-pill admin">Admin</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+    <a href="access_denied_screen.html" class="mockup-card"><div class="isquare c-red"><svg><use href="#i-lock"/></svg></div><div class="grow"><div class="name">access_denied_screen.dart</div><div class="sub">Permission denial screen.</div></div><div class="roles"><span class="role-pill all">All</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+  </div>
+
+  <h2 class="section-head section-title">Settings</h2>
+  <p class="muted">Settings hub and sub-pages.</p>
+  <div class="mockup-list">
+    <a href="settings_screen.html" class="mockup-card"><div class="isquare c-grey"><svg><use href="#i-gear"/></svg></div><div class="grow"><div class="name">settings_screen.dart</div><div class="sub">Settings hub with role-gated tiles.</div></div><div class="roles"><span class="role-pill owner">Owner</span><span class="role-pill admin">Admin</span><span class="role-pill staff">Staff</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+    <a href="settings/appearance_settings_page.html" class="mockup-card"><div class="isquare c-amber"><svg><use href="#i-palette"/></svg></div><div class="grow"><div class="name">settings/appearance_settings_page.dart</div><div class="sub">Light / dark theme selection.</div></div><div class="roles"><span class="role-pill all">All</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+    <a href="settings/pin_settings_page.html" class="mockup-card"><div class="isquare c-blue"><svg><use href="#i-lock"/></svg></div><div class="grow"><div class="name">settings/pin_settings_page.dart</div><div class="sub">Set, change, or remove PIN.</div></div><div class="roles"><span class="role-pill all">All</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+    <a href="settings/security_settings_page.html" class="mockup-card"><div class="isquare c-red"><svg><use href="#i-lock"/></svg></div><div class="grow"><div class="name">settings/security_settings_page.dart</div><div class="sub">Password and session security.</div></div><div class="roles"><span class="role-pill all">All</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+    <a href="settings/store_information_settings_page.html" class="mockup-card"><div class="isquare c-blue"><svg><use href="#i-folder"/></svg></div><div class="grow"><div class="name">settings/store_information_settings_page.dart</div><div class="sub">Store info, contact, receipt footer, currency.</div></div><div class="roles"><span class="role-pill owner">Owner</span></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
   </div>
 
   <h2 class="section-head section-title">Shared / preserved mockups</h2>
-  <p class="muted">Dialog, dropdown, and helper mockups kept unchanged as requested.</p>
+  <p class="muted">Dialog, dropdown, and helper mockups kept for reference.</p>
   <div class="mockup-list">
-    <a href="crud_dialogs.html" class="mockup-card">
-      <div class="isquare c-grey"><svg><use href="#i-box"/></svg></div>
-      <div class="grow">
-        <div class="name">crud_dialogs.html</div>
-        <div class="sub">Shared product / category / user CRUD dialogs.</div>
-      </div>
-      <div class="arrow"><svg><use href="#i-chevron"/></svg></div>
-    </a>
-    <a href="dialogs_settings.html" class="mockup-card">
-      <div class="isquare c-grey"><svg><use href="#i-gear"/></svg></div>
-      <div class="grow">
-        <div class="name">dialogs_settings.html</div>
-        <div class="sub">Settings-related shared dialogs.</div>
-      </div>
-      <div class="arrow"><svg><use href="#i-chevron"/></svg></div>
-    </a>
-    <a href="profile_dropdown.html" class="mockup-card">
-      <div class="isquare c-grey"><svg><use href="#i-people"/></svg></div>
-      <div class="grow">
-        <div class="name">profile_dropdown.html</div>
-        <div class="sub">Profile menu / dropdown states.</div>
-      </div>
-      <div class="arrow"><svg><use href="#i-chevron"/></svg></div>
-    </a>
+    <a href="crud_dialogs.html" class="mockup-card"><div class="isquare c-grey"><svg><use href="#i-box"/></svg></div><div class="grow"><div class="name">crud_dialogs.html</div><div class="sub">Shared product / category / user CRUD dialogs.</div></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+    <a href="dialogs_settings.html" class="mockup-card"><div class="isquare c-grey"><svg><use href="#i-gear"/></svg></div><div class="grow"><div class="name">dialogs_settings.html</div><div class="sub">Settings-related shared dialogs.</div></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
+    <a href="profile_dropdown.html" class="mockup-card"><div class="isquare c-grey"><svg><use href="#i-people"/></svg></div><div class="grow"><div class="name">profile_dropdown.html</div><div class="sub">Profile menu / dropdown states.</div></div><div class="arrow"><svg><use href="#i-chevron"/></svg></div></a>
   </div>
-
-  <h2 class="section-head section-title">Live source map</h2>
-  <p class="muted">
-    New files follow the convention <code>&lt;dart_screen_name&gt;.html</code>.<br>
-    Shared dialog files and old mockups without new screen replacements are preserved.
-  </p>
 </div>
 
 <script src="mockup.js"></script>
