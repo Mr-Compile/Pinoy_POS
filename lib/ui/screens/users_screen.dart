@@ -1,4 +1,6 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/constants.dart';
@@ -14,6 +16,7 @@ import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/dashboard_blocks.dart';
 import 'package:pinoy_pos/ui/widgets/app_list_item.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
+import 'package:pinoy_pos/ui/widgets/pagination_bar.dart';
 import 'package:pinoy_pos/ui/widgets/responsive_create_action.dart';
 import 'package:pinoy_pos/ui/widgets/error_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
@@ -32,6 +35,10 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     final _searchController = TextEditingController();
   String _searchQuery = '';
   UserRole? _roleFilter;
+
+  /// Client-side pagination, matching the mockup: 10 rows per page.
+  int _currentPage = 1;
+  static const int _pageSize = 10;
 
   @override
   void initState() {
@@ -83,6 +90,10 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
 
   Future<void> _refresh() async {
     await ref.read(userControllerProvider.notifier).loadUsers();
+  }
+
+  void _goToPage(int page) {
+    setState(() => _currentPage = page);
   }
 
   // ── DELETE (soft) ────────────────────────────────────────────────────
@@ -635,7 +646,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     final createAction = canManage
         ? ResponsiveCreateAction(
             label: 'Add User',
-            icon: Icons.person_add,
+            icon: Icons.add,
             onPressed: _showAddUserDialog,
           )
         : null;
@@ -667,11 +678,16 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
               search: AppSearchField(
                 controller: _searchController,
                 hint: 'Search by name or username',
-                onChanged: (value) =>
-                    setState(() => _searchQuery = value),
+                onChanged: (value) => setState(() {
+                  _searchQuery = value;
+                  _currentPage = 1;
+                }),
                 onClear: () {
                   _searchController.clear();
-                  setState(() => _searchQuery = '');
+                  setState(() {
+                    _searchQuery = '';
+                    _currentPage = 1;
+                  });
                 },
               ),
               controls: [_buildRoleFilter(context)],
@@ -704,7 +720,10 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
 
     return PopupMenuButton<UserRole?>(
       initialValue: _roleFilter,
-      onSelected: (value) => setState(() => _roleFilter = value),
+      onSelected: (value) => setState(() {
+        _roleFilter = value;
+        _currentPage = 1;
+      }),
       offset: const Offset(0, 40),
       itemBuilder: (context) => [
         PopupMenuItem(
@@ -841,6 +860,13 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     bool canToggleActive,
     double bottomClearance,
   ) {
+    final totalPages = (filteredUsers.length / _pageSize).ceil();
+    final effectivePage = math.min(_currentPage, math.max(totalPages, 1));
+    final pageItems = filteredUsers
+        .skip((effectivePage - 1) * _pageSize)
+        .take(_pageSize)
+        .toList();
+
     return ListView.builder(
       padding: EdgeInsets.fromLTRB(
         Spacing.lg,
@@ -848,9 +874,23 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
         Spacing.lg,
         Spacing.lg + bottomClearance,
       ),
-      itemCount: filteredUsers.length,
+      itemCount: pageItems.length + (totalPages > 1 ? 1 : 0),
       itemBuilder: (context, index) {
-        final user = filteredUsers[index];
+        if (index == pageItems.length) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: Spacing.sm,
+              vertical: Spacing.sm,
+            ),
+            child: PaginationBar(
+              totalItems: filteredUsers.length,
+              currentPage: effectivePage,
+              pageSize: _pageSize,
+              onPageChanged: _goToPage,
+            ),
+          );
+        }
+        final user = pageItems[index];
         final isSelf = currentUser?.id == user.id;
         final roleColor = _roleColor(user.role, colorScheme);
         final brightness = Theme.of(context).brightness;
