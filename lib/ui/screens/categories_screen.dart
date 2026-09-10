@@ -1,4 +1,6 @@
 ﻿import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
@@ -13,10 +15,12 @@ import 'package:pinoy_pos/ui/widgets/app_detail_row.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
+import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_list_item.dart';
 import 'package:pinoy_pos/ui/widgets/app_status_chip.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
+import 'package:pinoy_pos/ui/widgets/pagination_bar.dart';
 import 'package:pinoy_pos/ui/widgets/responsive_create_action.dart';
 import 'package:pinoy_pos/ui/widgets/summary_stat_card.dart';
 
@@ -38,6 +42,10 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
   String _searchQuery = '';
   CategoryFilter _categoryFilter = CategoryFilter.all;
   Timer? _debounce;
+
+  /// Client-side pagination, matching the mockup: 10 rows per page.
+  int _currentPage = 1;
+  static const int _pageSize = 10;
 
   String? get _roleLabel => ref.read(authStateProvider).user?.role.displayName;
 
@@ -114,6 +122,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
       if (mounted) {
         setState(() {
           _searchQuery = value.trim();
+          _currentPage = 1;
         });
       }
     });
@@ -123,6 +132,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
     _searchController.clear();
     setState(() {
       _searchQuery = '';
+      _currentPage = 1;
     });
   }
 
@@ -130,8 +140,15 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
     setState(() {
       _categoryFilter = CategoryFilter.all;
       _searchQuery = '';
+      _currentPage = 1;
     });
     _searchController.clear();
+  }
+
+  void _goToPage(int page) {
+    final totalPages = (_filteredCategories.length / _pageSize).ceil();
+    if (page < 1 || page > totalPages) return;
+    setState(() => _currentPage = page);
   }
 
   Future<void> _toggleCategoryStatus(Category category, int productCount) async {
@@ -318,8 +335,10 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
               value: '${_categories.length}',
               label: 'Total',
               selected: _categoryFilter == CategoryFilter.all,
-              onTap: () =>
-                  setState(() => _categoryFilter = CategoryFilter.all),
+              onTap: () => setState(() {
+                _categoryFilter = CategoryFilter.all;
+                _currentPage = 1;
+              }),
             ),
           ),
           const SizedBox(width: Spacing.sm),
@@ -330,8 +349,10 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
               value: '$activeCount',
               label: 'Active',
               selected: _categoryFilter == CategoryFilter.active,
-              onTap: () =>
-                  setState(() => _categoryFilter = CategoryFilter.active),
+              onTap: () => setState(() {
+                _categoryFilter = CategoryFilter.active;
+                _currentPage = 1;
+              }),
             ),
           ),
           const SizedBox(width: Spacing.sm),
@@ -342,8 +363,10 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
               value: '${_categories.length - activeCount}',
               label: 'Inactive',
               selected: _categoryFilter == CategoryFilter.inactive,
-              onTap: () =>
-                  setState(() => _categoryFilter = CategoryFilter.inactive),
+              onTap: () => setState(() {
+                _categoryFilter = CategoryFilter.inactive;
+                _currentPage = 1;
+              }),
             ),
           ),
         ],
@@ -467,6 +490,14 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
     bool canToggleStatus,
     double bottomClearance,
   ) {
+    final filtered = _filteredCategories;
+    final totalPages = (filtered.length / _pageSize).ceil();
+    final effectivePage = math.min(_currentPage, math.max(totalPages, 1));
+    final pageItems = filtered
+        .skip((effectivePage - 1) * _pageSize)
+        .take(_pageSize)
+        .toList();
+
     return ListView.builder(
       padding: EdgeInsets.fromLTRB(
         Spacing.lg,
@@ -474,9 +505,27 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
         Spacing.lg,
         Spacing.lg + bottomClearance,
       ),
-      itemCount: _filteredCategories.length,
+      itemCount: pageItems.length + (totalPages > 1 ? 1 : 0),
       itemBuilder: (context, index) {
-        final category = _filteredCategories[index];
+        if (index == pageItems.length) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: Spacing.md),
+            child: AppCard(
+              variant: AppCardVariant.filled,
+              padding: const EdgeInsets.symmetric(
+                horizontal: Spacing.md,
+                vertical: Spacing.sm,
+              ),
+              child: PaginationBar(
+                totalItems: filtered.length,
+                currentPage: effectivePage,
+                pageSize: _pageSize,
+                onPageChanged: _goToPage,
+              ),
+            ),
+          );
+        }
+        final category = pageItems[index];
         return _buildCategoryItem(
           category,
           canEdit,
@@ -611,7 +660,10 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
 
     return PopupMenuButton<CategoryFilter>(
       initialValue: _categoryFilter,
-      onSelected: (value) => setState(() => _categoryFilter = value),
+      onSelected: (value) => setState(() {
+        _categoryFilter = value;
+        _currentPage = 1;
+      }),
       offset: const Offset(0, 40),
       itemBuilder: (context) => [
         PopupMenuItem(
@@ -680,6 +732,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
       onPressed: () {
         setState(() {
           _categoryFilter = isSelected ? CategoryFilter.all : filter;
+          _currentPage = 1;
         });
       },
       elevation: 0,
