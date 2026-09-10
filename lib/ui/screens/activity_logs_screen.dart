@@ -140,9 +140,36 @@ class _ActivityLogsScreenState extends ConsumerState<ActivityLogsScreen> {
     );
   }
 
+  /// Filter chips the current role may use, derived from the same
+  /// permissions that gate the rest of the app:
+  ///   Sales → view_sales · Stock → view_stock · Users → view_users
+  List<_LogFilter> get _visibleFilters {
+    final auth = ref.read(authStateProvider.notifier);
+    return [
+      _LogFilter.all,
+      if (auth.hasPermission('view_sales')) _LogFilter.sales,
+      if (auth.hasPermission('view_stock')) _LogFilter.stock,
+      if (auth.hasPermission('view_users')) _LogFilter.users,
+    ];
+  }
+
+  /// Active filter clamped to what the role may use.
+  _LogFilter get _effectiveFilter =>
+      _visibleFilters.contains(_filter) ? _filter : _LogFilter.all;
+
   List<ActivityLog> get _filteredActivities {
+    final auth = ref.read(authStateProvider.notifier);
+    final canSeeSales = auth.hasPermission('view_sales');
+    final canSeeStock = auth.hasPermission('view_stock');
+    final canSeeUsers = auth.hasPermission('view_users');
+
     return _activities.where((a) {
-      switch (_filter) {
+      // Role scoping: even "All" hides categories the role cannot access.
+      if (_isSalesLog(a) && !canSeeSales) return false;
+      if (_isStockLog(a) && !canSeeStock) return false;
+      if (_isUserLog(a) && !canSeeUsers) return false;
+      // Unclassified logs (settings, backups, …) stay visible under All.
+      switch (_effectiveFilter) {
         case _LogFilter.sales:
           if (!_isSalesLog(a)) return false;
           break;
@@ -229,12 +256,7 @@ class _ActivityLogsScreenState extends ConsumerState<ActivityLogsScreen> {
 
   Widget _buildFilterChips() {
     final cs = Theme.of(context).colorScheme;
-    final filters = [
-      _LogFilter.all,
-      _LogFilter.sales,
-      _LogFilter.stock,
-      _LogFilter.users,
-    ];
+    final filters = _visibleFilters;
     final labels = {
       _LogFilter.all: 'All',
       _LogFilter.sales: 'Sales',
@@ -247,7 +269,7 @@ class _ActivityLogsScreenState extends ConsumerState<ActivityLogsScreen> {
       child: Wrap(
         spacing: Spacing.sm,
         children: filters.map((filter) {
-          final isSelected = _filter == filter;
+          final isSelected = _effectiveFilter == filter;
           return ChoiceChip(
             label: Text(labels[filter]!),
             selected: isSelected,
