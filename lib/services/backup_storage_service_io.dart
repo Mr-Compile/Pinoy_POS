@@ -579,14 +579,20 @@ class BackupStorageService {
     return p.basename(path);
   }
 
-  /// Returns a human-readable label for a backup location folder.
+  /// Returns a human-readable relative path for a backup location folder,
+  /// e.g. `/Documents/PinoyPOS/backups`, mirroring the backup screen mockup.
+  /// Falls back to the stored display name only when the reference cannot be
+  /// resolved into a meaningful relative path.
   String getLocationDisplayName(BackupLocation location) {
     if (location.isNone) return '';
-    if (location.displayName.isNotEmpty) return location.displayName;
-    if (location.type == BackupStorageType.androidSaf) {
-      return _displayNameFromUri(location.reference);
+    final computed = location.type == BackupStorageType.androidSaf
+        ? _displayNameFromUri(location.reference)
+        : _displayNameFromPath(location.reference);
+    if (computed.isNotEmpty && computed != 'Selected folder') {
+      return computed;
     }
-    return _displayNameFromPath(location.reference);
+    if (location.displayName.isNotEmpty) return location.displayName;
+    return computed;
   }
 
   /// Deletes a backup file by its storage reference.
@@ -649,21 +655,50 @@ class BackupStorageService {
     }
   }
 
+  /// Returns a relative, slash-separated path starting from a well-known folder
+  /// such as Documents, Downloads, or Desktop, e.g. `/Documents/PinoyPOS/backups`.
   String _displayNameFromPath(String path) {
     final resolved = _decodeFileUri(path);
-    final parts = p.split(resolved);
+    final parts = p
+        .split(resolved)
+        .where((s) => s.isNotEmpty)
+        .map((s) => s.replaceAll(RegExp(r'[\\/]+$'), ''))
+        .toList();
     if (parts.isEmpty) return resolved;
-    if (parts.length <= 3) return parts.join(' › ');
-    return '... › ${parts.sublist(parts.length - 3).join(' › ')}';
+
+    const anchors = {'documents', 'downloads', 'download', 'desktop'};
+    final anchor = parts.lastIndexWhere(
+      (s) => anchors.contains(s.toLowerCase()),
+    );
+    if (anchor >= 0) {
+      return '/${parts.sublist(anchor).join('/')}';
+    }
+    if (parts.length <= 3) return parts.join('/');
+    return '.../${parts.sublist(parts.length - 3).join('/')}';
   }
 
+  /// Returns a relative, slash-separated path from an Android SAF URI.
+  ///
+  /// SAF tree URIs look like `.../tree/<root>:<relative path>`; we strip the
+  /// `tree` prefix and the root volume so it reads like a folder path, e.g.
+  /// `/Documents/PinoyPOS/backups`.
   String _displayNameFromUri(String uri) {
     try {
       final parsed = Uri.parse(uri);
-      final segments = parsed.pathSegments.where((s) => s.isNotEmpty).toList();
-      if (segments.isEmpty) return 'Selected folder';
-      if (segments.length <= 3) return segments.join(' › ');
-      return '... › ${segments.sublist(segments.length - 3).join(' › ')}';
+      final segments = parsed.pathSegments;
+      final treeIndex = segments.indexOf('tree');
+      if (treeIndex >= 0 && treeIndex < segments.length - 1) {
+        var relative = segments.sublist(treeIndex + 1).join('/');
+        final colon = relative.indexOf(':');
+        if (colon >= 0) relative = relative.substring(colon + 1);
+        relative = relative.split('/').where((s) => s.isNotEmpty).join('/');
+        if (relative.isNotEmpty) return '/$relative';
+      }
+
+      final parts = segments.where((s) => s.isNotEmpty).toList();
+      if (parts.isEmpty) return 'Selected folder';
+      if (parts.length <= 3) return parts.join(' › ');
+      return '... › ${parts.sublist(parts.length - 3).join(' › ')}';
     } catch (e) {
       return 'Selected folder';
     }
