@@ -163,3 +163,25 @@ function closeMenu() {
   if (openMenu) { openMenu.remove(); openMenu = null; }
   document.querySelectorAll('.menu-backdrop').forEach(b => b.remove());
 }
+
+/* Renders a pagination bar: "1–10 of N" + ‹ 1 2 3 › buttons.
+   goFn is the name of the caller's page-change function (e.g. 'goPage').
+   cls adds extra classes (e.g. 'standalone' when the bar is not inside a card). */
+function pagerHtml(total, page, pageSize, goFn, cls) {
+  const totalPages = Math.ceil(total / pageSize);
+  if (totalPages <= 1) return '';
+  const start = (page - 1) * pageSize + 1;
+  const end = Math.min(page * pageSize, total);
+  let nums = '';
+  for (let i = 1; i <= totalPages; i++) {
+    nums += `<button class="pg-btn ${i === page ? 'on' : ''}" onclick="${goFn}(${i})">${i}</button>`;
+  }
+  return `<div class="pager ${cls || ''}">
+    <span class="pager-info">${start}–${end} of ${total}</span>
+    <div class="pager-btns">
+      <button class="pg-btn" ${page === 1 ? 'disabled' : ''} onclick="${goFn}(${page - 1})" aria-label="Previous page"><svg viewBox="0 0 24 24"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></button>
+      ${nums}
+      <button class="pg-btn" ${page === totalPages ? 'disabled' : ''} onclick="${goFn}(${page + 1})" aria-label="Next page"><svg viewBox="0 0 24 24"><path d="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg></button>
+    </div>
+  </div>`;
+}

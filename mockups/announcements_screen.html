@@ -16,6 +16,7 @@
   .announcement .head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
   .announcement .body { font-size: 13px; color: var(--text-2); line-height: 1.5; }
   .announcement .foot { font-size: 11px; color: var(--text-3); margin-top: 8px; }
+  #announcementList { display: flex; flex-direction: column; gap: 14px; }
 </style>
 </head>
 <body>
@@ -61,39 +62,91 @@
       </div>
       <div class="screen">
         <div class="screen-body">
-          <div class="card announcement">
-            <div class="head">
-              <svg width="16" height="16" fill="var(--primary)"><use href="#i-pushpin"/></svg>
-              <div class="name" style="font-weight:800;">New payment method available</div>
-            </div>
-            <div class="body">GCash QR payments are now enabled. Make sure customer name is collected before checkout.</div>
-            <div class="foot">Posted: 2026-09-10 08:00 · Pinned</div>
-            <div class="row" style="justify-content:flex-end;gap:8px;padding:10px 0 0;">
-              <div class="aicon"><svg><use href="#i-visibility"/></svg></div>
-              <div class="aicon"><svg><use href="#i-edit"/></svg></div>
-              <div class="aicon del"><svg><use href="#i-delete"/></svg></div>
-            </div>
-          </div>
-          <div class="card announcement" style="margin-top:12px;">
-            <div class="head">
-              <div class="name">Weekend promo</div>
-            </div>
-            <div class="body">Pastil is 20% off this Saturday and Sunday. Stock up before the rush.</div>
-            <div class="foot">Posted: 2026-09-09 14:30</div>
-            <div class="row" style="justify-content:flex-end;gap:8px;padding:10px 0 0;">
-              <div class="aicon"><svg><use href="#i-visibility"/></svg></div>
-              <div class="aicon"><svg><use href="#i-edit"/></svg></div>
-              <div class="aicon del"><svg><use href="#i-delete"/></svg></div>
-            </div>
-          </div>
+          <div id="announcementList"></div>
+          <div id="announcementPager"></div>
         </div>
       </div>
-      <button class="fab" style="position:absolute;bottom:16px;right:16px;" onclick="showToast('Add announcement', 'info')"><svg><use href="#i-add"/></svg> Add Announcement</button>
+      <button class="fab" style="position:absolute;bottom:16px;right:16px;" onclick="showToast('Add announcement', 'info')"><svg><use href="#i-add"/></svg></button>
     </div>
     <div class="frame-notes">Owner/Admin can pin, edit, delete, and add announcements. Staff see view-only. FAB is the primary create action on portrait mobile.</div>
   </div>
 </div>
 
 <script src="mockup.js"></script>
+<script>
+const PAGE_SIZE = 10;
+let currentPage = 1;
+
+const templates = [
+  { title: 'Weekend promo', body: 'Pastil is 20% off this Saturday and Sunday. Stock up before the rush.' },
+  { title: 'System maintenance', body: 'Scheduled maintenance on Sunday, 2:00 AM. Save your data before then.' },
+  { title: 'New staff onboarding', body: 'Welcome to the new cashier team! Please review the POS basics guide.' },
+  { title: 'Holiday schedule', body: 'The store will open from 10 AM to 6 PM on the upcoming holiday.' },
+  { title: 'Inventory check', body: 'Monthly inventory audit this Friday. Ensure stock counts are updated.' },
+  { title: 'GCash reminder', body: 'Always confirm GCash payment before generating the receipt.' },
+  { title: 'Promo ending soon', body: 'The 10% off dessert promo ends this week. Update signage by Thursday.' },
+  { title: 'Cleanliness drive', body: 'Please maintain counter cleanliness and follow the closing checklist.' },
+  { title: 'Supplier delay notice', body: 'Rice delivery may arrive 30 minutes late tomorrow. Plan accordingly.' },
+  { title: 'Customer feedback', body: 'Recent feedback highlights fast service. Keep it up!' },
+];
+
+const announcementData = [];
+for (let i = 0; i < 24; i++) {
+  const t = templates[i % templates.length];
+  const num = Math.floor(i / templates.length) + 1;
+  const suffix = num > 1 ? ' #' + num : '';
+  const hour = String(8 + (i % 12)).padStart(2, '0');
+  const day = String(1 + (i % 10)).padStart(2, '0');
+  announcementData.push({
+    id: i + 1,
+    title: t.title + suffix,
+    body: t.body,
+    posted: '2026-09-' + day + ' ' + hour + ':00',
+    pinned: i === 0,
+  });
+}
+
+function goPage(p) {
+  currentPage = p;
+  renderAnnouncements();
+}
+
+function renderAnnouncements() {
+  const container = document.getElementById('announcementList');
+  const pager = document.getElementById('announcementPager');
+  const total = announcementData.length;
+
+  if (total === 0) {
+    container.innerHTML = `<div class="center-screen" style="padding:28px 0;min-height:140px"><div class="icon-lg"><svg><use href="#i-campaign"/></svg></div><div class="title">No announcements yet</div><div class="msg">Announcements will appear here when added.</div></div>`;
+    pager.innerHTML = '';
+    return;
+  }
+
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  if (currentPage > totalPages) currentPage = totalPages;
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const pageItems = announcementData.slice(start, start + PAGE_SIZE);
+
+  container.innerHTML = pageItems.map(a => `
+    <div class="card announcement">
+      <div class="head">
+        ${a.pinned ? '<svg width="16" height="16" fill="var(--primary)"><use href="#i-pushpin"/></svg>' : ''}
+        <div class="name" style="font-weight:800;">${escapeHtml(a.title)}</div>
+      </div>
+      <div class="body">${escapeHtml(a.body)}</div>
+      <div class="foot">Posted: ${a.posted}${a.pinned ? ' · Pinned' : ''}</div>
+      <div class="row" style="justify-content:flex-end;gap:8px;padding:10px 0 0;">
+        <div class="aicon" onclick="showToast('View announcement', 'info')"><svg><use href="#i-visibility"/></svg></div>
+        <div class="aicon" onclick="showToast('Edit announcement', 'info')"><svg><use href="#i-edit"/></svg></div>
+        <div class="aicon del" onclick="showToast('Delete announcement', 'error')"><svg><use href="#i-delete"/></svg></div>
+      </div>
+    </div>
+  `).join('');
+
+  pager.innerHTML = pagerHtml(total, currentPage, PAGE_SIZE, 'goPage', 'standalone');
+}
+
+renderAnnouncements();
+</script>
 </body>
 </html>

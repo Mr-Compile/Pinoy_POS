@@ -8,6 +8,7 @@
 <style>
   .frames-legend { max-width: 900px; margin: 0 auto 24px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; color: var(--text-2); font-size: 13px; }
   .role-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; border: 1px solid var(--border); background: rgba(75,130,233,.16); color: var(--info); border-color: rgba(75,130,233,.4); }
+  #staffList { display: flex; flex-direction: column; gap: 10px; }
 </style>
 </head>
 <body>
@@ -21,13 +22,13 @@
   <symbol id="i-person" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></symbol>
   <symbol id="i-add" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></symbol>
   <symbol id="i-filter" viewBox="0 0 24 24"><path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/></symbol>
-  <symbol id="i-more" viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></symbol>
   <symbol id="i-view" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></symbol>
-  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></symbol>
   <symbol id="i-lock" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></symbol>
   <symbol id="i-power" viewBox="0 0 24 24"><path d="M16.56 13.66a8 8 0 0 1-11.31 0 8 8 0 0 1 0-11.31 1.5 1.5 0 0 0-2.12-2.12 10.99 10.99 0 0 0 0 15.56A10.99 10.99 0 0 0 18.68 2.23a1.5 1.5 0 0 0-2.12 2.12 8 8 0 0 1 0 11.31zM11 7.5v9a1.5 1.5 0 0 0 3 0v-9a1.5 1.5 0 0 0-3 0z"/></symbol>
   <symbol id="i-delete" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></symbol>
-  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></symbol>
   <symbol id="i-edit" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></symbol>
   <symbol id="i-lock" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zM9 8V6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9z"/></symbol>
   <symbol id="i-block" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM4 12c0-4.42 3.58-8 8-8 1.85 0 3.55.63 4.9 1.69L5.69 16.9C4.63 15.55 4 13.85 4 12zm8 8c-1.85 0-3.55-.63-4.9-1.69L18.31 7.1C19.37 8.45 20 10.15 20 12c0 4.42-3.58 8-8 8z"/></symbol>
@@ -71,24 +72,12 @@
               </select>
             </div>
           </div>
-          <div class="card row tap staff-row" data-status="active" onclick="showToast('Staff detail', 'info')">
-            <div class="icircle solid-blue">J</div>
-            <div class="grow"><div class="name">Juan Dela Cruz</div><div class="sub">@juan · Staff · 18 sales</div></div>
-            <div class="aicon" onclick="staffMenu(event, true)"><svg><use href="#i-more"/></svg></div>
-          </div>
-          <div class="card row tap staff-row" data-status="active" style="margin-top:10px;" onclick="showToast('Staff detail', 'info')">
-            <div class="icircle solid-green">M</div>
-            <div class="grow"><div class="name">Maria Reyes</div><div class="sub">@maria · Staff · 6 sales</div></div>
-            <div class="aicon" onclick="staffMenu(event, true)"><svg><use href="#i-more"/></svg></div>
-          </div>
-          <div class="card row tap staff-row" data-status="inactive" style="margin-top:10px;" onclick="showToast('Staff detail', 'info')">
-            <div class="icircle solid-grey">A</div>
-            <div class="grow"><div class="name">Ana Santos</div><div class="sub">@ana · Staff · Inactive</div></div>
-            <div class="aicon" onclick="staffMenu(event, false)"><svg><use href="#i-more"/></svg></div>
-          </div>
+
+          <div id="staffList"></div>
+          <div id="staffPager"></div>
         </div>
       </div>
-      <button class="fab" style="position:absolute;bottom:16px;right:16px;" onclick="showToast('Add staff', 'info')"><svg><use href="#i-add"/></svg> Add Staff</button>
+      <button class="fab" style="position:absolute;bottom:16px;right:16px;" onclick="showToast('Add staff', 'info')"><svg><use href="#i-add"/></svg></button>
     </div>
     <div class="frame-notes">Owner-only. Search, status filter dropdown, staff list rows with avatar, name, username, role, sale count, status, and a more-options menu. FAB adds a new staff account.</div>
   </div>
@@ -96,25 +85,85 @@
 
 <script src="mockup.js"></script>
 <script>
-  function filterStaff() {
+  const PAGE_SIZE = 10;
+  let currentPage = 1;
+
+  const staffNames = [
+    'Juan Dela Cruz', 'Maria Reyes', 'Ana Santos', 'Pedro Ramirez', 'Rosa Mendoza',
+    'Carlos Villanueva', 'Lorna Aquino', 'Rico Dizon', 'Gina Torres', 'Miguel Bautista',
+    'Sofia Lim', 'Dario Castro', 'Nena Ramos', 'Felix Gomez', 'Aida Cruz',
+    'Benito Ocampo', 'Cora Reyes', 'Dennis Abad', 'Elena Suarez', 'Frank Garcia',
+    'Grace Lopez', 'Harold Santos', 'Iris Tan', 'Jerome Vega'
+  ];
+
+  const staffData = staffNames.map((name, i) => ({
+    id: i + 1,
+    name,
+    username: name.split(' ')[0].toLowerCase(),
+    sales: Math.max(1, 24 - i),
+    isActive: i % 6 !== 5,
+  }));
+
+  function goPage(p) {
+    currentPage = p;
+    renderStaff();
+  }
+
+  function filteredStaff() {
     const status = document.getElementById('statusFilter').value;
     const query = document.getElementById('staffSearch').value.trim().toLowerCase();
-
-    document.querySelectorAll('.staff-row').forEach(row => {
-      const rowStatus = row.dataset.status;
-      const name = row.querySelector('.name').textContent.toLowerCase();
-      const sub = row.querySelector('.sub').textContent.toLowerCase();
-
-      const statusMatch = status === 'all' || rowStatus === status;
-      const searchMatch = query === '' || name.includes(query) || sub.includes(query);
-
-      row.style.display = statusMatch && searchMatch ? 'flex' : 'none';
+    return staffData.filter(s => {
+      const statusMatch = status === 'all' || (s.isActive ? 'active' : 'inactive') === status;
+      const searchMatch = query === '' || s.name.toLowerCase().includes(query) || s.username.toLowerCase().includes(query);
+      return statusMatch && searchMatch;
     });
+  }
+
+  function initials(name) {
+    return name.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase();
+  }
+
+  function avatarColor(s, i) {
+    if (!s.isActive) return 'solid-grey';
+    const colors = ['solid-blue', 'solid-green', 'solid-purple', 'solid-amber'];
+    return colors[i % colors.length];
+  }
+
+  function renderStaff() {
+    const list = filteredStaff();
+    const container = document.getElementById('staffList');
+    const pager = document.getElementById('staffPager');
+
+    if (list.length === 0) {
+      container.innerHTML = `<div class="center-screen" style="padding:28px 0;min-height:140px"><div class="icon-lg"><svg><use href="#i-person"/></svg></div><div class="title">No staff found</div><div class="msg">Try a different search or filter.</div></div>`;
+      pager.innerHTML = '';
+      return;
+    }
+
+    const totalPages = Math.ceil(list.length / PAGE_SIZE);
+    if (currentPage > totalPages) currentPage = totalPages;
+    const start = (currentPage - 1) * PAGE_SIZE;
+    const pageItems = list.slice(start, start + PAGE_SIZE);
+
+    container.innerHTML = pageItems.map((s, idx) => `
+      <div class="card row tap staff-row" data-status="${s.isActive ? 'active' : 'inactive'}" onclick="showToast('Staff detail', 'info')">
+        <div class="icircle ${avatarColor(s, idx)}">${initials(s.name)}</div>
+        <div class="grow"><div class="name">${escapeHtml(s.name)}</div><div class="sub">@${escapeHtml(s.username)} · Staff · ${s.isActive ? s.sales + ' sales' : 'Inactive'}</div></div>
+        <div class="aicon" onclick="staffMenu(event, ${s.isActive})"><svg><use href="#i-more"/></svg></div>
+      </div>
+    `).join('');
+
+    pager.innerHTML = pagerHtml(list.length, currentPage, PAGE_SIZE, 'goPage', 'standalone');
+  }
+
+  function filterStaff() {
+    currentPage = 1;
+    renderStaff();
   }
 
   const menuIcon = (id) => '<svg width="17" height="17" viewBox="0 0 24 24" style="fill:currentColor;flex-shrink:0;"><use href="#' + id + '"/></svg>';
 
-    function ic(id) { return `<svg viewBox="0 0 24 24"><use href="#${id}"/></svg>`; }
+  function ic(id) { return `<svg viewBox="0 0 24 24"><use href="#${id}"/></svg>`; }
 
   function staffMenu(event, isActive) {
     showMenu(event, [
@@ -125,6 +174,8 @@
       { label: 'Delete', icon: ic('i-delete'), action: "showToast('Delete staff', 'info')", cls: 'del' },
     ]);
   }
+
+  renderStaff();
 </script>
 </body>
 </html>

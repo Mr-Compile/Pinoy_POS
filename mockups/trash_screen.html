@@ -12,6 +12,7 @@
   .role-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; border: 1px solid var(--border); }
   .role-owner { background: rgba(75,130,233,.16); color: var(--info); border-color: rgba(75,130,233,.4); }
   .role-admin { background: rgba(139,92,246,.16); color: var(--purple); border-color: rgba(139,92,246,.4); }
+  .role-staff { background: rgba(6,182,212,.16); color: var(--teal); border-color: rgba(6,182,212,.4); }
   .frames-legend { max-width: 900px; margin: 0 auto 24px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; color: var(--text-2); font-size: 13px; }
 
   .search { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; display: flex; align-items: center; gap: 8px; color: var(--text-3); font-size: 13px; }
@@ -22,6 +23,7 @@
   .trash-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; }
   .trash-row + .trash-row { border-top: 1px solid var(--divider); }
   .trash-row .thumb { width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 20px; border: 1px solid var(--border); background: var(--surface-elev); }
+  .trash-row .thumb svg { width: 24px; height: 24px; fill: var(--text-3); }
   .trash-row .grow { flex: 1; min-width: 0; }
   .trash-row .name { font-size: 14px; font-weight: 600; color: var(--text); }
   .trash-row .sub { font-size: 12px; color: var(--text-3); margin-top: 2px; }
@@ -31,6 +33,10 @@
   .trash-row .actions svg { width: 18px; height: 18px; fill: var(--text-3); }
   .trash-row .actions .restore svg { fill: var(--success); }
   .trash-row .actions .del svg { fill: var(--error); }
+
+  .empty-state { text-align: center; padding: 40px 24px; color: var(--text-3); font-size: 13px; }
+  .empty-state .big { font-size: 40px; margin-bottom: 12px; }
+  .empty-state .title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
 
   .fab { display: inline-flex; align-items: center; gap: 8px; background: var(--error); color: #fff; font-size: 13.5px; font-weight: 700; padding: 13px 20px; border-radius: 16px; cursor: pointer; }
   .fabzone { display: flex; justify-content: flex-end; padding-right: 4px; margin-top: auto; }
@@ -42,11 +48,11 @@
   <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M12 21l3.5-4.5c-.97-.74-2.18-1.16-3.5-1.16s-2.53.42-3.5 1.16L12 21zM12 3C7.31 3 3.07 4.69 0 7.55l1.93 2.43C4.48 7.9 8.01 6.4 12 6.4s7.52 1.5 10.07 3.58L24 7.55C20.93 4.69 16.69 3 12 3z"/></symbol>
   <symbol id="i-batt" viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></symbol>
   <symbol id="i-bell" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></symbol>
-  <symbol id="i-more" viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2.zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></symbol>
-  <symbol id="i-dash" viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6.zm10 0h8V11h-8v10.zm0-18v6h8V3h-8z"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></symbol>
+  <symbol id="i-dash" viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></symbol>
   <symbol id="i-cart" viewBox="0 0 24 24"><path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.13.12-.27.12-.42 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="M20 2H4c-1 0-2 .9-2 2v3.01c0 .72.43 1.34 1 1.69V20c0 1.1 1.1 2 2 2h14c.9 0 2-.9 2-2V8.7c.57-.35 1-.97 1-1.69V4c0-1.1-1-2-2-2zm-5 12H9v-2h6v2zm5-7H4V4h16v3z"/></symbol>
   <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M19.5 3.5 18 2l-1.5 1.5L15 2l-1.5 1.5L12 2l-1.5 1.5L9 2 7.5 3.5 6 2 4.5 3.5 3 2v20l1.5-1.5L6 22l1.5-1.5L9 22l1.5-1.5L12 22l1.5-1.5L15 22l1.5-1.5L18 22l1.5-1.5L21 22V2l-1.5 1.5zM19 19.09H5V4.91h14v14.18z"/></symbol>
-  <symbol id="i-box" viewBox="0 0 24 24"><path d="M20 2H4c-1 0-2 .9-2 2v3.01c0 .72.43 1.34 1 1.69V20c0 1.1 1.1 2 2 2h14c.9 0 2-.9 2-2V8.7c.57-.35 1-.97 1-1.69V4c0-1.1-1-2-2-2.zm-5 12H9v-2h6v2.zm5-7H4V4h16v3z"/></symbol>
   <symbol id="i-search" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></symbol>
   <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></symbol>
   <symbol id="i-undo" viewBox="0 0 24 24"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62A7.95 7.95 0 0 1 12.5 10c2.76 0 5 2.24 5 5s-2.24 5-5 5-5-2.24-5-5H7c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5-2.46-5.5-5.5-5.5z"/></symbol>
@@ -55,16 +61,21 @@
   <symbol id="i-tag" viewBox="0 0 24 24"><path d="m21.41 11.58-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58s1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41s-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/></symbol>
   <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3.zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3.zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5.zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></symbol>
   <symbol id="i-campaign" viewBox="0 0 24 24"><path d="M18 2H6c-1.1 0-2 .9-2 2v4c0 1.1.9 2 2 2h1v8c0 1.1.9 2 2 2h2c1.1 0 2-.9 2-2V10h5c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM4 11h2v2H4v-2z"/></symbol>
+  <symbol id="i-qr" viewBox="0 0 24 24"><path d="M3 11h8V3H3v8zm2-6h4v4H5V5zM3 21h8v-8H3v8zm2-6h4v4H5v-4zM13 3v8h8V3h-8zm6 6h-4V5h4v4zM13 13h2v2h-2zM15 15h2v2h-2zM13 17h2v2h-2zM17 13h2v2h-2zM19 15h2v2h-2zM17 17h2v2h-2zM15 19h2v2h-2zM19 19h2v2h-2z"/></symbol>
+  <symbol id="i-backup" viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H8l4-4 4 4h-2z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84a.484.484 0 0 0-.48.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.488.488 0 0 0-.59.22L2.74 8.87c-.12.22 0 .49.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.39.3.61.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.29.41.48.41h3.84c.24 0 .48-.17.5-.41l.36-2.54c.59-.24 1.13-.58 1.62-.94l2.39.96c.22.08.49 0 .61-.22l1.92-3.32c.12-.22.07-.49-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></symbol>
 </svg>
 
 <div class="page-head">
   <div>
     <h1>Trash — lib/ui/screens/trash_screen.dart</h1>
-    <p>Unified trash list with permission-driven type tabs. Owner and Admin only; Staff has no view_trash.</p>
+    <p>Role-based trash filters. Tabs and actions are gated by the current user's permissions, not hard-coded by role.</p>
   </div>
   <div class="role-switcher">
     <button class="on" data-role="owner" onclick="setRole('owner')">Owner</button>
     <button data-role="admin" onclick="setRole('admin')">Admin</button>
+    <button data-role="staff" onclick="setRole('staff')">Staff</button>
   </div>
   <button class="theme-toggle" onclick="toggleTheme()">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
@@ -74,7 +85,7 @@
 
 <div class="frames-legend">
   <span class="role-chip role-owner" id="roleChip">Owner</span>
-  <span id="legendText">Owner sees Products, Categories, Users, Announcements, and Merchant QR tabs. Empty Trash is Owner-only.</span>
+  <span id="legendText">Owner sees every tab their permissions allow and can restore, delete, or empty trash.</span>
 </div>
 
 <div class="frames">
@@ -90,96 +101,143 @@
       <div class="screen">
         <div class="screen-body">
           <div class="search"><svg><use href="#i-search"/></svg>Search trash</div>
-          <div class="chips" id="typeChips" onclick="selectChip(event.target, 'type')">
-            <div class="chip on" data-group="type">All</div>
-            <div class="chip" data-group="type">Products</div>
-            <div class="chip" data-group="type">Categories</div>
-            <div class="chip" data-group="type">Users</div>
-            <div class="chip" data-group="type">Announcements</div>
-          </div>
-          <div class="card" id="trashList">
-            <div class="trash-row" data-visible="owner">
-              <div class="thumb">🍌</div>
-              <div class="grow"><div class="name">Banana Cue</div><div class="sub">Product · deleted by Owner · 2 hours ago</div></div>
-              <div class="actions"><div class="aicon restore" onclick="showToast('Restored', 'success')" title="Restore"><svg><use href="#i-undo"/></svg></div><div class="aicon del" onclick="showToast('Permanently deleted', 'error')" title="Delete forever"><svg><use href="#i-del"/></svg></div></div>
-            </div>
-            <div class="trash-row" data-visible="owner">
-              <div class="thumb">🏷️</div>
-              <div class="grow"><div class="name">Desserts</div><div class="sub">Category · deleted by Owner · 1 day ago</div></div>
-              <div class="actions"><div class="aicon restore" onclick="showToast('Restored', 'success')" title="Restore"><svg><use href="#i-undo"/></svg></div><div class="aicon del" onclick="showToast('Permanently deleted', 'error')" title="Delete forever"><svg><use href="#i-del"/></svg></div></div>
-            </div>
-            <div class="trash-row" data-visible="owner admin">
-              <div class="thumb letter">GR</div>
-              <div class="grow"><div class="name">Greg Ramos</div><div class="sub">User · deleted by Owner · 2 days ago</div></div>
-              <div class="actions"><div class="aicon restore" onclick="showToast('Restored', 'success')" title="Restore"><svg><use href="#i-undo"/></svg></div><div class="aicon del" onclick="showToast('Permanently deleted', 'error')" title="Delete forever"><svg><use href="#i-del"/></svg></div></div>
-            </div>
-          </div>
-          <div class="fabzone" id="emptyTrash"><div class="fab" onclick="showToast('Empty trash', 'error')"><svg><use href="#i-del"/></svg>Empty Trash</div></div>
+          <div class="chips" id="typeChips" onclick="selectChip(event.target, 'type')"></div>
+          <div class="card" id="trashList"></div>
+          <div class="fabzone" id="emptyTrash" style="display:none;"><div class="fab" onclick="showToast('Empty trash', 'error')"><svg><use href="#i-del"/></svg>Empty Trash</div></div>
         </div>
       </div>
-      <div class="bottomnav" id="bottomNav">
-        <div class="navitem"><span class="navicon"><svg><use href="#i-dash"/></svg></span><span class="navlbl">Dashboard</span></div>
-        <div class="navitem"><span class="navicon"><svg><use href="#i-cart"/></svg></span><span class="navlbl">POS</span></div>
-        <div class="navitem"><span class="navicon"><svg><use href="#i-box"/></svg></span><span class="navlbl">Products</span></div>
-        <div class="navitem"><span class="navicon"><svg><use href="#i-receipt"/></svg></span><span class="navlbl">Sales</span></div>
-        <div class="navitem"><span class="navicon"><svg><use href="#i-more"/></svg></span><span class="navlbl">More</span></div>
-      </div>
+      <div class="bottomnav" id="bottomNav"></div>
     </div>
-    <div class="frame-notes" id="frameNotes">Trash tabs are built from view_products, view_categories, view_users, view_announcements, and view_settings permissions. Only Owner sees Empty Trash.</div>
+    <div class="frame-notes" id="frameNotes">Tabs are derived from view_products, view_categories, view_users, view_settings (QR), and view_announcements. Empty Trash requires empty_trash. Restore/delete are gated by restore_trash and the matching delete permission.</div>
   </div>
 </div>
 
 <script src="mockup.js"></script>
 <script>
+function actionIcon(type, title) {
+  const icon = type === 'restore' ? '#i-undo' : '#i-del';
+  const cls = type === 'restore' ? 'restore' : 'del';
+  const toast = type === 'restore' ? "showToast('Restored', 'success')" : "showToast('Permanently deleted', 'error')";
+  return `<div class="aicon ${cls}" onclick="${toast}" title="${title}"><svg><use href="${icon}"/></svg></div>`;
+}
+
+function trashRow({ thumb, name, sub, restore, del }) {
+  const actions = [
+    restore ? actionIcon('restore', 'Restore') : '',
+    del ? actionIcon('del', 'Delete forever') : '',
+  ].join('');
+  return `
+    <div class="trash-row">
+      <div class="thumb">${thumb}</div>
+      <div class="grow"><div class="name">${escapeHtml(name)}</div><div class="sub">${escapeHtml(sub)}</div></div>
+      ${actions ? `<div class="actions">${actions}</div>` : ''}
+    </div>
+  `;
+}
+
 const roleData = {
   owner: {
     chipClass: 'role-owner',
-    text: 'Owner sees Products, Categories, Users, Announcements, and Merchant QR tabs. Empty Trash is Owner-only.',
+    text: 'Owner sees Products, Categories, Users, QR, and Announcements. Empty Trash is Owner-only.',
     subtitle: 'Owner',
     avatar: 'OW',
-    notes: 'Trash tabs are built from view_products, view_categories, view_users, view_announcements, and view_settings permissions. Only Owner sees Empty Trash.',
+    notes: 'Owner has view_products, view_categories, view_users, view_settings, view_announcements, view_trash, restore_trash, and empty_trash. All tabs, restore, delete, and empty actions are available.',
     nav: [
       { icon: '#i-dash', label: 'Dashboard' },
       { icon: '#i-cart', label: 'POS' },
       { icon: '#i-box', label: 'Products' },
       { icon: '#i-receipt', label: 'Sales' },
       { icon: '#i-more', label: 'More' }
-    ]
+    ],
+    chips: ['All', 'Products', 'Categories', 'Users', 'QR', 'Announcements'],
+    rows: [
+      { thumb: '🍌', name: 'Banana Cue', sub: 'Product · deleted by Owner · 2 hours ago', restore: true, del: true },
+      { thumb: '🏷️', name: 'Desserts', sub: 'Category · deleted by Owner · 1 day ago', restore: true, del: true },
+      { thumb: 'GR', name: 'Greg Ramos', sub: 'User · deleted by Owner · 2 days ago', restore: true, del: true },
+      { thumb: '<svg><use href="#i-qr"/></svg>', name: 'Merchant QR', sub: 'QR · deleted by Owner · 3 days ago', restore: true, del: true },
+      { thumb: '<svg><use href="#i-campaign"/></svg>', name: 'Sale Alert', sub: 'Announcement · deleted by Owner · 4 days ago', restore: true, del: true },
+    ],
+    emptyTrash: true,
   },
   admin: {
     chipClass: 'role-admin',
-    text: 'Admin sees only the tabs their permissions allow (Users, Announcements, Merchant QR). Empty Trash is hidden.',
+    text: 'Admin sees only Users and QR tabs. User rows can be restored or deleted; QR rows are view-only. Empty Trash is hidden.',
     subtitle: 'System Admin',
     avatar: 'AD',
-    notes: 'Admin has view_users, view_trash, and view_activity_logs but not view_products/categories. Trash shows only user and announcement rows; Empty Trash is not shown.',
+    notes: 'Admin has view_users, view_settings, view_trash, and restore_trash, but not view_products, view_categories, view_announcements, or empty_trash. QR can be viewed but not restored/deleted because it requires business-setting ownership.',
     nav: [
       { icon: '#i-dash', label: 'Dashboard' },
       { icon: '#i-people', label: 'Users' },
       { icon: '#i-backup', label: 'Backup' },
       { icon: '#i-gear', label: 'Settings' },
       { icon: '#i-more', label: 'More' }
-    ]
+    ],
+    chips: ['All', 'Users', 'QR'],
+    rows: [
+      { thumb: 'GR', name: 'Greg Ramos', sub: 'User · deleted by Owner · 2 days ago', restore: true, del: true },
+      { thumb: 'MA', name: 'Maria Santos', sub: 'User · deleted by Admin · 3 days ago', restore: true, del: true },
+      { thumb: '<svg><use href="#i-qr"/></svg>', name: 'Merchant QR', sub: 'QR · deleted by Owner · 3 days ago', restore: false, del: false },
+    ],
+    emptyTrash: false,
+  },
+  staff: {
+    chipClass: 'role-staff',
+    text: 'Staff has no view_trash permission, so the trash screen is not reachable and shows an access-denied empty state.',
+    subtitle: 'Staff',
+    avatar: 'ST',
+    notes: 'Staff does not have view_trash. The More and Settings tiles do not show Trash, and the screen itself falls back to an empty state.',
+    nav: [
+      { icon: '#i-dash', label: 'Dashboard' },
+      { icon: '#i-cart', label: 'POS' },
+      { icon: '#i-box', label: 'Products' },
+      { icon: '#i-receipt', label: 'Sales' },
+      { icon: '#i-more', label: 'More' }
+    ],
+    chips: [],
+    rows: [],
+    emptyTrash: false,
   }
 };
 
 function setRole(role) {
   const data = roleData[role];
   if (!data) return;
+
   document.querySelectorAll('.role-switcher button').forEach(b => b.classList.toggle('on', b.dataset.role === role));
+
   const chip = document.getElementById('roleChip');
   chip.className = 'role-chip ' + data.chipClass;
   chip.textContent = role === 'admin' ? 'System Admin' : role.charAt(0).toUpperCase() + role.slice(1);
+
   document.getElementById('legendText').textContent = data.text;
   document.getElementById('frameLabel').textContent = 'Trash — ' + data.subtitle;
   document.getElementById('roleSubtitle').textContent = data.subtitle;
   document.getElementById('avatar').textContent = data.avatar;
   document.getElementById('frameNotes').textContent = data.notes;
-  document.getElementById('emptyTrash').style.display = role === 'owner' ? 'flex' : 'none';
 
-  document.querySelectorAll('#trashList .trash-row').forEach(row => {
-    const visible = (row.dataset.visible || '').split(' ');
-    row.style.display = visible.includes(role) ? 'flex' : 'none';
-  });
+  const chipsContainer = document.getElementById('typeChips');
+  if (data.chips.length === 0) {
+    chipsContainer.innerHTML = '';
+  } else {
+    chipsContainer.innerHTML = data.chips.map((chip, i) =>
+      `<div class="chip ${i === 0 ? 'on' : ''}" data-group="type">${chip}</div>`
+    ).join('');
+  }
+
+  const list = document.getElementById('trashList');
+  if (data.rows.length === 0) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <div class="big">🔒</div>
+        <div class="title">No Trash Access</div>
+        <div>You do not have access to any trash categories.</div>
+      </div>
+    `;
+  } else {
+    list.innerHTML = data.rows.map(trashRow).join('');
+  }
+
+  document.getElementById('emptyTrash').style.display = data.emptyTrash ? 'flex' : 'none';
 
   const nav = document.getElementById('bottomNav');
   nav.innerHTML = data.nav.map(item => `
@@ -188,12 +246,6 @@ function setRole(role) {
       <span class="navlbl">${item.label}</span>
     </div>
   `).join('');
-}
-
-function selectChip(el, group) {
-  if (!el.dataset.group) return;
-  document.querySelectorAll(`[data-group="${group}"]`).forEach(c => c.classList.remove('on'));
-  el.classList.add('on');
 }
 
 setRole('owner');

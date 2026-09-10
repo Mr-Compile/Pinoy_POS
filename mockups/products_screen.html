@@ -43,8 +43,12 @@
   .product-row .actions svg { width: 18px; height: 18px; fill: var(--text-3); }
   .product-row .actions .del svg { fill: var(--error); }
 
-  .fab { display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #2C68D7, #2563C7); color: #fff; font-size: 13.5px; font-weight: 700; padding: 13px 20px; border-radius: 16px; box-shadow: 0 8px 20px rgba(44,104,215,.4); cursor: pointer; }
-  .fabzone { display: flex; justify-content: flex-end; padding-right: 4px; margin-top: auto; }
+  .fab { width: 56px; height: 56px; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #2C68D7, #2563C7); color: #fff; border-radius: 18px; box-shadow: 0 8px 20px rgba(44,104,215,.4); cursor: pointer; }
+  .fab svg { width: 24px; height: 24px; fill: #fff; }
+  /* Floating above bottom nav — mirrors Scaffold.floatingActionButton */
+  .fabzone { position: absolute; right: 16px; bottom: 84px; z-index: 40; }
+  /* Matches ResponsiveCreateAction.fabClearance = 88 so the pager clears the FAB */
+  .screen-body.has-fab { padding-bottom: 88px; }
 
   .dialog-overlay { position: absolute; inset: 0; top: 30px; background: rgba(0,0,0,.55); z-index: 50; display: none; align-items: center; justify-content: center; padding: 16px; }
   .dialog-overlay.open { display: flex; }
@@ -132,12 +136,24 @@
       <div class="screen">
         <div class="screen-body">
           <div class="stats" id="statsRow">
-            <div class="stat"><div class="num" id="statTotal">24</div><div class="lbl">Products</div></div>
-            <div class="stat"><div class="num" style="color:var(--warning)" id="statLow">3</div><div class="lbl">Low stock</div></div>
-            <div class="stat"><div class="num" style="color:var(--error)" id="statOut">1</div><div class="lbl">Out of stock</div></div>
+            <div class="stat">
+              <div class="ic" style="background:var(--primary)"><svg width="17" height="17"><use href="#i-box"/></svg></div>
+              <div class="num" id="statTotal">24</div>
+              <div class="lbl">Products</div>
+            </div>
+            <div class="stat">
+              <div class="ic" style="background:var(--warning)"><svg width="17" height="17"><use href="#i-warn"/></svg></div>
+              <div class="num" id="statLow">3</div>
+              <div class="lbl">Low stock</div>
+            </div>
+            <div class="stat">
+              <div class="ic" style="background:var(--error)"><svg width="17" height="17"><use href="#i-error"/></svg></div>
+              <div class="num" id="statOut">1</div>
+              <div class="lbl">Out of stock</div>
+            </div>
           </div>
           <div class="toolbar">
-            <div class="search"><svg><use href="#i-search"/></svg><input type="text" id="searchInput" placeholder="Search products" oninput="renderProducts()"></div>
+            <div class="search"><svg><use href="#i-search"/></svg><input type="text" id="searchInput" placeholder="Search products" oninput="searchChanged()"></div>
             <div class="filterbtn"><svg><use href="#i-filter"/></svg><select class="select" id="categoryFilter" onchange="setCategory(this.value)" style="width:92px;border:0;background:transparent;padding:8px 0;color:var(--text-2);font-weight:600;font-size:12.5px;cursor:pointer;"><option value="All">All</option><option value="Meals">Meals</option><option value="Drinks">Drinks</option><option value="Snacks">Snacks</option><option value="Coffee">Coffee</option><option value="Dessert">Dessert</option></select></div>
           </div>
           <div class="chips" id="chipRow" onclick="selectChip(event.target, 'stock')">
@@ -149,13 +165,14 @@
             <div class="card-head" style="padding: 14px 14px 0;">
               <div class="isquare c-purple" id="cardIcon"><svg><use href="#i-box"/></svg></div>
               <h3>All Products</h3>
-              <span class="pill pill-blue" id="productCountPill">4 items</span>
+              <span class="pill pill-blue" id="productCountPill">24 items</span>
             </div>
-            <div id="productList" style="padding: 0 14px 14px;"></div>
+            <div id="productList" style="padding: 0 14px;"></div>
+            <div id="productPager"></div>
           </div>
-          <div class="fabzone" id="fabZone"><div class="fab" onclick="openProductModal()"><svg><use href="#i-plus"/></svg>Add Product</div></div>
         </div>
       </div>
+      <div class="fabzone" id="fabZone"><div class="fab" onclick="openProductModal()"><svg><use href="#i-plus"/></svg></div></div>
       <div class="bottomnav" id="bottomNav">
         <div class="navitem"><span class="navicon"><svg><use href="#i-dash"/></svg></span><span class="navlbl">Dashboard</span></div>
         <div class="navitem"><span class="navicon"><svg><use href="#i-cart"/></svg></span><span class="navlbl">POS</span></div>
@@ -266,7 +283,21 @@ let viewingProductId = null;
 let selectedCategory = 'All';
 
 const emojis = ['🍗','🍚','🥤','🍌','🍰','☕','🥐','🍔','🍕','🍜','🍩','🥧'];
-let productEmojis = {1:'🍗',2:'🍚',3:'🥤',4:'🍌'};
+let productEmojis = {1:'🍗',2:'🍚',3:'🥤',4:'🍌',5:'🌶️',6:'🥩',7:'🍜',8:'🥟',9:'🍌',10:'🍧',11:'🥥',12:'💧',13:'☕',14:'🧋',15:'🧀',16:'🥖',17:'🥟',18:'🍚',19:'🐷',20:'🐟',21:'🥭',22:'🍋',23:'🍮',24:'🥓'};
+
+// Pagination — 10 rows per page
+const PAGE_SIZE = 10;
+let currentPage = 1;
+
+function goPage(p) {
+  currentPage = p;
+  renderProducts();
+}
+
+function searchChanged() {
+  currentPage = 1;
+  renderProducts();
+}
 
 const categoryColor = {
   'Meals':'pill-amber','Drinks':'pill-teal','Snacks':'pill-pink','Coffee':'pill-blue'
@@ -276,7 +307,27 @@ let products = [
   {id:1, name:'Chicken Adobo Rice', category:'Meals', price:80, stock:18},
   {id:2, name:'Pastil', category:'Snacks', price:10, stock:45},
   {id:3, name:'Iced Tea', category:'Drinks', price:25, stock:32},
-  {id:4, name:'Banana Cue', category:'Snacks', price:15, stock:0}
+  {id:4, name:'Banana Cue', category:'Snacks', price:15, stock:0},
+  {id:5, name:'Spicy Pork Sisig', category:'Meals', price:95, stock:12},
+  {id:6, name:'Beef Tapa Rice', category:'Meals', price:85, stock:9},
+  {id:7, name:'Pancit Canton', category:'Meals', price:60, stock:22},
+  {id:8, name:'Lumpiang Shanghai', category:'Snacks', price:35, stock:40},
+  {id:9, name:'Turon', category:'Snacks', price:12, stock:28},
+  {id:10, name:'Halo-Halo', category:'Dessert', price:65, stock:15},
+  {id:11, name:'Buko Juice', category:'Drinks', price:30, stock:20},
+  {id:12, name:'Bottled Water', category:'Drinks', price:20, stock:50},
+  {id:13, name:'Brewed Coffee', category:'Coffee', price:35, stock:16},
+  {id:14, name:'Iced Latte', category:'Coffee', price:75, stock:8},
+  {id:15, name:'Ensaymada', category:'Snacks', price:25, stock:14},
+  {id:16, name:'Pandesal (10 pcs)', category:'Snacks', price:30, stock:60},
+  {id:17, name:'Siopao Asado', category:'Snacks', price:35, stock:4},
+  {id:18, name:'Siomai Rice', category:'Meals', price:55, stock:19},
+  {id:19, name:'Lechon Kawali Rice', category:'Meals', price:110, stock:7},
+  {id:20, name:'Bangus Sisig Rice', category:'Meals', price:90, stock:5},
+  {id:21, name:'Mango Shake', category:'Drinks', price:45, stock:13},
+  {id:22, name:'Calamansi Juice', category:'Drinks', price:20, stock:26},
+  {id:23, name:'Leche Flan', category:'Dessert', price:50, stock:6},
+  {id:24, name:'Chicharon', category:'Snacks', price:40, stock:0}
 ];
 
 function setRole(role) {
@@ -295,7 +346,9 @@ function setRole(role) {
     ? 'Owner has edit_products and delete_products. Staff only has view_products, so row actions and the Add Product button are hidden.'
     : 'Staff sees the same product list but with no row actions and no Add Product button. Stock counts are visible for POS reference.';
 
-  document.getElementById('fabZone').style.display = role === 'owner' ? 'flex' : 'none';
+  const fabVisible = role === 'owner';
+  document.getElementById('fabZone').style.display = fabVisible ? 'block' : 'none';
+  document.querySelector('.screen-body').classList.toggle('has-fab', fabVisible);
   renderProducts();
 }
 
@@ -303,6 +356,7 @@ function selectChip(el, group) {
   if (!el.dataset.group) return;
   document.querySelectorAll(`[data-group="${group}"]`).forEach(c => c.classList.remove('on'));
   el.classList.add('on');
+  currentPage = 1;
   renderProducts();
 }
 
@@ -321,6 +375,7 @@ function computeStats() {
 
 function setCategory(cat) {
   selectedCategory = cat;
+  currentPage = 1;
   renderProducts();
 }
 
@@ -341,12 +396,18 @@ function renderProducts() {
   const list = filteredProducts();
   document.getElementById('productCountPill').textContent = list.length + ' item' + (list.length === 1 ? '' : 's');
   const container = document.getElementById('productList');
+  const pager = document.getElementById('productPager');
   if (list.length === 0) {
     container.innerHTML = `<div class="center-screen" style="padding:28px 0;min-height:140px"><div class="icon-lg"><svg><use href="#i-box"/></svg></div><div class="title">No products found</div><div class="msg">Try a different search or filter.</div></div>`;
+    pager.innerHTML = '';
     computeStats();
     return;
   }
-  container.innerHTML = list.map(p => {
+  const totalPages = Math.ceil(list.length / PAGE_SIZE);
+  if (currentPage > totalPages) currentPage = totalPages;
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const pageItems = list.slice(start, start + PAGE_SIZE);
+  container.innerHTML = pageItems.map(p => {
     const stockColor = p.stock <= 0 ? 'var(--error)' : (p.stock <= 5 ? 'var(--warning)' : 'var(--text-3)');
     const stockText = p.stock <= 0 ? `Stock: <span style="color:var(--error)">0</span>` : `Stock: ${p.stock}`;
     return `<div class="product-row" data-id="${p.id}" onclick="openViewModal(${p.id})" style="cursor:pointer">
@@ -358,6 +419,7 @@ function renderProducts() {
       </div>
     </div>`;
   }).join('');
+  pager.innerHTML = pagerHtml(list.length, currentPage, PAGE_SIZE, 'goPage');
   computeStats();
 }
 

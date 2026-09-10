@@ -10,6 +10,12 @@
   .role-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; border: 1px solid var(--border); }
   .role-owner { background: rgba(75,130,233,.16); color: var(--info); border-color: rgba(75,130,233,.4); }
   .role-admin { background: rgba(139,92,246,.16); color: var(--purple); border-color: rgba(139,92,246,.4); }
+  #userList { display: flex; flex-direction: column; gap: 10px; }
+  /* Compact plus-only FAB — mirrors ResponsiveCreateAction's compact variant */
+  .fab { width: 56px; height: 56px; display: flex; align-items: center; justify-content: center; padding: 0; background: linear-gradient(135deg, #2C68D7, #2563C7); color: #fff; border-radius: 18px; box-shadow: 0 8px 20px rgba(44,104,215,.4); cursor: pointer; border: none; }
+  .fab svg { width: 24px; height: 24px; fill: #fff; }
+  /* Matches ResponsiveCreateAction.fabClearance = 88 so the pager clears the FAB */
+  .screen-body.has-fab { padding-bottom: 88px; }
 </style>
 </head>
 <body>
@@ -22,7 +28,7 @@
   <symbol id="i-search" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></symbol>
   <symbol id="i-filter" viewBox="0 0 24 24"><path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/></symbol>
   <symbol id="i-add" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></symbol>
-  <symbol id="i-more" viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2 2-.9 2-2-.9-2-2-2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></symbol>
   <symbol id="i-eye" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></symbol>
   <symbol id="i-edit" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></symbol>
   <symbol id="i-lock" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zM9 8V6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9z"/></symbol>
@@ -34,7 +40,7 @@
 <div class="page-head">
   <div>
     <h1>Users — lib/ui/screens/users_screen.dart</h1>
-    <p>Owner/Admin user management with search, role filter, add user, and per-user actions (edit, reset password, activate/deactivate, delete).</p>
+    <p>Owner/Admin user management with search, role filter, add user, per-user actions (edit, reset password, activate/deactivate, delete), and paged lists.</p>
   </div>
   <div style="display:flex;gap:8px;">
     <span class="role-chip role-owner">Owner</span>
@@ -54,10 +60,10 @@
       <div class="appbar">
         <div class="back"><svg><use href="#i-back"/></svg></div>
         <div class="title"><h2>Users</h2></div>
-        <div class="act"><svg><use href="#i-refresh"/></svg></div>
+        <div class="act" onclick="renderUsers()"><svg><use href="#i-refresh"/></svg></div>
       </div>
       <div class="screen">
-        <div class="screen-body">
+        <div class="screen-body has-fab">
           <div class="toolbar">
             <div class="search"><svg><use href="#i-search"/></svg><input type="text" id="userSearch" placeholder="Search by name or username" oninput="filterUsers()" style="flex:1;background:transparent;border:none;color:var(--text);font-size:13px;outline:none;min-width:0;padding:0;"></div>
             <div class="filterbtn">
@@ -70,45 +76,92 @@
               </select>
             </div>
           </div>
-          <div class="card row tap user-row" data-role="owner" data-status="active" onclick="showToast('User detail', 'info')">
-            <div class="icircle solid-blue">J</div>
-            <div class="grow"><div class="name">Juan Dela Cruz</div><div class="sub">@juan · Owner · Active</div></div>
-            <div class="aicon" onclick="userMenu(event, true, true)"><svg><use href="#i-more"/></svg></div>
-          </div>
-          <div class="card row tap user-row" data-role="admin" data-status="active" style="margin-top:10px;" onclick="showToast('User detail', 'info')">
-            <div class="icircle solid-purple">A</div>
-            <div class="grow"><div class="name">Ana Santos</div><div class="sub">@ana · Admin · Active</div></div>
-            <div class="aicon" onclick="userMenu(event, true, false)"><svg><use href="#i-more"/></svg></div>
-          </div>
-          <div class="card row tap user-row" data-role="staff" data-status="inactive" style="margin-top:10px;" onclick="showToast('User detail', 'info')">
-            <div class="icircle solid-grey">M</div>
-            <div class="grow"><div class="name">Miguel Cruz</div><div class="sub">@miguel · Staff · Inactive</div></div>
-            <div class="aicon" onclick="userMenu(event, false, false)"><svg><use href="#i-more"/></svg></div>
-          </div>
+
+          <div id="userList"></div>
+          <div id="userPager"></div>
         </div>
       </div>
-      <button class="fab" style="position:absolute;bottom:16px;right:16px;" onclick="showToast('Add user', 'info')"><svg><use href="#i-add"/></svg> Add User</button>
+      <button class="fab" style="position:absolute;bottom:16px;right:16px;" onclick="showToast('Add user', 'info')" aria-label="Add user"><svg><use href="#i-add"/></svg></button>
     </div>
-    <div class="frame-notes">Owner/Admin can add, edit, reset passwords, activate/deactivate, and delete users. Search, role filter dropdown, user rows with avatar, name, username, role, status, and a more-options menu. Self account cannot be deleted or deactivated.</div>
+    <div class="frame-notes">Owner/Admin can add, edit, reset passwords, activate/deactivate, and delete users. Search and the role filter reset the pager to page 1; lists page at 10 rows. The plus-only FAB floats above the content — the list keeps 88px bottom clearance so the pager is never covered. Self account cannot be deleted or deactivated.</div>
   </div>
 </div>
 
 <script src="mockup.js"></script>
 <script>
-  function filterUsers() {
+  const PAGE_SIZE = 10;
+  let currentPage = 1;
+
+  // Sample data sized to show multiple pages (14 users → 2 pages).
+  const users = [
+    { name: 'Juan Dela Cruz',   role: 'owner', isActive: true,  isSelf: true },
+    { name: 'Ana Santos',       role: 'admin', isActive: true },
+    { name: 'Miguel Cruz',      role: 'staff', isActive: false },
+    { name: 'Maria Reyes',      role: 'staff', isActive: true },
+    { name: 'Pedro Ramirez',    role: 'staff', isActive: true },
+    { name: 'Rosa Mendoza',     role: 'staff', isActive: true },
+    { name: 'Carlos Villanueva',role: 'staff', isActive: true },
+    { name: 'Lorna Aquino',     role: 'admin', isActive: true },
+    { name: 'Rico Dizon',       role: 'staff', isActive: false },
+    { name: 'Gina Torres',      role: 'staff', isActive: true },
+    { name: 'Miguel Bautista',  role: 'staff', isActive: true },
+    { name: 'Sofia Lim',        role: 'staff', isActive: true },
+    { name: 'Dario Castro',     role: 'staff', isActive: true },
+    { name: 'Nena Ramos',       role: 'staff', isActive: true },
+  ].map((u, i) => ({
+    ...u,
+    id: i + 1,
+    username: u.name.split(' ')[0].toLowerCase(),
+  }));
+
+  const roleColor = { owner: 'solid-blue', admin: 'solid-purple', staff: 'solid-grey' };
+  const roleLabel = { owner: 'Owner', admin: 'Admin', staff: 'Staff' };
+
+  function goPage(p) {
+    currentPage = p;
+    renderUsers();
+  }
+
+  function filteredUsers() {
     const role = document.getElementById('roleFilter').value;
     const query = document.getElementById('userSearch').value.trim().toLowerCase();
-
-    document.querySelectorAll('.user-row').forEach(row => {
-      const rowRole = row.dataset.role;
-      const name = row.querySelector('.name').textContent.toLowerCase();
-      const sub = row.querySelector('.sub').textContent.toLowerCase();
-
-      const roleMatch = role === 'all' || rowRole === role;
-      const searchMatch = query === '' || name.includes(query) || sub.includes(query);
-
-      row.style.display = roleMatch && searchMatch ? 'flex' : 'none';
+    return users.filter(u => {
+      const roleMatch = role === 'all' || u.role === role;
+      const searchMatch = query === '' || u.name.toLowerCase().includes(query) || u.username.toLowerCase().includes(query);
+      return roleMatch && searchMatch;
     });
+  }
+
+  function renderUsers() {
+    const list = filteredUsers();
+    const container = document.getElementById('userList');
+    const pager = document.getElementById('userPager');
+
+    if (list.length === 0) {
+      container.innerHTML = `<div class="center-screen" style="padding:28px 0;min-height:140px"><div class="icon-lg"><svg><use href="#i-person"/></svg></div><div class="title">No users found</div><div class="msg">Try a different search or filter.</div></div>`;
+      pager.innerHTML = '';
+      return;
+    }
+
+    const totalPages = Math.ceil(list.length / PAGE_SIZE);
+    if (currentPage > totalPages) currentPage = totalPages;
+    const start = (currentPage - 1) * PAGE_SIZE;
+    const pageItems = list.slice(start, start + PAGE_SIZE);
+
+    container.innerHTML = pageItems.map(u => `
+      <div class="card row tap user-row" data-role="${u.role}" data-status="${u.isActive ? 'active' : 'inactive'}" onclick="showToast('User detail', 'info')">
+        <div class="icircle ${u.isActive ? roleColor[u.role] : 'solid-grey'}">${escapeHtml(u.name[0])}</div>
+        <div class="grow"><div class="name">${escapeHtml(u.name)}</div><div class="sub">@${escapeHtml(u.username)} · ${roleLabel[u.role]} · ${u.isActive ? 'Active' : 'Inactive'}</div></div>
+        <div class="aicon" onclick="userMenu(event, ${u.isActive}, ${u.isSelf === true})"><svg><use href="#i-more"/></svg></div>
+      </div>
+    `).join('');
+
+    pager.innerHTML = pagerHtml(list.length, currentPage, PAGE_SIZE, 'goPage', 'standalone');
+  }
+
+  function filterUsers() {
+    currentPage = 1;
+    renderUsers();
   }
 
   function ic(id) { return `<svg viewBox="0 0 24 24"><use href="#${id}"/></svg>`; }
@@ -127,6 +180,8 @@
     }
     showMenu(event, items);
   }
+
+  renderUsers();
 </script>
 </body>
 </html>

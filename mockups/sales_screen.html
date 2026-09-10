@@ -6,29 +6,31 @@
 <title>Pinoy POS — Sales Screen (lib/ui/screens/sales_screen.dart)</title>
 <link rel="stylesheet" href="mockup.css">
 <style>
-  .role-switcher { display: flex; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 4px; }
-  .role-switcher button { border: none; background: transparent; color: var(--text-3); border-radius: 20px; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; }
-  .role-switcher button.on { background: var(--primary); color: #fff; }
-  .role-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; border: 1px solid var(--border); }
-  .role-owner { background: rgba(75,130,233,.16); color: var(--info); border-color: rgba(75,130,233,.4); }
-  .role-staff { background: rgba(22,163,74,.16); color: var(--success); border-color: rgba(22,163,74,.4); }
-  .frames-legend { max-width: 900px; margin: 0 auto 24px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; color: var(--text-2); font-size: 13px; }
+  .stat-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 12px 10px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+  .stat-card .ic { width: 34px; height: 34px; border-radius: var(--radius-icon); display: flex; align-items: center; justify-content: center; }
+  .stat-card .ic svg { width: 17px; height: 17px; fill: #fff; }
+  .stat-card .num { font-size: 18px; font-weight: 800; color: var(--text); line-height: 1.1; }
+  .stat-card .lbl { font-size: 10.5px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: .4px; }
 
-  .search { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; display: flex; align-items: center; gap: 8px; color: var(--text-3); font-size: 13px; }
-  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
-  .chip { padding: 7px 14px; border-radius: 20px; font-size: 12.5px; font-weight: 600; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); cursor: pointer; }
-  .chip.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .group-label { font-size: 11.5px; font-weight: 700; color: var(--text-3); letter-spacing: .4px; padding: 0 4px; }
 
   .sale-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; }
   .sale-row + .sale-row { border-top: 1px solid var(--divider); }
   .sale-row .grow { flex: 1; min-width: 0; }
-  .sale-row .name { font-size: 14px; font-weight: 600; color: var(--text); }
-  .sale-row .sub { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+  .sale-row .name { font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sale-row .sub { font-size: 12px; color: var(--text-3); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sale-row .end { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; flex-shrink: 0; }
   .sale-row .price { font-size: 15px; font-weight: 800; color: var(--primary); white-space: nowrap; }
-  .sale-row .status { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px; }
+  .sale-row .menu-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+  .sale-row .menu-btn svg { width: 18px; height: 18px; fill: var(--text-3); }
 
-  .fab { display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #2C68D7, #2563C7); color: #fff; font-size: 13.5px; font-weight: 700; padding: 13px 20px; border-radius: 16px; box-shadow: 0 8px 20px rgba(44,104,215,.4); cursor: pointer; }
-  .fabzone { display: flex; justify-content: flex-end; padding-right: 4px; margin-top: auto; }
+  .filter-btn { height: 40px; padding: 0 14px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); color: var(--text-2); font-size: 12.5px; font-weight: 600; display: flex; align-items: center; gap: 6px; cursor: pointer; flex-shrink: 0; }
+  .filter-btn svg { width: 15px; height: 15px; fill: var(--text-2); }
+  .icon-btn { width: 40px; height: 40px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+  .icon-btn svg { width: 18px; height: 18px; fill: var(--text-2); }
+  .search input { flex: 1; background: transparent; border: none; color: var(--text); font-size: 13px; outline: none; min-width: 0; }
+  .search input::placeholder { color: var(--text-3); }
 </style>
 </head>
 <body>
@@ -36,25 +38,27 @@
 <svg width="0" height="0" style="position:absolute">
   <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M12 21l3.5-4.5c-.97-.74-2.18-1.16-3.5-1.16s-2.53.42-3.5 1.16L12 21zM12 3C7.31 3 3.07 4.69 0 7.55l1.93 2.43C4.48 7.9 8.01 6.4 12 6.4s7.52 1.5 10.07 3.58L24 7.55C20.93 4.69 16.69 3 12 3z"/></symbol>
   <symbol id="i-batt" viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></symbol>
   <symbol id="i-bell" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></symbol>
-  <symbol id="i-more" viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></symbol>
   <symbol id="i-dash" viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></symbol>
   <symbol id="i-cart" viewBox="0 0 24 24"><path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.13.12-.27.12-.42 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/></symbol>
-  <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M19.5 3.5 18 2l-1.5 1.5L15 2l-1.5 1.5L12 2l-1.5 1.5L9 2 7.5 3.5 6 2 4.5 3.5 3 2v20l1.5-1.5L6 22l1.5-1.5L9 22l1.5-1.5L12 22l1.5-1.5L15 22l1.5-1.5L18 22l1.5-1.5L21 22V2l-1.5 1.5zM19 19.09H5V4.91h14v14.18z"/></symbol>
   <symbol id="i-box" viewBox="0 0 24 24"><path d="M20 2H4c-1 0-2 .9-2 2v3.01c0 .72.43 1.34 1 1.69V20c0 1.1 1.1 2 2 2h14c.9 0 2-.9 2-2V8.7c.57-.35 1-.97 1-1.69V4c0-1.1-1-2-2-2zm-5 12H9v-2h6v2zm5-7H4V4h16v3z"/></symbol>
-  <symbol id="i-search" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></symbol>
+  <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M19.5 3.5 18 2l-1.5 1.5L15 2l-1.5 1.5L12 2l-1.5 1.5L9 2 7.5 3.5 6 2 4.5 3.5 3 2v20l1.5-1.5L6 22l1.5-1.5L9 22l1.5-1.5L12 22l1.5-1.5L15 22l1.5-1.5L18 22l1.5-1.5L21 22V2l-1.5 1.5zM19 19.09H5V4.91h14v14.18z"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></symbol>
+  <symbol id="i-morev" viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></symbol>
   <symbol id="i-filter" viewBox="0 0 24 24"><path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/></symbol>
-  <symbol id="i-export" viewBox="0 0 24 24"><path d="M12 4l-5 5 1.41 1.41L11 7.83V16h2V7.83l2.59 2.58L17 9l-5-5zM5 19h14v-2H5v2z"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 5.99 19.53 19H4.47L12 5.99M12 2 1 21h22L12 2zm1 14h-2v2h2v-2zm0-6h-2v4h2v-4z"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7v-5z"/></symbol>
 </svg>
 
 <div class="page-head">
   <div>
-    <h1>Sales — lib/ui/screens/sales_screen.dart</h1>
-    <p>Transaction list. Owner sees all sales; Staff sees own sales. Admin has no view_sales.</p>
-  </div>
-  <div class="role-switcher">
-    <button class="on" data-role="owner" onclick="setRole('owner')">Owner</button>
-    <button data-role="staff" onclick="setRole('staff')">Staff</button>
+    <h1>My Sales — lib/ui/screens/sales_screen.dart</h1>
+    <p>Transaction list with period chips, summary stats, search/filter, date-grouped sales, and working pagination (10 rows per page). Owner sees all sales; Staff sees their own.</p>
   </div>
   <button class="theme-toggle" onclick="toggleTheme()">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
@@ -62,68 +66,64 @@
   </button>
 </div>
 
-<div class="frames-legend">
-  <span class="role-chip role-owner" id="roleChip">Owner</span>
-  <span id="legendText">Owner sees all store sales, cashier names, and can void. Staff sees My Sales only.</span>
-</div>
-
 <div class="frames">
   <div class="frame-wrap">
-    <div class="frame-label" id="frameLabel">Sales — Owner</div>
+    <div class="frame-label">My Sales</div>
     <div class="phone">
       <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
       <div class="appbar">
-        <div class="title"><h2 id="screenTitle">Sales</h2><div class="sub" id="roleSubtitle">Owner</div></div>
-        <div class="act" onclick="showToast('Export report', 'info')"><svg><use href="#i-export"/></svg></div>
-        <div class="avatar" id="avatar">OW</div>
+        <div class="title"><h2>My Sales</h2></div>
+        <div class="act"><svg><use href="#i-moon"/></svg></div>
+        <div class="act"><svg><use href="#i-bell"/></svg></div>
+        <div class="avatar">OW</div>
       </div>
       <div class="screen">
         <div class="screen-body">
-          <div class="search"><svg><use href="#i-search"/></svg>Search receipt / customer</div>
-          <div class="chips" onclick="selectChip(event.target, 'sales')">
-            <div class="chip on" data-group="sales">All</div>
-            <div class="chip" data-group="sales">Today</div>
-            <div class="chip" data-group="sales">This Week</div>
-            <div class="chip" data-group="sales">Paid</div>
-            <div class="chip" data-group="sales">Pending</div>
+
+          <div class="chips" id="periodChips">
+            <div class="chip on" onclick="selectPeriod(this)">This month</div>
+            <div class="chip" onclick="selectPeriod(this)">This week</div>
+            <div class="chip" onclick="selectPeriod(this)">Today</div>
+            <div class="chip" onclick="selectPeriod(this)">Custom</div>
           </div>
-          <div class="card">
-            <div class="sale-row" onclick="showToast('View sale details', 'info')">
-              <div class="grow">
-                <div class="name">20260910-0001</div>
-                <div class="sub">Cashier: Juan Dela Cruz · 10:23 AM · Cash</div>
-              </div>
-              <div class="price">₱450.00</div>
-              <div class="status pill pill-solid-green">Paid</div>
+
+          <div class="stat-strip">
+            <div class="stat-card">
+              <div class="ic solid-blue"><svg><use href="#i-receipt"/></svg></div>
+              <div class="num" id="statTotal">₱0</div>
+              <div class="lbl">Total Sales</div>
             </div>
-            <div class="sale-row" onclick="showToast('View sale details', 'info')">
-              <div class="grow">
-                <div class="name">20260910-0002</div>
-                <div class="sub">Cashier: Maria Reyes · 10:45 AM · GCash</div>
-              </div>
-              <div class="price">₱1,200.00</div>
-              <div class="status pill pill-solid-green">Paid</div>
+            <div class="stat-card">
+              <div class="ic solid-purple"><svg><use href="#i-cart"/></svg></div>
+              <div class="num" id="statCount">0</div>
+              <div class="lbl">Transactions</div>
             </div>
-            <div class="sale-row" onclick="showToast('View sale details', 'info')">
-              <div class="grow">
-                <div class="name">20260910-0003</div>
-                <div class="sub">Cashier: Juan Dela Cruz · 11:02 AM · Cash</div>
-              </div>
-              <div class="price">₱95.00</div>
-              <div class="status pill pill-solid-green">Paid</div>
-            </div>
-            <div class="sale-row" onclick="showToast('View sale details', 'info')">
-              <div class="grow">
-                <div class="name">20260910-0004</div>
-                <div class="sub">Cashier: Maria Reyes · 11:30 AM · Card</div>
-              </div>
-              <div class="price">₱2,350.00</div>
-              <div class="status pill pill-solid-amber">Pending</div>
+            <div class="stat-card">
+              <div class="ic solid-amber"><svg><use href="#i-warn"/></svg></div>
+              <div class="num" id="statPending">0</div>
+              <div class="lbl">Pending</div>
             </div>
           </div>
+
+          <div class="toolbar">
+            <div class="search"><svg><use href="#i-search"/></svg><input type="text" id="searchInput" placeholder="Search receipt, customer, or reference..." oninput="searchChanged()"></div>
+            <div class="filter-btn"><svg><use href="#i-filter"/></svg>Filter</div>
+            <div class="icon-btn" title="Export sales"><svg><use href="#i-download"/></svg></div>
+            <div class="icon-btn" title="Refresh"><svg><use href="#i-refresh"/></svg></div>
+          </div>
+
+          <div class="chips" id="methodChips">
+            <div class="chip on" data-method="all" onclick="selectMethod(this)">All</div>
+            <div class="chip" data-method="GCash" onclick="selectMethod(this)">GCash</div>
+            <div class="chip" data-method="Cash" onclick="selectMethod(this)">Cash</div>
+          </div>
+
+          <div id="salesGroups"></div>
+          <div id="salesPager"></div>
+
         </div>
       </div>
-      <div class="bottomnav" id="bottomNav">
+      <div class="bottomnav">
         <div class="navitem"><span class="navicon"><svg><use href="#i-dash"/></svg></span><span class="navlbl">Dashboard</span></div>
         <div class="navitem"><span class="navicon"><svg><use href="#i-cart"/></svg></span><span class="navlbl">POS</span></div>
         <div class="navitem"><span class="navicon"><svg><use href="#i-box"/></svg></span><span class="navlbl">Products</span></div>
@@ -131,84 +131,136 @@
         <div class="navitem"><span class="navicon"><svg><use href="#i-more"/></svg></span><span class="navlbl">More</span></div>
       </div>
     </div>
-    <div class="frame-notes" id="frameNotes">Owner sees all transactions with cashier, customer, and void action. Staff sees My Sales scoped to their own user ID.</div>
+    <div class="frame-notes">
+      <b>Mirrors sales_screen.dart:</b> stat strip (Total Sales / Transactions / Pending), period chips (This month / This week / Today / Custom), search + Filter + export/refresh icons, method chips (All / GCash / Cash), date-grouped cards, and a per-sale ⋮ menu (View, Void for owners on confirmed sales). Rows show receipt number, time · payment method · customer. <b>Pagination:</b> 10 rows per page with a "1–10 of N" bar — try filtering by GCash/Cash or searching to see the page count change. Staff sees the same layout scoped to their own sales; bottom nav label reads "My Sales" for Staff.
+    </div>
   </div>
 </div>
 
 <script src="mockup.js"></script>
 <script>
-const roleData = {
-  owner: {
-    chipClass: 'role-owner',
-    text: 'Owner sees all store sales, cashier names, and can void. Staff sees My Sales only.',
-    title: 'Sales',
-    subtitle: 'Owner',
-    avatar: 'OW',
-    notes: 'Owner sees all transactions with cashier, customer, and void action. Staff sees My Sales scoped to their own user ID.',
-    nav: [
-      { icon: '#i-dash', label: 'Dashboard' },
-      { icon: '#i-cart', label: 'POS' },
-      { icon: '#i-box', label: 'Products' },
-      { icon: '#i-receipt', label: 'Sales', sel: true },
-      { icon: '#i-more', label: 'More' }
-    ]
-  },
-  staff: {
-    chipClass: 'role-staff',
-    text: 'Staff sees own sales only. Filter and export are limited to their own transactions.',
-    title: 'My Sales',
-    subtitle: 'Staff',
-    avatar: 'ST',
-    notes: 'Staff sales list is scoped to the current user. Cashier names are not shown because all rows belong to the current staff.',
-    nav: [
-      { icon: '#i-dash', label: 'Dashboard' },
-      { icon: '#i-cart', label: 'POS' },
-      { icon: '#i-box', label: 'Products' },
-      { icon: '#i-receipt', label: 'My Sales', sel: true },
-      { icon: '#i-more', label: 'More' }
-    ]
-  }
-};
+const PAGE_SIZE = 10;
+let currentPage = 1;
+let selectedMethod = 'all';
 
-function setRole(role) {
-  const data = roleData[role];
-  if (!data) return;
-  document.querySelectorAll('.role-switcher button').forEach(b => b.classList.toggle('on', b.dataset.role === role));
-  const chip = document.getElementById('roleChip');
-  chip.className = 'role-chip ' + data.chipClass;
-  chip.textContent = role.charAt(0).toUpperCase() + role.slice(1);
-  document.getElementById('legendText').textContent = data.text;
-  document.getElementById('frameLabel').textContent = data.title + ' — ' + data.subtitle;
-  document.getElementById('screenTitle').textContent = data.title;
-  document.getElementById('roleSubtitle').textContent = data.subtitle;
-  document.getElementById('avatar').textContent = data.avatar;
-  document.getElementById('frameNotes').textContent = data.notes;
+let sales = [
+  // TODAY — Sep 10
+  {receipt:'20260910-0006', time:'11:58 AM', method:'GCash', customer:'Ana Reyes', amount:2350.00, status:'confirmed', day:'TODAY'},
+  {receipt:'20260910-0005', time:'11:42 AM', method:'Cash', customer:'', amount:180.00, status:'confirmed', day:'TODAY'},
+  {receipt:'20260910-0004', time:'11:30 AM', method:'GCash', customer:'Ana Reyes', amount:2350.00, status:'confirmed', day:'TODAY'},
+  {receipt:'20260910-0003', time:'11:02 AM', method:'Cash', customer:'Maria Reyes', amount:95.00, status:'pending', day:'TODAY'},
+  {receipt:'20260910-0002', time:'10:45 AM', method:'GCash', customer:'Juan Cruz', amount:1200.00, status:'confirmed', day:'TODAY'},
+  {receipt:'20260910-0001', time:'9:15 AM', method:'Cash', customer:'', amount:60.00, status:'confirmed', day:'TODAY'},
+  // YESTERDAY — Sep 9
+  {receipt:'20260909-0156', time:'9:45 PM', method:'Cash', customer:'Maria Santos', amount:450.00, status:'confirmed', day:'YESTERDAY'},
+  {receipt:'20260909-0155', time:'8:30 PM', method:'GCash', customer:'', amount:320.00, status:'confirmed', day:'YESTERDAY'},
+  {receipt:'20260909-0154', time:'6:10 PM', method:'Cash', customer:'Pedro Lim', amount:715.00, status:'confirmed', day:'YESTERDAY'},
+  {receipt:'20260909-0153', time:'4:22 PM', method:'GCash', customer:'Lisa Tan', amount:540.00, status:'pending', day:'YESTERDAY'},
+  {receipt:'20260909-0152', time:'2:05 PM', method:'Cash', customer:'', amount:135.00, status:'confirmed', day:'YESTERDAY'},
+  {receipt:'20260909-0151', time:'11:48 AM', method:'GCash', customer:'Juan Cruz', amount:890.00, status:'confirmed', day:'YESTERDAY'},
+  // SEP 8
+  {receipt:'20260908-0142', time:'8:15 PM', method:'Cash', customer:'Maria Santos', amount:275.00, status:'confirmed', day:'SEP 8'},
+  {receipt:'20260908-0141', time:'7:40 PM', method:'GCash', customer:'', amount:1025.00, status:'confirmed', day:'SEP 8'},
+  {receipt:'20260908-0140', time:'5:55 PM', method:'Cash', customer:'Rosa Diaz', amount:410.00, status:'confirmed', day:'SEP 8'},
+  {receipt:'20260908-0139', time:'3:30 PM', method:'GCash', customer:'', amount:68.00, status:'confirmed', day:'SEP 8'},
+  {receipt:'20260908-0138', time:'1:12 PM', method:'Cash', customer:'', amount:150.00, status:'confirmed', day:'SEP 8'},
+  {receipt:'20260908-0137', time:'10:05 AM', method:'GCash', customer:'Ana Reyes', amount:1980.00, status:'confirmed', day:'SEP 8'},
+  // SEP 7
+  {receipt:'20260907-0098', time:'9:20 PM', method:'Cash', customer:'', amount:220.00, status:'confirmed', day:'SEP 7'},
+  {receipt:'20260907-0097', time:'7:05 PM', method:'GCash', customer:'Pedro Lim', amount:645.00, status:'confirmed', day:'SEP 7'},
+  {receipt:'20260907-0096', time:'5:48 PM', method:'Cash', customer:'', amount:95.00, status:'confirmed', day:'SEP 7'},
+  {receipt:'20260907-0095', time:'2:15 PM', method:'GCash', customer:'Lisa Tan', amount:1320.00, status:'confirmed', day:'SEP 7'},
+  {receipt:'20260907-0094', time:'11:30 AM', method:'Cash', customer:'Maria Reyes', amount:380.00, status:'confirmed', day:'SEP 7'},
+  {receipt:'20260907-0093', time:'9:02 AM', method:'Cash', customer:'', amount:55.00, status:'confirmed', day:'SEP 7'}
+];
 
-  document.querySelectorAll('.sale-row .sub').forEach((sub, i) => {
-    const cashiers = ['Juan Dela Cruz', 'Maria Reyes', 'Juan Dela Cruz', 'Maria Reyes'];
-    if (role === 'staff') {
-      sub.textContent = sub.textContent.split(' · ')[1] + ' · ' + sub.textContent.split(' · ')[2];
-    } else {
-      sub.textContent = 'Cashier: ' + cashiers[i] + ' · ' + sub.textContent.split(' · ')[1] + ' · ' + sub.textContent.split(' · ')[2];
-    }
+function formatPeso(n) {
+  return '₱' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+function filteredSales() {
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  return sales.filter(s => {
+    if (selectedMethod !== 'all' && s.method !== selectedMethod) return false;
+    if (q && !s.receipt.includes(q) && !(s.customer || '').toLowerCase().includes(q)) return false;
+    return true;
   });
-
-  const nav = document.getElementById('bottomNav');
-  nav.innerHTML = data.nav.map(item => `
-    <div class="navitem ${item.sel ? 'sel' : ''}">
-      <span class="navicon"><svg><use href="${item.icon}"/></svg></span>
-      <span class="navlbl">${item.label}</span>
-    </div>
-  `).join('');
 }
 
-function selectChip(el, group) {
-  if (!el.dataset.group) return;
-  document.querySelectorAll(`[data-group="${group}"]`).forEach(c => c.classList.remove('on'));
+function selectMethod(el) {
+  document.querySelectorAll('#methodChips .chip').forEach(c => c.classList.remove('on'));
   el.classList.add('on');
+  selectedMethod = el.dataset.method;
+  currentPage = 1;
+  renderSales();
 }
 
-setRole('owner');
+function selectPeriod(el) {
+  document.querySelectorAll('#periodChips .chip').forEach(c => c.classList.remove('on'));
+  el.classList.add('on');
+  currentPage = 1;
+  renderSales();
+}
+
+function searchChanged() {
+  currentPage = 1;
+  renderSales();
+}
+
+function goPage(p) {
+  currentPage = p;
+  renderSales();
+}
+
+function renderSales() {
+  const list = filteredSales();
+
+  const total = list.reduce((sum, s) => sum + s.amount, 0);
+  document.getElementById('statTotal').textContent = '₱' + Math.round(total).toLocaleString();
+  document.getElementById('statCount').textContent = list.length;
+  document.getElementById('statPending').textContent = list.filter(s => s.status === 'pending').length;
+
+  const container = document.getElementById('salesGroups');
+  const pager = document.getElementById('salesPager');
+
+  if (list.length === 0) {
+    container.innerHTML = `<div class="card pad"><div class="center-screen" style="padding:28px 0;min-height:140px"><div class="icon-lg"><svg><use href="#i-receipt"/></svg></div><div class="title">No sales</div><div class="msg">No sales match the selected filters.</div></div></div>`;
+    pager.innerHTML = '';
+    return;
+  }
+
+  const totalPages = Math.ceil(list.length / PAGE_SIZE);
+  if (currentPage > totalPages) currentPage = totalPages;
+  const pageItems = list.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  let html = '';
+  let lastDay = null;
+  pageItems.forEach(s => {
+    if (s.day !== lastDay) {
+      if (lastDay !== null) html += '</div>';
+      html += `<div class="group-label">${s.day}</div><div class="card pad">`;
+      lastDay = s.day;
+    }
+    const ok = s.status === 'confirmed';
+    html += `<div class="sale-row">
+      <div class="isquare ${ok ? 'c-green' : 'c-amber'}"><svg><use href="#${ok ? 'i-check' : 'i-warn'}"/></svg></div>
+      <div class="grow">
+        <div class="name">Sale #${s.receipt}</div>
+        <div class="sub">${s.time} · ${s.method}${s.customer ? ' · ' + escapeHtml(s.customer) : ''}</div>
+      </div>
+      <div class="end">
+        <div class="price">${formatPeso(s.amount)}</div>
+        <span class="pill ${ok ? 'pill-solid-green' : 'pill-amber'}">${ok ? 'Confirmed' : 'Pending'}</span>
+      </div>
+      <div class="menu-btn"><svg><use href="#i-morev"/></svg></div>
+    </div>`;
+  });
+  html += '</div>';
+  container.innerHTML = html;
+  pager.innerHTML = pagerHtml(list.length, currentPage, PAGE_SIZE, 'goPage', 'standalone');
+}
+
+renderSales();
 </script>
 </body>
 </html>

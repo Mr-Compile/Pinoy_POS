@@ -44,8 +44,12 @@
   .stock-actions .aicon:hover { background: var(--surface-elev); }
   .stock-actions svg { width: 18px; height: 18px; fill: var(--text-3); }
 
-  .fab { display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #2C68D7, #2563C7); color: #fff; font-size: 13.5px; font-weight: 700; padding: 13px 20px; border-radius: 16px; box-shadow: 0 8px 20px rgba(44,104,215,.4); cursor: pointer; }
-  .fabzone { display: flex; justify-content: flex-end; padding-right: 4px; margin-top: auto; }
+  .fab { width: 56px; height: 56px; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #2C68D7, #2563C7); color: #fff; border-radius: 18px; box-shadow: 0 8px 20px rgba(44,104,215,.4); cursor: pointer; }
+  .fab svg { width: 24px; height: 24px; fill: #fff; }
+  /* Floating at screen bottom — mirrors Scaffold.floatingActionButton */
+  .fabzone { position: absolute; right: 16px; bottom: 16px; z-index: 40; }
+  /* Matches ResponsiveCreateAction.fabClearance = 88 so the pager clears the FAB */
+  .screen-body.has-fab { padding-bottom: 88px; }
 
   .dialog-overlay { position: absolute; inset: 0; top: 30px; background: rgba(0,0,0,.55); z-index: 50; display: none; align-items: center; justify-content: center; padding: 16px; }
   .dialog-overlay.open { display: flex; }
@@ -142,10 +146,28 @@
         <div class="avatar" id="avatar">OW</div>
       </div>
       <div class="screen">
-        <div class="screen-body">
+        <div class="screen-body has-fab">
+
+          <div class="stats" id="statsRow">
+            <div class="stat">
+              <div class="ic" style="background:var(--primary)"><svg width="17" height="17"><use href="#i-box"/></svg></div>
+              <div class="num" id="statTotal">18</div>
+              <div class="lbl">Products</div>
+            </div>
+            <div class="stat">
+              <div class="ic" style="background:var(--warning)"><svg width="17" height="17"><use href="#i-warn"/></svg></div>
+              <div class="num" id="statLow">4</div>
+              <div class="lbl">Low stock</div>
+            </div>
+            <div class="stat">
+              <div class="ic" style="background:var(--error)"><svg width="17" height="17"><use href="#i-error"/></svg></div>
+              <div class="num" id="statOut">2</div>
+              <div class="lbl">Out of stock</div>
+            </div>
+          </div>
 
           <div class="toolbar">
-            <div class="search"><svg><use href="#i-search"/></svg><input type="text" id="searchInput" placeholder="Search products" oninput="renderStock()"></div>
+            <div class="search"><svg><use href="#i-search"/></svg><input type="text" id="searchInput" placeholder="Search products" oninput="searchChanged()"></div>
             <div class="filterbtn">
               <svg><use href="#i-filter"/></svg><select class="select" id="categoryFilter" onchange="setCategory(this.value)" style="width:92px;border:0;background:transparent;padding:8px 0;color:var(--text-2);font-weight:600;font-size:12.5px;cursor:pointer;">
                 <option value="All">All</option>
@@ -167,14 +189,15 @@
             <div class="card-head">
               <div class="isquare c-amber"><svg><use href="#i-box"/></svg></div>
               <h3>Inventory</h3>
-              <span class="pill pill-blue" id="stockCountPill">6 items</span>
+              <span class="pill pill-blue" id="stockCountPill">18 items</span>
             </div>
-            <div id="stockList" style="padding: 0 14px 14px;"></div>
+            <div id="stockList" style="padding: 0 14px;"></div>
+            <div id="stockPager"></div>
           </div>
 
-          <div class="fabzone" id="fabZone"><div class="fab" onclick="openProductPicker()"><svg><use href="#i-plus"/></svg>Add Stock</div></div>
         </div>
       </div>
+      <div class="fabzone" id="fabZone"><div class="fab" onclick="openProductPicker()"><svg><use href="#i-plus"/></svg></div></div>
 
       <!-- Stock details dialog -->
       <div class="dialog-overlay" id="stockViewDialog" onclick="if(event.target===this)closeStockView()">
@@ -318,8 +341,36 @@ let stockData = [
   ]},
   {id:6, name:'Chicken Adobo Rice', category:'Meals', min:12, stock:4, history:[
     {op:'sale', qty:14, from:18, to:4, reason:'', date:'Sep 9, 12:10 PM'}
-  ]}
+  ]},
+  {id:7, name:'Iced Tea', category:'Drinks', min:10, stock:32, history:[
+    {op:'add', qty:20, from:12, to:32, reason:'Restock', date:'Sep 8, 8:00 AM'}
+  ]},
+  {id:8, name:'Banana Cue', category:'Snacks', min:10, stock:0, history:[]},
+  {id:9, name:'Beef Tapa Rice', category:'Meals', min:8, stock:9, history:[]},
+  {id:10, name:'Pancit Canton', category:'Meals', min:10, stock:22, history:[]},
+  {id:11, name:'Lumpiang Shanghai', category:'Snacks', min:15, stock:40, history:[]},
+  {id:12, name:'Turon', category:'Snacks', min:10, stock:28, history:[]},
+  {id:13, name:'Buko Juice', category:'Drinks', min:12, stock:20, history:[]},
+  {id:14, name:'Bottled Water', category:'Drinks', min:24, stock:50, history:[]},
+  {id:15, name:'Siopao Asado', category:'Snacks', min:10, stock:4, history:[]},
+  {id:16, name:'Siomai Rice', category:'Meals', min:10, stock:19, history:[]},
+  {id:17, name:'Mango Shake', category:'Drinks', min:8, stock:13, history:[]},
+  {id:18, name:'Leche Flan', category:'Dessert', min:6, stock:6, history:[]}
 ];
+
+// Pagination — 10 rows per page
+const PAGE_SIZE = 10;
+let currentPage = 1;
+
+function goPage(p) {
+  currentPage = p;
+  renderStock();
+}
+
+function searchChanged() {
+  currentPage = 1;
+  renderStock();
+}
 
 let selectedCategory = 'All';
 
@@ -349,11 +400,13 @@ function selectChip(el, group) {
   if (!el.dataset.group) return;
   document.querySelectorAll(`[data-group="${group}"]`).forEach(c => c.classList.remove('on'));
   el.classList.add('on');
+  currentPage = 1;
   renderStock();
 }
 
 function setCategory(cat) {
   selectedCategory = cat;
+  currentPage = 1;
   renderStock();
 }
 
@@ -378,13 +431,24 @@ function stockColor(p) {
 
 function renderStock() {
   const list = filteredStock();
+  const lowCount = stockData.filter(p => p.stock > 0 && p.stock < p.min).length;
+  const outCount = stockData.filter(p => p.stock <= 0).length;
+  document.getElementById('statTotal').textContent = stockData.length;
+  document.getElementById('statLow').textContent = lowCount;
+  document.getElementById('statOut').textContent = outCount;
   document.getElementById('stockCountPill').textContent = list.length + ' item' + (list.length === 1 ? '' : 's');
   const container = document.getElementById('stockList');
+  const pager = document.getElementById('stockPager');
   if (list.length === 0) {
     container.innerHTML = `<div class="center-screen" style="padding:20px 0;min-height:120px"><div class="icon-lg"><svg><use href="#i-box"/></svg></div><div class="title">No products found</div><div class="msg">Try a different search or filter.</div></div>`;
+    pager.innerHTML = '';
     return;
   }
-  container.innerHTML = list.map(p => {
+  const totalPages = Math.ceil(list.length / PAGE_SIZE);
+  if (currentPage > totalPages) currentPage = totalPages;
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const pageItems = list.slice(start, start + PAGE_SIZE);
+  container.innerHTML = pageItems.map(p => {
     const c = stockColor(p);
     const canAdjust = currentRole === 'owner';
     return `<div class="stock-row" onclick="openStockView(${p.id})" style="cursor:pointer">
@@ -396,6 +460,7 @@ function renderStock() {
       </div>
     </div>`;
   }).join('');
+  pager.innerHTML = pagerHtml(list.length, currentPage, PAGE_SIZE, 'goPage');
 }
 
 function stockMenu(e, id) {
