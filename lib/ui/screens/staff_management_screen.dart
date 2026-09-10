@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
@@ -20,6 +22,7 @@ import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/app_list_item.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
+import 'package:pinoy_pos/ui/widgets/pagination_bar.dart';
 import 'package:pinoy_pos/ui/widgets/responsive_create_action.dart';
 import 'package:pinoy_pos/ui/widgets/validators.dart';
 
@@ -38,6 +41,10 @@ class StaffManagementScreen extends ConsumerStatefulWidget {
 class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
   final _searchController = TextEditingController();
 
+  /// Client-side pagination, matching the mockup: 10 rows per page.
+  int _currentPage = 1;
+  static const int _pageSize = 10;
+
   @override
   void initState() {
     super.initState();
@@ -52,6 +59,12 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
     super.dispose();
   }
 
+  void _goToPage(int page) {
+    final totalPages = (ref.read(staffControllerProvider).staff.length / _pageSize).ceil();
+    if (page < 1 || page > totalPages) return;
+    setState(() => _currentPage = page);
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(staffControllerProvider);
@@ -61,7 +74,7 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
     final createAction = canManage
         ? ResponsiveCreateAction(
             label: 'Add Staff',
-            icon: Icons.person_add,
+            icon: Icons.add,
             onPressed: _showAddStaffDialog,
           )
         : null;
@@ -111,9 +124,11 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
             controller: _searchController,
             hint: 'Search by name or username',
             onChanged: (value) {
+              _currentPage = 1;
               ref.read(staffControllerProvider.notifier).setSearch(value);
             },
             onClear: () {
+              _currentPage = 1;
               _searchController.clear();
               ref.read(staffControllerProvider.notifier).setSearch('');
             },
@@ -122,9 +137,10 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
           pinnedControls: [
             _SortMenu(
               sortBy: state.sortBy,
-              onSelected: (sort) => ref
-                  .read(staffControllerProvider.notifier)
-                  .setSort(sort),
+              onSelected: (sort) {
+                _currentPage = 1;
+                ref.read(staffControllerProvider.notifier).setSort(sort);
+              },
             ),
           ],
           primaryAction: primaryAction,
@@ -161,8 +177,10 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
 
     return PopupMenuButton<StaffFilter>(
       initialValue: state.filter,
-      onSelected: (value) =>
-          ref.read(staffControllerProvider.notifier).setFilter(value),
+      onSelected: (value) {
+        _currentPage = 1;
+        ref.read(staffControllerProvider.notifier).setFilter(value);
+      },
       offset: const Offset(0, 40),
       itemBuilder: (context) => [
         PopupMenuItem(
@@ -241,6 +259,16 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
       );
     }
 
+    final totalPages = (state.staff.length / _pageSize).ceil();
+    final effectivePage = math.min(
+      _currentPage,
+      math.max(totalPages, 1),
+    );
+    final pageItems = state.staff
+        .skip((effectivePage - 1) * _pageSize)
+        .take(_pageSize)
+        .toList();
+
     return ListView.builder(
       padding: EdgeInsets.fromLTRB(
         Spacing.md,
@@ -248,9 +276,24 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
         Spacing.md,
         Spacing.md + bottomClearance,
       ),
-      itemCount: state.staff.length,
+      itemCount: pageItems.length + (totalPages > 1 ? 1 : 0),
       itemBuilder: (context, index) {
-        final staff = state.staff[index];
+        if (index == pageItems.length) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: Spacing.sm,
+              vertical: Spacing.sm,
+            ),
+            child: PaginationBar(
+              totalItems: state.staff.length,
+              currentPage: effectivePage,
+              pageSize: _pageSize,
+              onPageChanged: _goToPage,
+            ),
+          );
+        }
+
+        final staff = pageItems[index];
         return _StaffListTile(
           staff: staff,
           onView: () => _openStaffDetail(staff),
