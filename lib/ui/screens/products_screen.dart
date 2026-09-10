@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
@@ -21,7 +23,9 @@ import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/app_status_chip.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
+import 'package:pinoy_pos/ui/widgets/pagination_bar.dart';
 import 'package:pinoy_pos/ui/widgets/responsive_create_action.dart';
+import 'package:pinoy_pos/ui/widgets/summary_stat_card.dart';
 
 class ProductsScreen extends ConsumerStatefulWidget {
   const ProductsScreen({super.key});
@@ -46,6 +50,10 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
   String _searchQuery = '';
   int? _selectedCategoryId;
   _ProductStockFilter _stockFilter = _ProductStockFilter.all;
+
+  /// Client-side pagination, matching the mockup: 10 rows per page.
+  int _currentPage = 1;
+  static const int _pageSize = 10;
 
   // Catalog-wide counts for the stat strip. Kept separate from _products
   // so they reflect the whole inventory, not the current search results.
@@ -135,7 +143,14 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     final query = value.trim();
     if (query == _searchQuery) return;
     _searchQuery = query;
+    _currentPage = 1;
     _loadData();
+  }
+
+  void _goToPage(int page) {
+    final totalPages = (_filteredProducts.length / _pageSize).ceil();
+    if (page < 1 || page > totalPages) return;
+    setState(() => _currentPage = page);
   }
 
   Future<void> _deleteProduct(Product product) async {
@@ -238,62 +253,44 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
       child: Row(
         children: [
           Expanded(
-            child: _buildProductStat(
+            child: SummaryStatCard(
+              icon: Icons.inventory_2_outlined,
+              color: cs.primary,
               value: '${_stockSummary.total}',
               label: 'Products',
-              valueColor: cs.onSurface,
+              selected: _stockFilter == _ProductStockFilter.all,
+              onTap: () => setState(() {
+                _stockFilter = _ProductStockFilter.all;
+                _currentPage = 1;
+              }),
             ),
           ),
           const SizedBox(width: Spacing.sm),
           Expanded(
-            child: _buildProductStat(
+            child: SummaryStatCard(
+              icon: Icons.warning_amber_outlined,
+              color: warningColor,
               value: '${_stockSummary.lowStock}',
               label: 'Low stock',
-              valueColor: warningColor,
+              selected: _stockFilter == _ProductStockFilter.lowStock,
+              onTap: () => setState(() {
+                _stockFilter = _ProductStockFilter.lowStock;
+                _currentPage = 1;
+              }),
             ),
           ),
           const SizedBox(width: Spacing.sm),
           Expanded(
-            child: _buildProductStat(
+            child: SummaryStatCard(
+              icon: Icons.error_outline,
+              color: errorColor,
               value: '${_stockSummary.outOfStock}',
               label: 'Out of stock',
-              valueColor: errorColor,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProductStat({
-    required String value,
-    required String label,
-    required Color valueColor,
-  }) {
-    final cs = Theme.of(context).colorScheme;
-
-    return AppCard(
-      variant: AppCardVariant.filled,
-      padding: const EdgeInsets.all(Spacing.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            value,
-            style: AppTypography.titleLarge(context).copyWith(
-              fontWeight: FontWeight.w800,
-              color: valueColor,
-              height: 1.1,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label.toUpperCase(),
-            style: AppTypography.labelSmall(context).copyWith(
-              color: cs.onSurfaceVariant,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.4,
+              selected: _stockFilter == _ProductStockFilter.outOfStock,
+              onTap: () => setState(() {
+                _stockFilter = _ProductStockFilter.outOfStock;
+                _currentPage = 1;
+              }),
             ),
           ),
         ],
@@ -354,7 +351,10 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
 
     return PopupMenuButton<int?>(
       initialValue: _selectedCategoryId,
-      onSelected: (value) => setState(() => _selectedCategoryId = value),
+      onSelected: (value) => setState(() {
+        _selectedCategoryId = value;
+        _currentPage = 1;
+      }),
       offset: const Offset(0, 40),
       itemBuilder: (context) => [
         PopupMenuItem<int?>(
@@ -422,6 +422,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
       onPressed: () {
         setState(() {
           _stockFilter = isSelected ? _ProductStockFilter.all : filter;
+          _currentPage = 1;
         });
       },
       elevation: 0,
@@ -491,6 +492,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                   _searchQuery = '';
                   _selectedCategoryId = null;
                   _stockFilter = _ProductStockFilter.all;
+                  _currentPage = 1;
                 });
                 _loadData();
               },
@@ -507,6 +509,14 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     final brightness = Theme.of(context).brightness;
     final listAccent = AppSemanticColors.resolve(AppSemanticColors.violet, brightness);
 
+    final filtered = _filteredProducts;
+    final totalPages = (filtered.length / _pageSize).ceil();
+    final effectivePage = math.min(_currentPage, math.max(totalPages, 1));
+    final pageItems = filtered
+        .skip((effectivePage - 1) * _pageSize)
+        .take(_pageSize)
+        .toList();
+
     return AppCard(
       margin: const EdgeInsets.fromLTRB(
         Spacing.lg,
@@ -521,7 +531,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
           _buildCardHead(
             'All Products',
             Icons.inventory_2_outlined,
-            '${_filteredProducts.length} items',
+            '${filtered.length} items',
             listAccent,
           ),
           Expanded(
@@ -532,10 +542,24 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                 Spacing.md,
                 bottomClearance + Spacing.md,
               ),
-              itemCount: _filteredProducts.length,
+              itemCount: pageItems.length + (totalPages > 1 ? 1 : 0),
               separatorBuilder: (context, index) => const Divider(height: 1),
               itemBuilder: (context, index) {
-                final product = _filteredProducts[index];
+                if (index == pageItems.length) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: Spacing.sm,
+                      vertical: Spacing.sm,
+                    ),
+                    child: PaginationBar(
+                      totalItems: filtered.length,
+                      currentPage: effectivePage,
+                      pageSize: _pageSize,
+                      onPageChanged: _goToPage,
+                    ),
+                  );
+                }
+                final product = pageItems[index];
                 final category = _categories.firstWhere(
                   (c) => c.id == product.categoryId,
                   orElse: () => Category(
