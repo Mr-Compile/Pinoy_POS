@@ -54,6 +54,12 @@ class PaymentMethodChart extends StatelessWidget {
       AppSemanticColors.resolve(AppSemanticColors.neutral, brightness),
     ];
 
+    // fl_chart measures section radius outward from centerSpaceRadius, so the
+    // pie's true outer radius is centerSpaceRadius + section.radius. Keeping
+    // that sum below size/2 stops the pie from painting over the legend.
+    final centerSpaceRadius = size * 0.27;
+    final ringRadius = size / 2 - centerSpaceRadius - Spacing.xs;
+
     final sections = active.asMap().entries.map((entry) {
       final i = entry.key;
       final p = entry.value;
@@ -63,7 +69,7 @@ class PaymentMethodChart extends StatelessWidget {
       return PieChartSectionData(
         color: color,
         value: p.total,
-        radius: size / 2 - 16,
+        radius: ringRadius,
         title: '${(pct * 100).toStringAsFixed(0)}%',
         titleStyle: TextStyle(
           color: _contrastColor(context, cs, color),
@@ -73,39 +79,58 @@ class PaymentMethodChart extends StatelessWidget {
       );
     }).toList();
 
-    return Row(
+    final chart = SizedBox(
+      width: size,
+      height: size,
+      child: PieChart(
+        PieChartData(
+          sectionsSpace: 2,
+          centerSpaceRadius: centerSpaceRadius,
+          sections: sections,
+          pieTouchData: PieTouchData(enabled: false),
+        ),
+      ),
+    );
+
+    final legend = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        SizedBox(
-          width: size,
-          height: size,
-          child: PieChart(
-            PieChartData(
-              sectionsSpace: 2,
-              centerSpaceRadius: 35,
-              sections: sections,
-              pieTouchData: PieTouchData(enabled: false),
-            ),
+        for (int i = 0; i < active.length; i++) ...[
+          _LegendItem(
+            color: colors[i % colors.length],
+            label: active[i].method,
+            count: active[i].count,
+            value: _formatMoney(active[i].total),
           ),
-        ),
-        const SizedBox(width: Spacing.md),
-        Flexible(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        ],
+      ],
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // On narrow containers the legend stacks below the chart instead of
+        // being squeezed beside it.
+        final stacked = constraints.maxWidth.isFinite &&
+            constraints.maxWidth < size + 170;
+        if (stacked) {
+          return Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              for (int i = 0; i < active.length; i++) ...[
-                _LegendItem(
-                  color: colors[i % colors.length],
-                  label: active[i].method,
-                  count: active[i].count,
-                  value: _formatMoney(active[i].total),
-                ),
-              ],
+              Center(child: chart),
+              const SizedBox(height: Spacing.md),
+              SizedBox(width: double.infinity, child: legend),
             ],
-          ),
-        ),
-      ],
+          );
+        }
+        return Row(
+          children: [
+            chart,
+            const SizedBox(width: Spacing.md),
+            Expanded(child: legend),
+          ],
+        );
+      },
     );
   }
 

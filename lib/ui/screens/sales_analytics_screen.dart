@@ -45,20 +45,9 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
     final canExport =
         ref.read(authStateProvider.notifier).hasPermission('export_reports');
 
-    final headerActions = canExport
-        ? [
-            IconButton(
-              onPressed: _showExportMenu,
-              icon: const Icon(Icons.download_outlined),
-              tooltip: 'Export',
-            ),
-          ]
-        : null;
-
     return Scaffold(
-      appBar: AppHeader(
+      appBar: const AppHeader(
         title: 'Reports',
-        actions: headerActions,
       ),
       body: state.isLoading && state.analytics == null
           ? const LoadingState(message: 'Loading sales analytics...')
@@ -127,6 +116,7 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
                     context,
                     state,
                     isCompact: false,
+                    canExport: canExport,
                   ),
                 );
               },
@@ -248,6 +238,7 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
                       context,
                       analyticsState,
                       isCompact: true,
+                      canExport: false,
                     ),
                     const SizedBox(height: Spacing.md),
                     Row(
@@ -282,8 +273,9 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
     BuildContext context,
     SalesAnalyticsState state, {
     required bool isCompact,
+    required bool canExport,
   }) {
-    final children = <Widget>[
+    final dropdowns = <Widget>[
       _buildPaymentMethodDropdown(
         state.paymentMethod,
         (v) => ref.read(salesAnalyticsProvider.notifier).setPaymentMethod(v),
@@ -297,7 +289,7 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
     if (isCompact) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: children
+        children: dropdowns
             .map((c) => Padding(
                   padding: const EdgeInsets.only(bottom: Spacing.md),
                   child: c,
@@ -308,14 +300,20 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: children
-          .map((c) => Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(right: Spacing.md),
-                  child: c,
-                ),
-              ))
-          .toList(),
+      children: [
+        ...dropdowns.map((c) => Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(right: Spacing.md),
+                child: c,
+              ),
+            )),
+        if (canExport)
+          FilledButton.icon(
+            onPressed: state.analytics == null ? null : _showExportMenu,
+            icon: const Icon(Icons.download),
+            label: const Text('Export'),
+          ),
+      ],
     );
   }
 

@@ -118,29 +118,7 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
               ref.read(staffControllerProvider.notifier).setSearch('');
             },
           ),
-          controls: [
-            _FilterChip(
-              label: 'All',
-              selected: state.filter == StaffFilter.all,
-              onSelected: () => ref
-                  .read(staffControllerProvider.notifier)
-                  .setFilter(StaffFilter.all),
-            ),
-            _FilterChip(
-              label: 'Active',
-              selected: state.filter == StaffFilter.active,
-              onSelected: () => ref
-                  .read(staffControllerProvider.notifier)
-                  .setFilter(StaffFilter.active),
-            ),
-            _FilterChip(
-              label: 'Inactive',
-              selected: state.filter == StaffFilter.inactive,
-              onSelected: () => ref
-                  .read(staffControllerProvider.notifier)
-                  .setFilter(StaffFilter.inactive),
-            ),
-          ],
+          controls: [_buildStatusFilter(context, state)],
           pinnedControls: [
             _SortMenu(
               sortBy: state.sortBy,
@@ -173,6 +151,77 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
     );
   }
 
+  Widget _buildStatusFilter(BuildContext context, StaffListState state) {
+    final cs = Theme.of(context).colorScheme;
+    final selectedLabel = switch (state.filter) {
+      StaffFilter.all => 'All',
+      StaffFilter.active => 'Active',
+      StaffFilter.inactive => 'Inactive',
+    };
+
+    return PopupMenuButton<StaffFilter>(
+      initialValue: state.filter,
+      onSelected: (value) =>
+          ref.read(staffControllerProvider.notifier).setFilter(value),
+      offset: const Offset(0, 40),
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: StaffFilter.all,
+          child: Row(
+            children: [
+              Icon(Icons.filter_list, size: 18, color: cs.onSurfaceVariant),
+              const SizedBox(width: 8),
+              const Text('All'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: StaffFilter.active,
+          child: Row(
+            children: [
+              Icon(Icons.toggle_on, size: 18, color: cs.onSurfaceVariant),
+              const SizedBox(width: 8),
+              const Text('Active'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: StaffFilter.inactive,
+          child: Row(
+            children: [
+              Icon(Icons.toggle_off, size: 18, color: cs.onSurfaceVariant),
+              const SizedBox(width: 8),
+              const Text('Inactive'),
+            ],
+          ),
+        ),
+      ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: cs.surface,
+          border: Border.all(color: cs.outline),
+          borderRadius: BorderRadius.circular(AppRadius.control),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.filter_list, size: 18, color: cs.onSurfaceVariant),
+            const SizedBox(width: 6),
+            Text(
+              selectedLabel,
+              style: AppTypography.bodySmall(context),
+            ),
+            Icon(
+              Icons.arrow_drop_down,
+              size: 18,
+              color: cs.onSurfaceVariant,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
   Widget _buildBody(
     BuildContext context,
     StaffListState state,
@@ -204,7 +253,7 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
         final staff = state.staff[index];
         return _StaffListTile(
           staff: staff,
-          onTap: () => _openStaffDetail(staff),
+          onView: () => _openStaffDetail(staff),
           onEdit: () => _showEditStaffDialog(staff),
           onResetPassword: () => _resetStaffPassword(staff),
           onToggleActive: () => _toggleStaffActive(staff),
@@ -526,7 +575,7 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
 
 class _StaffListTile extends StatelessWidget {
   final User staff;
-  final VoidCallback onTap;
+  final VoidCallback onView;
   final VoidCallback onEdit;
   final VoidCallback onResetPassword;
   final VoidCallback onToggleActive;
@@ -534,7 +583,7 @@ class _StaffListTile extends StatelessWidget {
 
   const _StaffListTile({
     required this.staff,
-    required this.onTap,
+    required this.onView,
     required this.onEdit,
     required this.onResetPassword,
     required this.onToggleActive,
@@ -544,9 +593,11 @@ class _StaffListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
-    final statusColor = staff.isActive
-        ? AppSemanticColors.resolve(AppSemanticColors.success, brightness)
-        : AppSemanticColors.resolve(AppSemanticColors.neutral, brightness);
+    final suspendColor = staff.isActive
+        ? AppSemanticColors.resolve(AppSemanticColors.warning, brightness)
+        : AppSemanticColors.resolve(AppSemanticColors.success, brightness);
+    final deleteColor =
+        AppSemanticColors.resolve(AppSemanticColors.error, brightness);
 
     return AppListItem(
       leading: AppAvatar(
@@ -557,64 +608,83 @@ class _StaffListTile extends StatelessWidget {
         radius: 24,
       ),
       title: staff.fullName,
-      subtitle: '@${staff.username}',
-      onTap: onTap,
-      statusLabel: staff.isActive ? 'Active' : 'Inactive',
-      statusColor: statusColor,
-      actions: [
-        AppListAction(
-          icon: Icons.edit,
-          tooltip: 'Edit',
-          onPressed: onEdit,
-        ),
-        AppListAction(
-          icon: Icons.lock_reset,
-          tooltip: 'Reset Password',
-          onPressed: onResetPassword,
-        ),
-        AppListAction(
-          icon: staff.isActive ? Icons.person_off : Icons.person,
-          tooltip: staff.isActive ? 'Deactivate' : 'Activate',
-          color: staff.isActive
-              ? AppSemanticColors.resolve(
-                  AppSemanticColors.warning, brightness)
-              : AppSemanticColors.resolve(
-                  AppSemanticColors.success, brightness),
-          onPressed: onToggleActive,
-        ),
-        AppListAction(
-          icon: Icons.delete,
-          tooltip: 'Delete',
-          color: AppSemanticColors.resolve(
-              AppSemanticColors.error, brightness),
-          onPressed: onDelete,
-        ),
-      ],
+      subtitle:
+          '@${staff.username} · Staff · ${staff.isActive ? 'Active' : 'Inactive'}',
+      onTap: onView,
+      trailing: _StaffMenu(
+        actions: [
+          AppListMenuAction(
+            icon: Icons.visibility_outlined,
+            label: 'View',
+            onPressed: onView,
+          ),
+          AppListMenuAction(
+            icon: Icons.edit,
+            label: 'Edit',
+            onPressed: onEdit,
+          ),
+          AppListMenuAction(
+            icon: Icons.lock_reset,
+            label: 'Reset Password',
+            onPressed: onResetPassword,
+          ),
+          AppListMenuAction(
+            icon: staff.isActive ? Icons.person_off : Icons.person,
+            label: staff.isActive ? 'Suspend' : 'Activate',
+            color: suspendColor,
+            onPressed: onToggleActive,
+          ),
+          AppListMenuAction(
+            icon: Icons.delete,
+            label: 'Delete',
+            color: deleteColor,
+            onPressed: onDelete,
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _FilterChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onSelected;
+class _StaffMenu extends StatelessWidget {
+  final List<AppListMenuAction> actions;
 
-  const _FilterChip({
-    required this.label,
-    required this.selected,
-    required this.onSelected,
-  });
+  const _StaffMenu({required this.actions});
 
   @override
   Widget build(BuildContext context) {
-    return ChoiceChip(
-      label: Text(label),
-      selected: selected,
-      onSelected: (_) => onSelected(),
+    final cs = Theme.of(context).colorScheme;
+    return PopupMenuButton<int>(
+      icon: Icon(Icons.more_vert, color: cs.onSurfaceVariant),
+      tooltip: 'Staff options',
+      padding: EdgeInsets.zero,
+      onSelected: (index) => actions[index].onPressed?.call(),
+      itemBuilder: (context) {
+        return actions.asMap().entries.map((entry) {
+          final index = entry.key;
+          final action = entry.value;
+          final color = action.color ?? cs.onSurfaceVariant;
+          return PopupMenuItem<int>(
+            value: index,
+            child: Row(
+              children: [
+                Icon(action.icon, size: 18, color: color),
+                const SizedBox(width: 8),
+                Text(
+                  action.label,
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList();
+      },
     );
   }
 }
-
 class _SortMenu extends StatelessWidget {
   final StaffSortOrder sortBy;
   final ValueChanged<StaffSortOrder> onSelected;

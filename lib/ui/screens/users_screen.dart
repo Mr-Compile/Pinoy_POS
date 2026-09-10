@@ -9,7 +9,6 @@ import 'package:pinoy_pos/providers/user_provider.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_form.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
-import 'package:pinoy_pos/ui/widgets/app_icon_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_image.dart';
 import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/dashboard_blocks.dart';
@@ -30,7 +29,7 @@ class UsersScreen extends ConsumerStatefulWidget {
 }
 
 class _UsersScreenState extends ConsumerState<UsersScreen> {
-  final _searchController = TextEditingController();
+    final _searchController = TextEditingController();
   String _searchQuery = '';
   UserRole? _roleFilter;
 
@@ -63,6 +62,12 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     }
     return filtered;
   }
+
+  String _roleLabel(UserRole role) => switch (role) {
+        UserRole.owner => 'Owner',
+        UserRole.admin => 'Admin',
+        UserRole.staff => 'Staff',
+      };
 
   Color _roleColor(UserRole role, ColorScheme colorScheme) {
     final brightness = Theme.of(context).brightness;
@@ -639,8 +644,6 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     final createFab = createAction?.fab(context);
     final bottomClearance =
         createAction?.contentBottomClearance(context) ?? 0;
-    final showSearch =
-        userState.users.isNotEmpty || _searchQuery.isNotEmpty;
 
     return Scaffold(
       appBar: const AppHeader(
@@ -648,91 +651,130 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
         showBackButton: true,
       ),
       floatingActionButton: createFab,
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── Content toolbar: search + refresh + primary add action ──
-          if (showSearch || toolbarAction != null)
+      body: RefreshIndicator(
+        onRefresh: _refresh,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Content toolbar: search + role filter + primary add action ──
             CrudToolbar(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-              search: showSearch
-                  ? AppSearchField(
-                      controller: _searchController,
-                      hint: 'Search by name or username',
-                      onChanged: (value) =>
-                          setState(() => _searchQuery = value),
-                      onClear: () {
-                        _searchController.clear();
-                        setState(() => _searchQuery = '');
-                      },
-                    )
-                  : null,
-              pinnedControls: [
-                AppIconButton(
-                  icon: Icons.refresh,
-                  tooltip: 'Refresh',
-                  onPressed: _refresh,
-                ),
-              ],
+              padding: const EdgeInsets.fromLTRB(
+                Spacing.md,
+                Spacing.md,
+                Spacing.md,
+                0,
+              ),
+              search: AppSearchField(
+                controller: _searchController,
+                hint: 'Search by name or username',
+                onChanged: (value) =>
+                    setState(() => _searchQuery = value),
+                onClear: () {
+                  _searchController.clear();
+                  setState(() => _searchQuery = '');
+                },
+              ),
+              controls: [_buildRoleFilter(context)],
               primaryAction: toolbarAction,
             ),
-          // ── Role filter chips ──
-          if (userState.users.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: Spacing.lg,
-                vertical: Spacing.xs,
-              ),
-              child: SizedBox(
-                height: 40,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  children: [
-                    _FilterChip(
-                      label: 'All',
-                      selected: _roleFilter == null,
-                      onSelected: () =>
-                          setState(() => _roleFilter = null),
-                    ),
-                    const SizedBox(width: 8),
-                    _FilterChip(
-                      label: UserRole.owner.displayName,
-                      selected: _roleFilter == UserRole.owner,
-                      onSelected: () =>
-                          setState(() => _roleFilter = UserRole.owner),
-                    ),
-                    const SizedBox(width: 8),
-                    _FilterChip(
-                      label: UserRole.admin.displayName,
-                      selected: _roleFilter == UserRole.admin,
-                      onSelected: () =>
-                          setState(() => _roleFilter = UserRole.admin),
-                    ),
-                    const SizedBox(width: 8),
-                    _FilterChip(
-                      label: UserRole.staff.displayName,
-                      selected: _roleFilter == UserRole.staff,
-                      onSelected: () =>
-                          setState(() => _roleFilter = UserRole.staff),
-                    ),
-                  ],
-                ),
+            // ── User list ──
+            Expanded(
+              child: _buildBody(
+                userState,
+                canEdit,
+                canDelete,
+                canResetPassword,
+                canToggleActive,
+                currentUser,
+                colorScheme,
+                bottomClearance,
               ),
             ),
-          // ── User list ──
-          Expanded(
-            child: _buildBody(
-              userState,
-              canEdit,
-              canDelete,
-              canResetPassword,
-              canToggleActive,
-              currentUser,
-              colorScheme,
-              bottomClearance,
-            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRoleFilter(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final selectedLabel = _roleFilter == null
+        ? 'All'
+        : _roleLabel(_roleFilter!);
+
+    return PopupMenuButton<UserRole?>(
+      initialValue: _roleFilter,
+      onSelected: (value) => setState(() => _roleFilter = value),
+      offset: const Offset(0, 40),
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: null,
+          child: Row(
+            children: [
+              Icon(Icons.filter_list,
+                  size: 18, color: cs.onSurfaceVariant),
+              const SizedBox(width: 8),
+              const Text('All'),
+            ],
           ),
-        ],
+        ),
+        PopupMenuItem(
+          value: UserRole.owner,
+          child: Row(
+            children: [
+              Icon(Icons.workspace_premium_outlined,
+                  size: 18, color: cs.onSurfaceVariant),
+              const SizedBox(width: 8),
+              const Text('Owner'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: UserRole.admin,
+          child: Row(
+            children: [
+              Icon(Icons.admin_panel_settings_outlined,
+                  size: 18, color: cs.onSurfaceVariant),
+              const SizedBox(width: 8),
+              const Text('Admin'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: UserRole.staff,
+          child: Row(
+            children: [
+              Icon(Icons.badge_outlined,
+                  size: 18, color: cs.onSurfaceVariant),
+              const SizedBox(width: 8),
+              const Text('Staff'),
+            ],
+          ),
+        ),
+      ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: cs.surface,
+          border: Border.all(color: cs.outline),
+          borderRadius: BorderRadius.circular(AppRadius.control),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.filter_list, size: 18, color: cs.onSurfaceVariant),
+            const SizedBox(width: 6),
+            Text(
+              selectedLabel,
+              style: AppTypography.bodySmall(context),
+            ),
+            Icon(
+              Icons.arrow_drop_down,
+              size: 18,
+              color: cs.onSurfaceVariant,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -799,8 +841,6 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     bool canToggleActive,
     double bottomClearance,
   ) {
-    final count = filteredUsers.length;
-
     return ListView.builder(
       padding: EdgeInsets.fromLTRB(
         Spacing.lg,
@@ -808,53 +848,58 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
         Spacing.lg,
         Spacing.lg + bottomClearance,
       ),
-      itemCount: count + 1,
+      itemCount: filteredUsers.length,
       itemBuilder: (context, index) {
-        if (index == 0) {
-          return Padding(
-            padding: const EdgeInsets.only(
-              left: Spacing.sm,
-              top: Spacing.sm,
-              bottom: Spacing.md,
-            ),
-            child: Text(
-              '$count user${count == 1 ? '' : 's'}',
-              style: AppTypography.labelMedium(context).copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-            ),
-          );
-        }
-
-        final user = filteredUsers[index - 1];
+        final user = filteredUsers[index];
         final isSelf = currentUser?.id == user.id;
         final roleColor = _roleColor(user.role, colorScheme);
+        final brightness = Theme.of(context).brightness;
 
-        final chips = <Widget>[
-          if (!user.isActive)
-            StatusPill(
-              label: 'Inactive',
-              color: colorScheme.error,
-              icon: Icons.pause_circle,
+        final menuActions = <AppListMenuAction>[
+          AppListMenuAction(
+            icon: Icons.visibility_outlined,
+            label: 'View',
+            onPressed: () => _showUserView(
+              user,
+              canEdit,
+              canDelete,
+              canResetPassword,
+              canToggleActive,
+              isSelf,
             ),
-          if (user.mustChangePassword)
-            StatusPill(
-              label: 'Temp Password',
-              color: AppSemanticColors.resolve(
-                AppSemanticColors.warning,
-                Theme.of(context).brightness,
-              ),
-              icon: Icons.key,
+          ),
+          if (canEdit)
+            AppListMenuAction(
+              icon: Icons.edit,
+              label: 'Edit',
+              onPressed: () => _editUser(user),
             ),
-          if (user.hasPin)
-            StatusPill(
-              label: 'PIN',
+          if (canResetPassword)
+            AppListMenuAction(
+              icon: Icons.lock_reset,
+              label: 'Reset Password',
+              onPressed: () => _resetPassword(user),
+            ),
+          if (canToggleActive && !isSelf)
+            AppListMenuAction(
+              icon: user.isActive ? Icons.person_off : Icons.person,
+              label: user.isActive ? 'Deactivate' : 'Activate',
+              color: user.isActive
+                  ? AppSemanticColors.resolve(
+                      AppSemanticColors.warning,
+                      brightness)
+                  : AppSemanticColors.resolve(
+                      AppSemanticColors.success,
+                      brightness),
+              onPressed: () => _toggleUserActive(user),
+            ),
+          if (canDelete && !isSelf)
+            AppListMenuAction(
+              icon: Icons.delete,
+              label: 'Delete',
               color: AppSemanticColors.resolve(
-                AppSemanticColors.info,
-                Theme.of(context).brightness,
-              ),
-              icon: Icons.lock,
+                  AppSemanticColors.error, brightness),
+              onPressed: () => _deleteUser(user),
             ),
         ];
 
@@ -863,26 +908,25 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
           child: AppListItem(
             leading: AppAvatar(
               imagePath: user.profileImagePath,
-              initials: user.fullName,
-              radius: 22,
+              initials: user.fullName.isNotEmpty
+                  ? user.fullName[0].toUpperCase()
+                  : '?',
+              radius: 24,
               backgroundColor: roleColor,
             ),
             title: user.fullName,
-            subtitle: '@${user.username}',
-            trailing: StatusPill(
-              label: user.role.displayName,
-              color: roleColor,
+            subtitle:
+                '@${user.username} · ${_roleLabel(user.role)} · ${user.isActive ? 'Active' : 'Inactive'}',
+            onTap: () => _showUserView(
+              user,
+              canEdit,
+              canDelete,
+              canResetPassword,
+              canToggleActive,
+              isSelf,
             ),
-            chips: chips,
-            onTap: (canEdit || canDelete) && !isSelf
-                ? () => _showUserActionsSheet(
-                      user,
-                      canEdit,
-                      canDelete,
-                      canResetPassword,
-                      canToggleActive,
-                      isSelf,
-                    )
+            trailing: menuActions.isNotEmpty
+                ? _UserMenu(actions: menuActions)
                 : null,
           ),
         );
@@ -890,7 +934,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     );
   }
 
-  void _showUserActionsSheet(
+  void _showUserView(
     User user,
     bool canEdit,
     bool canDelete,
@@ -900,110 +944,145 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
   ) {
     final roleColor = _roleColor(user.role, Theme.of(context).colorScheme);
 
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: AppAvatar(
-                imagePath: user.profileImagePath,
-                initials: user.fullName,
-                radius: 22,
-                backgroundColor: roleColor,
-              ),
-              title: Text(user.fullName),
-              subtitle: Text('@${user.username}'),
+      useRootNavigator: true,
+      builder: (context) {
+        final cs = Theme.of(context).colorScheme;
+        return AppDialog(
+          type: AppDialogType.info,
+          title: user.fullName,
+          message: 'User details',
+          actions: [
+            AppDialogAction(
+              label: 'Close',
+              onPressed: (dialogContext) => Navigator.of(dialogContext).pop(),
             ),
-            const Divider(),
             if (canEdit)
-              ListTile(
-                leading: const Icon(Icons.edit),
-                title: const Text('Edit User'),
-                onTap: () {
-                  Navigator.pop(context);
+              AppDialogAction(
+                label: 'Edit',
+                isPrimary: true,
+                onPressed: (dialogContext) {
+                  Navigator.of(dialogContext).pop();
                   _editUser(user);
                 },
               ),
-            if (canResetPassword)
-              ListTile(
-                leading: const Icon(Icons.lock_reset),
-                title: const Text('Reset Password'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _resetPassword(user);
-                },
-              ),
-            if (canToggleActive && !isSelf)
-              ListTile(
-                leading: Icon(user.isActive
-                    ? Icons.person_off
-                    : Icons.person),
-                title: Text(user.isActive ? 'Deactivate' : 'Activate'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _toggleUserActive(user);
-                },
-              ),
-            if (canDelete)
-              ListTile(
-                leading: Icon(Icons.delete,
-                    color: Theme.of(context).colorScheme.error),
-                title: Text('Delete',
-                    style: TextStyle(
-                        color: Theme.of(context).colorScheme.error)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _deleteUser(user);
-                },
-              ),
-            const SizedBox(height: 8),
           ],
-        ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  AppAvatar(
+                    imagePath: user.profileImagePath,
+                    initials: user.fullName,
+                    radius: 40,
+                    backgroundColor: roleColor,
+                  ),
+                  const SizedBox(width: Spacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          user.fullName,
+                          style: AppTypography.titleMediumSemibold(context),
+                        ),
+                        Text(
+                          '@${user.username}',
+                          style: AppTypography.bodySmall(context).copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  StatusPill(
+                    label: user.role.displayName,
+                    color: roleColor,
+                  ),
+                ],
+              ),
+              const SizedBox(height: Spacing.lg),
+              _buildViewRow('Status', user.isActive ? 'Active' : 'Inactive'),
+              _buildViewRow('Role', user.role.displayName),
+              if (user.inactivityTimeoutMinutes != null)
+                _buildViewRow(
+                  'Inactivity timeout',
+                  '${user.inactivityTimeoutMinutes} minutes',
+                ),
+              if (user.mustChangePassword)
+                _buildViewRow('Password', 'Temporary password'),
+              if (user.hasPin)
+                _buildViewRow('PIN', 'Set'),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildViewRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: AppTypography.bodySmall(context).copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          Text(
+            value,
+            style: AppTypography.bodySmall(context).copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _FilterChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onSelected;
+class _UserMenu extends StatelessWidget {
+  final List<AppListMenuAction> actions;
 
-  const _FilterChip({
-    required this.label,
-    required this.selected,
-    required this.onSelected,
-  });
+  const _UserMenu({required this.actions});
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return GestureDetector(
-      onTap: onSelected,
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 7,
-        ),
-        decoration: BoxDecoration(
-          color: selected ? cs.primary : cs.surface,
-          border: Border.all(
-            color: selected ? cs.primary : cs.outline,
-          ),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w600,
-            color: selected ? cs.onPrimary : cs.onSurfaceVariant,
-          ),
-        ),
-      ),
+    return PopupMenuButton<int>(
+      icon: Icon(Icons.more_vert, color: cs.onSurfaceVariant),
+      tooltip: 'User options',
+      padding: EdgeInsets.zero,
+      onSelected: (index) => actions[index].onPressed?.call(),
+      itemBuilder: (context) {
+        return actions.asMap().entries.map((entry) {
+          final index = entry.key;
+          final action = entry.value;
+          final color = action.color ?? cs.onSurfaceVariant;
+          return PopupMenuItem<int>(
+            value: index,
+            child: Row(
+              children: [
+                Icon(action.icon, size: 18, color: color),
+                const SizedBox(width: 8),
+                Text(
+                  action.label,
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList();
+      },
     );
   }
 }

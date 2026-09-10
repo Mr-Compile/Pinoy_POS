@@ -95,75 +95,72 @@ class ResponsiveCreateAction {
   ///
   /// Returns `null` on medium+ layouts and on compact landscape. Extended
   /// when the screen is wide enough, compact circular on very narrow
-  /// screens. Scaffold handles safe-area, bottom-navigation, and keyboard
-  /// insets automatically.
+  /// screens. The button uses the Pinoy POS primary blue gradient and
+  /// rounded-rectangle shape used in the CRUD mockups.
   Widget? fab(BuildContext context) {
     if (!isFabLayout(context)) return null;
 
     final width = MediaQuery.sizeOf(context).width;
+    final isExtended = width >= extendedFabMinWidth;
     final effectiveTooltip = tooltip ?? label;
-    final (backgroundColor, foregroundColor) = _fabColors(context);
-    // Per-label hero tag prevents duplicate-hero errors when navigating
-    // between CRUD screens that both show a FAB.
     final heroTag = 'crud_fab_$label';
-
-    if (width >= extendedFabMinWidth) {
-      return FloatingActionButton.extended(
-        heroTag: heroTag,
-        onPressed: onPressed,
-        tooltip: effectiveTooltip,
-        backgroundColor: backgroundColor,
-        foregroundColor: foregroundColor,
-        icon: Icon(icon),
-        label: Text(label),
-      );
-    }
-
-    return FloatingActionButton(
-      heroTag: heroTag,
-      onPressed: onPressed,
-      tooltip: effectiveTooltip,
-      backgroundColor: backgroundColor,
-      foregroundColor: foregroundColor,
-      child: Icon(icon),
-    );
-  }
-
-  /// Semantic FAB colors for non-primary actions; `null`s keep the
-  /// [FloatingActionButtonThemeData] colors for the primary role.
-  (Color?, Color?) _fabColors(BuildContext context) {
-    if (color == AppButtonColor.primary) return (null, null);
-
     final brightness = Theme.of(context).brightness;
-    final (accent, onAccent) = switch (color) {
-      AppButtonColor.success => (
-          AppSemanticColors.success,
-          AppSemanticColors.onSuccess
-        ),
-      AppButtonColor.warning => (
-          AppSemanticColors.warning,
-          AppSemanticColors.onWarning
-        ),
-      AppButtonColor.info => (AppSemanticColors.info, AppSemanticColors.onInfo),
-      AppButtonColor.error => (
-          AppSemanticColors.error,
-          AppSemanticColors.onError
-        ),
-      AppButtonColor.neutral => (
-          AppSemanticColors.neutral,
-          AppSemanticColors.onNeutral
-        ),
-      AppButtonColor.purple => (
-          AppSemanticColors.purple,
-          AppSemanticColors.onPurple
-        ),
-      _ => (AppSemanticColors.primary, AppSemanticColors.onPrimary),
-    };
-    return (
-      AppSemanticColors.resolve(accent, brightness),
-      AppSemanticColors.resolveOn(onAccent, brightness),
+
+    final gradient = LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [
+        AppSemanticColors.resolve(AppSemanticColors.primary, brightness),
+        AppSemanticColors.resolve(AppSemanticColors.primaryDark, brightness),
+      ],
+    );
+    final borderRadius = BorderRadius.circular(AppRadius.fab);
+
+    final fabButton = isExtended
+        ? FloatingActionButton.extended(
+            heroTag: heroTag,
+            onPressed: onPressed,
+            tooltip: effectiveTooltip,
+            backgroundColor: Colors.transparent,
+            foregroundColor: AppSemanticColors.onPrimary,
+            elevation: 0,
+            shape: RoundedRectangleBorder(borderRadius: borderRadius),
+            clipBehavior: Clip.antiAlias,
+            icon: Icon(icon),
+            label: Text(label),
+          )
+        : FloatingActionButton(
+            heroTag: heroTag,
+            onPressed: onPressed,
+            tooltip: effectiveTooltip,
+            backgroundColor: Colors.transparent,
+            foregroundColor: AppSemanticColors.onPrimary,
+            elevation: 0,
+            shape: RoundedRectangleBorder(borderRadius: borderRadius),
+            clipBehavior: Clip.antiAlias,
+            child: Icon(icon),
+          );
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: gradient,
+        borderRadius: borderRadius,
+        boxShadow: [
+          BoxShadow(
+            color: AppSemanticColors.resolve(
+              AppSemanticColors.primary,
+              brightness,
+            ).withValues(alpha: 0.35),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: fabButton,
     );
   }
+
 }
 
 /// The standard CRUD content toolbar:
