@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/data/models/announcement.dart';
@@ -14,7 +16,9 @@ import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/validators.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/modal_result.dart';
+import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
+import 'package:pinoy_pos/ui/widgets/pagination_bar.dart';
 import 'package:pinoy_pos/ui/widgets/responsive_create_action.dart';
 import 'package:pinoy_pos/providers/notification_provider.dart';
 
@@ -28,6 +32,10 @@ class AnnouncementsScreen extends ConsumerStatefulWidget {
 class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
   List<Announcement> _announcements = [];
   bool _isLoading = true;
+
+  /// Client-side pagination, matching the mockup: 10 rows per page.
+  int _currentPage = 1;
+  static const int _pageSize = 10;
 
   @override
   void initState() {
@@ -48,6 +56,12 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  void _goToPage(int page) {
+    final totalPages = (_announcements.length / _pageSize).ceil();
+    if (page < 1 || page > totalPages) return;
+    setState(() => _currentPage = page);
   }
 
   Future<void> _deleteAnnouncement(Announcement announcement) async {
@@ -168,15 +182,41 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
                     // toolbar action (other layouts) is the single primary
                     // create action.
                   )
-                : ListView.builder(
-                    padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottomClearance),
-              itemCount: _announcements.length,
-              itemBuilder: (context, index) {
-                final announcement = _announcements[index];
-                final cs = Theme.of(context).colorScheme;
-                return AppCard(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  onTap: () => _showAnnouncementDetails(announcement),
+                : Builder(
+                    builder: (context) {
+                      final totalPages = (_announcements.length / _pageSize).ceil();
+                      final effectivePage = math.min(
+                        _currentPage,
+                        math.max(totalPages, 1),
+                      );
+                      final pageItems = _announcements
+                          .skip((effectivePage - 1) * _pageSize)
+                          .take(_pageSize)
+                          .toList();
+
+                      return ListView.builder(
+                        padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottomClearance),
+                        itemCount: pageItems.length + (totalPages > 1 ? 1 : 0),
+                        itemBuilder: (context, index) {
+                          if (index == pageItems.length) {
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: Spacing.sm,
+                              ),
+                              child: PaginationBar(
+                                totalItems: _announcements.length,
+                                currentPage: effectivePage,
+                                pageSize: _pageSize,
+                                onPageChanged: _goToPage,
+                              ),
+                            );
+                          }
+
+                          final announcement = pageItems[index];
+                          final cs = Theme.of(context).colorScheme;
+                          return AppCard(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            onTap: () => _showAnnouncementDetails(announcement),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -243,9 +283,11 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
                   ),
                 );
               },
-            ),
+            );
+          },
           ),
-        ],
+        ),
+      ],
       ),
     );
   }
