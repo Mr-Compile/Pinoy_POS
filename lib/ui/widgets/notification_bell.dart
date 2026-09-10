@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/breakpoints.dart';
+import 'package:pinoy_pos/core/date_time_utils.dart';
+import 'package:pinoy_pos/core/notification_style.dart';
 import 'package:pinoy_pos/core/safe_navigation.dart';
 import 'package:pinoy_pos/data/models/notification.dart' as models;
 import 'package:pinoy_pos/providers/notification_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/screens/notifications_screen.dart';
+import 'package:pinoy_pos/ui/widgets/app_icon_square.dart';
 import 'package:pinoy_pos/ui/screens/report_submissions_screen.dart';
 import 'package:pinoy_pos/ui/screens/stock_screen.dart';
 import 'package:pinoy_pos/ui/screens/announcements_screen.dart';
@@ -307,13 +310,13 @@ class _NotificationTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final brightness = theme.brightness;
     final isUnread = !notification.isRead;
 
-    final iconData = _iconForType(notification.type);
-    final iconColor = _colorForType(
+    final style = NotificationStyle.fromType(
       notification.type,
-      theme.brightness,
       colorScheme,
+      brightness,
     );
 
     return InkWell(
@@ -326,18 +329,14 @@ class _NotificationTile extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Icon
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.12),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(iconData, size: 18, color: iconColor),
+            AppIconSquare(
+              icon: style.icon,
+              size: 38,
+              backgroundColor: style.color.withValues(alpha: 0.16),
+              iconColor: style.color,
+              iconSizeFactor: 0.5,
             ),
             const SizedBox(width: 12),
-            // Content
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -347,8 +346,8 @@ class _NotificationTile extends StatelessWidget {
                       Expanded(
                         child: Text(
                           notification.title,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: isUnread ? FontWeight.bold : FontWeight.normal,
+                          style: AppTypography.bodyMedium(context).copyWith(
+                            fontWeight: isUnread ? FontWeight.bold : FontWeight.w600,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -365,14 +364,16 @@ class _NotificationTile extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     notification.message,
-                    style: theme.textTheme.bodySmall,
+                    style: AppTypography.bodySmall(context).copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    _timeAgo(notification.createdAt),
-                    style: theme.textTheme.labelSmall?.copyWith(
+                    DateTimeUtils.formatRelative(notification.createdAt),
+                    style: AppTypography.labelSmall(context).copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),
                   ),
@@ -383,46 +384,5 @@ class _NotificationTile extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  IconData _iconForType(String? type) {
-    switch (type) {
-      case 'low_stock':
-        return Icons.warning_amber_rounded;
-      case 'announcement':
-        return Icons.campaign_outlined;
-      case 'backup':
-        return Icons.backup_outlined;
-      case 'report_submitted':
-        return Icons.insert_drive_file_outlined;
-      default:
-        return Icons.info_outline;
-    }
-  }
-
-  Color _colorForType(String? type, Brightness brightness, ColorScheme cs) {
-    switch (type) {
-      case 'low_stock':
-        return AppSemanticColors.resolve(AppSemanticColors.warning, brightness);
-      case 'announcement':
-        return cs.primary;
-      case 'backup':
-        return AppSemanticColors.resolve(AppSemanticColors.info, brightness);
-      case 'report_submitted':
-        return AppSemanticColors.resolve(AppSemanticColors.success, brightness);
-      default:
-        return cs.onSurfaceVariant;
-    }
-  }
-
-  String _timeAgo(DateTime createdAt) {
-    final now = DateTime.now();
-    final diff = now.difference(createdAt);
-
-    if (diff.inMinutes < 1) return 'Just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    if (diff.inDays < 7) return '${diff.inDays}d ago';
-    return '${createdAt.month}/${createdAt.day}/${createdAt.year}';
   }
 }
