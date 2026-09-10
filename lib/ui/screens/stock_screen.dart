@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
@@ -20,7 +22,9 @@ import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/app_status_chip.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 import 'package:pinoy_pos/ui/widgets/loading_state.dart';
+import 'package:pinoy_pos/ui/widgets/pagination_bar.dart';
 import 'package:pinoy_pos/ui/widgets/responsive_create_action.dart';
+import 'package:pinoy_pos/ui/widgets/summary_stat_card.dart';
 
 /// Stock status filter options.
 enum StockFilter { all, lowStock, outOfStock }
@@ -44,6 +48,10 @@ class _StockScreenState extends ConsumerState<StockScreen> {
   StockFilter _stockFilter = StockFilter.all;
   int? _selectedCategoryId;
   Timer? _debounce;
+
+  /// Client-side pagination, matching the mockup: 10 rows per page.
+  int _currentPage = 1;
+  static const int _pageSize = 10;
 
   String? get _roleLabel => ref.read(authStateProvider).user?.role.displayName;
 
@@ -157,6 +165,7 @@ class _StockScreenState extends ConsumerState<StockScreen> {
       if (mounted) {
         setState(() {
           _searchQuery = value.trim();
+          _currentPage = 1;
         });
       }
     });
@@ -166,6 +175,7 @@ class _StockScreenState extends ConsumerState<StockScreen> {
     _searchController.clear();
     setState(() {
       _searchQuery = '';
+      _currentPage = 1;
     });
   }
 
@@ -174,8 +184,15 @@ class _StockScreenState extends ConsumerState<StockScreen> {
       _selectedCategoryId = null;
       _stockFilter = StockFilter.all;
       _searchQuery = '';
+      _currentPage = 1;
     });
     _searchController.clear();
+  }
+
+  void _goToPage(int page) {
+    final totalPages = (_filteredProducts.length / _pageSize).ceil();
+    if (page < 1 || page > totalPages) return;
+    setState(() => _currentPage = page);
   }
 
   // ── Stock operations ───────────────────────────────────────────────
@@ -395,6 +412,7 @@ class _StockScreenState extends ConsumerState<StockScreen> {
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                _buildStatsStrip(),
                 _buildToolbar(toolbarAction),
                 Expanded(
                   child: _filteredProducts.isEmpty
@@ -422,6 +440,78 @@ class _StockScreenState extends ConsumerState<StockScreen> {
       message: canManageProducts
           ? 'Add products first to manage their stock.'
           : 'Please ask an administrator to add products.',
+    );
+  }
+
+  // ── Stats strip: catalog-wide stock counts ─────────────────────────
+
+  Widget _buildStatsStrip() {
+    final cs = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
+    final warningColor = AppSemanticColors.resolve(
+      AppSemanticColors.warning,
+      brightness,
+    );
+    final errorColor = AppSemanticColors.resolve(
+      AppSemanticColors.error,
+      brightness,
+    );
+
+    final lowStockCount = _products.where(_isLowStock).length;
+    final outOfStockCount = _products.where(_isOutOfStock).length;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        Spacing.lg,
+        Spacing.md,
+        Spacing.lg,
+        0,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: SummaryStatCard(
+              icon: Icons.inventory_2_outlined,
+              color: cs.primary,
+              value: '${_products.length}',
+              label: 'Products',
+              selected: _stockFilter == StockFilter.all,
+              onTap: () => setState(() {
+                _stockFilter = StockFilter.all;
+                _currentPage = 1;
+              }),
+            ),
+          ),
+          const SizedBox(width: Spacing.sm),
+          Expanded(
+            child: SummaryStatCard(
+              icon: Icons.warning_amber_outlined,
+              color: warningColor,
+              value: '$lowStockCount',
+              label: 'Low stock',
+              selected: _stockFilter == StockFilter.lowStock,
+              onTap: () => setState(() {
+                _stockFilter = StockFilter.lowStock;
+                _currentPage = 1;
+              }),
+            ),
+          ),
+          const SizedBox(width: Spacing.sm),
+          Expanded(
+            child: SummaryStatCard(
+              icon: Icons.error_outline,
+              color: errorColor,
+              value: '$outOfStockCount',
+              label: 'Out of stock',
+              selected: _stockFilter == StockFilter.outOfStock,
+              onTap: () => setState(() {
+                _stockFilter = StockFilter.outOfStock;
+                _currentPage = 1;
+              }),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -480,7 +570,10 @@ class _StockScreenState extends ConsumerState<StockScreen> {
 
     return PopupMenuButton<int?>(
       initialValue: _selectedCategoryId,
-      onSelected: (value) => setState(() => _selectedCategoryId = value),
+      onSelected: (value) => setState(() {
+        _selectedCategoryId = value;
+        _currentPage = 1;
+      }),
       offset: const Offset(0, 40),
       itemBuilder: (context) => [
         PopupMenuItem<int?>(
@@ -548,6 +641,7 @@ class _StockScreenState extends ConsumerState<StockScreen> {
       onPressed: () {
         setState(() {
           _stockFilter = isSelected ? StockFilter.all : filter;
+          _currentPage = 1;
         });
       },
       elevation: 0,
@@ -628,6 +722,14 @@ class _StockScreenState extends ConsumerState<StockScreen> {
       brightness,
     );
 
+    final filtered = _filteredProducts;
+    final totalPages = (filtered.length / _pageSize).ceil();
+    final effectivePage = math.min(_currentPage, math.max(totalPages, 1));
+    final pageItems = filtered
+        .skip((effectivePage - 1) * _pageSize)
+        .take(_pageSize)
+        .toList();
+
     return AppCard(
       margin: const EdgeInsets.fromLTRB(
         Spacing.lg,
@@ -642,7 +744,7 @@ class _StockScreenState extends ConsumerState<StockScreen> {
           _buildCardHead(
             'Inventory',
             Icons.inventory_2_outlined,
-            '${_filteredProducts.length} items',
+            '${filtered.length} items',
             headColor,
           ),
           Expanded(
@@ -653,10 +755,24 @@ class _StockScreenState extends ConsumerState<StockScreen> {
                 Spacing.md,
                 bottomClearance + Spacing.md,
               ),
-              itemCount: _filteredProducts.length,
+              itemCount: pageItems.length + (totalPages > 1 ? 1 : 0),
               separatorBuilder: (context, index) => const Divider(height: 1),
               itemBuilder: (context, index) {
-                final product = _filteredProducts[index];
+                if (index == pageItems.length) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: Spacing.sm,
+                      vertical: Spacing.sm,
+                    ),
+                    child: PaginationBar(
+                      totalItems: filtered.length,
+                      currentPage: effectivePage,
+                      pageSize: _pageSize,
+                      onPageChanged: _goToPage,
+                    ),
+                  );
+                }
+                final product = pageItems[index];
                 return _buildStockRow(
                   product,
                   canAddStock,
