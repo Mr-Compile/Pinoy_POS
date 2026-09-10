@@ -58,6 +58,8 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
 
   void _computeAllowedTypes() {
     final authNotifier = ref.read(authStateProvider.notifier);
+    _allowedTypes = [];
+    if (!authNotifier.hasPermission('view_trash')) return;
     _allowedTypes = [
       if (authNotifier.hasPermission('view_products')) 'product',
       if (authNotifier.hasPermission('view_categories')) 'category',
@@ -130,8 +132,8 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
     final snapshot = item.snapshotMap;
     final snapshotText = snapshot != null
         ? snapshot.values
-            .map((v) => v?.toString().toLowerCase() ?? '')
-            .join(' ')
+              .map((v) => v?.toString().toLowerCase() ?? '')
+              .join(' ')
         : '';
     final haystack = '$name $typeLabel $rawType $deletedBy $snapshotText';
     return haystack.contains(query);
@@ -221,8 +223,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
 
     final confirmed = await AppDialogService.permanentDeleteConfirm(
       context,
-      itemName:
-          '${items.length} selected item${items.length == 1 ? '' : 's'}',
+      itemName: '${items.length} selected item${items.length == 1 ? '' : 's'}',
     );
 
     if (confirmed == true && mounted) {
@@ -369,8 +370,9 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
         return;
       }
 
-      final result =
-          await ref.read(trashServiceProvider).bulkPermanentDelete(ids);
+      final result = await ref
+          .read(trashServiceProvider)
+          .bulkPermanentDelete(ids);
       if (mounted) {
         if (result.success) {
           await AppDialogService.success(
@@ -441,8 +443,9 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
 
     final authNotifier = ref.read(authStateProvider.notifier);
 
-    final appBarTitle =
-        _selectionMode ? '${_selectedIds.length} selected' : 'Trash';
+    final appBarTitle = _selectionMode
+        ? '${_selectedIds.length} selected'
+        : 'Trash';
 
     return Scaffold(
       appBar: AppHeader(
@@ -456,9 +459,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
         children: [
           _buildToolbar(authNotifier),
           _buildTypeFilter(),
-          Expanded(
-            child: _buildBody(),
-          ),
+          Expanded(child: _buildBody()),
         ],
       ),
     );
@@ -492,9 +493,14 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
                 backgroundColor: cs.surface,
                 side: BorderSide(color: cs.outline),
                 shape: const StadiumBorder(),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 7,
+                ),
                 labelStyle: TextStyle(
-                  color: _selectedType == type ? cs.onPrimary : cs.onSurfaceVariant,
+                  color: _selectedType == type
+                      ? cs.onPrimary
+                      : cs.onSurfaceVariant,
                   fontWeight: FontWeight.w600,
                   fontSize: 12.5,
                 ),
@@ -516,7 +522,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
         message: hasSearch
             ? 'Try a different search term.'
             : 'Deleted products, categories, users, QR images, and '
-                'announcements will appear here.',
+                  'announcements will appear here.',
       );
     }
 
@@ -557,9 +563,9 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
                   const SizedBox(height: 2),
                   Text(
                     _descriptionForItem(item),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: cs.onSurfaceVariant,
-                        ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -568,9 +574,9 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
                     'Deleted by ${item.deletedByName ?? 'Unknown'} '
                     '• ${_dateFormat.format(item.deletedAt)} '
                     '• ${_expiryText(item)}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: cs.onSurfaceVariant,
-                        ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -635,12 +641,15 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
 
   Color _typeColor(String type, Brightness brightness) {
     return switch (type) {
-      'category' || 'announcement' =>
-        AppSemanticColors.resolve(AppSemanticColors.warning, brightness),
-      'user' =>
-        AppSemanticColors.resolve(AppSemanticColors.info, brightness),
-      'merchant_qr' =>
-        AppSemanticColors.resolve(AppSemanticColors.error, brightness),
+      'category' || 'announcement' => AppSemanticColors.resolve(
+        AppSemanticColors.warning,
+        brightness,
+      ),
+      'user' => AppSemanticColors.resolve(AppSemanticColors.info, brightness),
+      'merchant_qr' => AppSemanticColors.resolve(
+        AppSemanticColors.error,
+        brightness,
+      ),
       _ => AppSemanticColors.resolve(AppSemanticColors.neutral, brightness),
     };
   }
@@ -695,10 +704,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
         return Container(
           width: 40,
           height: 40,
-          decoration: BoxDecoration(
-            color: cs.primary,
-            shape: BoxShape.circle,
-          ),
+          decoration: BoxDecoration(color: cs.primary, shape: BoxShape.circle),
           alignment: Alignment.center,
           child: Text(
             initial,
@@ -746,11 +752,16 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
 
   String _titleForItem(TrashItem item) {
     return switch (item.entityType) {
-      'product' => _parseProduct(item)?.name ?? item.entityName ?? 'Unknown product',
-      'category' => _parseCategory(item)?.name ?? item.entityName ?? 'Unknown category',
+      'product' =>
+        _parseProduct(item)?.name ?? item.entityName ?? 'Unknown product',
+      'category' =>
+        _parseCategory(item)?.name ?? item.entityName ?? 'Unknown category',
       'user' => _parseUser(item)?.fullName ?? item.entityName ?? 'Unknown user',
       'merchant_qr' => item.entityName ?? 'Merchant QR',
-      'announcement' => _parseAnnouncement(item)?.title ?? item.entityName ?? 'Unknown announcement',
+      'announcement' =>
+        _parseAnnouncement(item)?.title ??
+            item.entityName ??
+            'Unknown announcement',
       _ => item.entityName ?? 'Unknown item',
     };
   }
@@ -865,9 +876,11 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
 
   Widget _buildSelectionToolbar(AuthStateNotifier authNotifier) {
     final selected = _selectedItems();
-    final canRestoreAll = selected.isNotEmpty &&
+    final canRestoreAll =
+        selected.isNotEmpty &&
         selected.every((i) => _canRestoreItem(i, authNotifier));
-    final canDeleteAll = selected.isNotEmpty &&
+    final canDeleteAll =
+        selected.isNotEmpty &&
         selected.every((i) => _canDeleteItem(i, authNotifier));
 
     final cs = Theme.of(context).colorScheme;
