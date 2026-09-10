@@ -7,8 +7,8 @@
 The primary Add/Create action for a CRUD module lives in exactly one place
 per layout:
 
-- **Compact width + portrait** → `FloatingActionButton` (extended at >=360
-  logical px, circular below).
+- **Compact width + portrait** → compact icon-only `FloatingActionButton`
+  (plus sign only, no text label).
 - **Every other layout** (compact landscape, tablet, desktop, resized
   windows) → labeled `AppButton` inside the screen's `CrudToolbar`.
 - **`AppHeader` never hosts a module create action.** It keeps title,
@@ -339,7 +339,7 @@ Result: `flutter analyze` reports no issues; `flutter test` passes 232/232 tests
 - **Owner owns the business continuity settings.** `_ownerPermissions` now includes `backup_restore`. The previous restriction kept backup/restore off the Owner''s Settings screen; the business owner should control it.
 - **Admin stays out of business analytics.** `_systemAdminPermissions` no longer includes `view_reports` or `view_staff_performance`. Admin manages users, AI config, backups, and system settings.
 - **Activity logs are per-actor, never global.** `ActivityLogService.getRecentActivities()` returns only the current user''s logs. Owner and Admin see their own actions in the dashboard and on the Activity Logs screen.
-- **Trash tabs are permission-driven.** `TrashScreen` builds its tab list from `view_products`, `view_categories`, and `manage_users`, and it gates restore/delete with the matching entity permission.
+- **Trash tabs are permission-driven.** `TrashScreen` first requires `view_trash`, then builds its tab list from `view_products`, `view_categories`, `view_users`, `view_settings` (merchant QR), and `view_announcements`. It gates restore/delete with the matching entity permission; QR restore/delete is Owner-only because it requires `canEditBusinessSettings()`.
 - **GCash uses a merchant QR stored in settings.** `settings.gcash_qr_image_path` and `settings.gcash_qr_image_type` persist the QR image. `SettingsService` uploads/clears it, `PaymentSettingsPage` previews it, and `GcashPaymentScreen` displays it during checkout.
 - **Staff report submissions notify Owners.** `ReportService.submitReport()` creates a `report_submitted` notification for every Owner account.
 - **Backup packages include image directories.** `BackupService` now zips `payment_evidence/`, `gcash_qr/`, and `images/` and restores them.
