@@ -47,7 +47,7 @@
 <div class="page-head">
   <div>
     <h1>Automated Backup — lib/ui/screens/backup_restore_screen.dart</h1>
-    <p>Admin sets an automatic backup schedule (every 3 days, 7 days, or once a month). On success, Owners and Admins receive in-app notifications.</p>
+    <p>Admin sets an automatic backup schedule (every day, 3 days, 7 days, or once a month). On success, Owners and Admins receive in-app notifications.</p>
   </div>
   <div style="display:flex;gap:8px;">
     <span class="role-chip role-owner">Owner notified</span>
@@ -117,6 +117,7 @@
                   <div class="sub">How often the backup should run.</div>
                 </div>
                 <select class="input" style="width:100%;" onchange="updateNextBackup()">
+                  <option value="1">Every day</option>
                   <option value="3">Every 3 days</option>
                   <option value="7" selected>Every 7 days</option>
                   <option value="monthly">Once a month</option>
@@ -164,7 +165,7 @@
       </div>
     </div>
     <div class="frame-notes">
-      <b>Admin only.</b> A toggle enables the scheduler. When on, Admin picks one of three frequencies and a time of day. The card shows the next scheduled run. Requires a saved backup location. Saving the schedule persists to Settings and recalculates the next run.
+      <b>Admin only.</b> A toggle enables the scheduler. When on, Admin picks one of four frequencies and a time of day. The card shows the next scheduled run. Requires a saved backup location. Saving the schedule persists to Settings and anchors the next run to a fixed date.
     </div>
   </div>
 
@@ -220,14 +221,16 @@
     const freq = document.querySelector('#autoFields select').value;
     const time = document.getElementById('timeInput').value;
     const [h, m] = time.split(':');
+    // First slot after now on the schedule grid anchored at save time.
     const date = new Date();
-    if (freq === 'monthly') {
-      date.setMonth(date.getMonth() + 1);
-      date.setDate(1);
-    } else {
-      date.setDate(date.getDate() + parseInt(freq, 10));
-    }
     date.setHours(parseInt(h, 10), parseInt(m, 10), 0, 0);
+    while (date <= new Date()) {
+      if (freq === 'monthly') {
+        date.setMonth(date.getMonth() + 1);
+      } else {
+        date.setDate(date.getDate() + parseInt(freq, 10));
+      }
+    }
     const fmt = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }).format(date);
     document.getElementById('nextBackup').textContent = fmt;
   }

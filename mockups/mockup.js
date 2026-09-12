@@ -59,10 +59,14 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
 }
 
-function setPinDigit(length) {
+/* Binds a keypad inside `scope` (CSS selector, default: whole document)
+   so several mockup frames on one page stay independent. */
+function setPinDigit(length, scope) {
   let value = '';
-  const dots = document.querySelectorAll('.pin-dot');
-  const keys = document.querySelectorAll('.pin-key');
+  const root = scope ? document.querySelector(scope) : document;
+  if (!root) return;
+  const dots = root.querySelectorAll('.pin-dot');
+  const keys = root.querySelectorAll('.pin-key');
   keys.forEach(k => {
     k.addEventListener('click', () => {
       const d = k.dataset.d;

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinoy POS — Set PIN Screen (replaces the set-PIN dialog in lib/ui/screens/settings/pin_settings_page.dart)</title>
+<link rel="stylesheet" href="mockup.css">
+<style>
+  .pin-keypad.static .pin-key { cursor: default; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M12 21l3.5-4.5c-.97-.74-2.18-1.16-3.5-1.16s-2.53.42-3.5 1.16L12 21zM12 3C7.31 3 3.07 4.69 0 7.55l1.93 2.43C4.48 7.9 8.01 6.4 12 6.4s7.52 1.5 10.07 3.58L24 7.55C20.93 4.69 16.69 3 12 3z"/></symbol>
+  <symbol id="i-batt" viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></symbol>
+  <symbol id="i-backspace" viewBox="0 0 24 24"><path d="M22 3H7c-.69 0-1.23.35-1.59.88L0 12l5.41 8.11c.36.53.9.89 1.59.89h15c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-3 12.59L17.59 16 14 12.41 10.41 16 9 14.59 12.59 11 9 7.41 10.41 6 14 9.59 17.59 6 19 7.41 15.41 11 19 14.59z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 5.99 19.53 19H4.47L12 5.99M12 2 1 21h22L12 2zm1 14h-2v2h2v-2zm0-6h-2v4h2v-4z"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2-.9 2-2-.9-2-2-2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></symbol>
+</svg>
+
+<div class="page-head">
+  <div>
+    <h1>Set PIN — replaces the dialog in lib/ui/screens/settings/pin_settings_page.dart</h1>
+    <p>Two-step create/confirm flow using the same circular dial as the PIN lock screen. Reached from Settings → PIN → Set / Change PIN.</p>
+  </div>
+  <button class="theme-toggle" onclick="toggleTheme()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
+    <span id="themeLabel">Light mode</span>
+  </button>
+</div>
+
+<div class="frames">
+
+  <!-- Frame 1 — full interactive flow -->
+  <div class="frame-wrap" id="setPinA">
+    <div class="frame-label">Create → Confirm — try it</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="appbar">
+        <div class="back"><svg><use href="#i-back"/></svg></div>
+        <div class="title"><h2>Set PIN</h2><div class="sub pin-step">Step 1 of 2 — Create</div></div>
+      </div>
+      <div class="screen">
+        <div class="screen-body pin-body">
+          <div class="pin-avatar"><svg><use href="#i-pin"/></svg></div>
+          <div class="pin-prompt" style="margin-top:0;font-size:16px;font-weight:700;color:var(--text);">Create your PIN</div>
+          <div class="pin-hint">Use 4–6 digits, then tap ✓</div>
+          <div class="pin-dots"></div>
+          <div class="pin-keypad">
+            <div class="pin-key" data-d="1"><span class="num">1</span></div>
+            <div class="pin-key" data-d="2"><span class="num">2</span><span class="letters">ABC</span></div>
+            <div class="pin-key" data-d="3"><span class="num">3</span><span class="letters">DEF</span></div>
+            <div class="pin-key" data-d="4"><span class="num">4</span><span class="letters">GHI</span></div>
+            <div class="pin-key" data-d="5"><span class="num">5</span><span class="letters">JKL</span></div>
+            <div class="pin-key" data-d="6"><span class="num">6</span><span class="letters">MNO</span></div>
+            <div class="pin-key" data-d="7"><span class="num">7</span><span class="letters">PQRS</span></div>
+            <div class="pin-key" data-d="8"><span class="num">8</span><span class="letters">TUV</span></div>
+            <div class="pin-key" data-d="9"><span class="num">9</span><span class="letters">WXYZ</span></div>
+            <div class="pin-key next" data-d="next"><svg><use href="#i-check"/></svg></div>
+            <div class="pin-key" data-d="0"><span class="num">0</span></div>
+            <div class="pin-key ghost" data-d="back"><svg><use href="#i-backspace"/></svg></div>
+          </div>
+          <button class="pin-textbtn" onclick="showToast('Cancelled', 'info')">Cancel</button>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes"><b>Interactive:</b> dots grow as you type (variable 4–6 digits, no fixed slots). The <b>✓ key</b> sits in the bottom-left slot — muted until 4 digits are entered, then rings in primary. Step 1 captures the PIN; step 2 confirms. Match → green dots + success dialog. Mismatch → red shake, then back to step 1.</div>
+  </div>
+
+  <!-- Frame 2 — confirm step, mid-entry -->
+  <div class="frame-wrap">
+    <div class="frame-label">Step 2 — mid-entry</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="appbar">
+        <div class="back"><svg><use href="#i-back"/></svg></div>
+        <div class="title"><h2>Set PIN</h2><div class="sub">Step 2 of 2 — Confirm</div></div>
+      </div>
+      <div class="screen">
+        <div class="screen-body pin-body">
+          <div class="pin-avatar"><svg><use href="#i-pin"/></svg></div>
+          <div class="pin-prompt" style="margin-top:0;font-size:16px;font-weight:700;color:var(--text);">Confirm your PIN</div>
+          <div class="pin-hint">Re-enter the same PIN</div>
+          <div class="pin-dots">
+            <div class="pin-dot filled"></div>
+            <div class="pin-dot filled"></div>
+            <div class="pin-dot filled"></div>
+          </div>
+          <div class="pin-keypad static">
+            <div class="pin-key"><span class="num">1</span></div>
+            <div class="pin-key"><span class="num">2</span><span class="letters">ABC</span></div>
+            <div class="pin-key"><span class="num">3</span><span class="letters">DEF</span></div>
+            <div class="pin-key pressed"><span class="num">4</span><span class="letters">GHI</span></div>
+            <div class="pin-key"><span class="num">5</span><span class="letters">JKL</span></div>
+            <div class="pin-key"><span class="num">6</span><span class="letters">MNO</span></div>
+            <div class="pin-key"><span class="num">7</span><span class="letters">PQRS</span></div>
+            <div class="pin-key"><span class="num">8</span><span class="letters">TUV</span></div>
+            <div class="pin-key"><span class="num">9</span><span class="letters">WXYZ</span></div>
+            <div class="pin-key next on"><svg><use href="#i-check"/></svg></div>
+            <div class="pin-key"><span class="num">0</span></div>
+            <div class="pin-key ghost"><svg><use href="#i-backspace"/></svg></div>
+          </div>
+          <button class="pin-textbtn">Cancel</button>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes">Confirm step: header subtitle flips to <b>Step 2 of 2 — Confirm</b>. Dots only show what has been typed; the ✓ stays enabled while the entry can still match. Key "4" shows the pressed state mid-tap.</div>
+  </div>
+
+  <!-- Frame 3 — mismatch error -->
+  <div class="frame-wrap">
+    <div class="frame-label">Mismatch error</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="screen">
+        <div class="screen-body pin-body">
+          <div class="pin-avatar"><svg><use href="#i-pin"/></svg></div>
+          <div class="pin-prompt" style="margin-top:0;font-size:16px;font-weight:700;color:var(--text);">Create your PIN</div>
+          <div class="pin-hint pin-hint-error" style="display:flex;align-items:center;gap:6px;"><svg style="width:14px;height:14px;fill:var(--error)"><use href="#i-warn"/></svg> PINs didn't match — start over</div>
+          <div class="pin-dots shake">
+            <div class="pin-dot error"></div>
+            <div class="pin-dot error"></div>
+            <div class="pin-dot error"></div>
+            <div class="pin-dot error"></div>
+          </div>
+          <div class="pin-keypad static">
+            <div class="pin-key"><span class="num">1</span></div>
+            <div class="pin-key"><span class="num">2</span><span class="letters">ABC</span></div>
+            <div class="pin-key"><span class="num">3</span><span class="letters">DEF</span></div>
+            <div class="pin-key"><span class="num">4</span><span class="letters">GHI</span></div>
+            <div class="pin-key"><span class="num">5</span><span class="letters">JKL</span></div>
+            <div class="pin-key"><span class="num">6</span><span class="letters">MNO</span></div>
+            <div class="pin-key"><span class="num">7</span><span class="letters">PQRS</span></div>
+            <div class="pin-key"><span class="num">8</span><span class="letters">TUV</span></div>
+            <div class="pin-key"><span class="num">9</span><span class="letters">WXYZ</span></div>
+            <div class="pin-key next"><svg><use href="#i-check"/></svg></div>
+            <div class="pin-key"><span class="num">0</span></div>
+            <div class="pin-key ghost"><svg><use href="#i-backspace"/></svg></div>
+          </div>
+          <button class="pin-textbtn">Cancel</button>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes">When the confirmation doesn't match, the dots turn <b>error red and shake</b>, the hint swaps to "PINs didn't match — start over", and the flow returns to step 1 with cleared input. No dialog needed for this recoverable error.</div>
+  </div>
+
+  <!-- Frame 4 — success -->
+  <div class="frame-wrap">
+    <div class="frame-label">Success</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="screen">
+        <div class="center-screen">
+          <div class="icon-lg" style="background:rgba(22,163,74,.16);"><svg style="fill:var(--success)"><use href="#i-check"/></svg></div>
+          <div class="title">PIN saved</div>
+          <div class="msg">You can now use this PIN for quick login on this device.</div>
+          <button class="btn btn-primary" style="max-width:200px;">Done</button>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes">On match, dots flash <b>success green</b> and the existing AppDialogService success dialog confirms "Your PIN has been set." Tapping Done returns to the PIN settings page.</div>
+  </div>
+
+</div>
+
+<script src="mockup.js"></script>
+<script>
+(function () {
+  const root = document.getElementById('setPinA');
+  const dotsBox = root.querySelector('.pin-dots');
+  const prompt = root.querySelector('.pin-prompt');
+  const hint = root.querySelector('.pin-hint');
+  const stepLbl = root.querySelector('.pin-step');
+  const nextKey = root.querySelector('.pin-key.next');
+  const MIN = 4, MAX = 6;
+  let step = 1, pin = '', entry = '';
+
+  function render() {
+    dotsBox.innerHTML = '';
+    for (let i = 0; i < entry.length; i++) {
+      const d = document.createElement('div');
+      d.className = 'pin-dot filled';
+      dotsBox.appendChild(d);
+    }
+    nextKey.classList.toggle('on', entry.length >= MIN);
+  }
+
+  function setStep(n) {
+    step = n; entry = '';
+    prompt.textContent = n === 1 ? 'Create your PIN' : 'Confirm your PIN';
+    hint.textContent = n === 1 ? 'Use 4–6 digits, then tap ✓' : 'Re-enter the same PIN';
+    hint.classList.remove('pin-hint-error');
+    stepLbl.textContent = n === 1 ? 'Step 1 of 2 — Create' : 'Step 2 of 2 — Confirm';
+    dotsBox.classList.remove('shake');
+    render();
+  }
+
+  root.querySelectorAll('.pin-key').forEach(k => {
+    k.addEventListener('click', () => {
+      const d = k.dataset.d;
+      if (d === 'back') {
+        if (entry.length) { entry = entry.slice(0, -1); render(); }
+        return;
+      }
+      if (d === 'next') {
+        if (entry.length < MIN) return;
+        if (step === 1) {
+          pin = entry;
+          setStep(2);
+        } else if (entry === pin) {
+          dotsBox.querySelectorAll('.pin-dot').forEach(x => { x.classList.remove('filled'); x.classList.add('success'); });
+          showToast('PIN saved', 'success');
+          setTimeout(() => setStep(1), 1600);
+        } else {
+          dotsBox.classList.add('shake');
+          dotsBox.querySelectorAll('.pin-dot').forEach(x => { x.classList.remove('filled'); x.classList.add('error'); });
+          hint.textContent = "PINs didn't match — start over";
+          hint.classList.add('pin-hint-error');
+          setTimeout(() => setStep(1), 900);
+        }
+        return;
+      }
+      if (entry.length < MAX) { entry += d; render(); }
+    });
+  });
+  setStep(1);
+})();
+</script>
+</body>
+</html>
