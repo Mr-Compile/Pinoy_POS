@@ -1,0 +1,96 @@
+Flutter crash report.
+Please report a bug at https://github.com/flutter/flutter/issues.
+
+## command
+
+flutter test
+
+## exception
+
+PathAccessException: PathAccessException: Deletion failed, path = 'C:\wamp64\www\Pinoy_POS\build\native_assets\windows\sqlite3.dll' (OS Error: Access is denied, errno = 5)
+
+```
+#0      _checkForErrorResponse (dart:io/common.dart:58:9)
+#1      _Directory._delete.<anonymous closure> (dart:io/directory_impl.dart:208:7)
+#2      _rootRunUnary (dart:async/zone_root.dart:48:47)
+#3      _CustomZone.runUnary (dart:async/zone.dart:733:19)
+<asynchronous suspension>
+#4      _File._delete.<anonymous closure> (dart:io/file_impl.dart:345:63)
+<asynchronous suspension>
+#5      ForwardingFileSystemEntity.delete (package:file/src/forwarding/forwarding_file_system_entity.dart:66:12)
+<asynchronous suspension>
+#6      ForwardingFileSystemEntity.delete (package:file/src/forwarding/forwarding_file_system_entity.dart:66:12)
+<asynchronous suspension>
+#7      _copyNativeCodeAssetsForOS (package:flutter_tools/src/isolated/native_assets/native_assets.dart:468:5)
+<asynchronous suspension>
+#8      installCodeAssets (package:flutter_tools/src/isolated/native_assets/native_assets.dart:135:37)
+<asynchronous suspension>
+#9      testCompilerBuildNativeAssets (package:flutter_tools/src/isolated/native_assets/test/native_assets.dart:88:3)
+<asynchronous suspension>
+#10     TestCommand.runCommand (package:flutter_tools/src/commands/test.dart:494:11)
+<asynchronous suspension>
+#11     FlutterCommand.run.<anonymous closure> (package:flutter_tools/src/runner/flutter_command.dart:1630:27)
+<asynchronous suspension>
+#12     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
+<asynchronous suspension>
+#13     CommandRunner.runCommand (package:args/command_runner.dart:212:13)
+<asynchronous suspension>
+#14     FlutterCommandRunner.runCommand.<anonymous closure> (package:flutter_tools/src/runner/flutter_command_runner.dart:496:9)
+<asynchronous suspension>
+#15     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
+<asynchronous suspension>
+#16     FlutterCommandRunner.runCommand (package:flutter_tools/src/runner/flutter_command_runner.dart:431:5)
+<asynchronous suspension>
+#17     FlutterCommandRunner.run.<anonymous closure> (package:flutter_tools/src/runner/flutter_command_runner.dart:307:33)
+<asynchronous suspension>
+#18     run.<anonymous closure>.<anonymous closure> (package:flutter_tools/runner.dart:104:11)
+<asynchronous suspension>
+#19     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
+<asynchronous suspension>
+#20     main (package:flutter_tools/executable.dart:103:3)
+<asynchronous suspension>
+```
+
+## flutter doctor
+
+```
+[✓] Flutter (Channel stable, 3.44.2, on Microsoft Windows [Version 10.0.26200.6584], locale en-PH) [1,932ms]
+    • Flutter version 3.44.2 on channel stable at C:\flutter
+    • Upstream repository https://github.com/flutter/flutter.git
+    • Framework revision c9a6c48423 (3 months ago), 2026-06-10 15:52:41 -0700
+    • Engine revision 77e2e94772
+    • Dart version 3.12.2
+    • DevTools version 2.57.0
+    • Feature flags: enable-web, enable-linux-desktop, enable-macos-desktop, enable-windows-desktop, enable-android, enable-ios, cli-animations, enable-native-assets, enable-swift-package-manager, omit-legacy-version-file, enable-lldb-debugging, enable-uiscene-migration
+
+[✓] Windows Version (Windows 11 or higher, 25H2, 2009) [25.1s]
+
+[!] Android toolchain - develop for Android devices (Android SDK version 36.0.0) [21.3s]
+    • Android SDK at C:\Users\myrus\AppData\Local\Android\sdk
+    • Emulator version 37.1.11.0 (build_id 15917651) (CL:N/A)
+    • Platform android-36.1, build-tools 36.0.0
+    • Java binary at: C:\Program Files\Android\Android Studio\jbr\bin\java
+      This is the JDK bundled with the latest Android Studio installation on this machine.
+      To manually set the JDK path, use: `flutter config --jdk-dir="path/to/jdk"`.
+    • Java version OpenJDK Runtime Environment (build 21.0.10+-14961533-b1163.108)
+    ✗ Android license status unknown.
+      Run `flutter doctor --android-licenses` to accept the SDK licenses.
+      See https://flutter.dev/to/windows-android-setup for more details.
+
+[✗] Chrome - develop for the web (Cannot find Chrome executable at .\Google\Chrome\Application\chrome.exe) [152ms]
+    ! Cannot find Chrome. Try setting CHROME_EXECUTABLE to a Chrome executable.
+
+[✗] Visual Studio - develop Windows apps [129ms]
+    ✗ Visual Studio not installed; this is necessary to develop Windows apps.
+      Download at https://visualstudio.microsoft.com/downloads/.
+      Please install the "Desktop development with C++" workload, including all of its default components
+
+[✓] Connected device (2 available) [11.9s]
+    • Windows (desktop) • windows • windows-x64    • Microsoft Windows [Version 10.0.26200.6584]
+    • Edge (web)        • edge    • web-javascript • Microsoft Edge 152.0.4191.66
+
+[✓] Network resources [2.4s]
+    • All expected network resources are available.
+
+! Doctor found issues in 3 categories.
+```
