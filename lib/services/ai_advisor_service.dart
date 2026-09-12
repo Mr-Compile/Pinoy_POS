@@ -4,6 +4,7 @@ import 'package:pinoy_pos/core/authorization_exception.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/services/ai_response_policy.dart';
+import 'package:pinoy_pos/services/ai_skill_service.dart';
 import 'package:pinoy_pos/services/ai_usage_service.dart';
 import 'package:pinoy_pos/services/business_intelligence_service.dart';
 import 'package:pinoy_pos/services/groq_service.dart';
@@ -93,6 +94,7 @@ class AIAdvisorService {
   final SettingsService _settingsService;
   final SessionManager _sessionManager;
   final BusinessIntelligenceService _biService;
+  final AISkillService _skillService;
 
   AIAdvisorService({
     GroqService? groqService,
@@ -100,11 +102,13 @@ class AIAdvisorService {
     SettingsService? settingsService,
     SessionManager? sessionManager,
     BusinessIntelligenceService? biService,
+    AISkillService? skillService,
   })  : _groqService = groqService ?? GroqService(),
         _aiUsageService = aiUsageService ?? AIUsageService(),
         _settingsService = settingsService ?? SettingsService(),
         _sessionManager = sessionManager ?? SessionManager(),
-        _biService = biService ?? BusinessIntelligenceService();
+        _biService = biService ?? BusinessIntelligenceService(),
+        _skillService = skillService ?? AISkillService();
 
   /// Sends a user query to the AI Advisor and returns the result.
   ///
@@ -188,8 +192,14 @@ class AIAdvisorService {
       userId: userId,
     );
 
-    // 9. Build the role-specific system prompt with facts as context.
-    final systemPrompt = _buildSystemPrompt(facts, role);
+    // 9. Build the role-specific system prompt with facts as context,
+    //    plus the best-matching bundled skill guidance for this query.
+    final skillGuidance = await _skillService.buildGuidance(
+      userQuery,
+      effectiveIntent.intent,
+      role,
+    );
+    final systemPrompt = _buildSystemPrompt(facts, role, skillGuidance);
 
     // 10. Build the conversation messages for Groq.
     final messages = <Map<String, String>>[];
@@ -302,15 +312,20 @@ class AIAdvisorService {
 
   /// Builds the centralized system prompt with role-specific context.
   ///
-  /// The system prompt enforces:
-  /// - Role-aware identity (Business Advisor / System Assistant / Work Assistant)
-  /// - Facts vs Insights vs Recommendations structure
-  /// - Never inventing numbers
-  /// - Philippine peso formatting
-  /// - No exposure of sensitive data
-  /// - Clear distinction between database facts and general advice
-  /// - Role-appropriate scope enforcement
-  String _buildSystemPrompt(BusinessFacts facts, UserRole? role) {
+  /// The prompt keeps only:
+  /// - Role-aware identity and scope limits (role-based access)
+  /// - A slim data-integrity block (no invented numbers, PHP formatting,
+  ///   no sensitive data)
+  /// - Skill guidance selected from the bundled `assets/Skill` library
+  ///   ([AISkillService]) which carries the response style and reasoning
+  ///   stance for this query
+  /// - The authorized facts gathered by [BusinessIntelligenceService],
+  ///   including computed audit signals
+  String _buildSystemPrompt(
+    BusinessFacts facts,
+    UserRole? role,
+    String skillGuidance,
+  ) {
     final roleIntro = switch (role) {
       UserRole.owner => '''You are the Pinoy POS AI Business Advisor.
 
@@ -371,31 +386,13 @@ CURRENT ROLE: ${role?.displayName ?? 'Unknown'}
 CURRENT STORE: $storeName
 CAPABILITIES: $capabilityDesc
 
-PERSONALITY AND TONE:
-You are "Turing", the Pinoy POS AI assistant. Be warm, respectful, and approachable. Greet the user once in a while when the conversation starts, and close with a brief, helpful sign-off when it feels natural. Use clear, plain language. Avoid robotic or overly technical phrasing. A light Filipino touch in greetings (e.g., "Magandang araw po") is welcome, but keep the rest of the response in English unless the user writes in Filipino.
-
-CRITICAL RULES:
-1. Use ONLY the supplied Pinoy POS database analysis as the source for numerical facts.
-2. Never invent sales totals, product quantities, stock levels, user counts, activity counts, dates, or trends.
-3. If the supplied data is insufficient or empty, say what information is missing. Do not pretend to have data you were not given.
-4. Clearly distinguish between:
-   - FACTS: numbers and statements derived directly from the database data provided
-   - INSIGHTS: your interpretation of those facts
-   - RECOMMENDATIONS: your suggestions for what to do next
-5. Do not claim to have direct unrestricted access to the database.
-6. Do not expose passwords, PINs, API keys, or sensitive configuration.
-7. Use Philippine peso (PHP) formatting for all monetary values.
-8. When comparing periods, clearly state which periods you are comparing.
-9. Be concise and practical. Do not overload the user with unnecessary technical SQL details.
-10. If the user asks something outside the scope of the supplied data or outside your role's capabilities, explain the limitation clearly. You may provide general advice but must state that it is general and not based on current data.
-11. Do not claim to calculate profit, profit margin, expenses, or customer demographics unless those data points are explicitly provided in the context.
-12. Never claim access to data that was not supplied to you in the context below.
-
-FINANCIAL SAFETY:
-You are a business assistant, not a licensed financial or investment advisor. Do not tell the user to borrow money, invest in specific financial products, or make high-risk business decisions. Frame all monetary advice as practical operational suggestions (e.g., "consider reviewing slow-moving stock") rather than guarantees of profit.
-
-${AiResponsePolicy.instruction}
-
+DATA RULES (STRICT):
+1. Use ONLY the supplied Pinoy POS data and AUDIT SIGNALS as the source for numbers. Never invent sales totals, product quantities, stock levels, user counts, dates, or trends.
+2. If the supplied data is empty or insufficient, say what is missing. Clearly separate facts from the data, your interpretation, and your recommendations.
+3. Use Philippine peso (PHP) formatting for money. Never expose passwords, PINs, API keys, or sensitive configuration.
+4. Frame monetary advice as practical operational suggestions, not financial or investment advice.
+5. Answer in plain conversational text — no Markdown, headings, bold/italic markers, or code fences. When an AUDIT SIGNALS block is present, mention only the signals relevant to the question and explain them in plain words.
+${skillGuidance.isNotEmpty ? '\n$skillGuidance\n' : ''}
 AUTHORIZED CONTEXT:
 ${facts.context}
 
@@ -409,6 +406,25 @@ Generate a helpful, role-aware, humanized answer based ONLY on the information a
       return [];
     }
     return await _biService.generateContextualSuggestions();
+  }
+
+  /// Returns follow-up question suggestions that adapt to the
+  /// conversation. Runs entirely locally — no API call, no quota usage.
+  ///
+  /// [userQuery] is the question the user just asked. [exclude] should
+  /// contain the text of the user's previous queries so already-asked
+  /// questions are not suggested again.
+  List<String> getFollowUpSuggestions(
+    String userQuery, {
+    Set<String> exclude = const {},
+  }) {
+    if (!_sessionManager.hasPermission('use_ai_advisor')) {
+      return [];
+    }
+    return _biService.generateFollowUpSuggestions(
+      userQuery,
+      exclude: exclude,
+    );
   }
 
   void _log(String message) {

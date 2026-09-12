@@ -108,6 +108,7 @@ flutter:
   assets:
     - assets/branding/
     - assets/fonts/
+    - assets/Skill/
 
   fonts:
     - family: Inter

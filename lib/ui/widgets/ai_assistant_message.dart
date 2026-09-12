@@ -12,7 +12,9 @@ import 'package:pinoy_pos/services/ai_navigation_resolver.dart';
 ///
 /// Plain text is shown as [SelectableText]. When the message carries a
 /// structured [AIResponse], this widget renders the message, numbered
-/// instructions, clickable navigation actions, and follow-up suggestions.
+/// instructions, and clickable navigation actions. Follow-up suggestion
+/// chips are rendered by the chat list below the bubble — see
+/// [AISuggestionChips] and [AIChatMessage.effectiveSuggestions].
 class AIAssistantMessage extends ConsumerWidget {
   final AIChatMessage message;
 
@@ -56,10 +58,6 @@ class AIAssistantMessage extends ConsumerWidget {
         if (response.actions.isNotEmpty) ...[
           const SizedBox(height: 12),
           _ActionList(actions: response.actions),
-        ],
-        if (response.suggestions.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          _SuggestionChips(suggestions: response.suggestions),
         ],
       ],
     );
@@ -191,10 +189,15 @@ class _ActionList extends ConsumerWidget {
   }
 }
 
-class _SuggestionChips extends ConsumerWidget {
+/// Suggestion chips rendered below an assistant bubble.
+///
+/// Each chip sends its label as the next user query through
+/// [aiAdvisorChatProvider], so follow-ups behave exactly like a typed
+/// message (quota, permissions, and navigation resolution included).
+class AISuggestionChips extends ConsumerWidget {
   final List<String> suggestions;
 
-  const _SuggestionChips({required this.suggestions});
+  const AISuggestionChips({super.key, required this.suggestions});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

@@ -1,7 +1,11 @@
+import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 import 'package:pinoy_pos/core/date_utils.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/repositories/sale_item_repository.dart';
+import 'package:pinoy_pos/data/models/daily_sales_point.dart';
+import 'package:pinoy_pos/data/models/reporting_period.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/data/repositories/activity_log_repository.dart';
 import 'package:pinoy_pos/data/repositories/backup_history_repository.dart';
@@ -381,7 +385,51 @@ class BusinessIntelligenceService {
   /// [role] and [userId] are used for Staff queries which are filtered by
   /// the authenticated user ID at the database query layer
   /// (`sales.user_id = currentUserId`).
+  ///
+  /// For sales-related intents, an AUDIT SIGNALS block computed from the
+  /// last 28 days (baseline mean, standard deviation, z-score of today's
+  /// total, same-weekday comparison, payment-mix shift) is appended to
+  /// the context so the AI can flag real anomalies instead of guessing.
   Future<BusinessFacts> gatherFacts(
+    DetectedIntent detected, {
+    UserRole? role,
+    int? userId,
+  }) async {
+    final facts =
+        await _dispatchFacts(detected, role: role, userId: userId);
+    if (!_auditIntents.contains(detected.intent)) return facts;
+    try {
+      final audit = await _buildAuditSignals(role: role, userId: userId);
+      if (audit.isEmpty) return facts;
+      return BusinessFacts(
+        context: '${facts.context}\n$audit',
+        intent: facts.intent,
+        hasData: facts.hasData,
+      );
+    } catch (e) {
+      _log('Audit signals failed for intent ${detected.intent}: $e');
+      return facts;
+    }
+  }
+
+  /// Intents that receive a computed audit block appended to their facts.
+  static const Set<BusinessIntent> _auditIntents = {
+    BusinessIntent.todaySales,
+    BusinessIntent.yesterdaySales,
+    BusinessIntent.dateRangeSales,
+    BusinessIntent.weeklySales,
+    BusinessIntent.monthlySales,
+    BusinessIntent.salesComparison,
+    BusinessIntent.businessSummary,
+    BusinessIntent.trendAnalysis,
+    BusinessIntent.busiestPeriod,
+    BusinessIntent.myTodaySales,
+    BusinessIntent.myDateRangeSales,
+    BusinessIntent.myRecentSales,
+    BusinessIntent.myWorkSummary,
+  };
+
+  Future<BusinessFacts> _dispatchFacts(
     DetectedIntent detected, {
     UserRole? role,
     int? userId,
@@ -1418,6 +1466,268 @@ class BusinessIntelligenceService {
     return suggestions;
   }
 
+  /// Generates follow-up question suggestions that adapt to the
+  /// conversation. Re-runs [detectIntent] on the user's latest query and
+  /// maps the detected intent to a curated set of natural next questions
+  /// for the user's role.
+  ///
+  /// This is a pure local computation — it does not call the AI service
+  /// and does not consume the daily query quota.
+  ///
+  /// [exclude] receives the questions the user already asked (raw text);
+  /// matching candidates are skipped so the chips keep evolving instead of
+  /// repeating the conversation. Falls back to a role-level pool when the
+  /// intent-specific set is exhausted. Returns at most [maxSuggestions].
+  List<String> generateFollowUpSuggestions(
+    String userQuery, {
+    UserRole? role,
+    Set<String> exclude = const {},
+    int maxSuggestions = 3,
+  }) {
+    final effectiveRole = role ?? _sessionManager.currentUser?.role;
+    final detected = detectIntent(userQuery, role: effectiveRole);
+
+    final asked = <String>{
+      _normalizeFollowUpKey(userQuery),
+      for (final q in exclude) _normalizeFollowUpKey(q),
+    };
+
+    final pools = switch (effectiveRole) {
+      UserRole.admin => _adminFollowUpSuggestions,
+      UserRole.staff => _staffFollowUpSuggestions,
+      _ => _ownerFollowUpSuggestions,
+    };
+    final fallback = switch (effectiveRole) {
+      UserRole.admin => _adminFallbackFollowUps,
+      UserRole.staff => _staffFallbackFollowUps,
+      _ => _ownerFallbackFollowUps,
+    };
+
+    final result = <String>[];
+    void addCandidates(Iterable<String> candidates) {
+      for (final candidate in candidates) {
+        if (result.length >= maxSuggestions) return;
+        if (asked.contains(_normalizeFollowUpKey(candidate))) continue;
+        if (result.contains(candidate)) continue;
+        result.add(candidate);
+      }
+    }
+
+    addCandidates(pools[detected.intent] ?? const []);
+    if (result.length < maxSuggestions) addCandidates(fallback);
+    return result;
+  }
+
+  static String _normalizeFollowUpKey(String value) => value
+      .toLowerCase()
+      .trim()
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .replaceAll(RegExp(r'[?.!]+$'), '');
+
+  // ── Follow-up suggestion pools ───────────────────────────────────────
+  //
+  // Every candidate is phrased so [detectIntent] resolves it to a real,
+  // data-backed intent — tapping a chip never produces a dead-end query.
+  // Pools are role-scoped so Staff is never offered business-wide or
+  // administrative questions.
+
+  static const Map<BusinessIntent, List<String>> _ownerFollowUpSuggestions = {
+    BusinessIntent.todaySales: [
+      'How do my sales compare to yesterday?',
+      'What products are selling the most?',
+      'Which products are low in stock?',
+    ],
+    BusinessIntent.yesterdaySales: [
+      'How are my sales today?',
+      'What products are selling the most?',
+      'What should I restock soon?',
+    ],
+    BusinessIntent.dateRangeSales: [
+      'Compare my sales to yesterday.',
+      'What products are selling the most?',
+      'Give me a business summary.',
+    ],
+    BusinessIntent.weeklySales: [
+      'Compare my sales to last week.',
+      'What products are selling the most?',
+      'Which products are low in stock?',
+    ],
+    BusinessIntent.monthlySales: [
+      'How are my sales this week?',
+      'What products are selling the most?',
+      'Give me a business summary.',
+    ],
+    BusinessIntent.salesComparison: [
+      'What products are selling the most?',
+      'Why did sales decrease this week?',
+      'Which products are low in stock?',
+    ],
+    BusinessIntent.topProducts: [
+      'Which products are low in stock?',
+      'What should I restock soon?',
+      'How are my sales today?',
+    ],
+    BusinessIntent.lowSellingProducts: [
+      'What products are selling the most?',
+      'What should I restock soon?',
+      'What is my inventory status?',
+    ],
+    BusinessIntent.productPerformance: [
+      'Which products are low selling?',
+      'Which products are low in stock?',
+      'How are my sales today?',
+    ],
+    BusinessIntent.lowStock: [
+      'What should I restock soon?',
+      'What products are selling the most?',
+      'How are my sales today?',
+    ],
+    BusinessIntent.restockRecommendation: [
+      'Which products are low in stock?',
+      'What products are selling the most?',
+      'Give me a business summary.',
+    ],
+    BusinessIntent.categoryPerformance: [
+      'What products are selling the most?',
+      'How are my sales this week?',
+      'Which products are low in stock?',
+    ],
+    BusinessIntent.busiestPeriod: [
+      'How are my sales this week?',
+      'What products are selling the most?',
+      'Give me a business summary.',
+    ],
+    BusinessIntent.inventoryStatus: [
+      'What should I restock soon?',
+      'Which products are low in stock?',
+      'What products are selling the most?',
+    ],
+    BusinessIntent.trendAnalysis: [
+      'How did my sales change this week?',
+      'What products are selling the most?',
+      'What should I focus on tomorrow?',
+    ],
+    BusinessIntent.businessSummary: [
+      'How are my sales today?',
+      'What products are selling the most?',
+      'Which products are low in stock?',
+      'What should I restock soon?',
+    ],
+  };
+
+  static const List<String> _ownerFallbackFollowUps = [
+    'How are my sales today?',
+    'What products are selling the most?',
+    'Which products are low in stock?',
+    'What should I restock soon?',
+    'Give me a business summary.',
+  ];
+
+  static const Map<BusinessIntent, List<String>> _adminFollowUpSuggestions = {
+    BusinessIntent.activeUserSummary: [
+      'Show recent system activity.',
+      'When was the latest backup?',
+      'Give me a system summary.',
+    ],
+    BusinessIntent.userStatusSummary: [
+      'Show recent system activity.',
+      'When was the latest backup?',
+      'Give me a system summary.',
+    ],
+    BusinessIntent.systemActivitySummary: [
+      'How many active users do we have?',
+      'When was the latest backup?',
+      'What was exported recently?',
+    ],
+    BusinessIntent.recentActivity: [
+      'How many active users do we have?',
+      'When was the latest backup?',
+      'What was exported recently?',
+    ],
+    BusinessIntent.backupSummary: [
+      'Show recent system activity.',
+      'Give me a system summary.',
+      'How many active users do we have?',
+    ],
+    BusinessIntent.exportSummary: [
+      'Show recent system activity.',
+      'When was the latest backup?',
+      'Give me a system summary.',
+    ],
+    BusinessIntent.systemStatusSummary: [
+      'How many active users do we have?',
+      'Show recent system activity.',
+      'When was the latest backup?',
+    ],
+    BusinessIntent.adminSummary: [
+      'How many active users do we have?',
+      'Show recent system activity.',
+      'When was the latest backup?',
+    ],
+  };
+
+  static const List<String> _adminFallbackFollowUps = [
+    'How many active users do we have?',
+    'Show recent system activity.',
+    'When was the latest backup?',
+    'Give me a system summary.',
+  ];
+
+  static const Map<BusinessIntent, List<String>> _staffFollowUpSuggestions = {
+    BusinessIntent.myTodaySales: [
+      'Which products sell best in my transactions?',
+      'What products are low in stock?',
+      'Show my recent sales.',
+    ],
+    BusinessIntent.myDateRangeSales: [
+      'How much did I sell today?',
+      'Which products sell best in my transactions?',
+      'What products are low in stock?',
+    ],
+    BusinessIntent.myRecentSales: [
+      'How much did I sell today?',
+      'Which products sell best in my transactions?',
+      'Give me a summary of my work today.',
+    ],
+    BusinessIntent.myTopSoldProducts: [
+      'What products are low in stock?',
+      'How much did I sell today?',
+      'Show my recent sales.',
+    ],
+    BusinessIntent.lowStock: [
+      'Show products.',
+      'Which products sell best in my transactions?',
+      'How much did I sell today?',
+    ],
+    BusinessIntent.productInformation: [
+      'What products are low in stock?',
+      'Which products sell best in my transactions?',
+      'Show my recent sales.',
+    ],
+    BusinessIntent.categoryInformation: [
+      'What products are low in stock?',
+      'Which products sell best in my transactions?',
+      'Show my recent sales.',
+    ],
+    BusinessIntent.myActivitySummary: [
+      'How much did I sell today?',
+      'Show my recent sales.',
+      'What products are low in stock?',
+    ],
+    BusinessIntent.myWorkSummary: [
+      'How much did I sell today?',
+      'Show my recent sales.',
+      'What products are low in stock?',
+    ],
+  };
+
+  static const List<String> _staffFallbackFollowUps = [
+    'How much did I sell today?',
+    'Show my recent sales.',
+    'What products are low in stock?',
+    'Which products sell best in my transactions?',
+  ];
+
   // ── Admin intent detection ───────────────────────────────────────────
 
   DetectedIntent _detectAdminIntent(
@@ -2265,6 +2575,160 @@ class BusinessIntelligenceService {
       intent: d.intent,
       hasData: true,
     );
+  }
+
+  // ── Audit signals (deterministic anomaly detection) ────────────────
+  //
+  // Computed in Dart from SQL-aggregated daily totals — no ML model, no
+  // arbitrary SQL. Signals are descriptive statistics over the last
+  // 28 days so the AI can cite real deviations instead of speculating.
+
+  /// Baseline window for audit computations (complete days before today).
+  static const int _auditBaselineDays = 28;
+
+  /// Minimum number of baseline days with data before signals are trusted.
+  static const int _auditMinBaselineDays = 7;
+
+  /// Builds a compact AUDIT SIGNALS block for the AI context.
+  ///
+  /// Owner gets business-wide signals; Staff gets signals scoped to
+  /// `sales.user_id = userId` at the SQL level; Admin and missing users
+  /// get none.
+  Future<String> _buildAuditSignals({UserRole? role, int? userId}) async {
+    if (role == UserRole.admin) return '';
+    final scopedUserId = role == UserRole.staff ? userId : null;
+    if (role == UserRole.staff && userId == null) return '';
+
+    final now = DateTime.now();
+    final today = startOfDay(now);
+    final baselineStart = today.subtract(
+      const Duration(days: _auditBaselineDays),
+    );
+
+    // Daily totals (SQL-aggregated, confirmed sales only).
+    final points = await _saleRepository.getSalesTrend(
+      baselineStart,
+      today.add(const Duration(days: 1)),
+      groupBy: ReportGroupBy.day,
+      userId: scopedUserId,
+    );
+
+    final baseline = points
+        .where((p) => !startOfDay(p.date).isAtSameMomentAs(today))
+        .toList();
+    final todayPoint = points
+        .where((p) => startOfDay(p.date).isAtSameMomentAs(today))
+        .fold<DailySalesPoint?>(null, (a, b) => a == null
+            ? b
+            : DailySalesPoint(
+                date: b.date,
+                total: a.total + b.total,
+                count: a.count + b.count));
+    final todayTotal = todayPoint?.total ?? 0.0;
+
+    if (baseline.length < _auditMinBaselineDays) {
+      return '--- AUDIT SIGNALS ---\n'
+          'Not enough history (${baseline.length} days with sales in the '
+          'last $_auditBaselineDays days) to compute a reliable baseline. '
+          'Treat today\'s numbers as-is, without anomaly flags.\n'
+          '--- END AUDIT ---';
+    }
+
+    // Baseline statistics over days that had sales.
+    final totals = baseline.map((p) => p.total).toList();
+    final mean = totals.reduce((a, b) => a + b) / totals.length;
+    final variance = totals
+            .map((t) => (t - mean) * (t - mean))
+            .reduce((a, b) => a + b) /
+        totals.length;
+    final stddev = sqrt(variance);
+    final zScore = stddev > 0 ? (todayTotal - mean) / stddev : 0.0;
+
+    // Same-weekday baseline (e.g. the last ~4 Fridays vs today).
+    final sameWeekday = baseline
+        .where((p) => p.date.weekday == now.weekday)
+        .toList();
+    final sameWeekdayAvg = sameWeekday.isEmpty
+        ? null
+        : sameWeekday.map((p) => p.total).reduce((a, b) => a + b) /
+            sameWeekday.length;
+
+    // Payment-method mix shift (share of revenue, today vs baseline).
+    final todayBreakdown = await _saleRepository.getPaymentBreakdown(
+      today,
+      today.add(const Duration(days: 1)),
+      userId: scopedUserId,
+    );
+    final baselineBreakdown = await _saleRepository.getPaymentBreakdown(
+      baselineStart,
+      today,
+      userId: scopedUserId,
+    );
+    String? mixSignal;
+    if (todayBreakdown.isNotEmpty && baselineBreakdown.isNotEmpty) {
+      final todayGrand =
+          todayBreakdown.fold<double>(0, (s, p) => s + p.total);
+      final baseGrand =
+          baselineBreakdown.fold<double>(0, (s, p) => s + p.total);
+      if (todayGrand > 0 && baseGrand > 0) {
+        final topToday = todayBreakdown.first;
+        final baseMatch = baselineBreakdown
+            .where((p) => p.method == topToday.method)
+            .firstOrNull;
+        final todayShare = topToday.percentageOf(todayGrand);
+        final baseShare =
+            baseMatch?.percentageOf(baseGrand) ?? 0.0;
+        final shift = todayShare - baseShare;
+        if (shift.abs() >= 10) {
+          mixSignal = 'Payment mix: ${topToday.method} is '
+              '${todayShare.toStringAsFixed(0)}% of today\'s sales vs '
+              '${baseShare.toStringAsFixed(0)}% over the baseline '
+              '(shift of ${shift >= 0 ? '+' : ''}'
+              '${shift.toStringAsFixed(0)} points).';
+        }
+      }
+    }
+
+    String verdict;
+    if (zScore.abs() < 1.75) {
+      verdict = 'within the normal range';
+    } else if (zScore.abs() < 2.5) {
+      verdict = zScore > 0
+          ? 'notably above normal'
+          : 'notably below normal';
+    } else {
+      verdict = zScore > 0
+          ? 'unusually high (strong positive anomaly)'
+          : 'unusually low (strong negative anomaly)';
+    }
+
+    final buf = StringBuffer();
+    buf.writeln('--- AUDIT SIGNALS '
+        '(computed from the last $_auditBaselineDays days) ---');
+    buf.writeln('Baseline: PHP ${_formatMoney(mean)} average per sales day '
+        'across ${baseline.length} days (std dev PHP '
+        '${_formatMoney(stddev)}).');
+    buf.writeln('Today vs baseline: ${mean > 0 ? (((todayTotal - mean) / mean) * 100).toStringAsFixed(1) : '0.0'}% '
+        '(z-score ${zScore.toStringAsFixed(2)}) — $verdict.');
+    if (sameWeekdayAvg != null && sameWeekdayAvg > 0) {
+      final diff = ((todayTotal - sameWeekdayAvg) / sameWeekdayAvg) * 100;
+      buf.writeln('Same-weekday check: recent ${_weekdayName(now.weekday)}s '
+          'averaged PHP ${_formatMoney(sameWeekdayAvg)}; today is '
+          '${diff >= 0 ? '+' : ''}${diff.toStringAsFixed(1)}% vs that.');
+    }
+    if (mixSignal != null) buf.writeln(mixSignal);
+    buf.writeln('These signals are computed from recorded sales and are '
+        'flags to investigate, not proven causes.');
+    buf.writeln('--- END AUDIT ---');
+    return buf.toString();
+  }
+
+  static String _weekdayName(int weekday) {
+    const names = [
+      '', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday',
+      'Saturday', 'Sunday',
+    ];
+    return names[weekday.clamp(1, 7)];
   }
 
   /// Returns a "no user data" fact when the current user ID is missing.

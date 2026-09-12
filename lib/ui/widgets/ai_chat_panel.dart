@@ -423,40 +423,53 @@ class _AIChatPanelState extends ConsumerState<AIChatPanel> {
     );
     final isUser = msg.isUser;
     final isError = msg.isError;
+    final suggestions =
+        !isUser && !isError ? msg.effectiveSuggestions : const <String>[];
 
     return Padding(
       padding: const EdgeInsets.only(bottom: Spacing.sm),
-      child: Row(
-        mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (!isUser) ...[
-            CircleAvatar(
-              radius: 14,
-              backgroundColor: aiColor,
-              child: Icon(Icons.auto_awesome, color: onAiColor, size: 16),
-            ),
-            const SizedBox(width: Spacing.xs),
-          ],
-          Flexible(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.sm + 2),
-              decoration: BoxDecoration(
-                color: isError
-                    ? cs.errorContainer
-                    : isUser
-                        ? cs.primary
-                        : cs.surfaceContainerHighest,
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(AppRadius.lg),
-                  topRight: const Radius.circular(AppRadius.lg),
-                  bottomLeft: Radius.circular(isUser ? 16 : 4),
-                  bottomRight: Radius.circular(isUser ? 4 : 16),
+          Row(
+            mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (!isUser) ...[
+                CircleAvatar(
+                  radius: 14,
+                  backgroundColor: aiColor,
+                  child: Icon(Icons.auto_awesome, color: onAiColor, size: 16),
+                ),
+                const SizedBox(width: Spacing.xs),
+              ],
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.sm + 2),
+                  decoration: BoxDecoration(
+                    color: isError
+                        ? cs.errorContainer
+                        : isUser
+                            ? cs.primary
+                            : cs.surfaceContainerHighest,
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(AppRadius.lg),
+                      topRight: const Radius.circular(AppRadius.lg),
+                      bottomLeft: Radius.circular(isUser ? 16 : 4),
+                      bottomRight: Radius.circular(isUser ? 4 : 16),
+                    ),
+                  ),
+                  child: AIAssistantMessage(message: msg),
                 ),
               ),
-              child: AIAssistantMessage(message: msg),
-            ),
+            ],
           ),
+          if (suggestions.isNotEmpty)
+            Padding(
+              // Align the chips with the bubble (avatar 28 + gap 4).
+              padding: const EdgeInsets.only(left: 32, top: Spacing.xs),
+              child: AISuggestionChips(suggestions: suggestions),
+            ),
         ],
       ),
     );

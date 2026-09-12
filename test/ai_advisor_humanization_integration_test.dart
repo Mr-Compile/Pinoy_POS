@@ -12,6 +12,8 @@ import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/services/ai_advisor_service.dart';
 import 'package:pinoy_pos/services/ai_response_policy.dart';
+import 'package:pinoy_pos/services/ai_skill_service.dart';
+import 'package:pinoy_pos/services/ai_skill_service.dart';
 import 'package:pinoy_pos/services/ai_usage_service.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
 import 'package:pinoy_pos/services/business_intelligence_service.dart';
@@ -139,6 +141,7 @@ AIAdvisorService _makeService(String rawResponse) {
     aiUsageService: _FakeAIUsageService(),
     settingsService: _FakeSettingsService(),
     biService: _FakeBIService(),
+    skillService: _FakeSkillService(),
   );
 }
 
@@ -153,6 +156,7 @@ ProviderContainer _createContainer(String rawResponse) {
           aiUsageService: _FakeAIUsageService(),
           settingsService: _FakeSettingsService(),
           biService: _FakeBIService(),
+          skillService: _FakeSkillService(),
         ),
       ),
       aiUsageServiceProvider.overrideWith((ref) => _FakeAIUsageService()),
@@ -249,6 +253,17 @@ class _FakeBIService extends BusinessIntelligenceService {
       hasData: true,
     );
   }
+}
+
+/// Skips the asset bundle entirely — skill guidance is empty in tests.
+class _FakeSkillService extends AISkillService {
+  @override
+  Future<String> buildGuidance(
+    String query,
+    BusinessIntent intent,
+    UserRole? role,
+  ) async =>
+      '';
 }
 
 class _FakeAuthService extends AuthService {

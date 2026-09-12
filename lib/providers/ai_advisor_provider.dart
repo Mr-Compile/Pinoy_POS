@@ -22,13 +22,26 @@ class AIChatMessage {
   final DateTime timestamp;
   final bool isError;
 
+  /// Adaptive follow-up questions attached to an assistant message.
+  ///
+  /// Rendered as suggestion chips below the assistant bubble. Structured
+  /// [AIResponse] suggestions take precedence when present.
+  final List<String> followUps;
+
   AIChatMessage({
     required this.text,
     this.response,
     required this.isUser,
     required this.timestamp,
     this.isError = false,
+    this.followUps = const [],
   });
+
+  /// The suggestion chips to show below this message, if any.
+  List<String> get effectiveSuggestions =>
+      response != null && response!.suggestions.isNotEmpty
+          ? response!.suggestions
+          : followUps;
 
   /// True when this message should be rendered as a structured card.
   bool get isStructured => response != null;
@@ -169,6 +182,9 @@ class AIAdvisorChatNotifier extends StateNotifier<AIAdvisorChatState> {
       _addBotMessage(
         text: navigationResponse.message,
         response: navigationResponse,
+        followUps: navigationResponse.suggestions.isEmpty
+            ? _buildFollowUps(q)
+            : const [],
       );
       return;
     }
@@ -225,6 +241,7 @@ class AIAdvisorChatNotifier extends StateNotifier<AIAdvisorChatState> {
               text: result.content ?? 'No response from the advisor.',
               isUser: false,
               timestamp: DateTime.now(),
+              followUps: _buildFollowUps(q),
             ),
           ],
           isSending: false,
@@ -281,10 +298,30 @@ class AIAdvisorChatNotifier extends StateNotifier<AIAdvisorChatState> {
     );
   }
 
+  /// Builds adaptive follow-up suggestions for the user query [query].
+  ///
+  /// Excludes every question the user has already asked in this
+  /// conversation so the chips keep evolving instead of repeating.
+  List<String> _buildFollowUps(String query) {
+    try {
+      final asked = <String>{
+        for (final m in state.messages)
+          if (m.isUser) m.text,
+      };
+      return _ref
+          .read(aiAdvisorServiceProvider)
+          .getFollowUpSuggestions(query, exclude: asked);
+    } catch (e, st) {
+      _log('buildFollowUps failed', e, st);
+      return const [];
+    }
+  }
+
   void _addBotMessage({
     required String text,
     AIResponse? response,
     bool isError = false,
+    List<String> followUps = const [],
   }) {
     state = state.copyWith(
       messages: [
@@ -295,6 +332,7 @@ class AIAdvisorChatNotifier extends StateNotifier<AIAdvisorChatState> {
           isUser: false,
           timestamp: DateTime.now(),
           isError: isError,
+          followUps: followUps,
         ),
       ],
       isSending: false,
