@@ -995,3 +995,224 @@ Results:
 - `flutter analyze` — no issues.
 - `flutter test test/backup_service_test.dart test/backup_service_integration_test.dart test/backup_validation_test.dart test/auto_backup_settings_test.dart` — pass.
 - `test/auto_backup_settings_test.dart` — schedule math (3 days, 7 days, monthly, clamping, catch-up, disabled, time respect).
+
+## Automated Backup Schedule Anchor Fix + Daily Frequency
+
+### Root Cause
+
+`AutoBackupSettings.computeNextRun` always returned a slot strictly in the
+future (its catch-up loop advances past `now`), while
+`AutoBackupService.runIfDue` only ran when the computed next run was at or
+before `now`. The two conditions were mutually exclusive, so the scheduled
+backup could never fire. `auto_backup_last_run` therefore stayed null
+forever, and with no persisted anchor the next run was recomputed from the
+current date on every check — the displayed "Next backup" drifted forward
+day by day (e.g. always "3 days from today").
+
+### Changes Made
+
+- `lib/core/constants.dart` — DB version bumped to 26.
+- `lib/core/database.dart` — migration v25→v26 adds
+  `auto_backup_scheduled_at TEXT` to `settings` and backfills it with
+  `COALESCE(auto_backup_last_run, updated_at)` so existing schedules get a
+  fixed anchor; the column was also added to `_createTables`.
+- `lib/data/models/settings.dart` — added `autoBackupScheduledAt`
+  (toMap/fromMap/copyWith).
+- `lib/data/models/auto_backup_settings.dart` — added `scheduledAt`. The
+  schedule grid now anchors on the later of `lastRun` and `scheduledAt`
+  instead of the current date. `computeNextRun` (display) returns the first
+  slot after max(anchor, now); `computePendingRun` (scheduler) returns the
+  first slot after the anchor and is due once reached. Added `isDue` and a
+  `daily` frequency (+1 day).
+- `lib/services/settings_service.dart` — `updateAutoBackupSettings` stamps
+  `auto_backup_scheduled_at` with the save time; `getAutoBackupSettings`
+  returns it.
+- `lib/services/auto_backup_service.dart` — `runIfDue` now evaluates the
+  pending run (first slot after the anchor) and runs the backup when it is
+  due; it self-heals a missing anchor by persisting `scheduled_at = now`.
+- `lib/ui/screens/backup_restore_screen.dart` — added "Every day" to the
+  frequency dropdown; editing the toggle/frequency/time re-anchors the
+  local preview to now so it matches what saving will produce; the status
+  line shows a "backup is due" message when a pending slot has been reached.
+- `mockups/automated_backup_screen.html` — added the "Every day" option and
+  aligned the next-backup preview JS with the anchored grid logic.
+- `test/auto_backup_settings_test.dart` — added anchor-stability, pending
+  run, `isDue`, and daily-frequency cases.
+
+### Verification
+
+- `flutter analyze` — no issues.
+- `flutter test` — 435/435 pass (includes `auto_backup_settings_test.dart`,
+  21/21).
+
+## Circular PIN Dial + Set PIN Screen
+
+### What Changed
+
+- `lib/ui/widgets/pin_keypad.dart`
+  - Digit keys are now 80px circles (was rounded squares) with
+    dial-style letter hints under 2–9 (ABC/DEF/.../WXYZ).
+  - While held, a key fills with `primary` and scales to 0.94 —
+    implemented via `GestureDetector` + `AnimatedContainer`/
+    `AnimatedScale`, not InkWell, to match the mockup press state.
+  - Backspace is a ghost circle: transparent until pressed.
+  - New optional `onNextPressed` + `nextEnabled` put a check key in
+    the bottom-left slot (used by set-PIN). When `onNextPressed` is
+    null the slot stays empty, preserving the lock layout.
+  - Public API unchanged for existing callers:
+    `onDigitPressed`, `onBackspacePressed`, `enabled`.
+
+- `lib/ui/widgets/pin_indicators.dart`
+  - Now a `StatefulWidget`; empty dots render as rings
+    (`onSurfaceVariant` border, transparent fill) instead of solid
+    muted dots.
+  - New `success` flag — filled dots resolve to
+    `AppSemanticColors.success` for the theme.
+  - `PinIndicatorsState.shake()` (via `GlobalKey`) plays a decaying
+    horizontal sine shake (~450ms) for wrong/mismatched PINs.
+  - For variable-length flows pass `enteredCount` as `pinLength` so
+    dots grow as digits are typed.
+
+- `lib/ui/screens/pin_lock_screen.dart`
+  - Wrong PIN now shakes the dots, shows all slots in error red, and
+    swaps the prompt for an inline "Incorrect PIN — try again" line
+    behind the existing `AppDialogService.error` dialog.
+
+- `lib/ui/screens/settings/set_pin_screen.dart` (new)
+  - Full-screen two-step create/confirm flow replacing the old
+    New PIN / Confirm PIN dialog.
+  - Step 1 captures 4–6 digits; the check key enables at 4. Step 2
+    re-enters; match saves via `authStateProvider.updateProfile`,
+    flashes success dots, then shows the success dialog and pops.
+  - Mismatch shakes red, shows "PINs didn't match — start over",
+    and restarts at step 1. No dialog for this recoverable error.
+  - `AppHeader` shows `Step N of 2 — Create/Confirm` as `subtitle`;
+    Cancel is a plain `TextButton`.
+
+- `lib/ui/screens/settings/pin_settings_page.dart`
+  - "Set / Change PIN" now pushes `SetPinScreen` through
+    `SafeNavigator.pushUnique`; the `AppDialogForm` set-PIN dialog and
+    its `app_input_fields`/`validators` imports were removed. The
+    Remove PIN dialog is unchanged.
+
+- `mockups/pin_lock_screen.html` / `mockups/set_pin_screen.html`
+  - HTML mockups for both flows; shared circular `.pin-key` styles
+    live in `mockups/mockup.css` (`.pin-key.next`, `.pin-textbtn`,
+    `pin-shake`, ring `.pin-dot`, `.pin-dot.success`).
+
+- `test/pin_flow_test.dart` (new)
+  - 13 widget tests: keypad rendering/letters/callbacks, disabled
+    inertness, check-key enable gating, indicator fill/error/shake,
+    and the full SetPinScreen create → confirm save, mismatch
+    restart, and 6-digit cap.
+
+### Verification
+
+- `flutter analyze` — no issues.
+- `flutter test` — 448/448 pass (includes `pin_flow_test.dart`, 13/13).
+
+## AI Advisor Adaptive Follow-Up Chips
+
+### What Changed
+
+- `lib/services/business_intelligence_service.dart`
+  - Added `generateFollowUpSuggestions(userQuery, {role, exclude, maxSuggestions})`
+    — a pure local computation that re-runs `detectIntent` on the user's
+    latest query and maps the detected intent to a curated pool of
+    next-step questions per role (Owner/Admin/Staff).
+  - Already-asked questions are filtered out (normalized: case, whitespace,
+    trailing punctuation), and the just-asked query is never re-suggested.
+  - Pads from a role-level fallback pool so every answer ends with 3 chips.
+  - All candidate phrasing matches `detectIntent` keywords, so tapping a
+    chip always resolves to a real data-backed intent.
+
+- `lib/services/ai_advisor_service.dart`
+  - Added `getFollowUpSuggestions(userQuery, {exclude})` — permission-gated
+    pass-through to the BI layer. No API call, no quota usage.
+
+- `lib/providers/ai_advisor_provider.dart`
+  - `AIChatMessage` gained `followUps` plus an `effectiveSuggestions`
+    getter (structured `AIResponse.suggestions` take precedence).
+  - `sendQuery` attaches adaptive follow-ups on both the Groq success path
+    and the local navigation path (when the structured response carries no
+    suggestions of its own). `_buildFollowUps` excludes every question the
+    user already asked in the conversation.
+
+- `lib/ui/widgets/ai_assistant_message.dart`
+  - `_SuggestionChips` is now the public `AISuggestionChips`; tapping a
+    chip routes through `sendQuery` like a typed message.
+  - Structured-response suggestions moved out of the bubble — the chat
+    lists render them below it for consistent placement.
+
+- `lib/ui/screens/ai_advisor_screen.dart` / `lib/ui/widgets/ai_chat_panel.dart`
+  - `_buildMessageBubble` wraps the bubble row in a `Column` and renders
+    `AISuggestionChips` below every non-error assistant reply, indented to
+    align with the bubble edge (34px screen / 32px panel).
+
+- Tests
+  - `test/ai_followup_suggestions_test.dart` — 13 tests: per-role pools,
+    intent mapping, dedup/normalization, maxSuggestions, session-role
+    fallback, and provider wiring.
+  - `test/ai_advisor_humanization_integration_test.dart` — injected a
+    no-op `AISkillService` stub so the skill-guidance asset loader never
+    runs inside tests (fixes post-completion async failures).
+
+### Verification
+
+- `dart analyze` on all touched files — no issues.
+- `flutter test test/ai_followup_suggestions_test.dart test/ai_advisor_humanization_integration_test.dart test/ai_navigation_service_test.dart` — all pass.
+
+## AI Advisor Skill-Based Responses + Audit Signals
+
+### What Changed
+
+- `lib/services/ai_advisor_service.dart`
+  - `_buildSystemPrompt` now takes a `skillGuidance` block and keeps only:
+    role identity + scope limits (RBAC), CURRENT ROLE/STORE/CAPABILITIES,
+    a slim DATA RULES block (no invented numbers, PHP formatting, no
+    secrets, plain text only), the skill guidance, and AUTHORIZED CONTEXT.
+  - The old PERSONALITY/TONE ("Turing"), 12-item CRITICAL RULES, FINANCIAL
+    SAFETY, and the `AiResponsePolicy.instruction` humanized-response
+    template were removed from the prompt.
+  - `AiResponsePolicy.sanitizeAndValidate` still post-processes every
+    model reply (the response pipeline is unchanged).
+  - New constructor param `skillService` (`AISkillService`).
+
+- `lib/services/ai_skill_service.dart` (new)
+  - Loads a curated allowlist of skills bundled under `assets/Skill/`:
+    `stop-slop` (tone, all roles), `analytics` (owner/staff sales),
+    `the-fool` (audit/critical reasoning), `marketing-psychology`
+    (owner recommendations), `monitoring-expert` and `debugging-wizard`
+    (admin intents).
+  - `selectSkillNames(query, intent, role)` — pure routing; max 2 skills
+    injected (tone + one domain skill).
+  - `parseSkillFile` strips fenced code, `references/` links, and
+    agent-tool mentions before injection; bodies capped at ~1400 chars.
+  - `seededIndex` constructor bypasses the asset bundle in tests.
+  - `AiResponsePolicy.instruction` is no longer injected anywhere; the
+    sanitizer/validator remain the enforcement layer.
+
+- `lib/services/business_intelligence_service.dart`
+  - `gatherFacts` now wraps a private `_dispatchFacts`; for sales-related
+    intents it appends an AUDIT SIGNALS block computed in Dart from the
+    last 28 days via `SaleRepository.getSalesTrend` /
+    `getPaymentBreakdown` (role-scoped, staff filtered by `userId` at SQL
+    level): baseline mean/stddev, today z-score, same-weekday comparison,
+    and payment-mix shift >= 10 points. Needs >= 7 baseline days.
+
+- `pubspec.yaml` — `assets/Skill/` added to bundled assets.
+
+- `test/ai_skill_service_test.dart` (new) — 12 tests: frontmatter parsing,
+  body cleaning, role/intent routing, injection cap.
+- `test/ai_advisor_humanization_integration_test.dart` /
+  `test/ai_followup_suggestions_test.dart` — advisor constructions inject
+  `_FakeSkillService` so tests never touch the asset bundle.
+
+### Verification
+
+```powershell
+flutter analyze
+flutter test test/ai_skill_service_test.dart test/ai_response_policy_test.dart test/ai_advisor_humanization_integration_test.dart test/ai_followup_suggestions_test.dart
+```
+
+Result: `flutter analyze` clean; focused suite 40/40 pass.

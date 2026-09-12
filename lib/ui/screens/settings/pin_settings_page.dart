@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/modal_result.dart';
+import 'package:pinoy_pos/core/safe_navigation.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/ui/screens/settings/set_pin_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_form.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
-import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
-import 'package:pinoy_pos/ui/widgets/validators.dart';
 
 /// PIN settings sub-page — set or clear a login PIN.
 ///
@@ -57,7 +57,10 @@ class PinSettingsPage extends ConsumerWidget {
                         ? 'PIN is set (${user.configuredPinLength} digits)'
                         : 'No PIN set'),
                     trailing: const Icon(Icons.chevron_right),
-                    onTap: () => _showSetPinDialog(context, ref, user),
+                    onTap: () => SafeNavigator.pushUnique<void>(
+                      context,
+                      const SetPinScreen(),
+                    ),
                   ),
                   if (hasPin) ...[
                     const Divider(),
@@ -76,131 +79,6 @@ class PinSettingsPage extends ConsumerWidget {
         ),
       ),
     );
-  }
-
-  Future<void> _showSetPinDialog(
-      BuildContext context, WidgetRef ref, User user) async {
-    final result = await showDialog<ModalResult<void>>(
-      context: context,
-      useRootNavigator: true,
-      builder: (dialogContext) => AppDialogForm<ModalResult<void>>(
-        type: AppDialogType.add,
-        title: 'Set PIN',
-        message: 'Enter a 4-6 digit PIN.',
-        childBuilder: (context, state) {
-          final pinController = state.textController('pin');
-          final confirmPinController = state.textController('confirmPin');
-
-          return Form(
-            key: state.formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AppPasswordField(
-                  controller: pinController,
-                  label: 'New PIN',
-                  prefixIcon: Icons.lock_outline,
-                  keyboardType: TextInputType.number,
-                  autofillHints: null,
-                  onChanged: (_) => state.markChanged(),
-                  validator: (value) => Validators.pin(value),
-                ),
-                const SizedBox(height: 16),
-                AppPasswordField(
-                  controller: confirmPinController,
-                  label: 'Confirm PIN',
-                  prefixIcon: Icons.lock_outline,
-                  keyboardType: TextInputType.number,
-                  autofillHints: null,
-                  onChanged: (_) => state.markChanged(),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Please confirm your PIN';
-                    }
-                    if (value.trim() != pinController.text.trim()) {
-                      return 'PINs do not match';
-                    }
-                    return null;
-                  },
-                ),
-              ],
-            ),
-          );
-        },
-        actionsBuilder: (context, state) => [
-          AppDialogAction(
-            label: 'Cancel',
-            isLoading: state.isSaving,
-            onPressed: state.isSaving
-                ? null
-                : (context) async {
-                    if (state.hasChanges) {
-                      final discard =
-                          await AppDialogService.unsavedChanges(context);
-                      if (discard == true) {
-                        state.pop(const ModalResult<void>.cancelled());
-                      }
-                    } else {
-                      state.pop(const ModalResult<void>.cancelled());
-                    }
-                  },
-          ),
-          AppDialogAction(
-            label: 'Save',
-            isPrimary: true,
-            isLoading: state.isSaving,
-            onPressed: state.isSaving
-                ? null
-                : (context) => _savePin(context, ref, state, user),
-          ),
-        ],
-      ),
-    );
-
-    if (!context.mounted) return;
-
-    if (result?.isSaved ?? false) {
-      await AppDialogService.success(
-        context,
-        title: 'PIN Updated',
-        message: 'Your PIN has been set successfully.',
-      );
-    }
-  }
-
-  Future<void> _savePin(
-    BuildContext dialogContext,
-    WidgetRef ref,
-    AppDialogFormState<ModalResult<void>> state,
-    User user,
-  ) async {
-    if (!state.formKey.currentState!.validate()) return;
-
-    final pin = state.textController('pin').text.trim();
-    final confirmPin = state.textController('confirmPin').text.trim();
-
-    if (pin != confirmPin) return;
-
-    state.setSaving(true);
-
-    final success = await ref.read(authStateProvider.notifier).updateProfile(
-          userId: user.id!,
-          fullName: user.fullName,
-          pin: pin,
-        );
-
-    if (!dialogContext.mounted) return;
-
-    if (success) {
-      state.pop(const ModalResult<void>.saved());
-    } else {
-      state.setSaving(false);
-      await AppDialogService.error(
-        dialogContext,
-        title: 'Update Failed',
-        message: 'Failed to update PIN.',
-      );
-    }
   }
 
   Future<void> _showRemovePinDialog(

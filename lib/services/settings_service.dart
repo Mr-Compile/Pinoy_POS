@@ -125,6 +125,7 @@ class SettingsService {
       frequency: settings.autoBackupFrequency,
       time: settings.autoBackupTime,
       lastRun: settings.autoBackupLastRun,
+      scheduledAt: settings.autoBackupScheduledAt,
     );
   }
 
@@ -137,11 +138,13 @@ class SettingsService {
       throw AuthorizationException('backup_restore');
     }
     final current = await getSettings();
+    final now = DateTime.now();
     final updated = current.copyWith(
       autoBackupEnabled: schedule.enabled,
       autoBackupFrequency: schedule.frequency,
       autoBackupTime: schedule.time,
-      updatedAt: DateTime.now(),
+      autoBackupScheduledAt: now,
+      updatedAt: now,
     );
     return updateSettings(updated);
   }

@@ -682,6 +682,8 @@ class _AdminDashboard extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        _buildStatusHero(context),
+        const SizedBox(height: Spacing.lg),
         StatStrip(
           columns: 2,
           items: [
@@ -721,6 +723,44 @@ class _AdminDashboard extends ConsumerWidget {
         _buildNeedsAttentionCard(context),
         const SizedBox(height: Spacing.lg),
         _buildRecentActivityCard(context, data.recentActivities),
+      ],
+    );
+  }
+
+  Widget _buildStatusHero(BuildContext context) {
+    final servicesOk = data.backupStatus.hasBackup && data.aiConfigured;
+    final attentionCount =
+        (data.trashCount > 0 ? 1 : 0) + (data.inactiveUsers > 0 ? 1 : 0);
+
+    final String pillLabel;
+    final IconData pillIcon;
+    if (!servicesOk) {
+      pillLabel = 'Check System Health below';
+      pillIcon = Icons.warning_amber;
+    } else if (attentionCount > 0) {
+      pillLabel =
+          '$attentionCount item${attentionCount == 1 ? '' : 's'} to review';
+      pillIcon = Icons.warning_amber;
+    } else {
+      pillLabel = 'All clear';
+      pillIcon = Icons.check_circle_outline;
+    }
+
+    return HeroKpiCard(
+      icon: Icons.verified_user_outlined,
+      label: 'System Status',
+      amount:
+          servicesOk ? 'All Systems Operational' : 'Attention Required',
+      amountFontSize: 24,
+      pill: StatusPill(
+        label: pillLabel,
+        color: Colors.white,
+        icon: pillIcon,
+      ),
+      footStats: [
+        HeroFootStat('${data.usersByRole.total}', 'total users'),
+        HeroFootStat('${data.exportCount}', 'reports exported'),
+        HeroFootStat('${data.aiQueriesToday}', 'AI queries today'),
       ],
     );
   }
@@ -831,13 +871,13 @@ class _AdminDashboard extends ConsumerWidget {
                 label: 'Admin',
                 value: data.usersByRole.admin,
                 color: AppSemanticColors.resolve(
-                    AppSemanticColors.info, cs.brightness),
+                    AppSemanticColors.violet, cs.brightness),
               ),
               DonutSegment(
                 label: 'Staff',
                 value: data.usersByRole.staff,
                 color: AppSemanticColors.resolve(
-                    AppSemanticColors.neutral, cs.brightness),
+                    AppSemanticColors.success, cs.brightness),
               ),
             ],
           ),
@@ -1406,7 +1446,7 @@ List<Widget> _topProductRows(
   return List<Widget>.generate(products.length, (i) {
     final p = products[i];
     return DashRow(
-      leading: DashThumb(label: p.productName),
+      leading: DashThumb(label: p.productName, imagePath: p.imageUrl),
       title: p.productName,
       subtitle:
           '${p.categoryName ?? 'Product'} · ${p.totalQuantity} sold',
@@ -1516,7 +1556,11 @@ class _StaffRow extends StatelessWidget {
         : '${summary.transactionCount} sales';
 
     return DashRow(
-      leading: DashAvatar(name: summary.fullName, color: bgColor),
+      leading: DashAvatar(
+        name: summary.fullName,
+        color: bgColor,
+        imagePath: summary.profileImagePath,
+      ),
       title: summary.fullName,
       subtitle: subtitle,
       showDivider: showDivider,
@@ -1544,7 +1588,7 @@ class _LowStockRow extends StatelessWidget {
     final warning = AppSemanticColors.resolve(
         AppSemanticColors.warning, Theme.of(context).brightness);
     return DashRow(
-      leading: DashThumb(label: product.name),
+      leading: DashThumb(label: product.name, imagePath: product.imageUrl),
       title: product.name,
       subtitle: categoryName,
       showDivider: showDivider,

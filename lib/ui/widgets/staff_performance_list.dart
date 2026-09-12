@@ -5,6 +5,7 @@ import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
 import 'package:pinoy_pos/data/models/staff_sales_summary.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
+import 'package:pinoy_pos/ui/widgets/app_image.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 
 /// Displays staff sales performance for owner/managers.
@@ -45,17 +46,14 @@ class StaffPerformanceList extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    CircleAvatar(
+                    AppAvatar(
+                      imagePath: staff[i].profileImagePath,
+                      initials: staff[i].fullName,
                       radius: 16,
                       backgroundColor: cs.primaryContainer,
-                      child: Text(
-                        staff[i].fullName.isNotEmpty
-                            ? staff[i].fullName.substring(0, 1).toUpperCase()
-                            : '?',
-                        style: TextStyle(
-                          color: cs.onPrimaryContainer,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      initialsStyle: TextStyle(
+                        color: cs.onPrimaryContainer,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(width: Spacing.md),

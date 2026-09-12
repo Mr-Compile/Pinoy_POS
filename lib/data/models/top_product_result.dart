@@ -8,12 +8,17 @@ class TopProductResult {
   /// Display name of the product's category, when it can be resolved.
   final String? categoryName;
 
+  /// Relative path to the product image, when the product still exists and
+  /// has one. Null for deleted products or products without an image.
+  final String? imageUrl;
+
   const TopProductResult({
     required this.productId,
     required this.productName,
     required this.totalQuantity,
     this.revenue = 0.0,
     this.categoryName,
+    this.imageUrl,
   });
 
   /// Alias for [productName], used by dashboard code that labels the field
@@ -27,6 +32,7 @@ class TopProductResult {
       totalQuantity: (map['total_quantity'] as num?)?.toInt() ?? 0,
       revenue: (map['revenue'] as num?)?.toDouble() ?? 0.0,
       categoryName: map['category_name'] as String?,
+      imageUrl: map['image_url'] as String?,
     );
   }
 

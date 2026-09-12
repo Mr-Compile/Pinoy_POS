@@ -119,6 +119,151 @@ void main() {
     });
   });
 
+  group('AutoBackupSettings.computeNextRun with scheduledAt anchor', () {
+    final scheduledAt = DateTime(2026, 9, 12, 15, 0);
+
+    test('next run stays fixed as the current date advances', () {
+      final settings = AutoBackupSettings(
+        enabled: true,
+        frequency: '3_days',
+        time: '02:00',
+        scheduledAt: scheduledAt,
+      );
+      // Saved on Sep 12 after the 02:00 slot: first run is Sep 15.
+      expect(
+        AutoBackupSettings.computeNextRun(settings, now: DateTime(2026, 9, 12, 16, 0)),
+        DateTime(2026, 9, 15, 2, 0),
+      );
+      // Opening the app the next day must still show Sep 15, not Sep 16.
+      expect(
+        AutoBackupSettings.computeNextRun(settings, now: DateTime(2026, 9, 13, 9, 0)),
+        DateTime(2026, 9, 15, 2, 0),
+      );
+      expect(
+        AutoBackupSettings.computeNextRun(settings, now: DateTime(2026, 9, 14, 23, 0)),
+        DateTime(2026, 9, 15, 2, 0),
+      );
+    });
+
+    test('uses todays slot when it is still upcoming at save time', () {
+      final settings = AutoBackupSettings(
+        enabled: true,
+        frequency: '3_days',
+        time: '02:00',
+        scheduledAt: DateTime(2026, 9, 12, 1, 0),
+      );
+      expect(
+        AutoBackupSettings.computeNextRun(settings, now: DateTime(2026, 9, 12, 1, 30)),
+        DateTime(2026, 9, 12, 2, 0),
+      );
+    });
+
+    test('advances one day for daily frequency', () {
+      final settings = AutoBackupSettings(
+        enabled: true,
+        frequency: 'daily',
+        time: '02:00',
+        scheduledAt: scheduledAt,
+      );
+      expect(
+        AutoBackupSettings.computeNextRun(settings, now: DateTime(2026, 9, 12, 16, 0)),
+        DateTime(2026, 9, 13, 2, 0),
+      );
+      expect(
+        AutoBackupSettings.computeNextRun(settings, now: DateTime(2026, 9, 13, 9, 0)),
+        DateTime(2026, 9, 14, 2, 0),
+      );
+    });
+
+    test('lastRun wins over scheduledAt when it is more recent', () {
+      final settings = AutoBackupSettings(
+        enabled: true,
+        frequency: '3_days',
+        time: '02:00',
+        lastRun: DateTime(2026, 9, 14, 2, 5),
+        scheduledAt: scheduledAt,
+      );
+      expect(
+        AutoBackupSettings.computeNextRun(settings, now: DateTime(2026, 9, 14, 9, 0)),
+        DateTime(2026, 9, 17, 2, 0),
+      );
+    });
+  });
+
+  group('AutoBackupSettings.computePendingRun', () {
+    test('returns null when disabled', () {
+      final settings = AutoBackupSettings(
+        enabled: false,
+        frequency: 'daily',
+        time: '02:00',
+        scheduledAt: DateTime(2026, 9, 12, 15, 0),
+      );
+      expect(AutoBackupSettings.computePendingRun(settings), isNull);
+    });
+
+    test('returns null when no anchor exists', () {
+      const settings = AutoBackupSettings(
+        enabled: true,
+        frequency: 'daily',
+        time: '02:00',
+      );
+      expect(AutoBackupSettings.computePendingRun(settings), isNull);
+    });
+
+    test('returns the first slot after the save time', () {
+      final settings = AutoBackupSettings(
+        enabled: true,
+        frequency: '3_days',
+        time: '02:00',
+        scheduledAt: DateTime(2026, 9, 12, 15, 0),
+      );
+      expect(
+        AutoBackupSettings.computePendingRun(settings),
+        DateTime(2026, 9, 15, 2, 0),
+      );
+    });
+
+    test('daily pending run is the next day after save', () {
+      final settings = AutoBackupSettings(
+        enabled: true,
+        frequency: 'daily',
+        time: '02:00',
+        scheduledAt: DateTime(2026, 9, 12, 15, 0),
+      );
+      expect(
+        AutoBackupSettings.computePendingRun(settings),
+        DateTime(2026, 9, 13, 2, 0),
+      );
+    });
+
+    test('isDue is true once the pending slot has been reached', () {
+      final settings = AutoBackupSettings(
+        enabled: true,
+        frequency: '3_days',
+        time: '02:00',
+        scheduledAt: DateTime(2026, 9, 12, 15, 0),
+      );
+      expect(settings.isDue(now: DateTime(2026, 9, 14, 9, 0)), isFalse);
+      expect(settings.isDue(now: DateTime(2026, 9, 15, 2, 0)), isTrue);
+      expect(settings.isDue(now: DateTime(2026, 9, 16, 10, 0)), isTrue);
+    });
+
+    test('a run completed today re-anchors the next pending slot', () {
+      final settings = AutoBackupSettings(
+        enabled: true,
+        frequency: 'daily',
+        time: '02:00',
+        lastRun: DateTime(2026, 9, 15, 2, 5),
+        scheduledAt: DateTime(2026, 9, 12, 15, 0),
+      );
+      expect(
+        AutoBackupSettings.computePendingRun(settings),
+        DateTime(2026, 9, 16, 2, 0),
+      );
+      expect(settings.isDue(now: DateTime(2026, 9, 15, 9, 0)), isFalse);
+    });
+  });
+
   group('AutoBackupSettings.nextRun', () {
     test('getter matches computeNextRun with DateTime.now()', () {
       final settings = AutoBackupSettings(

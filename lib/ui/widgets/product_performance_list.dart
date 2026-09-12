@@ -5,6 +5,7 @@ import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
 import 'package:pinoy_pos/data/models/top_product_result.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
+import 'package:pinoy_pos/ui/widgets/app_image.dart';
 import 'package:pinoy_pos/ui/widgets/empty_state.dart';
 
 /// Displays top products with rank, quantity sold, and revenue.
@@ -39,16 +40,9 @@ class ProductPerformanceList extends StatelessWidget {
             padding: const EdgeInsets.all(Spacing.md),
             child: Row(
               children: [
-                CircleAvatar(
-                  radius: 14,
-                  backgroundColor: cs.primaryContainer,
-                  child: Text(
-                    '${i + 1}',
-                    style: AppTypography.labelMedium(context).copyWith(
-                      color: cs.onPrimaryContainer,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                _RankedProductThumb(
+                  product: products[i],
+                  rank: i + 1,
                 ),
                 const SizedBox(width: Spacing.md),
                 Expanded(
@@ -98,6 +92,84 @@ class ProductPerformanceList extends StatelessWidget {
           if (i < products.length - 1) const SizedBox(height: Spacing.sm),
         ],
       ],
+    );
+  }
+}
+
+/// Product thumbnail with the rank badge overlaid on the bottom-right
+/// corner. Shows the product image when available; otherwise falls back
+/// to a dynamic placeholder built from the product's initial.
+class _RankedProductThumb extends StatelessWidget {
+  final TopProductResult product;
+  final int rank;
+
+  const _RankedProductThumb({
+    required this.product,
+    required this.rank,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final initial = product.productName.isNotEmpty
+        ? product.productName[0].toUpperCase()
+        : '?';
+
+    return SizedBox(
+      width: 40,
+      height: 40,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHighest,
+                border: Border.all(color: cs.outline),
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: AppImage(
+                imagePath: product.imageUrl,
+                borderRadius: AppRadius.md,
+                placeholderIcon: Icons.inventory_2,
+                placeholderIconSize: 20,
+                placeholderBuilder: (context) => Center(
+                  child: Text(
+                    initial,
+                    style: AppTypography.labelMedium(context).copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: Container(
+              width: 16,
+              height: 16,
+              decoration: BoxDecoration(
+                color: cs.primary,
+                shape: BoxShape.circle,
+                border: Border.all(color: cs.surface, width: 1.5),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                '$rank',
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                  color: cs.onPrimary,
+                  height: 1,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

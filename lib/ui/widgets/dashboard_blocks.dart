@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/user.dart';
+import 'package:pinoy_pos/ui/widgets/app_image.dart';
 
 /// Accent palette used by dashboard cards, icon badges and quick actions.
 enum DashAccent {
@@ -165,6 +166,14 @@ class HeroKpiCard extends StatelessWidget {
   final List<double>? sparkValues;
   final List<Widget>? footStats;
 
+  /// Custom pill shown under the amount. Takes precedence over the
+  /// delta pill when provided.
+  final Widget? pill;
+
+  /// Overrides the default 34pt amount size for long, non-currency
+  /// values such as status text.
+  final double? amountFontSize;
+
   const HeroKpiCard({
     super.key,
     required this.icon,
@@ -174,6 +183,8 @@ class HeroKpiCard extends StatelessWidget {
     this.deltaSuffix,
     this.sparkValues,
     this.footStats,
+    this.pill,
+    this.amountFontSize,
   });
 
   @override
@@ -212,14 +223,17 @@ class HeroKpiCard extends StatelessWidget {
                     const SizedBox(height: 6),
                     Text(
                       amount,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'Inter',
-                        fontSize: 34,
+                        fontSize: amountFontSize ?? 34,
                         fontWeight: FontWeight.w800,
                         color: Colors.white,
                       ),
                     ),
-                    if (delta != null) ...[
+                    if (pill != null) ...[
+                      const SizedBox(height: Spacing.sm),
+                      pill!,
+                    ] else if (delta != null) ...[
                       const SizedBox(height: Spacing.sm),
                       _DeltaPill(delta: delta, suffix: deltaSuffix),
                     ],
@@ -827,13 +841,19 @@ class DashRow extends StatelessWidget {
   }
 }
 
-/// A small product thumbnail placeholder for dashboard rows.
+/// A small product thumbnail for dashboard rows.
+///
+/// Shows the product image when [imagePath] resolves; otherwise falls back
+/// to a dynamic placeholder built from the first letter of [label]. Missing
+/// or corrupted files render the same placeholder — never a broken image.
 class DashThumb extends StatelessWidget {
   final String label;
+  final String? imagePath;
 
   const DashThumb({
     super.key,
     required this.label,
+    this.imagePath,
   });
 
   @override
@@ -849,27 +869,40 @@ class DashThumb extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: cs.outline),
       ),
-      alignment: Alignment.center,
-      child: Text(
-        initial,
-        style: AppTypography.titleMediumBold(context).copyWith(
-          color: cs.onSurfaceVariant,
-          fontSize: 22,
+      clipBehavior: Clip.antiAlias,
+      child: AppImage(
+        imagePath: imagePath,
+        borderRadius: 12,
+        placeholderIcon: Icons.inventory_2,
+        placeholderIconSize: 20,
+        placeholderBuilder: (context) => Center(
+          child: Text(
+            initial,
+            style: AppTypography.titleMediumBold(context).copyWith(
+              color: cs.onSurfaceVariant,
+              fontSize: 22,
+            ),
+          ),
         ),
       ),
     );
   }
 }
 
-/// A circular avatar with initials for dashboard rows.
+/// A circular avatar for dashboard rows.
+///
+/// Shows the user's profile photo when [imagePath] resolves; otherwise
+/// falls back to initials on [color] (or the primary colour).
 class DashAvatar extends StatelessWidget {
   final String name;
   final Color? color;
+  final String? imagePath;
 
   const DashAvatar({
     super.key,
     required this.name,
     this.color,
+    this.imagePath,
   });
 
   @override
@@ -877,33 +910,17 @@ class DashAvatar extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final bg = color ?? cs.primary;
     final fg = _Contrast.onColor(context, bg);
-    final initials = _initials(name);
 
-    return Container(
-      width: 34,
-      height: 34,
-      decoration: BoxDecoration(
-        color: bg,
-        shape: BoxShape.circle,
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        initials,
-        style: AppTypography.bodySmallSemibold(context).copyWith(
-          color: fg,
-        ),
+    return AppAvatar(
+      imagePath: imagePath,
+      initials: name,
+      radius: 17,
+      backgroundColor: bg,
+      initialsStyle: AppTypography.bodySmallSemibold(context).copyWith(
+        color: fg,
       ),
     );
   }
-}
-
-String _initials(String name) {
-  final parts = name.trim().split(RegExp(r'\s+'));
-  if (parts.isEmpty) return '';
-  if (parts.length == 1) {
-    return parts[0].isNotEmpty ? parts[0][0].toUpperCase() : '';
-  }
-  return '${parts[0][0]}${parts[parts.length - 1][0]}'.toUpperCase();
 }
 
 /// A coloured icon badge used by dashboard cards and rows.

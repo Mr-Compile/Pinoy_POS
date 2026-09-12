@@ -12,6 +12,9 @@ class StaffSalesSummary {
   /// the dashboard to render a per-staff trend pill.
   final double? previousTotalSales;
 
+  /// Relative path to the user's profile image, when one is set.
+  final String? profileImagePath;
+
   const StaffSalesSummary({
     required this.userId,
     required this.fullName,
@@ -19,6 +22,7 @@ class StaffSalesSummary {
     required this.totalSales,
     required this.transactionCount,
     this.previousTotalSales,
+    this.profileImagePath,
   });
 
   double get averageTransaction =>
@@ -38,6 +42,7 @@ class StaffSalesSummary {
       transactionCount: (map['transaction_count'] as num?)?.toInt() ?? 0,
       previousTotalSales:
           (map['previous_total_sales'] as num?)?.toDouble(),
+      profileImagePath: map['profile_image_path'] as String?,
     );
   }
 }

@@ -36,6 +36,8 @@ class _PinLockScreenState extends ConsumerState<PinLockScreen> {
   bool _isVerifying = false;
   bool _hasError = false;
   ProviderSubscription<AuthState>? _authSubscription;
+  final GlobalKey<PinIndicatorsState> _dotsKey =
+      GlobalKey<PinIndicatorsState>();
 
   @override
   void initState() {
@@ -139,19 +141,45 @@ class _PinLockScreenState extends ConsumerState<PinLockScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    // ── "Enter your PIN" prompt ──
-                    Text(
-                      'Enter your PIN',
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: cs.onSurfaceVariant,
+                    // ── Prompt — swaps to an inline error after a
+                    // wrong PIN while the error dialog is shown ──
+                    if (_hasError)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            size: 16,
+                            color: cs.error,
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              'Incorrect PIN — try again',
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                color: cs.error,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    else
+                      Text(
+                        'Enter your PIN',
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
                       ),
-                    ),
                     const SizedBox(height: 20),
 
                     // ── PIN indicators ──
                     PinIndicators(
+                      key: _dotsKey,
                       pinLength: pinLength,
-                      enteredCount: _enteredPin.length,
+                      enteredCount:
+                          _hasError ? pinLength : _enteredPin.length,
                       error: _hasError,
                     ),
                     const SizedBox(height: 32),
@@ -239,6 +267,7 @@ class _PinLockScreenState extends ConsumerState<PinLockScreen> {
           _isVerifying = false;
           _enteredPin = '';
         });
+        _dotsKey.currentState?.shake();
         await AppDialogService.error(
           context,
           title: 'Incorrect PIN',

@@ -500,9 +500,7 @@ class SalesAnalyticsService {
     final products = await _productRepository.getAll();
     final categories = await _categoryRepository.getAll();
     final categoryNames = {for (final c in categories) c.id: c.name};
-    final productCategory = {
-      for (final p in products) p.id: categoryNames[p.categoryId],
-    };
+    final productById = {for (final p in products) p.id: p};
 
     final grouped = <int, TopProductResult>{};
     for (final item in items) {
@@ -510,12 +508,14 @@ class SalesAnalyticsService {
           ? item.productName!
           : 'Product #${item.productId}';
       final existing = grouped[item.productId];
+      final product = productById[item.productId];
       grouped[item.productId] = TopProductResult(
         productId: item.productId,
         productName: name,
         totalQuantity: (existing?.totalQuantity ?? 0) + item.quantity,
         revenue: (existing?.revenue ?? 0.0) + item.totalPrice,
-        categoryName: productCategory[item.productId],
+        categoryName: categoryNames[product?.categoryId],
+        imageUrl: product?.imageUrl,
       );
     }
     final list = grouped.values.toList()
@@ -583,6 +583,7 @@ class SalesAnalyticsService {
               totalSales: s.totalSales,
               transactionCount: s.transactionCount,
               previousTotalSales: previousByUser[s.userId] ?? 0.0,
+              profileImagePath: s.profileImagePath,
             ))
         .toList();
   }
@@ -632,6 +633,7 @@ class SalesAnalyticsService {
         totalSales: data.$1,
         transactionCount: data.$2,
         previousTotalSales: previousByUser[user.id] ?? 0.0,
+        profileImagePath: user.profileImagePath,
       ));
     }
 

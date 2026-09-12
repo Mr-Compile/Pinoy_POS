@@ -324,7 +324,7 @@ class SaleDao extends BaseDao<Sale> {
     }
 
     final result = await database.rawQuery('''
-      SELECT s.user_id, u.full_name, u.role,
+      SELECT s.user_id, u.full_name, u.role, u.profile_image_path,
              COALESCE(SUM(s.total_amount), 0) as total_sales,
              COUNT(*) as transaction_count
       FROM sales s

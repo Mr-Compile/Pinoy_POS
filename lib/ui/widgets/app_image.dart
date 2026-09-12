@@ -187,6 +187,10 @@ class AppAvatar extends StatefulWidget {
   /// Optional background color behind the initials or while an image loads.
   final Color? backgroundColor;
 
+  /// Optional text style for the initials. Defaults to
+  /// `colorScheme.onSurface` at a size derived from [radius].
+  final TextStyle? initialsStyle;
+
   /// Optional border color for the avatar ring.
   final Color? borderColor;
 
@@ -202,6 +206,7 @@ class AppAvatar extends StatefulWidget {
     required this.initials,
     this.radius = 48,
     this.backgroundColor,
+    this.initialsStyle,
     this.borderColor,
     this.borderWidth = 0,
     this.semanticLabel,
@@ -296,7 +301,8 @@ class _AppAvatarState extends State<AppAvatar> {
       child: _imageFile == null
           ? Text(
               initials,
-              style: TextStyle(fontSize: fontSize, color: cs.onSurface),
+              style: widget.initialsStyle ??
+                  TextStyle(fontSize: fontSize, color: cs.onSurface),
             )
           : null,
     );

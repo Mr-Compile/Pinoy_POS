@@ -35,13 +35,26 @@ class AutoBackupService {
     if (kIsWeb) return;
     if (_isRunning) return;
 
-    final settings = await _settingsRepository.getSettings();
+    var settings = await _settingsRepository.getSettings();
     if (settings == null) return;
     if (!settings.autoBackupEnabled) return;
 
-    final nextRun = _computeNextRun(settings);
     final now = DateTime.now();
-    if (nextRun.isAfter(now)) return;
+
+    // Self-heal: schedules saved before the auto_backup_scheduled_at column
+    // existed have no anchor. Persist one now so the schedule becomes a
+    // fixed date instead of drifting with the current date.
+    if (settings.autoBackupScheduledAt == null &&
+        settings.autoBackupLastRun == null) {
+      settings = settings.copyWith(
+        autoBackupScheduledAt: now,
+        updatedAt: now,
+      );
+      await _settingsRepository.update(settings);
+    }
+
+    final pendingRun = _computePendingRun(settings);
+    if (pendingRun == null || pendingRun.isAfter(now)) return;
 
     _isRunning = true;
     try {
@@ -75,15 +88,18 @@ class AutoBackupService {
     }
   }
 
-  /// Computes the next scheduled run for [settings].
-  DateTime _computeNextRun(Settings settings) {
+  /// Computes the pending scheduled run for [settings]: the first slot
+  /// after the schedule anchor. When it is at or before now, a backup
+  /// is due.
+  DateTime? _computePendingRun(Settings settings) {
     final schedule = AutoBackupSettings(
       enabled: settings.autoBackupEnabled,
       frequency: settings.autoBackupFrequency,
       time: settings.autoBackupTime,
       lastRun: settings.autoBackupLastRun,
+      scheduledAt: settings.autoBackupScheduledAt,
     );
-    return AutoBackupSettings.computeNextRun(schedule) ?? DateTime.now();
+    return AutoBackupSettings.computePendingRun(schedule);
   }
 
   Future<void> _notifyOwnerAndAdmin(BackupExportRecord result) async {

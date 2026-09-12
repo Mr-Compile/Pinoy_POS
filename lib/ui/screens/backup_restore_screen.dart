@@ -594,13 +594,16 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
     setState(() {
       final hour = picked.hour.toString().padLeft(2, '0');
       final minute = picked.minute.toString().padLeft(2, '0');
-      _autoBackupSettings =
-          _autoBackupSettings.copyWith(time: '$hour:$minute');
+      _autoBackupSettings = _autoBackupSettings.copyWith(
+        time: '$hour:$minute',
+        scheduledAt: DateTime.now(),
+      );
     });
   }
 
   String _frequencyLabel(String frequency) {
     return switch (frequency) {
+      'daily' => 'Every day',
       '3_days' => 'Every 3 days',
       '7_days' => 'Every 7 days',
       'monthly' => 'Once a month',
@@ -614,6 +617,10 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
     if (next == null) return 'Set a backup location to enable automatic backups.';
     if (_backupLocation == null || _backupLocation!.isNone) {
       return 'Choose a backup location to run automatic backups.';
+    }
+    final pending = _autoBackupSettings.pendingRun;
+    if (pending != null && !pending.isAfter(DateTime.now())) {
+      return 'A backup is due. It will run automatically while the app is open.';
     }
     return 'Next backup: ${_formatDate(next)}';
   }
@@ -1001,7 +1008,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
     }
 
     final isWeb = kIsWeb;
-    final frequencyItems = ['3_days', '7_days', 'monthly'];
+    final frequencyItems = ['daily', '3_days', '7_days', 'monthly'];
 
     return AppCard(
       padding: const EdgeInsets.all(Spacing.lg),
@@ -1057,8 +1064,10 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                   value: _autoBackupSettings.enabled,
                   onChanged: (value) {
                     setState(() {
-                      _autoBackupSettings =
-                          _autoBackupSettings.copyWith(enabled: value);
+                      _autoBackupSettings = _autoBackupSettings.copyWith(
+                        enabled: value,
+                        scheduledAt: DateTime.now(),
+                      );
                     });
                   },
                 ),
@@ -1081,8 +1090,10 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                 onChanged: (value) {
                   if (value == null) return;
                   setState(() {
-                    _autoBackupSettings =
-                        _autoBackupSettings.copyWith(frequency: value);
+                    _autoBackupSettings = _autoBackupSettings.copyWith(
+                      frequency: value,
+                      scheduledAt: DateTime.now(),
+                    );
                   });
                 },
               ),

@@ -26,6 +26,7 @@
   final String autoBackupFrequency;
   final String autoBackupTime;
   final DateTime? autoBackupLastRun;
+  final DateTime? autoBackupScheduledAt;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -55,6 +56,7 @@
     this.autoBackupFrequency = '7_days',
     this.autoBackupTime = '02:00',
     this.autoBackupLastRun,
+    this.autoBackupScheduledAt,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -86,6 +88,7 @@
       'auto_backup_frequency': autoBackupFrequency,
       'auto_backup_time': autoBackupTime,
       'auto_backup_last_run': autoBackupLastRun?.toIso8601String(),
+      'auto_backup_scheduled_at': autoBackupScheduledAt?.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -160,6 +163,9 @@
       autoBackupLastRun: stringOrNull('auto_backup_last_run') != null
           ? DateTime.tryParse(stringOrNull('auto_backup_last_run')!)
           : null,
+      autoBackupScheduledAt: stringOrNull('auto_backup_scheduled_at') != null
+          ? DateTime.tryParse(stringOrNull('auto_backup_scheduled_at')!)
+          : null,
       createdAt: parseDateTime('created_at'),
       updatedAt: parseDateTime('updated_at'),
     );
@@ -191,6 +197,7 @@
     String? autoBackupFrequency,
     String? autoBackupTime,
     Object? autoBackupLastRun = _sentinel,
+    Object? autoBackupScheduledAt = _sentinel,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -235,6 +242,9 @@
       autoBackupLastRun: autoBackupLastRun == _sentinel
           ? this.autoBackupLastRun
           : autoBackupLastRun as DateTime?,
+      autoBackupScheduledAt: autoBackupScheduledAt == _sentinel
+          ? this.autoBackupScheduledAt
+          : autoBackupScheduledAt as DateTime?,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

@@ -481,6 +481,30 @@ class DatabaseHelper {
       }
     }
 
+    // Migration from v25 → v26: add the automatic backup schedule anchor.
+    // The anchor records when the schedule was saved so the next run is a
+    // fixed date instead of drifting with the current date. Backfill from
+    // the last run (or the row's last update) so existing schedules keep a
+    // stable anchor immediately.
+    if (oldVersion < 26) {
+      try {
+        await db.execute(
+          'ALTER TABLE settings ADD COLUMN auto_backup_scheduled_at TEXT',
+        );
+      } catch (_) {
+        // Column may already exist.
+      }
+      try {
+        await db.execute(
+          'UPDATE settings SET auto_backup_scheduled_at = '
+          'COALESCE(auto_backup_last_run, updated_at) '
+          'WHERE auto_backup_scheduled_at IS NULL',
+        );
+      } catch (_) {
+        // Backfill is best-effort; the service self-heals a missing anchor.
+      }
+    }
+
     // Create any tables that were introduced after the backup's original
     // version but do not have an explicit migration block above (e.g.
     // `announcements`, `ai_usage`).  All CREATE statements in _createTables
@@ -833,6 +857,7 @@ class DatabaseHelper {
         auto_backup_frequency TEXT NOT NULL DEFAULT '7_days',
         auto_backup_time TEXT NOT NULL DEFAULT '02:00',
         auto_backup_last_run TEXT,
+        auto_backup_scheduled_at TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       )

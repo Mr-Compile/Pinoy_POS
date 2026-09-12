@@ -58,7 +58,7 @@ class SaleItemDao extends BaseDao<SaleItem> {
   ///
   /// Returns a list of maps with keys:
   ///   `product_id`, `product_name`, `total_quantity`, `revenue`,
-  ///   `category_name`.
+  ///   `category_name`, `image_url`.
   Future<List<Map<String, dynamic>>> getTopProducts({
     int limit = 5,
     DateTime? since,
@@ -96,7 +96,8 @@ class SaleItemDao extends BaseDao<SaleItem> {
              COALESCE(si.product_name, p.name, 'Product #' || si.product_id) AS product_name,
              SUM(si.quantity) AS total_quantity,
              COALESCE(SUM(si.total_price), 0) AS revenue,
-             c.name AS category_name
+             c.name AS category_name,
+             p.image_url AS image_url
       FROM sale_items si
       INNER JOIN sales s ON si.sale_id = s.id
       LEFT JOIN products p ON si.product_id = p.id
