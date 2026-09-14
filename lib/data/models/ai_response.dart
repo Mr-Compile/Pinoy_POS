@@ -125,4 +125,9 @@ enum AIActionType {
 
   /// Open an external URL from the allowlist.
   externalLink,
+
+  /// Request creation of a catalog product. The application validates the
+  /// supplied parameters (name, price, stock, categoryId) and runs the
+  /// write through ProductService only after the user confirms.
+  createProduct,
 }

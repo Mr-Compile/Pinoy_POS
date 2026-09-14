@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:pinoy_pos/core/ai_navigation_registry.dart';
 import 'package:pinoy_pos/data/models/ai_response.dart';
 import 'package:pinoy_pos/data/models/user.dart';
+import 'package:pinoy_pos/services/ai_product_action_service.dart';
 import 'package:pinoy_pos/services/external_link_validator.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 
@@ -50,6 +51,11 @@ class AINavigationResolver {
       );
     }
 
+    if (action.type == AIActionType.createProduct) {
+      return hasPermission('edit_products') &&
+          AIProductActionService.hasValidParameters(action);
+    }
+
     final destination = AINavigationRegistry.get(action.destination);
     if (destination == null) return false;
 
@@ -80,6 +86,10 @@ class AINavigationResolver {
     required bool Function(String) hasPermission,
     String? currentDestinationId,
   }) async {
+    if (action.type == AIActionType.createProduct) {
+      return _executeCreateProduct(context, action, hasPermission);
+    }
+
     final destination = AINavigationRegistry.get(action.destination);
     if (destination == null) {
       _showError(context, title: 'Navigation Unavailable', message: 'The requested destination is not recognized.');
@@ -162,6 +172,39 @@ class AINavigationResolver {
     }
 
     return _ValidationResult.valid();
+  }
+
+  /// Runs a confirmed AI product-creation request through
+  /// [AIProductActionService]. Every check is re-run inside the service so
+  /// a stale chip cannot write invalid data.
+  static Future<bool> _executeCreateProduct(
+    BuildContext context,
+    AIAction action,
+    bool Function(String) hasPermission,
+  ) async {
+    if (!hasPermission('edit_products')) {
+      _showError(
+        context,
+        title: 'Not Allowed',
+        message: 'Only the Owner account can create products.',
+      );
+      return false;
+    }
+    final result = await AIProductActionService.createProduct(
+      action,
+      hasPermission: hasPermission,
+    );
+    if (!context.mounted) return false;
+    if (result.success) {
+      await AppDialogService.success(
+        context,
+        title: 'Product Created',
+        message: result.message,
+      );
+    } else {
+      _showError(context, title: 'Create Failed', message: result.message);
+    }
+    return result.success;
   }
 
   static bool _validParameters(AIAction action, AIDestination destination) {

@@ -5,6 +5,7 @@ import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/ai_response.dart';
 import 'package:pinoy_pos/providers/ai_advisor_provider.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/providers/catalog_provider.dart';
 import 'package:pinoy_pos/providers/navigation_provider.dart';
 import 'package:pinoy_pos/services/ai_navigation_resolver.dart';
 
@@ -158,7 +159,12 @@ class _ActionList extends ConsumerWidget {
         );
 
         final isExternal = action.type == AIActionType.externalLink;
-        final icon = isExternal ? Icons.open_in_new : Icons.arrow_forward;
+        final isCreate = action.type == AIActionType.createProduct;
+        final icon = isExternal
+            ? Icons.open_in_new
+            : isCreate
+                ? Icons.add_circle_outline
+                : Icons.arrow_forward;
 
         return ActionChip.elevated(
           avatar: Icon(icon, size: 18, color: onAiContainer),
@@ -179,13 +185,16 @@ class _ActionList extends ConsumerWidget {
     final role = SessionManager().currentUser?.role;
     final currentDestinationId = ref.read(currentRouteProvider);
 
-    await AINavigationResolver.execute(
+    final executed = await AINavigationResolver.execute(
       context,
       action: action,
       role: role,
       hasPermission: authNotifier.hasPermission,
       currentDestinationId: currentDestinationId,
     );
+    if (executed && action.type == AIActionType.createProduct) {
+      bumpCatalogRevision(ref);
+    }
   }
 }
 

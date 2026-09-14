@@ -142,8 +142,10 @@ class AINavigationRegistry {
       howToSteps: [
         'Open Products.',
         'Tap Add Product or select an existing product.',
-        'Enter product details, price, and stock.',
+        'Enter the product name, price, stock, and category.',
         'Tap Save.',
+        'Tip: ask the AI Advisor "add product: name=..., price=..., '
+            'stock=..., category=..." to create one for you.',
       ],
       relatedDestinations: ['categories', 'stock', 'pos'],
     ),

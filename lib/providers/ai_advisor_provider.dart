@@ -9,6 +9,7 @@ import 'package:pinoy_pos/providers/navigation_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/services/ai_advisor_service.dart';
 import 'package:pinoy_pos/services/ai_navigation_service.dart';
+import 'package:pinoy_pos/services/ai_product_action_service.dart';
 
 /// A single message in the AI Advisor conversation.
 ///
@@ -166,6 +167,25 @@ class AIAdvisorChatNotifier extends StateNotifier<AIAdvisorChatState> {
       return;
     }
 
+    // Product-creation commands resolve locally — no API call, no quota.
+    // This runs before navigation so "add product" phrasing is not routed
+    // to the Products destination.
+    final productResponse = await AIProductActionService.resolveCommand(
+      q,
+      hasPermission: authNotifier.hasPermission,
+    );
+    if (productResponse != null) {
+      _addUserMessage(q);
+      _addBotMessage(
+        text: productResponse.message,
+        response: productResponse,
+        followUps: productResponse.suggestions.isEmpty
+            ? _buildFollowUps(q)
+            : const [],
+      );
+      return;
+    }
+
     // First, try to satisfy navigation and how-to queries locally so the
     // assistant works even when offline or when the AI service is not
     // configured. The application always validates permissions.
@@ -234,14 +254,19 @@ class AIAdvisorChatNotifier extends StateNotifier<AIAdvisorChatState> {
       if (!mounted) return;
 
       if (result.success) {
+        final action = result.action;
+        final content = result.content ?? 'No response from the advisor.';
         state = state.copyWith(
           messages: [
             ...state.messages,
             AIChatMessage(
-              text: result.content ?? 'No response from the advisor.',
+              text: content,
               isUser: false,
               timestamp: DateTime.now(),
-              followUps: _buildFollowUps(q),
+              response: action == null
+                  ? null
+                  : AIResponse(message: content, actions: [action]),
+              followUps: action == null ? _buildFollowUps(q) : const [],
             ),
           ],
           isSending: false,

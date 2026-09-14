@@ -351,6 +351,37 @@ Result: `flutter analyze` reports no issues; `flutter test` passes 232/232 tests
 - `flutter analyze` -- No issues found.
 - `flutter test` -- 235 tests passed.
 
+## AI-Assisted Product Creation (Owner)
+
+### Design
+
+The AI Advisor can prepare catalog products for the Owner via a confirm-then-write flow. The model never writes to the database; the application validates and executes.
+
+Two entry paths share one validation pipeline in `lib/services/ai_product_action_service.dart`:
+
+- **Local command (no quota, works offline / without Groq config):**
+  `add product: name=Pastil; price=80; stock=20; category=Meals` (multiline also supported; `min_stock` and `description` optional).
+  `AIAdvisorChatNotifier.sendQuery` calls `AIProductActionService.resolveCommand` BEFORE `AINavigationService` so "add product" phrasing is not swallowed by the Products navigation destination.
+- **Model extraction:** the Owner system prompt (`AIAdvisorService._productCreationBlock`) instructs Groq to emit an `ACTION:create_product ... END_ACTION` block when all required fields are known. `AIAdvisorService.query` extracts it via `AIProductActionService.extractModelAction` BEFORE `AiResponsePolicy.sanitizeAndValidate` (the sanitizer strips formatting but not the payload). `AIAdvisorResult.action` carries the prepared `AIAction` to the provider, which renders it as a confirmation chip.
+
+### Validation & execution
+
+- Required: name, price > 0, stock >= 0, category. Optional: min_stock (default 10), description.
+- Category names resolve to `categoryId` via `CategoryService.getActiveCategories` (exact-insensitive, then unambiguous prefix, then numeric id).
+- Duplicate rule mirrors the product dialog: same name + same category is rejected.
+- `AIActionType.createProduct` chips execute through `AINavigationResolver.execute` → `AIProductActionService.createProduct` → `ProductService.createProduct` (permission `edit_products`, activity log `create_product`). All checks re-run at tap time.
+- Permission gating is `edit_products` everywhere (Owner only); Staff/Admin get a denial response, and a forged/stale chip cannot write.
+- After a successful create, `bumpCatalogRevision(ref)` refreshes Products/POS/catalog listeners.
+
+### Verification
+
+```powershell
+flutter analyze
+flutter test test/ai_product_action_service_test.dart
+```
+
+`flutter analyze` reports no issues; the suite covers parse, validation, confirmation, DB write, duplicate rejection, staff denial, and ACTION-block extraction (15 tests; 507 total passing).
+
 ## GCash QR Owner/Staff Flow Repair
 
 ### Root Cause

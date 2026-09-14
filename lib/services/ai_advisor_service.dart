@@ -2,7 +2,10 @@
 import 'package:pinoy_pos/core/ai_capability_policy.dart';
 import 'package:pinoy_pos/core/authorization_exception.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
+import 'package:pinoy_pos/data/models/ai_response.dart';
 import 'package:pinoy_pos/data/models/user.dart';
+import 'package:pinoy_pos/data/repositories/category_repository.dart';
+import 'package:pinoy_pos/services/ai_product_action_service.dart';
 import 'package:pinoy_pos/services/ai_response_policy.dart';
 import 'package:pinoy_pos/services/ai_skill_service.dart';
 import 'package:pinoy_pos/services/ai_usage_service.dart';
@@ -23,10 +26,16 @@ class AIAdvisorResult {
   final bool limitReached;
   final bool isModelUnavailable;
 
+  /// A prepared (but not yet executed) action the model requested, e.g.
+  /// product creation. The UI renders it as a confirmation chip; the write
+  /// only happens after the user taps it.
+  final AIAction? action;
+
   AIAdvisorResult({
     required this.success,
     this.content,
     this.errorMessage,
+    this.action,
     this.isNotConfigured = false,
     this.isNetworkError = false,
     this.isAuthError = false,
@@ -95,6 +104,7 @@ class AIAdvisorService {
   final SessionManager _sessionManager;
   final BusinessIntelligenceService _biService;
   final AISkillService _skillService;
+  final CategoryRepository _categoryRepository;
 
   AIAdvisorService({
     GroqService? groqService,
@@ -103,12 +113,14 @@ class AIAdvisorService {
     SessionManager? sessionManager,
     BusinessIntelligenceService? biService,
     AISkillService? skillService,
+    CategoryRepository? categoryRepository,
   })  : _groqService = groqService ?? GroqService(),
         _aiUsageService = aiUsageService ?? AIUsageService(),
         _settingsService = settingsService ?? SettingsService(),
         _sessionManager = sessionManager ?? SessionManager(),
         _biService = biService ?? BusinessIntelligenceService(),
-        _skillService = skillService ?? AISkillService();
+        _skillService = skillService ?? AISkillService(),
+        _categoryRepository = categoryRepository ?? CategoryRepository();
 
   /// Sends a user query to the AI Advisor and returns the result.
   ///
@@ -163,6 +175,18 @@ class AIAdvisorService {
     final role = currentUser?.role;
     final userId = currentUser?.id;
 
+    // Active category names feed the owner's product-creation contract.
+    List<String> categoryNames = const [];
+    if (role == UserRole.owner &&
+        _sessionManager.hasPermission('edit_products')) {
+      try {
+        final categories = await _categoryRepository.getActiveCategories();
+        categoryNames = [for (final c in categories) c.name];
+      } catch (_) {
+        // Non-fatal: the prompt simply omits the category list.
+      }
+    }
+
     // 6. Detect the user's analytical intent (role-aware).
     final detectedIntent = _biService.detectIntent(userQuery, role: role);
 
@@ -199,7 +223,8 @@ class AIAdvisorService {
       effectiveIntent.intent,
       role,
     );
-    final systemPrompt = _buildSystemPrompt(facts, role, skillGuidance);
+    final systemPrompt =
+        _buildSystemPrompt(facts, role, skillGuidance, categoryNames);
 
     // 10. Build the conversation messages for Groq.
     final messages = <Map<String, String>>[];
@@ -232,10 +257,28 @@ class AIAdvisorService {
       );
     }
 
-    // 12. Sanitize and validate the model's raw output before storing or
+    // 12. Extract a model-emitted product-creation block BEFORE the
+    //     humanization sanitizer runs. The action is validated against the
+    //     real permission system and catalog, then attached to the result
+    //     so the UI can render a confirmation chip.
+    var rawContent = groqResult.content ?? '';
+    AIAction? pendingAction;
+    final extracted = await AIProductActionService.extractModelAction(
+      rawContent,
+      hasPermission: _sessionManager.hasPermission,
+    );
+    if (extracted != null) {
+      rawContent = extracted.cleanedText;
+      pendingAction = extracted.action;
+      final notice = extracted.notice;
+      if (notice != null && notice.isNotEmpty) {
+        rawContent = rawContent.isEmpty ? notice : '$rawContent\n\n$notice';
+      }
+    }
+
+    // 13. Sanitize and validate the model's raw output before storing or
     //     displaying it.  This enforces the humanized response policy at the
     //     application layer even if the model ignores the system prompt.
-    final rawContent = groqResult.content ?? '';
     final sanitized = AiResponsePolicy.sanitizeAndValidate(rawContent);
     if (sanitized.isEmpty) {
       return AIAdvisorResult(
@@ -245,7 +288,7 @@ class AIAdvisorService {
       );
     }
 
-    // 13. Record usage (only after a successful API response).
+    // 14. Record usage (only after a successful API response).
     final recorded =
         await _aiUsageService.recordQuery(userQuery, sanitized);
 
@@ -256,10 +299,15 @@ class AIAdvisorService {
       return AIAdvisorResult(
         success: true,
         content: sanitized,
+        action: pendingAction,
       );
     }
 
-    return AIAdvisorResult(success: true, content: sanitized);
+    return AIAdvisorResult(
+      success: true,
+      content: sanitized,
+      action: pendingAction,
+    );
   }
 
   /// Validates that the saved model exists in the current Groq model list.
@@ -325,6 +373,7 @@ class AIAdvisorService {
     BusinessFacts facts,
     UserRole? role,
     String skillGuidance,
+    List<String> categoryNames,
   ) {
     final roleIntro = switch (role) {
       UserRole.owner => '''You are the Pinoy POS AI Business Advisor.
@@ -392,11 +441,38 @@ DATA RULES (STRICT):
 3. Use Philippine peso (PHP) formatting for money. Never expose passwords, PINs, API keys, or sensitive configuration.
 4. Frame monetary advice as practical operational suggestions, not financial or investment advice.
 5. Answer in plain conversational text — no Markdown, headings, bold/italic markers, or code fences. When an AUDIT SIGNALS block is present, mention only the signals relevant to the question and explain them in plain words.
-${skillGuidance.isNotEmpty ? '\n$skillGuidance\n' : ''}
+${skillGuidance.isNotEmpty ? '\n$skillGuidance\n' : ''}${_productCreationBlock(role, categoryNames)}
 AUTHORIZED CONTEXT:
 ${facts.context}
 
 Generate a helpful, role-aware, humanized answer based ONLY on the information above.''';
+  }
+
+  /// The product-creation contract appended to the Owner's system prompt.
+  /// The model may EMIT a machine-readable action block; the application
+  /// parses, validates, and executes it only after owner confirmation.
+  String _productCreationBlock(UserRole? role, List<String> categoryNames) {
+    if (role != UserRole.owner) return '';
+    final categories =
+        categoryNames.isEmpty ? 'none yet' : categoryNames.join(', ');
+    return '''
+PRODUCT CREATION (OWNER CAPABILITY):
+You can prepare a new product for the catalog. When the owner asks you to create or add a product and has provided ALL required fields — name, price (greater than 0), stock (0 or more), and a category — end your reply with this exact block on its own lines, with nothing after it:
+ACTION:create_product
+name=<product name>
+price=<number>
+stock=<whole number>
+category=<category name>
+min_stock=<whole number, optional>
+description=<optional text>
+END_ACTION
+Rules:
+- The category must be one of the AVAILABLE CATEGORIES below. If the requested category is not listed, say so and do not emit the block.
+- If any required field is missing, unclear, or invalid, ask for it in plain words and do not emit the block.
+- Emit the block only when the owner asks to create a product. The application validates the details and creates the product only after the owner confirms.
+AVAILABLE CATEGORIES: $categories
+
+''';
   }
 
   /// Returns contextual suggested questions based on real database
