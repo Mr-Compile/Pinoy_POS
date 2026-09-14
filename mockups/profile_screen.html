@@ -12,6 +12,20 @@
   .tile + .tile { border-top: 1px solid var(--divider); }
   .tile .grow { flex: 1; }
   .pill { background: rgba(22,163,74,.16); color: var(--success); border-color: rgba(22,163,74,.4); }
+  .avatar-wrap { position: relative; width: 90px; margin: 0 auto 14px; }
+  .avatar-wrap .cam { position: absolute; bottom: 0; right: 0; width: 30px; height: 30px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; border: 3px solid var(--bg); cursor: pointer; }
+  .avatar-wrap .cam svg { width: 15px; height: 15px; fill: #fff; }
+  .dialog-overlay { position: absolute; inset: 0; top: 30px; background: rgba(0,0,0,.55); z-index: 50; display: none; align-items: center; justify-content: center; padding: 16px; }
+  .dialog-overlay.open { display: flex; }
+  .dialog { background: var(--surface); border: 1px solid var(--border); border-radius: 22px; width: 100%; max-width: 310px; max-height: 520px; overflow-y: auto; box-shadow: 0 24px 64px rgba(0,0,0,.45); display: flex; flex-direction: column; }
+  .dialog-header { padding: 20px 20px 12px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .dialog-header .icircle { background: var(--surface-elev); }
+  .dialog-header h3 { font-size: 18px; font-weight: 800; color: var(--text); }
+  .dialog-header p { font-size: 13px; color: var(--text-3); line-height: 1.4; }
+  .dialog-body { padding: 0 20px; }
+  .dialog-actions { padding: 16px 20px 20px; display: flex; gap: 10px; }
+  .dialog-actions .btn { flex: 1; }
+  .helper { font-size: 11.5px; color: var(--text-3); margin-top: 4px; }
 </style>
 </head>
 <body>
@@ -31,7 +45,7 @@
 <div class="page-head">
   <div>
     <h1>Profile — lib/ui/screens/profile_screen.dart</h1>
-    <p>Authenticated user profile with edit action and read-only account information.</p>
+    <p>Authenticated user profile with per-field edit dialogs and read-only account information. Username can be changed once.</p>
   </div>
   <button class="theme-toggle" onclick="toggleTheme()">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
@@ -51,29 +65,182 @@
       <div class="screen">
         <div class="screen-body">
           <div class="card profile-head">
-            <div class="avatar" style="width:90px;height:90px;font-size:34px;margin:0 auto 14px;">J</div>
+            <div class="avatar-wrap">
+              <div class="avatar" style="width:90px;height:90px;font-size:34px;">J</div>
+              <div class="cam" title="Change profile picture" onclick="showToast('Pick profile image', 'info')"><svg viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/><path d="M20 4h-3.17L15 2H9L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-5 11.5V13H9.5v2.5H7V13h-2.5v-2H7V8.5h2.5V11H13V8.5h2.5V11H17c.55 0 1 .45 1 1v2.5h-3.5V13z"/></svg></div>
+            </div>
             <div style="font-size:22px;font-weight:800;">Juan Dela Cruz</div>
             <div style="font-size:13px;color:var(--text-2);">@juan</div>
             <span class="pill" style="margin-top:10px;">Owner</span>
           </div>
 
-          <button class="btn btn-primary" style="background:linear-gradient(135deg,var(--primary),var(--info));" onclick="showToast('Edit profile', 'info')">Edit Profile</button>
+          <button class="btn btn-primary" style="background:linear-gradient(135deg,var(--primary),var(--info));" onclick="openEditProfile()">Edit Profile</button>
 
           <div class="section-title">Account Information</div>
           <div class="card">
-            <div class="tile"><div class="isquare c-blue"><svg><use href="#i-person"/></svg></div><div class="grow"><div class="name">Full Name</div><div class="sub">Juan Dela Cruz</div></div><svg><use href="#i-chevron"/></svg></div>
-            <div class="tile"><div class="isquare c-purple"><svg><use href="#i-at"/></svg></div><div class="grow"><div class="name">Username</div><div class="sub">juan</div></div><svg><use href="#i-chevron"/></svg></div>
+            <div class="tile" style="cursor:pointer" onclick="openFieldDialog('fullname')"><div class="isquare c-blue"><svg><use href="#i-person"/></svg></div><div class="grow"><div class="name">Full Name</div><div class="sub">Juan Dela Cruz</div></div><svg><use href="#i-chevron"/></svg></div>
+            <div class="tile" id="usernameRow" style="cursor:pointer" onclick="openFieldDialog('username')"><div class="isquare c-purple"><svg><use href="#i-at"/></svg></div><div class="grow"><div class="name">Username</div><div class="sub" id="usernameValue">juan</div></div><svg id="usernameChevron"><use href="#i-chevron"/></svg></div>
             <div class="tile"><div class="isquare c-green"><svg><use href="#i-shield"/></svg></div><div class="grow"><div class="name">Role</div><div class="sub">Owner</div></div></div>
             <div class="tile"><div class="isquare c-amber"><svg><use href="#i-calendar"/></svg></div><div class="grow"><div class="name">Member Since</div><div class="sub">Sep 1, 2025</div></div></div>
             <div class="tile"><div class="isquare c-teal"><svg><use href="#i-login"/></svg></div><div class="grow"><div class="name">Last Login</div><div class="sub">Sep 10, 2026 · 09:30 AM</div></div></div>
           </div>
         </div>
       </div>
+
+      <!-- Edit Profile dialog (both fields) -->
+      <div class="dialog-overlay" id="editProfileDialog" onclick="if(event.target===this)closeDialog('editProfileDialog')">
+        <div class="dialog" onclick="event.stopPropagation()">
+          <div class="dialog-header">
+            <div class="icircle c-green"><svg width="20" height="20"><use href="#i-person"/></svg></div>
+            <h3>Edit Profile</h3>
+          </div>
+          <div class="dialog-body">
+            <div class="field has-icon" style="margin-top:0">
+              <label>Full Name</label>
+              <svg class="field-icon input-icon"><use href="#i-person"/></svg>
+              <input class="input" type="text" id="profileFullName" value="Juan Dela Cruz">
+            </div>
+            <div class="field has-icon">
+              <label>Username</label>
+              <svg class="field-icon input-icon"><use href="#i-at"/></svg>
+              <input class="input" type="text" id="profileUsername" value="juan">
+              <div class="helper" id="profileUsernameHelper">You can only change your username once.</div>
+            </div>
+          </div>
+          <div class="dialog-actions">
+            <button class="btn btn-outlined" onclick="closeDialog('editProfileDialog')">Cancel</button>
+            <button class="btn btn-primary" onclick="saveEditProfile()">Save</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Single-field dialog: Edit Full Name / Change Username -->
+      <div class="dialog-overlay" id="fieldDialog" onclick="if(event.target===this)closeDialog('fieldDialog')">
+        <div class="dialog" onclick="event.stopPropagation()">
+          <div class="dialog-header">
+            <div class="icircle c-blue" id="fieldDialogIcon"><svg width="20" height="20"><use href="#i-person"/></svg></div>
+            <h3 id="fieldDialogTitle">Edit Full Name</h3>
+          </div>
+          <div class="dialog-body">
+            <div class="field has-icon" style="margin-top:0">
+              <label id="fieldLabel">Full Name</label>
+              <svg class="field-icon input-icon" id="fieldIcon"><use href="#i-person"/></svg>
+              <input class="input" type="text" id="fieldInput" value="">
+              <div class="helper" id="fieldHelper" style="display:none;">You can only change your username once.</div>
+            </div>
+          </div>
+          <div class="dialog-actions">
+            <button class="btn btn-outlined" onclick="closeDialog('fieldDialog')">Cancel</button>
+            <button class="btn btn-primary" onclick="saveField()">Save</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Change Username confirmation -->
+      <div class="dialog-overlay" id="confirmUsernameDialog" onclick="if(event.target===this)closeDialog('confirmUsernameDialog')">
+        <div class="dialog" onclick="event.stopPropagation()">
+          <div class="dialog-header">
+            <div class="icircle c-amber"><svg width="20" height="20"><use href="#i-at"/></svg></div>
+            <h3>Change Username?</h3>
+            <p id="confirmUsernameMsg">You can only change your username once.</p>
+          </div>
+          <div class="dialog-body"></div>
+          <div class="dialog-actions">
+            <button class="btn btn-outlined" onclick="closeDialog('confirmUsernameDialog')">Cancel</button>
+            <button class="btn btn-primary" onclick="confirmUsernameChange()">Yes, Change It</button>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="frame-notes">Profile card with avatar, name, username, role pill, Edit Profile action, and account information rows. Password/PIN management moved to Settings hub.</div>
+    <div class="frame-notes">Avatar camera badge changes the profile picture. Full Name row opens "Edit Full Name"; Username row opens "Change Username" — allowed once, confirmed by a second dialog, then the row loses its chevron and becomes read-only. The Edit Profile button opens a combined dialog where the username field turns read-only after the one-time change. Unsaved changes prompt a discard confirmation. Password/PIN management lives in the Settings hub.</div>
   </div>
 </div>
 
 <script src="mockup.js"></script>
+<script>
+let usernameChanged = false;
+let editingField = null;
+let pendingUsername = null;
+const originalUsername = 'juan';
+
+function closeDialog(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+function openEditProfile() {
+  const u = document.getElementById('profileUsername');
+  u.value = document.getElementById('usernameValue').textContent;
+  u.readOnly = usernameChanged;
+  document.getElementById('profileUsernameHelper').textContent = usernameChanged
+    ? 'You have already changed your username.'
+    : 'You can only change your username once.';
+  document.getElementById('editProfileDialog').classList.add('open');
+}
+
+function saveEditProfile() {
+  const name = document.getElementById('profileFullName').value.trim();
+  const uname = document.getElementById('profileUsername').value.trim();
+  if (!name || !uname) { showToast('Full Name and Username are required', 'error'); return; }
+  if (!usernameChanged && uname !== document.getElementById('usernameValue').textContent) {
+    pendingUsername = uname;
+    document.getElementById('confirmUsernameMsg').innerHTML =
+      'You can only change your username once. After saving, it will be permanently set to "<b>' + escapeHtml(uname) + '</b>".';
+    document.getElementById('confirmUsernameDialog').classList.add('open');
+    return;
+  }
+  closeDialog('editProfileDialog');
+  showToast('Profile updated successfully', 'success');
+}
+
+function openFieldDialog(field) {
+  if (field === 'username' && usernameChanged) return;
+  editingField = field;
+  const isUser = field === 'username';
+  document.getElementById('fieldDialogTitle').textContent = isUser ? 'Change Username' : 'Edit Full Name';
+  document.getElementById('fieldLabel').textContent = isUser ? 'Username' : 'Full Name';
+  document.getElementById('fieldInput').value = isUser
+    ? document.getElementById('usernameValue').textContent
+    : 'Juan Dela Cruz';
+  document.getElementById('fieldHelper').style.display = isUser ? 'block' : 'none';
+  document.getElementById('fieldDialogIcon').className = 'icircle ' + (isUser ? 'c-purple' : 'c-blue');
+  document.getElementById('fieldIcon').innerHTML = '<use href="#' + (isUser ? 'i-at' : 'i-person') + '"/>';
+  document.getElementById('fieldDialog').classList.add('open');
+}
+
+function saveField() {
+  const value = document.getElementById('fieldInput').value.trim();
+  if (!value) { showToast('This field is required', 'error'); return; }
+  if (editingField === 'username') {
+    if (value === document.getElementById('usernameValue').textContent) {
+      closeDialog('fieldDialog');
+      return;
+    }
+    pendingUsername = value;
+    document.getElementById('confirmUsernameMsg').innerHTML =
+      'You can only change your username once. After saving, it will be permanently set to "<b>' + escapeHtml(value) + '</b>".';
+    closeDialog('fieldDialog');
+    document.getElementById('confirmUsernameDialog').classList.add('open');
+    return;
+  }
+  closeDialog('fieldDialog');
+  showToast('Your full name has been updated.', 'success');
+}
+
+function confirmUsernameChange() {
+  if (pendingUsername) {
+    document.getElementById('usernameValue').textContent = pendingUsername;
+    usernameChanged = true;
+    pendingUsername = null;
+    const row = document.getElementById('usernameRow');
+    row.style.cursor = 'default';
+    row.onclick = null;
+    const chev = document.getElementById('usernameChevron');
+    if (chev) chev.style.display = 'none';
+  }
+  closeDialog('confirmUsernameDialog');
+  closeDialog('editProfileDialog');
+  showToast('Your username has been changed.', 'success');
+}
+</script>
 </body>
 </html>

@@ -304,7 +304,7 @@
         </div>
       </div>
     </div>
-    <div class="frame-notes" id="frameNotes">Owner has add_stock and adjust_stock. Staff has add_stock and view_stock but cannot adjust stock.</div>
+    <div class="frame-notes" id="frameNotes">Owner has add_stock and adjust_stock. Staff has add_stock and view_stock but cannot adjust stock. The stats strip, toolbar, filters, and inventory list scroll together as a single page.</div>
   </div>
 </div>
 
@@ -391,8 +391,8 @@ function setRole(role) {
   document.getElementById('roleSubtitle').textContent = role === 'owner' ? 'Owner' : 'Staff';
   document.getElementById('avatar').textContent = role === 'owner' ? 'OW' : 'ST';
   document.getElementById('frameNotes').textContent = role === 'owner'
-    ? 'Owner has add_stock and adjust_stock. Staff has add_stock and view_stock but cannot adjust stock.'
-    : 'Staff can add stock and view history. The Adjust option is hidden.';
+    ? 'Owner has add_stock and adjust_stock. Staff has add_stock and view_stock but cannot adjust stock. The stats strip, toolbar, filters, and inventory list scroll together as a single page.'
+    : 'Staff can add stock and view history. The Adjust option is hidden. The whole page scrolls as one.';
   renderStock();
 }
 

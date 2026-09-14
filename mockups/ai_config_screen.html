@@ -11,6 +11,8 @@
   .status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--success); }
   .status-row { display: flex; align-items: center; gap: 12px; }
   .btns { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+  .spinner { width: 28px; height: 28px; border-radius: 50%; border: 2.5px solid var(--surface-elev); border-top-color: var(--primary); animation: spin 0.9s linear infinite; flex-shrink: 0; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
@@ -66,7 +68,7 @@
               <div class="status-dot"></div>
               <div class="grow">
                 <div class="name">Connected</div>
-                <div class="sub">Groq API is responding.</div>
+                <div class="sub">Connected. 24 models available.</div>
               </div>
             </div>
           </div>
@@ -97,6 +99,64 @@
       </div>
     </div>
     <div class="frame-notes">Admin-only screen. API key is masked; test, refresh, save, and clear actions are shown. Connection status is displayed prominently.</div>
+  </div>
+
+  <div class="frame-wrap">
+    <div class="frame-label">AI Integration — Auto-verifying</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="appbar">
+        <div class="back"><svg><use href="#i-back"/></svg></div>
+        <div class="title"><h2>AI Integration</h2></div>
+        <div class="act"><svg><use href="#i-refresh"/></svg></div>
+      </div>
+      <div class="screen">
+        <div class="screen-body">
+          <div class="card" style="display:flex;gap:14px;align-items:flex-start;">
+            <div class="isquare c-purple"><svg><use href="#i-psych"/></svg></div>
+            <div class="grow">
+              <div class="name">AI Integration</div>
+              <div class="sub">Configure the Groq AI service used by the Owner's Business Advisor.</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="section-title" style="margin-bottom:12px;">Status</div>
+            <div class="status-row">
+              <div class="spinner"></div>
+              <div class="grow">
+                <div class="name">Checking connection...</div>
+                <div class="sub">Re-verifying the saved API key.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="section-title" style="margin-bottom:8px;">Groq API Key</div>
+            <div class="sub" style="margin-bottom:12px;">The API key is stored locally and never displayed after saving.</div>
+            <div class="field has-icon" style="margin-bottom:12px;">
+              <label>API Key</label>
+              <div class="field-ic c-purple"><svg><use href="#i-key"/></svg></div>
+              <input class="input" type="password" value="••••••••••••••••" readonly>
+            </div>
+            <div class="btns">
+              <button class="btn btn-outlined" onclick="showToast('Connection tested', 'success')">Test Connection</button>
+              <button class="btn btn-primary" onclick="showToast('Configuration saved', 'success')">Save Configuration</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="section-title" style="margin-bottom:12px;">Model</div>
+            <div class="select-row" style="padding-left:0;padding-right:0;">
+              <div class="grow"><div class="name">Selected model</div></div>
+              <select><option>llama3-70b-8192</option><option>llama3-8b-8192</option><option>mixtral-8x7b</option></select>
+            </div>
+            <button class="btn btn-outlined" style="margin-top:10px;" onclick="showToast('Models refreshed', 'info')">Refresh Models</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes">On open, a saved key is silently re-verified when the in-memory model cache is empty (after logout/login or app restart). The status icon becomes a spinner with "Checking connection...". On success the card shows "Connected. N models available."; if the saved model is no longer active, the recommended model is auto-selected ("Auto-selected … as the default model"). A manual Test Connection supersedes a stale auto-verify.</div>
   </div>
 </div>
 

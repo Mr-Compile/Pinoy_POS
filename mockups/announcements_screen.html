@@ -37,12 +37,10 @@
 <div class="page-head">
   <div>
     <h1>Announcements — lib/ui/screens/announcements_screen.dart</h1>
-    <p>Owner/Admin announcement list with pin, edit, delete, and view actions. View-only for Staff.</p>
+    <p>Owner announcement list with pin, edit, delete, and view actions. Staff receive announcement content via notifications.</p>
   </div>
   <div style="display:flex;gap:8px;">
     <span class="role-chip role-owner">Owner</span>
-    <span class="role-chip role-admin">Admin</span>
-    <span class="role-chip role-staff">Staff</span>
   </div>
   <button class="theme-toggle" onclick="toggleTheme()">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
@@ -52,7 +50,7 @@
 
 <div class="frames">
   <div class="frame-wrap">
-    <div class="frame-label">Announcements — Owner / Admin</div>
+    <div class="frame-label">Announcements — Owner</div>
     <div class="phone">
       <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
       <div class="appbar">
@@ -68,7 +66,7 @@
       </div>
       <button class="fab" style="position:absolute;bottom:16px;right:16px;" onclick="showToast('Add announcement', 'info')"><svg><use href="#i-add"/></svg></button>
     </div>
-    <div class="frame-notes">Owner/Admin can pin, edit, delete, and add announcements. Staff see view-only. FAB is the primary create action on portrait mobile.</div>
+    <div class="frame-notes">Owner can pin, edit, delete, and add announcements. Staff receive the content via notifications (no screen access). FAB is the primary create action on portrait mobile.</div>
   </div>
 </div>
 

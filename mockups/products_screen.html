@@ -269,7 +269,7 @@
         </div>
       </div>
     </div>
-    <div class="frame-notes" id="frameNotes">Owner has edit_products and delete_products. Staff only has view_products, so row actions and the Add Product button are hidden.</div>
+    <div class="frame-notes" id="frameNotes">Owner has edit_products and delete_products. Staff only has view_products, so row actions and the Add Product button are hidden. The stats strip, toolbar, filters, and product list scroll together as a single page.</div>
   </div>
 </div>
 
@@ -343,8 +343,8 @@ function setRole(role) {
   document.getElementById('roleSubtitle').textContent = role === 'owner' ? 'Owner' : 'Staff';
   document.getElementById('avatar').textContent = role === 'owner' ? 'OW' : 'ST';
   document.getElementById('frameNotes').textContent = role === 'owner'
-    ? 'Owner has edit_products and delete_products. Staff only has view_products, so row actions and the Add Product button are hidden.'
-    : 'Staff sees the same product list but with no row actions and no Add Product button. Stock counts are visible for POS reference.';
+    ? 'Owner has edit_products and delete_products. Staff only has view_products, so row actions and the Add Product button are hidden. The stats strip, toolbar, filters, and product list scroll together as a single page.'
+    : 'Staff sees the same product list but with no row actions and no Add Product button. Stock counts are visible for POS reference. The whole page scrolls as one.';
 
   const fabVisible = role === 'owner';
   document.getElementById('fabZone').style.display = fabVisible ? 'block' : 'none';

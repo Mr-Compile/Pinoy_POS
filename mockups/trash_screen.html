@@ -15,7 +15,12 @@
   .role-staff { background: rgba(6,182,212,.16); color: var(--teal); border-color: rgba(6,182,212,.4); }
   .frames-legend { max-width: 900px; margin: 0 auto 24px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; color: var(--text-2); font-size: 13px; }
 
+  .toolbar { display: flex; gap: 8px; align-items: center; }
+  .toolbar .search { flex: 1; }
   .search { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; display: flex; align-items: center; gap: 8px; color: var(--text-3); font-size: 13px; }
+  .ticon { width: 42px; height: 42px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+  .ticon svg { width: 20px; height: 20px; fill: var(--text-2); }
+  .ticon.del svg { fill: var(--error); }
   .chips { display: flex; gap: 8px; flex-wrap: wrap; }
   .chip { padding: 7px 14px; border-radius: 20px; font-size: 12.5px; font-weight: 600; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); cursor: pointer; }
   .chip.on { background: var(--primary); border-color: var(--primary); color: #fff; }
@@ -37,9 +42,6 @@
   .empty-state { text-align: center; padding: 40px 24px; color: var(--text-3); font-size: 13px; }
   .empty-state .big { font-size: 40px; margin-bottom: 12px; }
   .empty-state .title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
-
-  .fab { display: inline-flex; align-items: center; gap: 8px; background: var(--error); color: #fff; font-size: 13.5px; font-weight: 700; padding: 13px 20px; border-radius: 16px; cursor: pointer; }
-  .fabzone { display: flex; justify-content: flex-end; padding-right: 4px; margin-top: auto; }
 </style>
 </head>
 <body>
@@ -65,6 +67,8 @@
   <symbol id="i-backup" viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H8l4-4 4 4h-2z"/></symbol>
   <symbol id="i-gear" viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84a.484.484 0 0 0-.48.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.488.488 0 0 0-.59.22L2.74 8.87c-.12.22 0 .49.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.39.3.61.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.29.41.48.41h3.84c.24 0 .48-.17.5-.41l.36-2.54c.59-.24 1.13-.58 1.62-.94l2.39.96c.22.08.49 0 .61-.22l1.92-3.32c.12-.22.07-.49-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></symbol>
   <symbol id="i-lock" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></symbol>
+  <symbol id="i-check-circle" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></symbol>
+  <symbol id="i-del-sweep" viewBox="0 0 24 24"><path d="M15 16h4v2h-4v-2zm0-8h7v2h-7V8zm0 4h6v2h-6v-2zM3 18c0 1.1.9 2 2 2h6c1.1 0 2-.9 2-2V8H3v10zm2-8h6v8H5v-8zm9-5h-3l-1-1H6L5 5H2v2h12V5z"/></symbol>
 </svg>
 
 <div class="page-head">
@@ -100,15 +104,18 @@
       </div>
       <div class="screen">
         <div class="screen-body">
-          <div class="search"><svg><use href="#i-search"/></svg>Search trash</div>
+          <div class="toolbar">
+            <div class="search"><svg><use href="#i-search"/></svg>Search trash</div>
+            <div class="ticon" id="selectBtn" title="Select items" onclick="showToast('Select items mode', 'info')"><svg><use href="#i-check-circle"/></svg></div>
+            <div class="ticon del" id="emptyTrash" title="Empty trash" style="display:none;" onclick="showToast('Empty trash', 'error')"><svg><use href="#i-del-sweep"/></svg></div>
+          </div>
           <div class="chips" id="typeChips" onclick="selectChip(event.target, 'type')"></div>
           <div class="card" id="trashList"></div>
-          <div class="fabzone" id="emptyTrash" style="display:none;"><div class="fab" onclick="showToast('Empty trash', 'error')"><svg><use href="#i-del"/></svg>Empty Trash</div></div>
         </div>
       </div>
       <div class="bottomnav" id="bottomNav"></div>
     </div>
-    <div class="frame-notes" id="frameNotes">Tabs are derived from view_products, view_categories, view_users, view_settings (QR), and view_announcements. Empty Trash requires empty_trash. Restore/delete are gated by restore_trash and the matching delete permission.</div>
+    <div class="frame-notes" id="frameNotes">Tabs are derived from view_products, view_categories, view_users, QR (Owner-only via business settings), and view_announcements. The search field, select/empty actions, filter chips, and list all scroll together as one page. Empty Trash (delete-sweep icon) requires empty_trash. Restore/delete are gated by restore_trash and the matching delete permission.</div>
   </div>
 </div>
 
@@ -141,7 +148,7 @@ const roleData = {
     text: 'Owner sees Products, Categories, Users, QR, and Announcements. Empty Trash is Owner-only.',
     subtitle: 'Owner',
     avatar: 'OW',
-    notes: 'Owner has view_products, view_categories, view_users, view_settings, view_announcements, view_trash, restore_trash, and empty_trash. All tabs, restore, delete, and empty actions are available.',
+    notes: 'Owner has view_products, view_categories, view_users, view_settings, view_announcements, view_trash, restore_trash, empty_trash, and business-settings ownership — so the QR tab appears only for Owner. All tabs, restore, delete, and empty actions are available. Search, chips, and list scroll as one page.',
     nav: [
       { icon: '#i-dash', label: 'Dashboard' },
       { icon: '#i-cart', label: 'POS' },
@@ -161,10 +168,10 @@ const roleData = {
   },
   admin: {
     chipClass: 'role-admin',
-    text: 'Admin sees only Users and QR tabs. User rows can be restored or deleted; QR rows are view-only. Empty Trash is hidden.',
+    text: 'Admin sees only the Users tab. User rows can be restored or deleted. Empty Trash is hidden.',
     subtitle: 'System Admin',
     avatar: 'AD',
-    notes: 'Admin has view_users, view_settings, view_trash, and restore_trash, but not view_products, view_categories, view_announcements, or empty_trash. QR can be viewed but not restored/deleted because it requires business-setting ownership.',
+    notes: 'Admin has view_users, view_trash, and restore_trash, but not view_products, view_categories, view_announcements, or empty_trash. The QR tab no longer appears: merchant QR trash requires business-Owner settings access, which Admin does not have.',
     nav: [
       { icon: '#i-dash', label: 'Dashboard' },
       { icon: '#i-people', label: 'Users' },
@@ -172,11 +179,10 @@ const roleData = {
       { icon: '#i-gear', label: 'Settings' },
       { icon: '#i-more', label: 'More' }
     ],
-    chips: ['All', 'Users', 'QR'],
+    chips: ['All', 'Users'],
     rows: [
       { thumb: 'GR', name: 'Greg Ramos', sub: 'User · deleted by Owner · 2 days ago', restore: true, del: true },
       { thumb: 'MA', name: 'Maria Santos', sub: 'User · deleted by Admin · 3 days ago', restore: true, del: true },
-      { thumb: '<svg><use href="#i-qr"/></svg>', name: 'Merchant QR', sub: 'QR · deleted by Owner · 3 days ago', restore: false, del: false },
     ],
     emptyTrash: false,
   },
@@ -238,6 +244,7 @@ function setRole(role) {
   }
 
   document.getElementById('emptyTrash').style.display = data.emptyTrash ? 'flex' : 'none';
+  document.getElementById('selectBtn').style.display = data.chips.length ? 'flex' : 'none';
 
   const nav = document.getElementById('bottomNav');
   nav.innerHTML = data.nav.map(item => `

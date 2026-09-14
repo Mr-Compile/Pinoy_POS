@@ -12,6 +12,54 @@
   .tile { display: flex; align-items: center; gap: 12px; padding: 12px 0; }
   .tile + .tile { border-top: 1px solid var(--divider); }
   .tile .grow { flex: 1; }
+
+  /* In-phone dialog overlay (same pattern as dialogs_settings.html) */
+  .phone-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 10;
+  }
+  .phone-dialog {
+    width: 100%;
+    max-width: 320px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 22px;
+    box-shadow: 0 20px 50px rgba(0,0,0,.4);
+  }
+  .phone-dialog .dialog-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 14px;
+  }
+  .phone-dialog .dialog-icon svg { width: 28px; height: 28px; }
+  .phone-dialog h3 {
+    color: var(--text);
+    font-size: 18px;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 8px;
+  }
+  .phone-dialog p {
+    color: var(--text-3);
+    font-size: 13px;
+    line-height: 1.5;
+    text-align: left;
+    margin-bottom: 14px;
+  }
+  .phone-dialog .actions { display: flex; gap: 10px; margin-top: 16px; }
+  .phone-dialog .actions .btn { flex: 1; }
+  .fake-screen { opacity: .35; filter: blur(1px); }
 </style>
 </head>
 <body>
@@ -24,6 +72,7 @@
   <symbol id="i-timer" viewBox="0 0 24 24"><path d="M15 1H9v2h6V1zm-4 13h2V7h-2v7zm8.03-6.61 1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42C16.07 4.74 14.12 4 12 4c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-2.12-.74-4.07-1.97-5.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></symbol>
   <symbol id="i-notify" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></symbol>
   <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M8.59 16.59 13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></symbol>
 </svg>
 
 <div class="page-head">
@@ -79,7 +128,110 @@
         </div>
       </div>
     </div>
-    <div class="frame-notes">Password change is available to all. Session settings only visible with manage_session_settings permission. Dialogs include current, new, and confirm password with strength meter.</div>
+    <div class="frame-notes">Password change is available to all. Session settings only visible with manage_session_settings permission. Both session values are dropdowns; "Session warning" is disabled when the timeout is Unlimited.</div>
+  </div>
+
+  <!-- Inactivity Timeout Dialog -->
+  <div class="frame-wrap">
+    <div class="frame-label">Inactivity Timeout</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="appbar">
+        <div class="back"><svg><use href="#i-back"/></svg></div>
+        <div class="title"><h2>Security</h2></div>
+      </div>
+      <div class="screen fake-screen">
+        <div class="screen-body">
+          <div class="section-title">Session</div>
+          <div class="card">
+            <div class="tile">
+              <div class="isquare c-amber"><svg><use href="#i-timer"/></svg></div>
+              <div class="grow"><div class="name">Inactivity timeout</div><div class="sub">15 minutes</div></div>
+              <svg><use href="#i-chevron"/></svg>
+            </div>
+            <div class="tile">
+              <div class="isquare c-amber"><svg><use href="#i-notify"/></svg></div>
+              <div class="grow"><div class="name">Session warning</div><div class="sub">Warn 30 seconds before logout</div></div>
+              <svg><use href="#i-chevron"/></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="phone-overlay">
+        <div class="phone-dialog">
+          <div class="dialog-icon solid-blue"><svg><use href="#i-info"/></svg></div>
+          <h3>Inactivity Timeout</h3>
+          <p>How long the app waits for input before locking. Unlimited never locks on idle — the 8-hour maximum session length still applies. This is the store default; a per-user override can be set in User Management.</p>
+          <div class="field has-icon">
+            <label>Timeout</label>
+            <div class="field-ic c-amber"><svg><use href="#i-timer"/></svg></div>
+            <select class="select">
+              <option>3 minutes</option>
+              <option selected>15 minutes</option>
+              <option>30 minutes</option>
+              <option>1 hour</option>
+              <option>Unlimited</option>
+            </select>
+          </div>
+          <div class="actions">
+            <button class="btn btn-outlined">Cancel</button>
+            <button class="btn btn-primary">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes">Dropdown replaces the old free-text minutes field. Choices: 3 minutes, 15 minutes, 30 minutes, 1 hour, Unlimited (stored as 0). A previously saved custom value is appended as an extra option.</div>
+  </div>
+
+  <!-- Session Warning Dialog -->
+  <div class="frame-wrap">
+    <div class="frame-label">Session Warning</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="appbar">
+        <div class="back"><svg><use href="#i-back"/></svg></div>
+        <div class="title"><h2>Security</h2></div>
+      </div>
+      <div class="screen fake-screen">
+        <div class="screen-body">
+          <div class="section-title">Session</div>
+          <div class="card">
+            <div class="tile">
+              <div class="isquare c-amber"><svg><use href="#i-timer"/></svg></div>
+              <div class="grow"><div class="name">Inactivity timeout</div><div class="sub">15 minutes</div></div>
+              <svg><use href="#i-chevron"/></svg>
+            </div>
+            <div class="tile">
+              <div class="isquare c-amber"><svg><use href="#i-notify"/></svg></div>
+              <div class="grow"><div class="name">Session warning</div><div class="sub">Warn 30 seconds before logout</div></div>
+              <svg><use href="#i-chevron"/></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="phone-overlay">
+        <div class="phone-dialog">
+          <div class="dialog-icon solid-blue"><svg><use href="#i-info"/></svg></div>
+          <h3>Session Warning</h3>
+          <p>How long before automatic logout the "Session Expiring" warning appears. It always stays shorter than the inactivity timeout.</p>
+          <div class="field has-icon">
+            <label>Warn before logout</label>
+            <div class="field-ic c-amber"><svg><use href="#i-notify"/></svg></div>
+            <select class="select">
+              <option>15 seconds</option>
+              <option selected>30 seconds</option>
+              <option>1 minute</option>
+              <option>2 minutes</option>
+            </select>
+          </div>
+          <div class="actions">
+            <button class="btn btn-outlined">Cancel</button>
+            <button class="btn btn-primary">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes">Dropdown replaces the old free-text seconds field. Choices: 15 seconds, 30 seconds (default), 1 minute, 2 minutes — filtered to stay shorter than the current inactivity timeout.</div>
   </div>
 </div>
 
