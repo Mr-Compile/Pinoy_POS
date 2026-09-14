@@ -1393,3 +1393,117 @@ flutter test
 ```
 
 Result: `flutter analyze` clean; 491/491 tests pass.
+
+## Developer License Lock ("time bomb")
+
+### Design
+
+A developer-controlled license expiry that logs out all users on the device
+and blocks login behind a full-screen lock page when the deadline passes.
+
+- **Storage is fail-closed.** State lives in `flutter_secure_storage` as an
+  HMAC-SHA256-signed JSON blob (`pinoy_pos.license_state.v1`); a separate
+  SharedPreferences marker (`pinoy_pos.license_configured.v1`) records that
+  the feature was configured. Editing OR deleting the blob while the marker
+  survives resolves to `LicenseLockState.tampered` → locked.
+- **Clock-rollback defence.** `lastSeenAtMs` is a monotonic watermark inside
+  the signed blob; `effectiveNow = max(wallClock, watermark)` is used for
+  every expiry comparison, so rewinding the device clock cannot extend the
+  license.
+- **Hidden entry.** 7 taps within 4s on the login-screen logo opens the
+  developer access dialog (no visual affordance). On the lock screen a
+  subtle "Developer access" text button does the same.
+- **Developer password** is stored as a SHA-256 hash inside the signed blob
+  (cannot be swapped without invalidating the signature). First use runs a
+  create-password flow; `DevGateMode.blocked` denies access entirely when
+  the stored state is untrusted.
+- **Offline unlock codes.** `unlockGrants` maps grant days → code count
+  (`{90: 20, 365: 5}`); each code is
+  `base32(HMAC(secret, 'PINOY-POS:EXTEND:<days>:<index>'))[:8]` formatted
+  `XXXX-XXXX`. Multiple distinct codes per grant exist so different codes
+  can be handed to different clients. Redemption STACKS: before the
+  deadline it extends from the deadline, after it extends from now. A
+  disarmed (paid-in-full) license refuses codes so it cannot be silently
+  re-armed.
+- **Proportional expiry warning.** `armedAtMs` in the signed blob records
+  when the current term began (set on arming, on a deadline change, and on
+  every successful redemption; cleared on disarm). `LicenseStatus.
+  warningThreshold` = term/4 clamped to [1 day, `warningWindow` (30
+  days)], so a 30-day trial warns only in its last ~7 days while a
+  365-day term still warns at 30. Legacy blobs without `armedAtMs` fall
+  back to the full 30-day window. `LicenseExpiryBanner` (warning colors,
+  "Enter code") shows inside the threshold; `LicenseCountdownChip`
+  (neutral, "Trial · N days left" / "License · N days left", "Enter
+  code") shows while armed outside it — both mounted on the login card
+  and atop every AppShell tab. Terms of ≤ `trialMaxTerm` (45 days) read
+  as "Trial" in the banner copy and get "Trial Ended" on the lock screen.
+  The login screen also shows a "Have an unlock code?" link while armed.
+- **Shared rate limit.** Password and unlock-code failures share a signed,
+  persisted counter: 5 failures → 5-minute lockout (checked against the
+  watermark, not the wall clock).
+- **Enforcement points.** `SplashScreen` waits for the license evaluation
+  before routing (locked wins over any auth phase); `SessionGuard` listens
+  to `licenseStatusProvider`, re-evaluates every minute and on app resume,
+  and on transition to locked calls `logout()` then replaces the whole
+  route stack with `LicenseLockedScreen`; `LoginScreen._login` re-checks
+  the status before attempting credentials.
+- **No amount field.** The lock screen is contact-only by design — the
+  client must reach the developer, so no amount-due card exists.
+- **Paid-in-full path.** "License paid in full" in the panel calls
+  `clearConfiguration()` — removes the deadline, codes and developer
+  password; the app then runs with no license requirement at all.
+
+### Files
+
+- `lib/services/license_service.dart` — storage adapters, signed blob,
+  watermark, `armedAtMs` term tracking, `evaluate()`, `saveConfig`,
+  `developerGateMode`, `initialize/verify/changeDeveloperPassword`,
+  `unlockCode(days, index)`, `redeemUnlockCode` (stacking),
+  `clearConfiguration`, `warningWindow`, `trialMaxTerm`.
+- `lib/providers/license_provider.dart` — `licenseServiceProvider`,
+  `licenseStatusProvider` (`LicenseStatusNotifier`, starts `evaluating`).
+- `lib/ui/dialogs/developer_access_dialog.dart` — setup/verify gate
+  (`AppDialogForm`, inline errors, lockout messaging).
+- `lib/ui/dialogs/license_unlock_dialog.dart` — shared code-entry dialog
+  used by the banner and the login-screen link (pre-lock redemption).
+- `lib/ui/widgets/license_expiry_banner.dart` — warning strip driven by
+  `isExpiringSoon`, mounted in `login_screen.dart` (clipped to card
+  radius) and `app_shell.dart` (above the tab content on both layouts).
+- `lib/ui/widgets/license_countdown_chip.dart` — neutral countdown strip
+  driven by `showCountdown`, mounted in the same two spots.
+- `lib/ui/screens/developer_license_screen.dart` — hidden panel: status
+  card, arm switch, deadline picker, lock message, developer contact,
+  per-grant expandable code lists with copy, change password, "License
+  paid in full" (clear).
+- `lib/ui/screens/license_locked_screen.dart` — blocking screen (`PopScope
+  canPop: false`): lock badge, message, contact card, unlock-code field,
+  Unlock CTA, Developer access.
+- Wired into `splash_screen.dart`, `session_guard.dart`,
+  `login_screen.dart`, `app_shell.dart`.
+
+### Caveats
+
+- Client-side enforcement only — a determined client who reverse-engineers
+  the APK can bypass it. Ship release builds with `--obfuscate
+  --split-debug-info`. The compiled-in secrets in `LicenseService` gate a
+  license check, not user data.
+- Clearing app data also wipes the whole POS database (sales included), so
+  that bypass is self-defeating for the client.
+- Lock never touches business data — only UI access is gated.
+- Recommended contract language: "software license is valid until [date]
+  and renews upon payment" so the mechanism is disclosed license
+  enforcement, not an undisclosed kill switch.
+
+### Verification
+
+```powershell
+flutter analyze
+flutter test test/license_service_test.dart test/license_countdown_chip_test.dart
+flutter test
+```
+
+Result: `flutter analyze` clean; `license_service_test.dart` 42/42 pass
+(evaluation, rollback, tamper, password, proportional warning window,
+term tracking, unlock codes — format, per-grant enumeration, stacking,
+disarm refusal, clear); `license_countdown_chip_test.dart` 5/5 pass;
+full suite 554/554 pass.

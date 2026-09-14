@@ -6,9 +6,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/auth_navigation.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/providers/license_provider.dart';
+import 'package:pinoy_pos/services/license_service.dart';
 import 'package:pinoy_pos/services/session_settings_service.dart';
 import 'package:pinoy_pos/services/session_timeout_service.dart';
 import 'package:pinoy_pos/ui/dialogs/session_expiring_dialog.dart';
+import 'package:pinoy_pos/ui/screens/license_locked_screen.dart';
 
 /// Root-level widget that watches user input and app lifecycle to enforce
 /// inactivity and absolute session expiry.
@@ -33,6 +36,9 @@ class _SessionGuardState extends ConsumerState<SessionGuard>
     with WidgetsBindingObserver {
   late final SessionTimeoutService _sessionTimeoutService;
   late final ProviderSubscription<AuthState> _authSubscription;
+  late final ProviderSubscription<LicenseStatus> _licenseSubscription;
+  Timer? _licenseTimer;
+  bool _licenseLockEnforced = false;
 
   /// The currently displayed session-expiry warning route, if any.
   /// Tracked so the warning can never be shown twice and can be removed
@@ -57,6 +63,18 @@ class _SessionGuardState extends ConsumerState<SessionGuard>
       authStateProvider,
       _handleAuthStateChanged,
     );
+
+    // License enforcement: watch the status provider for a transition into
+    // a locked state, and re-evaluate it on a timer so an armed license
+    // that expires mid-session still logs everyone out.
+    _licenseSubscription = ref.listenManual(
+      licenseStatusProvider,
+      _handleLicenseChanged,
+    );
+    _licenseTimer = Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => _recheckLicense(),
+    );
   }
 
   @override
@@ -64,6 +82,8 @@ class _SessionGuardState extends ConsumerState<SessionGuard>
     WidgetsBinding.instance.removeObserver(this);
     _detachInputListeners();
     _authSubscription.close();
+    _licenseSubscription.close();
+    _licenseTimer?.cancel();
     unawaited(_sessionTimeoutService.endSession());
     super.dispose();
   }
@@ -71,6 +91,43 @@ class _SessionGuardState extends ConsumerState<SessionGuard>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     unawaited(_sessionTimeoutService.handleAppLifecycle(state));
+    if (state == AppLifecycleState.resumed) {
+      _recheckLicense();
+    }
+  }
+
+  void _recheckLicense() {
+    unawaited(ref.read(licenseStatusProvider.notifier).refresh());
+  }
+
+  void _handleLicenseChanged(LicenseStatus? previous, LicenseStatus next) {
+    if (!next.isLocked) {
+      _licenseLockEnforced = false;
+      return;
+    }
+    if (previous?.isLocked ?? false) return;
+    _enforceLicenseLock();
+  }
+
+  /// Logs out any active session and replaces the whole navigation stack
+  /// with [LicenseLockedScreen]. Runs even when nobody is logged in so the
+  /// lock also covers the login screen itself.
+  void _enforceLicenseLock() {
+    if (_licenseLockEnforced) return;
+    _licenseLockEnforced = true;
+
+    unawaited(() async {
+      try {
+        if (ref.read(authStateProvider).user != null) {
+          await ref.read(authStateProvider.notifier).logout();
+        }
+      } finally {
+        widget.navigatorKey.currentState?.pushAndRemoveUntil(
+          LicenseLockedScreen.route(),
+          (_) => false,
+        );
+      }
+    }());
   }
 
   void _attachInputListeners() {

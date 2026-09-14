@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/auth_navigation.dart';
 import 'package:pinoy_pos/core/constants.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/providers/license_provider.dart';
+import 'package:pinoy_pos/ui/screens/license_locked_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_logo.dart';
 
 /// Splash screen shown during application initialization.
@@ -35,22 +37,33 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
+    final license = ref.watch(licenseStatusProvider);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    // Once auth initialization completes, navigate to the appropriate
-    // screen. We use a post-frame callback to avoid triggering
-    // navigation during build, and a [_hasNavigated] guard to ensure
-    // only one navigation is ever attempted.
-    if (!authState.isLoading && !_hasNavigated) {
+    // Once auth initialization AND the license evaluation complete,
+    // navigate to the appropriate screen. We use a post-frame callback to
+    // avoid triggering navigation during build, and a [_hasNavigated]
+    // guard to ensure only one navigation is ever attempted. A locked
+    // license wins over any auth phase — nobody gets past it.
+    final ready = !authState.isLoading && !license.isEvaluating;
+    if (ready && !_hasNavigated) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_hasNavigated || !mounted) return;
 
         final current = ref.read(authStateProvider);
-        if (current.isLoading) return;
+        final currentLicense = ref.read(licenseStatusProvider);
+        if (current.isLoading || currentLicense.isEvaluating) return;
 
         _hasNavigated = true;
-        AuthPhaseNavigator.pushAndRemoveUntil(context, current.phase);
+        if (currentLicense.isLocked) {
+          Navigator.of(context).pushAndRemoveUntil(
+            LicenseLockedScreen.route(),
+            (_) => false,
+          );
+        } else {
+          AuthPhaseNavigator.pushAndRemoveUntil(context, current.phase);
+        }
       });
     }
 

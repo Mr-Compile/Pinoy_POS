@@ -1,8 +1,12 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/providers/license_provider.dart';
+import 'package:pinoy_pos/services/license_service.dart';
+import 'package:pinoy_pos/ui/dialogs/license_unlock_dialog.dart';
 import 'package:pinoy_pos/ui/screens/activity_logs_screen.dart';
 import 'package:pinoy_pos/ui/screens/ai_config_screen.dart';
 import 'package:pinoy_pos/ui/screens/ai_quota_management_page.dart';
@@ -15,6 +19,7 @@ import 'package:pinoy_pos/ui/screens/settings/security_settings_page.dart';
 import 'package:pinoy_pos/ui/screens/settings/store_information_settings_page.dart';
 import 'package:pinoy_pos/ui/screens/trash_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 
 /// Settings hub — a container screen that links to all user-accessible
@@ -87,6 +92,33 @@ class SettingsScreen extends ConsumerWidget {
       subtitle: 'Theme mode and display preferences',
       screen: const AppearanceSettingsPage(),
     ));
+
+    // License code entry — only while the license is armed, so anyone on
+    // the device (owner or staff) can redeem a developer code without
+    // logging out or waiting for the warning window.
+    if (ref.watch(licenseStatusProvider).state == LicenseLockState.active) {
+      personalEntries.add(_SettingsEntry(
+        icon: Icons.key_outlined,
+        title: 'Unlock Code',
+        subtitle: 'Enter a developer code to extend the license',
+        onTap: (context) async {
+          final result = await showLicenseUnlockDialog(
+            context,
+            ref.read(licenseServiceProvider),
+          );
+          if (result == null || !context.mounted) return;
+          await ref.read(licenseStatusProvider.notifier).refresh();
+          if (!context.mounted) return;
+          await AppDialogService.success(
+            context,
+            title: 'License Extended',
+            message:
+                'The license now runs until '
+                '${DateFormat('MMM d, yyyy').format(result.newExpiry!)}.',
+          );
+        },
+      ));
+    }
 
     // ── Business (Owner only) ──
     if (canEditBusiness) {
@@ -276,6 +308,7 @@ class _SettingsTile extends StatelessWidget {
       'Security' => AppSemanticColors.success,
       'PIN' => AppSemanticColors.purple,
       'Appearance' => AppSemanticColors.teal,
+      'Unlock Code' => AppSemanticColors.warning,
       'Store Information' => AppSemanticColors.warning,
       'Payment Settings' => AppSemanticColors.info,
       'Backup & Restore' => AppSemanticColors.purple,

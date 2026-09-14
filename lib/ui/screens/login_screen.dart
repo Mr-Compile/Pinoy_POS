@@ -1,15 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/auth_navigation.dart';
 import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/constants.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/providers/license_provider.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
+import 'package:pinoy_pos/services/license_service.dart';
+import 'package:pinoy_pos/ui/dialogs/developer_access_dialog.dart';
+import 'package:pinoy_pos/ui/dialogs/license_unlock_dialog.dart';
+import 'package:pinoy_pos/ui/screens/developer_license_screen.dart';
+import 'package:pinoy_pos/ui/screens/license_locked_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/app_logo.dart';
+import 'package:pinoy_pos/ui/widgets/license_countdown_chip.dart';
+import 'package:pinoy_pos/ui/widgets/license_expiry_banner.dart';
 import 'package:pinoy_pos/ui/widgets/theme_toggle.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -29,6 +38,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   /// Prevents the self-healing redirect in [build] from scheduling more
   /// than one navigation.
   bool _hasNavigated = false;
+
+  /// Hidden developer entry: 7 taps on the logo within 4 seconds opens the
+  /// developer access gate. No visual affordance — that's the point.
+  int _logoTapCount = 0;
+  DateTime? _logoTapWindowStart;
 
   @override
   void initState() {
@@ -50,8 +64,66 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
+  void _onLogoTapped() {
+    final now = DateTime.now();
+    if (_logoTapWindowStart == null ||
+        now.difference(_logoTapWindowStart!) > const Duration(seconds: 4)) {
+      _logoTapCount = 0;
+      _logoTapWindowStart = now;
+    }
+    _logoTapCount++;
+    if (_logoTapCount >= 7) {
+      _logoTapCount = 0;
+      _logoTapWindowStart = null;
+      _openDeveloperAccess();
+    }
+  }
+
+  Future<void> _openDeveloperAccess() async {
+    final authorized = await showDeveloperAccessDialog(
+      context,
+      ref.read(licenseServiceProvider),
+    );
+    if (!authorized || !mounted) return;
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const DeveloperLicenseScreen()),
+    );
+    if (!mounted) return;
+    await ref.read(licenseStatusProvider.notifier).refresh();
+  }
+
+  /// Pre-expiry code redemption — a client holding a code can extend the
+  /// license before it locks, straight from the sign-in screen.
+  Future<void> _enterUnlockCode() async {
+    final result = await showLicenseUnlockDialog(
+      context,
+      ref.read(licenseServiceProvider),
+    );
+    if (result == null || !mounted) return;
+
+    await ref.read(licenseStatusProvider.notifier).refresh();
+    if (!mounted) return;
+    await AppDialogService.success(
+      context,
+      title: 'License Extended',
+      message:
+          'The license now runs until '
+          '${DateFormat('MMM d, yyyy').format(result.newExpiry!)}.',
+    );
+  }
+
   Future<void> _login() async {
     FocusScope.of(context).unfocus();
+
+    // A locked license blocks login entirely — route to the lock screen.
+    if (ref.read(licenseStatusProvider).isLocked) {
+      await Navigator.of(context).pushAndRemoveUntil(
+        LicenseLockedScreen.route(),
+        (_) => false,
+      );
+      return;
+    }
 
     if (ref.read(authStateProvider).isLoading) return;
 
@@ -108,6 +180,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
+    final licenseStatus = ref.watch(licenseStatusProvider);
     final colorScheme = Theme.of(context).colorScheme;
     final brightness = Theme.of(context).brightness;
 
@@ -178,10 +251,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  _IconContainer(
-                                    size: iconContainerSize,
-                                    iconSize: iconSize,
-                                    isDark: isDark,
+                                  GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onTap: _onLogoTapped,
+                                    child: _IconContainer(
+                                      size: iconContainerSize,
+                                      iconSize: iconSize,
+                                      isDark: isDark,
+                                    ),
                                   ),
                                   const SizedBox(height: 20),
                                   Text(
@@ -195,6 +272,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     style: AppTypography.bodyMedium(context)
                                         .copyWith(color: colorScheme.onSurfaceVariant),
                                   ),
+                                  if (licenseStatus.isExpiringSoon) ...[
+                                    const SizedBox(height: 20),
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(
+                                          AppRadius.card),
+                                      child: const LicenseExpiryBanner(),
+                                    ),
+                                  ] else if (licenseStatus.showCountdown) ...[
+                                    const SizedBox(height: 20),
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(
+                                          AppRadius.card),
+                                      child: const LicenseCountdownChip(),
+                                    ),
+                                  ],
                                   const SizedBox(height: 40),
                                   _buildUsernameField(),
                                   const SizedBox(height: 16),
@@ -206,6 +298,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     isLoading: authState.isLoading,
                     fullWidth: true,
                   ),
+                                  if (licenseStatus.state ==
+                                      LicenseLockState.active) ...[
+                                    const SizedBox(height: 8),
+                                    AppButton.text(
+                                      label: 'Have an unlock code?',
+                                      size: AppButtonSize.small,
+                                      color: AppButtonColor.neutral,
+                                      onPressed: _enterUnlockCode,
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
