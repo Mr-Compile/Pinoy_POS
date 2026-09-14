@@ -15,6 +15,7 @@ import 'package:pinoy_pos/ui/screens/settings_screen.dart';
 import 'package:pinoy_pos/ui/screens/users_screen.dart';
 import 'package:pinoy_pos/ui/screens/more_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_logo.dart';
+import 'package:pinoy_pos/ui/widgets/developer_access_gate.dart';
 import 'package:pinoy_pos/ui/widgets/license_countdown_chip.dart';
 import 'package:pinoy_pos/ui/widgets/license_expiry_banner.dart';
 
@@ -196,8 +197,9 @@ class _AppShellState extends ConsumerState<AppShell> {
       leading: Padding(
         padding: const EdgeInsets.symmetric(vertical: Spacing.lg),
         child: layout.isAtLeastExpanded
-            ? const AppLogo(size: 56, variant: LogoVariant.full)
-            : const AppIcon(size: 40),
+            ? const DeveloperAccessGate(
+                child: AppLogo(size: 56, variant: LogoVariant.full))
+            : const DeveloperAccessGate(child: AppIcon(size: 40)),
       ),
       destinations: tabs
           .map((tab) => NavigationRailDestination(
@@ -221,7 +223,9 @@ class _AppShellState extends ConsumerState<AppShell> {
             child: const Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                AppLogo(size: 80, variant: LogoVariant.full),
+                DeveloperAccessGate(
+                  child: AppLogo(size: 80, variant: LogoVariant.full),
+                ),
               ],
             ),
           ),

@@ -1,4 +1,4 @@
-﻿/// Application-wide constants
+/// Application-wide constants
 class AppConstants {
   AppConstants._();
 
@@ -14,8 +14,9 @@ class AppConstants {
   static const int defaultPageSize = 10;
 
   // AI
-  static const int maxDailyAIQueries = 10; // Legacy fallback; prefer aiDailyQuota from Settings.
-  static const int defaultDailyAIQuota =10;
+  static const int maxDailyAIQueries =
+      10; // Legacy fallback; prefer aiDailyQuota from Settings.
+  static const int defaultDailyAIQuota = 10;
   static const int maxDailyAIQuota = 1000;
 
   // Security
