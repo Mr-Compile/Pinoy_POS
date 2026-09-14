@@ -107,7 +107,7 @@
           <div class="toolbar">
             <div class="search"><svg><use href="#i-search"/></svg>Search trash</div>
             <div class="ticon" id="selectBtn" title="Select items" onclick="showToast('Select items mode', 'info')"><svg><use href="#i-check-circle"/></svg></div>
-            <div class="ticon del" id="emptyTrash" title="Empty trash" style="display:none;" onclick="showToast('Empty trash', 'error')"><svg><use href="#i-del-sweep"/></svg></div>
+            <div class="ticon del" id="emptyTrash" title="Empty trash" style="display:none;" onclick="confirmEmptyTrash()"><svg><use href="#i-del-sweep"/></svg></div>
           </div>
           <div class="chips" id="typeChips" onclick="selectChip(event.target, 'type')"></div>
           <div class="card" id="trashList"></div>
@@ -121,17 +121,45 @@
 
 <script src="mockup.js"></script>
 <script>
-function actionIcon(type, title) {
+function actionIcon(type, title, name) {
   const icon = type === 'restore' ? '#i-undo' : '#i-del';
   const cls = type === 'restore' ? 'restore' : 'del';
-  const toast = type === 'restore' ? "showToast('Restored', 'success')" : "showToast('Permanently deleted', 'error')";
-  return `<div class="aicon ${cls}" onclick="${toast}" title="${title}"><svg><use href="${icon}"/></svg></div>`;
+  return `<div class="aicon ${cls}" onclick="confirmTrashAction('${type}', '${name.replace(/'/g, "\\'")}')" title="${title}"><svg><use href="${icon}"/></svg></div>`;
+}
+
+function confirmTrashAction(type, name) {
+  if (type === 'restore') {
+    openDialog({
+      title: 'Restore item?',
+      message: `Restore "${name}" back to its module?`,
+      confirmLabel: 'Restore',
+      onConfirm: () => showToast('Restored', 'success')
+    });
+  } else {
+    openDialog({
+      title: 'Delete forever?',
+      message: `Permanently delete "${name}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => showToast('Permanently deleted', 'error')
+    });
+  }
+}
+
+function confirmEmptyTrash() {
+  openDialog({
+    title: 'Empty trash?',
+    message: 'Permanently delete all items in Trash? This cannot be undone.',
+    confirmLabel: 'Empty Trash',
+    destructive: true,
+    onConfirm: () => showToast('Trash emptied', 'success')
+  });
 }
 
 function trashRow({ thumb, name, sub, restore, del }) {
   const actions = [
-    restore ? actionIcon('restore', 'Restore') : '',
-    del ? actionIcon('del', 'Delete forever') : '',
+    restore ? actionIcon('restore', 'Restore', name) : '',
+    del ? actionIcon('del', 'Delete forever', name) : '',
   ].join('');
   return `
     <div class="trash-row">

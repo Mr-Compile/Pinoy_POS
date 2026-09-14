@@ -9,10 +9,14 @@
   .frames-legend { max-width: 900px; margin: 0 auto 24px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; color: var(--text-2); font-size: 13px; }
   .banner { padding: 10px 14px; display: flex; gap: 10px; align-items: center; background: rgba(245,158,11,.12); color: var(--warning); font-size: 13px; }
   .chat-row { display: flex; gap: 8px; margin-bottom: 10px; }
-  .chat-row.me { flex-direction: row-reverse; }
+  .chat-row.me, .chat-row.user { flex-direction: row-reverse; }
   .chat-bubble { max-width: 75%; padding: 12px 14px; border-radius: 18px; font-size: 13px; line-height: 1.45; }
   .chat-bubble.ai { background: var(--surface-elev); border-bottom-left-radius: 4px; color: var(--text); }
-  .chat-bubble.me { background: var(--primary); color: #fff; border-bottom-right-radius: 4px; }
+  .chat-bubble.me, .chat-bubble.user { background: var(--primary); color: #fff; border-bottom-right-radius: 4px; }
+  .role-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; border: 1px solid var(--border); }
+  .role-owner { background: rgba(75,130,233,.16); color: var(--info); border-color: rgba(75,130,233,.4); }
+  .role-staff { background: rgba(22,163,74,.16); color: var(--success); border-color: rgba(22,163,74,.4); }
+  .role-admin { background: rgba(139,92,246,.16); color: var(--purple); border-color: rgba(139,92,246,.4); }
   .typing-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--purple); animation: blink 1s infinite; }
   .input-bar { display: flex; gap: 8px; align-items: center; padding: 10px 0; }
   .input-bar input { flex: 1; border-radius: 24px; border: 1px solid var(--border); background: var(--surface); color: var(--text); padding: 10px 14px; }
@@ -34,15 +38,27 @@
     <h1>AI Advisor — lib/ui/screens/ai_advisor_screen.dart</h1>
     <p>Role-aware AI chat with status chip, query limit bar, welcome/suggestions, and message input.</p>
   </div>
-  <button class="theme-toggle" onclick="toggleTheme()">
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <div class="chips" id="roleSwitcher">
+      <button class="chip on" data-role="owner" onclick="setRole('owner')">Owner</button>
+      <button class="chip" data-role="admin" onclick="setRole('admin')">Admin</button>
+      <button class="chip" data-role="staff" onclick="setRole('staff')">Staff</button>
+    </div>
+    <button class="theme-toggle" onclick="toggleTheme()">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
     <span id="themeLabel">Light mode</span>
-  </button>
+    </button>
+  </div>
+</div>
+
+<div class="frames-legend">
+  <span class="role-chip role-owner" id="roleChip">Owner</span>
+  <span id="legendText">Owner and Staff use daily AI queries; Admin additionally manages quotas via manage_ai_quota.</span>
 </div>
 
 <div class="frames">
   <div class="frame-wrap">
-    <div class="frame-label">AI Advisor</div>
+    <div class="frame-label" id="frameLabel">AI Advisor — Owner</div>
     <div class="phone">
       <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
       <div class="appbar">
@@ -55,20 +71,20 @@
         <div style="padding:10px 14px;background:rgba(139,92,246,.08);display:flex;align-items:center;gap:10px;">
           <svg width="16" height="16" fill="var(--purple)"><use href="#i-auto"/></svg>
           <span style="font-size:12px;">AI Queries Today</span>
-          <div style="flex:1;height:6px;background:var(--surface-elev);border-radius:3px;overflow:hidden;"><div style="width:35%;height:100%;background:var(--purple);"></div></div>
-          <span style="font-size:11px;font-weight:700;">35/100</span>
+          <div style="flex:1;height:6px;background:var(--surface-elev);border-radius:3px;overflow:hidden;"><div id="quotaBar" style="width:35%;height:100%;background:var(--purple);"></div></div>
+          <span id="quotaText" style="font-size:11px;font-weight:700;">35/100</span>
         </div>
-        <div class="screen-body" style="padding-bottom:80px;">
+        <div class="screen-body" id="chatList" style="padding-bottom:80px;">
           <div style="text-align:center;padding:28px 0;">
             <svg width="48" height="48" fill="var(--purple)" style="opacity:.5;"><use href="#i-auto"/></svg>
-            <div style="font-weight:800;margin-top:8px;">AI Advisor</div>
-            <div style="font-size:12px;color:var(--text-2);">I can help you with your business data.</div>
+            <div style="font-weight:800;margin-top:8px;" id="aiGreeting">AI Advisor</div>
+            <div style="font-size:12px;color:var(--text-2);" id="aiTagline">I can help you with your business data.</div>
           </div>
           <div class="section-title" style="font-size:12px;">Try asking</div>
           <div class="chips" style="flex-wrap:wrap;">
-            <div class="chip" onclick="showToast('Suggested question sent', 'info')">How are my sales today?</div>
-            <div class="chip" onclick="showToast('Suggested question sent', 'info')">Give me a summary.</div>
-            <div class="chip" onclick="showToast('Suggested question sent', 'info')">Top selling products?</div>
+            <div class="chip" onclick="suggest(this)">How are my sales today?</div>
+            <div class="chip" onclick="suggest(this)">Give me a summary.</div>
+            <div class="chip" onclick="suggest(this)">Top selling products?</div>
           </div>
           <div class="chat-row me"><div class="chat-bubble me">How are my sales today?</div></div>
           <div class="chat-row">
@@ -77,14 +93,43 @@
           </div>
         </div>
         <div style="padding:8px 14px;border-top:1px solid var(--border);position:absolute;bottom:0;left:0;right:0;background:var(--surface);">
-          <div class="input-bar"><input placeholder="Ask about your business..."><button class="btn" style="width:auto;padding:10px;border-radius:50%;"><svg width="18" height="18" fill="#fff"><use href="#i-send"/></svg></button></div>
+          <div class="input-bar"><input id="aiInput" placeholder="Ask about your business..." onkeydown="if(event.key==='Enter')sendAi()"><button class="btn" style="width:auto;padding:10px;border-radius:50%;" onclick="sendAi()"><svg width="18" height="18" fill="#fff"><use href="#i-send"/></svg></button></div>
         </div>
       </div>
     </div>
-    <div class="frame-notes">AI chat with status chip, quota bar, welcome state, suggestions, message bubbles, typing indicator, and input bar.</div>
+    <div class="frame-notes" id="frameNotes">AI chat with status chip, quota bar, welcome state, suggestions, message bubbles, typing indicator, and input bar.</div>
   </div>
 </div>
 
 <script src="mockup.js"></script>
+<script>
+const roleText = {
+  owner: { chip: 'Owner', cls: 'role-owner', legend: 'Owner and Staff use daily AI queries; Admin additionally manages quotas via manage_ai_quota.',
+           greeting: 'AI Advisor', tagline: 'I can help you with your business data.', quota: '35/100', width: '35%' },
+  admin: { chip: 'Admin', cls: 'role-admin', legend: 'Admin configures the AI provider and manages per-user daily quotas (manage_ai_quota).',
+           greeting: 'AI Advisor — Admin', tagline: 'Ask questions, or manage quotas from AI Quota Management.', quota: '12/100', width: '12%' },
+  staff: { chip: 'Staff', cls: 'role-staff', legend: 'Staff share the same daily AI quota pool; usage counts against their own limit.',
+           greeting: 'AI Advisor', tagline: 'I can help you with your business data.', quota: '8/50', width: '16%' }
+};
+
+function setRole(role) {
+  const t = roleText[role];
+  const chip = document.getElementById('roleChip');
+  chip.textContent = t.chip;
+  chip.className = 'role-chip ' + t.cls;
+  document.getElementById('legendText').textContent = t.legend;
+  document.getElementById('frameLabel').textContent = 'AI Advisor — ' + t.chip;
+  document.getElementById('aiGreeting').textContent = t.greeting;
+  document.getElementById('aiTagline').textContent = t.tagline;
+  document.getElementById('quotaText').textContent = t.quota;
+  document.getElementById('quotaBar').style.width = t.width;
+  document.getElementById('frameNotes').textContent = role === 'admin'
+    ? 'Admin sees the same chat but also owns AI configuration and quota management under Settings → AI.'
+    : 'Chat interface with role-aware greeting, status chip, daily quota bar, suggestion chips, message bubbles, typing indicator, and input bar.';
+  document.querySelectorAll('#roleSwitcher .chip').forEach(c => c.classList.toggle('on', c.dataset.role === role));
+}
+
+setRole('owner');
+</script>
 </body>
 </html>

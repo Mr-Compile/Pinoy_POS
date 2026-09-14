@@ -3,102 +3,142 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pinoy POS — Sales Analytics / Reports Screen (lib/ui/screens/sales_analytics_screen.dart)</title>
+<title>Pinoy POS — Sales Analytics Screen (lib/ui/screens/sales_analytics_screen.dart)</title>
 <link rel="stylesheet" href="mockup.css">
 <style>
-  /* KPI grid (SalesSummaryCards → KpiGrid, 2 cols on compact) */
+  .frames-legend { max-width: 900px; margin: 0 auto 24px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; color: var(--text-2); font-size: 13px; }
+  .role-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; border: 1px solid var(--border); }
+  .role-owner { background: rgba(75,130,233,.16); color: var(--info); border-color: rgba(75,130,233,.4); }
+  .role-staff { background: rgba(22,163,74,.16); color: var(--success); border-color: rgba(22,163,74,.4); }
+  .frame-notes { max-width: 360px; color: var(--text-3); font-size: 12.5px; line-height: 1.6; margin-top: 8px; }
+  .pill-outline { background: transparent; border: 1px solid var(--border); color: var(--text-2); }
+
+  .section-heading { font-size: 15.5px; font-weight: 700; color: var(--text); margin-bottom: 10px; }
+  .section-sub { font-size: 12px; color: var(--text-3); margin-top: -8px; margin-bottom: 10px; }
+
+  /* KPI cards */
   .kpi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-  .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 14px 12px; display: flex; flex-direction: column; gap: 8px; }
-  .kpi .head { display: flex; align-items: center; gap: 8px; }
-  .kpi .ic { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .kpi .ic svg { width: 15px; height: 15px; }
-  .kpi .lbl { font-size: 11px; font-weight: 600; color: var(--text-3); }
-  .kpi .num { font-size: 20px; font-weight: 800; color: var(--text); line-height: 1.1; }
-  .kpi.primary { border-color: rgba(75,130,233,.35); }
-  .kpi.primary .num { font-size: 22px; color: var(--primary); }
-  .kpi .delta { font-size: 11px; color: var(--text-3); }
+  .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .kpi-card.primary { padding: 16px; border-color: rgba(75,130,233,.35); }
+  .kpi-head { display: flex; align-items: center; gap: 8px; }
+  .kpi-head .icircle { width: 28px; height: 28px; }
+  .kpi-head .icircle svg { width: 15px; height: 15px; }
+  .kpi-label { font-size: 11.5px; font-weight: 600; color: var(--text-3); }
+  .kpi-value { font-size: 19px; font-weight: 800; color: var(--text); line-height: 1.1; }
+  .kpi-card.primary .kpi-value { font-size: 22px; color: var(--primary); }
+  .kpi-sub { font-size: 11px; color: var(--text-3); }
+  .kpi-sub.up { color: var(--success); }
+  .kpi-sub.down { color: var(--error); }
 
-  /* Segmented period selector + calendar toggle + ‹ date › navigator */
-  .seg-row { display: flex; gap: 8px; }
-  .seg { flex: 1; display: flex; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
-  .seg div { flex: 1; padding: 9px 0; text-align: center; font-size: 12.5px; font-weight: 700; color: var(--text-3); cursor: pointer; }
-  .seg div.on { background: var(--primary); color: #fff; }
-  .cal-toggle { width: 36px; height: 36px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
-  .cal-toggle svg { width: 18px; height: 18px; fill: var(--text-3); }
-  .date-nav { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 2px 4px; display: flex; align-items: center; }
-  .date-nav .nav-arrow { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-  .date-nav .nav-arrow svg { width: 18px; height: 18px; fill: var(--text-2); }
-  .date-nav .nav-label { flex: 1; text-align: center; font-size: 13.5px; font-weight: 600; color: var(--text); }
+  /* Period selector */
+  .period-selector { display: flex; flex-direction: column; gap: 10px; }
+  .period-bar { display: flex; gap: 8px; align-items: center; }
+  .segmented { flex: 1; display: flex; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .segment { flex: 1; padding: 9px 0; text-align: center; font-size: 12.5px; font-weight: 700; color: var(--text-2); background: transparent; cursor: pointer; border: none; }
+  .segment.on { background: var(--primary); color: #fff; }
+  .cal-btn { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; cursor: pointer; }
+  .cal-btn svg { width: 18px; height: 18px; fill: var(--text-2); }
+  .date-nav { display: flex; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 2px 8px; }
+  .date-nav .nav { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .date-nav .nav svg { width: 18px; height: 18px; fill: var(--text-2); }
+  .date-nav .range { flex: 1; text-align: center; font-size: 13px; font-weight: 600; color: var(--text); }
 
-  .period-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-  .period-head .p-title { font-size: 15px; font-weight: 600; color: var(--text); }
-  .period-head .p-range { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+  /* Period header + actions */
+  .period-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .period-title { font-size: 15px; font-weight: 700; color: var(--text); }
+  .period-dates { font-size: 12px; color: var(--text-3); }
+  .set-store { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--primary); background: transparent; border: none; cursor: pointer; }
+  .set-store svg { width: 16px; height: 16px; fill: var(--primary); }
 
-  .actions-bar { display: flex; align-items: center; justify-content: space-between; }
-  .text-btn { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: var(--primary); cursor: pointer; padding: 8px 4px; }
-  .text-btn svg { width: 16px; height: 16px; fill: var(--primary); }
-  .export-btn { background: var(--primary); color: #fff; border: none; border-radius: 10px; padding: 10px 16px; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; cursor: pointer; }
-  .export-btn svg { width: 15px; height: 15px; fill: #fff; }
+  .actions-bar { display: flex; align-items: center; gap: 10px; }
+  .actions-bar .btn { width: auto; flex: 0; padding: 10px 16px; }
+  .actions-bar .spacer { flex: 1; }
 
-  .sec-title { font-size: 15px; font-weight: 700; color: var(--text); }
-  .sec-sub { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+  /* Mini bar chart */
+  .mini-bar-chart { display: flex; flex-direction: column; gap: 4px; height: 150px; }
+  .mini-bar-row { display: flex; gap: 4px; flex: 1; align-items: flex-end; }
+  .mini-bar { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .mini-bar .bar { width: 100%; border-radius: 4px 4px 0 0; background: var(--primary); min-height: 2px; }
+  .mini-bar.highlight .bar { background: var(--info); }
+  .mini-bar.zero .bar { background: var(--surface-elev); }
+  .mini-bar .value { font-size: 9.5px; color: var(--text-3); text-align: center; }
+  .mini-bar .label { font-size: 10px; color: var(--text-3); text-align: center; }
 
-  /* Trend bar chart (MiniBarChart + legend) */
-  .trend { height: 160px; display: flex; flex-direction: column; }
-  .trend .bars { flex: 1; display: flex; align-items: flex-end; gap: 4px; }
-  .trend .bars .b { flex: 1; border-radius: 4px 4px 0 0; background: var(--primary); min-height: 2px; }
-  .trend .bars .b.top { background: var(--info); }
-  .trend .vals, .trend .labs { display: flex; gap: 4px; margin-top: 6px; }
-  .trend .vals div, .trend .labs div { flex: 1; text-align: center; font-size: 9px; color: var(--text-3); white-space: nowrap; overflow: hidden; }
-  .chart-legend { display: flex; justify-content: center; gap: 14px; margin-top: 8px; font-size: 10px; color: var(--text-3); }
-  .chart-legend .li { display: flex; align-items: center; gap: 4px; }
-  .chart-legend .dot { width: 8px; height: 8px; border-radius: 4px; }
+  /* Trend legend */
+  .chart-legend { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 8px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-3); }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
 
-  /* Payment donut + legend */
-  .donut-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
-  .donut { width: 130px; height: 130px; border-radius: 50%; background: conic-gradient(var(--primary) 0 45%, var(--success) 45% 80%, var(--info) 80% 100%); position: relative; }
-  .donut::after { content: ''; position: absolute; inset: 27%; border-radius: 50%; background: var(--surface); }
-  .donut .pct { position: absolute; z-index: 1; font-size: 10px; font-weight: 700; color: #fff; }
-  .pay-legend { width: 100%; }
-  .pay-legend .li { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 12px; }
-  .pay-legend .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-  .pay-legend .nm { flex: 1; color: var(--text); }
-  .pay-legend .ct { color: var(--text-3); }
-  .pay-legend .amt { color: var(--text); font-weight: 600; }
+  /* Donut chart — stacked so the legend never overlaps the donut on narrow widths */
+  .donut-wrap { display: flex; flex-direction: column; align-items: center; gap: 18px; width: 100%; }
+  .donut { width: 150px; height: 150px; border-radius: 50%; position: relative; flex-shrink: 0; }
+  .donut-hole { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80px; height: 80px; border-radius: 50%; background: var(--surface); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .donut-hole b { font-size: 18px; font-weight: 800; color: var(--text); }
+  .donut-hole span { font-size: 10px; color: var(--text-3); }
+  .donut-legend { width: 100%; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+  .donut-legend-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; width: 100%; }
+  .donut-legend-item .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .donut-legend-item .label { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .donut-legend-item .value { margin-left: auto; font-weight: 700; color: var(--text); white-space: nowrap; flex-shrink: 0; }
+  .donut-legend-item .count { font-size: 11px; color: var(--text-3); margin-left: 6px; white-space: nowrap; }
 
-  /* Horizontal bar chart rows (TopProductsBarChart / CategorySalesBarChart) */
-  .hbar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-  .hbar-row:last-child { margin-bottom: 0; }
-  .hbar-row .lb { width: 80px; font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
-  .hbar-row .track { flex: 1; height: 24px; border-radius: 4px; background: var(--surface-elev); overflow: hidden; }
-  .hbar-row .fill { height: 100%; border-radius: 4px; background: var(--surface-hi); }
-  .hbar-row .fill.first { background: var(--primary); }
-  .hbar-row .tv { width: 56px; text-align: right; font-size: 11.5px; font-weight: 600; color: var(--text-3); flex-shrink: 0; }
+  /* Horizontal bar chart */
+  .hbar-list { display: flex; flex-direction: column; gap: 12px; }
+  .hbar-row { display: flex; align-items: center; gap: 10px; }
+  .hbar-label { width: 100px; font-size: 12px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hbar-track { flex: 1; height: 22px; background: var(--surface-elev); border-radius: 6px; position: relative; overflow: hidden; }
+  .hbar-fill { height: 100%; border-radius: 6px; background: var(--primary); opacity: .35; position: absolute; left: 0; top: 0; }
+  .hbar-row:first-child .hbar-fill { opacity: 1; }
+  .hbar-value { width: 70px; text-align: right; font-size: 12px; color: var(--text-2); font-weight: 600; }
 
-  /* Staff performance cards */
-  .staff-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 14px; margin-bottom: 10px; }
-  .staff-card:last-child { margin-bottom: 0; }
-  .staff-card .top { display: flex; align-items: center; gap: 12px; }
-  .staff-card .av { width: 32px; height: 32px; border-radius: 50%; background: var(--surface-elev); color: var(--primary); font-size: 13px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .staff-card .nm { font-size: 13.5px; font-weight: 600; color: var(--text); }
-  .staff-card .ct { font-size: 11.5px; color: var(--text-3); margin-top: 2px; }
-  .staff-card .amt { text-align: right; }
-  .staff-card .amt .t { font-size: 13.5px; font-weight: 700; color: var(--text); }
-  .staff-card .amt .a { font-size: 11.5px; color: var(--text-3); margin-top: 2px; }
-  .staff-card .bar { height: 8px; border-radius: 4px; background: var(--surface-elev); margin-top: 12px; overflow: hidden; }
-  .staff-card .bar div { height: 100%; border-radius: 4px; background: var(--primary); }
+  /* Staff performance */
+  .staff-list { display: flex; flex-direction: column; gap: 10px; }
+  .staff-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .staff-head { display: flex; align-items: center; gap: 10px; }
+  .staff-avatar { width: 32px; height: 32px; border-radius: 50%; background: rgba(75,130,233,.16); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; color: var(--primary); flex-shrink: 0; }
+  .staff-meta { flex: 1; min-width: 0; }
+  .staff-name { font-size: 13.5px; font-weight: 700; color: var(--text); }
+  .staff-count { font-size: 11.5px; color: var(--text-3); }
+  .staff-amt { text-align: right; }
+  .staff-total { font-size: 14px; font-weight: 700; color: var(--text); }
+  .staff-avg { font-size: 11px; color: var(--text-3); }
+  .staff-progress { height: 8px; background: var(--surface-elev); border-radius: 4px; overflow: hidden; }
+  .staff-progress .fill { height: 100%; background: var(--primary); border-radius: 4px; }
 
-  /* Recent transaction cards (AppListItem) */
-  .tx-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 14px; margin-bottom: 10px; cursor: pointer; }
-  .tx-card:last-child { margin-bottom: 0; }
-  .tx-card .top { display: flex; align-items: flex-start; gap: 12px; }
-  .tx-card .av { width: 36px; height: 36px; border-radius: 50%; background: var(--surface-elev); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .tx-card .av svg { width: 18px; height: 18px; fill: var(--primary); }
-  .tx-card .nm { font-size: 14px; font-weight: 600; color: var(--text); }
-  .tx-card .sub { font-size: 12px; color: var(--text-3); margin-top: 2px; }
-  .tx-card .amt { font-size: 15px; font-weight: 800; color: var(--text); white-space: nowrap; }
-  .tx-card .chiprow { display: flex; gap: 8px; margin-top: 8px; }
-  .chip-outline { font-size: 10.5px; font-weight: 700; padding: 4px 10px; border-radius: 20px; border: 1px solid rgba(75,130,233,.3); color: var(--primary); }
+  /* Transaction list */
+  .txn-list { display: flex; flex-direction: column; gap: 10px; }
+  .txn-row { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 14px; display: grid; grid-template-columns: 40px 1fr auto; grid-template-areas: "avatar main trailing" ". chips chips"; gap: 10px; align-items: center; }
+  .txn-avatar { grid-area: avatar; width: 36px; height: 36px; border-radius: 50%; background: rgba(75,130,233,.16); display: flex; align-items: center; justify-content: center; }
+  .txn-avatar svg { width: 18px; height: 18px; fill: var(--primary); }
+  .txn-main { grid-area: main; min-width: 0; }
+  .txn-title { font-size: 14px; font-weight: 700; color: var(--text); }
+  .txn-sub { font-size: 11.5px; color: var(--text-3); margin-top: 2px; }
+  .txn-trailing { grid-area: trailing; text-align: right; }
+  .txn-price { font-size: 15px; font-weight: 800; color: var(--text); }
+  .txn-chips { grid-area: chips; display: flex; gap: 6px; flex-wrap: wrap; }
+
+  /* Bottom sheets */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: none; z-index: 99; }
+  .overlay.show { display: block; }
+  .bottom-sheet { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--border); border-radius: 24px 24px 0 0; padding: 20px; box-shadow: 0 -12px 40px rgba(0,0,0,.4); transform: translateY(110%); transition: transform .25s; z-index: 100; max-width: 400px; margin: 0 auto; }
+  .bottom-sheet.show { transform: translateY(0); }
+  .sheet-close { position: absolute; top: 12px; right: 16px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .sheet-close svg { width: 18px; height: 18px; fill: var(--text-3); }
+  .sheet-title { font-size: 17px; font-weight: 700; color: var(--text); margin-bottom: 18px; text-align: center; }
+  .sheet-item { display: flex; align-items: center; gap: 14px; padding: 14px; border-radius: 14px; cursor: pointer; }
+  .sheet-item:hover { background: var(--surface-elev); }
+  .sheet-item .icircle { width: 38px; height: 38px; }
+  .sheet-item .icircle svg { width: 19px; height: 19px; }
+  .sheet-item .grow { flex: 1; }
+  .sheet-item .name { font-size: 14px; font-weight: 600; color: var(--text); }
+  .sheet-item .sub { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+
+  /* Filter sheet */
+  .filter-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+  .filter-field label { font-size: 12px; font-weight: 700; color: var(--text-3); }
+  .filter-select { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-elev); color: var(--text); font-size: 13.5px; font-weight: 600; }
+  .filter-actions { display: flex; gap: 10px; margin-top: 10px; }
+  .filter-actions .btn { flex: 1; }
 </style>
 </head>
 <body>
@@ -106,203 +146,457 @@
 <svg width="0" height="0" style="position:absolute">
   <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M12 21l3.5-4.5c-.97-.74-2.18-1.16-3.5-1.16s-2.53.42-3.5 1.16L12 21zM12 3C7.31 3 3.07 4.69 0 7.55l1.93 2.43C4.48 7.9 8.01 6.4 12 6.4s7.52 1.5 10.07 3.58L24 7.55C20.93 4.69 16.69 3 12 3z"/></symbol>
   <symbol id="i-batt" viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></symbol>
-  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></symbol>
-  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></symbol>
   <symbol id="i-download" viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></symbol>
-  <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M19.5 3.5 18 2l-1.5 1.5L15 2l-1.5 1.5L12 2l-1.5 1.5L9 2 7.5 3.5 6 2 4.5 3.5 3 2v20l1.5-1.5L6 22l1.5-1.5L9 22l1.5-1.5L12 22l1.5-1.5L15 22l1.5-1.5L18 22l1.5-1.5L21 22V2l-1.5 1.5zM19 19.09H5V4.91h14v14.18z"/></symbol>
-  <symbol id="i-peso" viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.89 2.4 1.88H17c.05-1.98-1.52-3.31-3.9-3.49V4h-3v2.18C8.14 6.54 6.5 7.73 6.5 9.64c0 2.26 2.02 3.19 4.5 3.82 2.61.68 3 .98 3 1.79 0 .77-.7 1.49-2.55 1.49-1.69 0-2.73-.65-2.73-1.65H6c.05 2.03 1.66 3.41 4.05 3.56V21h3v-2.15c2.28-.24 3.77-1.48 3.77-3.1 0-2.36-2.05-3.35-4.02-3.92z"/></symbol>
-  <symbol id="i-trend" viewBox="0 0 24 24"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></symbol>
-  <symbol id="i-basket" viewBox="0 0 24 24"><path d="M17.21 9l-4.38-6.56c-.19-.28-.51-.42-.83-.42-.32 0-.64.14-.83.43L6.79 9H2c-.55 0-1 .45-1 1 0 .09.01.18.04.27l2.54 9.27c.23.84 1 1.46 1.92 1.46h13c.92 0 1.68-.62 1.91-1.46l2.54-9.27L23 10c0-.55-.45-1-1-1h-4.79zM9 9l3-4.4L15 9H9zm3 8c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></symbol>
   <symbol id="i-filter" viewBox="0 0 24 24"><path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/></symbol>
-  <symbol id="i-calendar" viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7v-5z"/></symbol>
-  <symbol id="i-left" viewBox="0 0 24 24"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></symbol>
-  <symbol id="i-right" viewBox="0 0 24 24"><path d="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></symbol>
+  <symbol id="i-wallet" viewBox="0 0 24 24"><path d="M18 4H6C4.89 4 4 4.89 4 6v12c0 1.1.89 2 2 2h12c1.1 0 2-.9 2-2V6c0-1.11-.9-2-2-2zm0 10H6V8h12v6zm-6-2H8v2h4v-2z"/></symbol>
+  <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M19.5 3.5 18 2l-1.5 1.5L15 2l-1.5 1.5L12 2l-1.5 1.5L9 2 7.5 3.5 6 2 4.5 3.5 3 2v20l1.5-1.5L6 22l1.5-1.5L9 22l1.5-1.5L12 22l1.5-1.5L15 22l1.5-1.5L18 22l1.5-1.5L21 22V2l-1.5 1.5zM19 19.09H5V4.91h14v14.18zM6 15h12v2H6zm0-4h12v2H6zm0-4h12v2H6z"/></symbol>
+  <symbol id="i-trend" viewBox="0 0 24 24"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="M20 2H4c-1 0-2 .9-2 2v3.01c0 .72.43 1.34 1 1.69V20c0 1.1 1.1 2 2 2h14c.9 0 2-.9 2-2V8.7c.57-.35 1-.97 1-1.69V4c0-1.1-1-2-2-2zm-5 12H9v-2h6v2zm5-7H4V4h16v3z"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM9 10H7v2h2v-2z"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M8.59 16.59 13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></symbol>
+  <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="M15.41 16.59 10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></symbol>
+  <symbol id="i-pdf" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></symbol>
+  <symbol id="i-table" viewBox="0 0 24 24"><path d="M5 3h14c1.1 0 2 .9 2 2v14c0 1.1-.9 2-2 2H5c-1.1 0-2-.9-2-2V5c0-1.1.9-2 2-2zm0 4v5h14V7H5zm0 7v5h14v-5H5z"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></symbol>
+  <symbol id="i-store" viewBox="0 0 24 24"><path d="M20 4H4v2h16V4zm1 10v-2l-1-6H4L3 12v2h1v6h5v-6h4v6h5v-6h1zm-3 4H5v-4h14v4z"/></symbol>
 </svg>
 
 <div class="page-head">
   <div>
     <h1>Reports — lib/ui/screens/sales_analytics_screen.dart</h1>
-    <p>Sales analytics hub: KPI grid, period selector, filters, trend chart, payment breakdown, top products, categories, staff performance, and recent transactions.</p>
+    <p>Sales analytics hub: KPIs, period selector, filters, trend, payment breakdown, top products, staff performance, and recent transactions. Role-aware export menu.</p>
   </div>
-  <button class="theme-toggle" onclick="toggleTheme()">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
-    <span id="themeLabel">Light mode</span>
-  </button>
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <div class="chips" id="roleSwitcher">
+      <button class="chip on" data-role="owner" onclick="setRole('owner')">Owner</button>
+      <button class="chip" data-role="staff" onclick="setRole('staff')">Staff</button>
+    </div>
+    <button class="theme-toggle" onclick="toggleTheme()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
+      <span id="themeLabel">Light mode</span>
+    </button>
+  </div>
+</div>
+
+<div class="frames-legend">
+  <span class="role-chip role-owner" id="roleChip">Owner</span>
+  <span id="roleFlowText">Owner export menu: PDF and Excel only.</span>
 </div>
 
 <div class="frames">
   <div class="frame-wrap">
-    <div class="frame-label">Reports — Sales Analytics</div>
+    <div class="frame-label" id="frameLabel">Reports — Owner</div>
     <div class="phone">
-      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="statusbar">
+        <span>9:41</span>
+        <span class="icons">
+          <svg><use href="#i-wifi"/></svg>
+          <svg><use href="#i-batt"/></svg>
+        </span>
+      </div>
       <div class="appbar">
+        <div class="back">
+          <svg><use href="#i-back"/></svg>
+        </div>
         <div class="title"><h2>Reports</h2></div>
-        <div class="act"><svg><use href="#i-moon"/></svg></div>
-        <div class="act"><svg><use href="#i-bell"/></svg></div>
-        <div class="avatar">OW</div>
+        <div class="act"><svg class="ic-moon"><use href="#i-moon"/></svg></div>
+        <div class="act" title="Notifications">
+          <div class="bell-wrap"><svg><use href="#i-bell"/></svg></div>
+        </div>
+        <div class="avatar" id="avatar">OW</div>
       </div>
       <div class="screen">
         <div class="screen-body">
 
+          <!-- KPIs -->
           <div class="kpi-grid">
-            <div class="kpi primary">
-              <div class="head"><div class="ic c-blue"><svg><use href="#i-peso"/></svg></div><div class="lbl">Total Sales</div></div>
-              <div class="num">₱12,450</div>
-              <div class="delta">▲ 12.5% vs previous period</div>
-            </div>
-            <div class="kpi">
-              <div class="head"><div class="ic c-purple"><svg><use href="#i-receipt"/></svg></div><div class="lbl">Transactions</div></div>
-              <div class="num">24</div>
-              <div class="delta">▲ 4.2% vs previous period</div>
-            </div>
-            <div class="kpi">
-              <div class="head"><div class="ic c-green"><svg><use href="#i-trend"/></svg></div><div class="lbl">Average Sale</div></div>
-              <div class="num">₱519</div>
-              <div class="delta">▼ 2.1% vs previous period</div>
-            </div>
-            <div class="kpi">
-              <div class="head"><div class="ic c-blue"><svg><use href="#i-basket"/></svg></div><div class="lbl">Items Sold</div></div>
-              <div class="num">86</div>
-              <div class="delta">▲ 8.0% vs previous period</div>
-            </div>
-          </div>
-
-          <div>
-            <div class="seg-row">
-              <div class="seg">
-                <div>Daily</div>
-                <div class="on">Weekly</div>
-                <div>Monthly</div>
+            <div class="kpi-card primary">
+              <div class="kpi-head">
+                <div class="icircle c-blue"><svg><use href="#i-wallet"/></svg></div>
+                <span class="kpi-label">Total Sales</span>
               </div>
-              <div class="cal-toggle"><svg><use href="#i-calendar"/></svg></div>
+              <div class="kpi-value">₱19,300.00</div>
+              <div class="kpi-sub up">▲ 8.5% vs previous period</div>
             </div>
-            <div class="date-nav" style="margin-top:8px;">
-              <div class="nav-arrow"><svg><use href="#i-left"/></svg></div>
-              <div class="nav-label">9/7/2026 – 9/13/2026</div>
-              <div class="nav-arrow"><svg><use href="#i-right"/></svg></div>
+            <div class="kpi-card">
+              <div class="kpi-head">
+                <div class="icircle c-purple"><svg><use href="#i-receipt"/></svg></div>
+                <span class="kpi-label">Transactions</span>
+              </div>
+              <div class="kpi-value">102</div>
+              <div class="kpi-sub up">▲ 5.2% vs previous period</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-head">
+                <div class="icircle c-green"><svg><use href="#i-trend"/></svg></div>
+                <span class="kpi-label">Average Sale</span>
+              </div>
+              <div class="kpi-value">₱189.22</div>
+              <div class="kpi-sub up">▲ 3.1% vs previous period</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-head">
+                <div class="icircle c-blue"><svg><use href="#i-box"/></svg></div>
+                <span class="kpi-label">Items Sold</span>
+              </div>
+              <div class="kpi-value">276</div>
+              <div class="kpi-sub up">▲ 4.8% vs previous period</div>
             </div>
           </div>
 
-          <div class="period-head">
+          <!-- Period selector -->
+          <div class="period-selector">
+            <div class="period-bar">
+              <div class="segmented">
+                <button class="segment" data-period="daily" onclick="setPeriod('daily')">Daily</button>
+                <button class="segment on" data-period="weekly" onclick="setPeriod('weekly')">Weekly</button>
+                <button class="segment" data-period="monthly" onclick="setPeriod('monthly')">Monthly</button>
+              </div>
+              <div class="cal-btn"><svg><use href="#i-calendar"/></svg></div>
+            </div>
+            <div class="date-nav">
+              <div class="nav"><svg><use href="#i-chevron-left"/></svg></div>
+              <div class="range">Sep 1 - Sep 7, 2026</div>
+              <div class="nav"><svg><use href="#i-chevron"/></svg></div>
+            </div>
+          </div>
+
+          <!-- Period header -->
+          <div class="period-header">
             <div>
-              <div class="p-title">9/7/2026 – 9/13/2026</div>
-              <div class="p-range">9/7/2026 - 9/13/2026</div>
+              <div class="period-title">This Week</div>
+              <div class="period-dates">9/1/2026 - 9/7/2026</div>
             </div>
+            <button class="set-store" onclick="location.href='settings/store_information_settings_page.html'">
+              <svg><use href="#i-store"/></svg>
+              Set store
+            </button>
           </div>
 
+          <!-- Actions bar -->
           <div class="actions-bar">
-            <div class="text-btn"><svg><use href="#i-filter"/></svg>Filters</div>
-            <button class="export-btn"><svg><use href="#i-download"/></svg>Export</button>
+            <button class="btn btn-outlined" onclick="openFilter()">
+              <svg><use href="#i-filter"/></svg>
+              Filters
+            </button>
+            <div class="spacer"></div>
+            <button class="btn btn-primary" onclick="openExport()">
+              <svg><use href="#i-download"/></svg>
+              Export
+            </button>
           </div>
 
+          <!-- Sales Trend -->
           <div>
-            <div class="sec-title" style="margin-bottom:10px;">Sales Trend</div>
-            <div class="trend">
-              <div class="bars">
-                <div class="b" style="height:35%"></div>
-                <div class="b" style="height:55%"></div>
-                <div class="b" style="height:30%"></div>
-                <div class="b" style="height:70%"></div>
-                <div class="b" style="height:50%"></div>
-                <div class="b top" style="height:90%"></div>
-                <div class="b" style="height:65%"></div>
+            <div class="section-heading">Sales Trend</div>
+            <div class="mini-bar-chart">
+              <div class="mini-bar-row" id="trendBars">
+                <div class="mini-bar"><div class="value">₱1.2k</div><div class="bar" style="height:18%"></div><div class="label">Mon</div></div>
+                <div class="mini-bar"><div class="value">₱2.1k</div><div class="bar" style="height:32%"></div><div class="label">Tue</div></div>
+                <div class="mini-bar"><div class="value">₱1.8k</div><div class="bar" style="height:28%"></div><div class="label">Wed</div></div>
+                <div class="mini-bar"><div class="value">₱2.5k</div><div class="bar" style="height:38%"></div><div class="label">Thu</div></div>
+                <div class="mini-bar"><div class="value">₱3.0k</div><div class="bar" style="height:46%"></div><div class="label">Fri</div></div>
+                <div class="mini-bar"><div class="value">₱2.2k</div><div class="bar" style="height:34%"></div><div class="label">Sat</div></div>
+                <div class="mini-bar highlight"><div class="value">₱6.5k</div><div class="bar" style="height:100%"></div><div class="label">Sun</div></div>
               </div>
-              <div class="vals"><div>₱420</div><div>₱680</div><div>₱350</div><div>₱840</div><div>₱610</div><div>₱1.1k</div><div>₱790</div></div>
-              <div class="labs"><div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div></div>
             </div>
             <div class="chart-legend">
-              <div class="li"><div class="dot" style="background:var(--primary)"></div>Sales</div>
-              <div class="li"><div class="dot" style="background:var(--info)"></div>Top</div>
+              <div class="legend-item"><span class="legend-dot" style="background:var(--primary)"></span>Sales</div>
+              <div class="legend-item"><span class="legend-dot" style="background:var(--info)"></span>Top</div>
             </div>
           </div>
 
+          <!-- Payment Methods -->
           <div>
-            <div class="sec-title" style="margin-bottom:10px;">Payment Methods</div>
+            <div class="section-heading">Payment Methods</div>
             <div class="donut-wrap">
-              <div class="donut"></div>
-              <div class="pay-legend">
-                <div class="li"><div class="dot" style="background:var(--primary)"></div><div class="nm">Cash</div><div class="ct">87</div><div class="amt">₱15,780.00</div></div>
-                <div class="li"><div class="dot" style="background:var(--success)"></div><div class="nm">GCash</div><div class="ct">55</div><div class="amt">₱9,670.00</div></div>
+              <div class="donut" style="background: conic-gradient(var(--primary) 0% 62%, var(--success) 62% 100%);">
+                <div class="donut-hole"><b>102</b><span>transactions</span></div>
+              </div>
+              <div class="donut-legend">
+                <div class="donut-legend-item">
+                  <span class="dot" style="background:var(--primary)"></span>
+                  <span class="label">Cash</span>
+                  <span class="count">62</span>
+                  <span class="value">₱11,973.00</span>
+                </div>
+                <div class="donut-legend-item">
+                  <span class="dot" style="background:var(--success)"></span>
+                  <span class="label">GCash</span>
+                  <span class="count">40</span>
+                  <span class="value">₱7,327.00</span>
+                </div>
               </div>
             </div>
           </div>
 
+          <!-- Top Products -->
           <div>
-            <div class="sec-title" style="margin-bottom:10px;">Top Products</div>
-            <div class="hbar-row"><div class="lb">Chicken Adobo</div><div class="track"><div class="fill first" style="width:100%"></div></div><div class="tv">68 sold</div></div>
-            <div class="hbar-row"><div class="lb">Pastil</div><div class="track"><div class="fill" style="width:80%"></div></div><div class="tv">120 sold</div></div>
-            <div class="hbar-row"><div class="lb">Iced Tea</div><div class="track"><div class="fill" style="width:44%"></div></div><div class="tv">95 sold</div></div>
-          </div>
-
-          <div>
-            <div class="sec-title" style="margin-bottom:10px;">Sales by Category</div>
-            <div class="hbar-row"><div class="lb">Meals</div><div class="track"><div class="fill first" style="width:100%"></div></div><div class="tv">210 items</div></div>
-            <div class="hbar-row"><div class="lb">Drinks</div><div class="track"><div class="fill" style="width:55%"></div></div><div class="tv">95 items</div></div>
-            <div class="hbar-row"><div class="lb">Snacks</div><div class="track"><div class="fill" style="width:30%"></div></div><div class="tv">81 items</div></div>
-          </div>
-
-          <div>
-            <div class="sec-title" style="margin-bottom:10px;">Staff Performance</div>
-            <div class="staff-card">
-              <div class="top">
-                <div class="av">J</div>
-                <div style="flex:1;min-width:0;">
-                  <div class="nm">Juan Dela Cruz</div>
-                  <div class="ct">14 sales</div>
-                </div>
-                <div class="amt"><div class="t">₱7,200.00</div><div class="a">Avg ₱514.29</div></div>
+            <div class="section-heading">Top Products</div>
+            <div class="hbar-list">
+              <div class="hbar-row">
+                <div class="hbar-label">Chicken Adobo Rice</div>
+                <div class="hbar-track"><div class="hbar-fill" style="width:78%"></div></div>
+                <div class="hbar-value">68 sold</div>
               </div>
-              <div class="bar"><div style="width:100%"></div></div>
-            </div>
-            <div class="staff-card">
-              <div class="top">
-                <div class="av">M</div>
-                <div style="flex:1;min-width:0;">
-                  <div class="nm">Maria Reyes</div>
-                  <div class="ct">10 sales</div>
-                </div>
-                <div class="amt"><div class="t">₱5,250.00</div><div class="a">Avg ₱525.00</div></div>
+              <div class="hbar-row">
+                <div class="hbar-label">Iced Tea</div>
+                <div class="hbar-track"><div class="hbar-fill" style="width:52%"></div></div>
+                <div class="hbar-value">80 sold</div>
               </div>
-              <div class="bar"><div style="width:73%"></div></div>
+              <div class="hbar-row">
+                <div class="hbar-label">Pastil</div>
+                <div class="hbar-track"><div class="hbar-fill" style="width:35%"></div></div>
+                <div class="hbar-value">120 sold</div>
+              </div>
             </div>
           </div>
 
+          <!-- Sales by Category -->
           <div>
-            <div class="sec-title">Recent Transactions</div>
-            <div class="sec-sub" style="margin:2px 0 10px;">Confirmed sales for the selected period</div>
-            <div class="tx-card">
-              <div class="top">
-                <div class="av"><svg><use href="#i-receipt"/></svg></div>
-                <div style="flex:1;min-width:0;">
-                  <div class="nm">20260910-0008</div>
-                  <div class="sub">9/10/2026 9:42 AM • Cashier: Maria Reyes</div>
-                </div>
-                <div class="amt">₱210.00</div>
+            <div class="section-heading">Sales by Category</div>
+            <div class="hbar-list">
+              <div class="hbar-row">
+                <div class="hbar-label">Meals</div>
+                <div class="hbar-track"><div class="hbar-fill" style="width:60%"></div></div>
+                <div class="hbar-value">160 items</div>
               </div>
-              <div class="chiprow"><span class="pill pill-green">Paid</span><span class="chip-outline">Cash</span></div>
+              <div class="hbar-row">
+                <div class="hbar-label">Drinks</div>
+                <div class="hbar-track"><div class="hbar-fill" style="width:30%"></div></div>
+                <div class="hbar-value">90 items</div>
+              </div>
+              <div class="hbar-row">
+                <div class="hbar-label">Snacks</div>
+                <div class="hbar-track"><div class="hbar-fill" style="width:10%"></div></div>
+                <div class="hbar-value">26 items</div>
+              </div>
             </div>
-            <div class="tx-card">
-              <div class="top">
-                <div class="av"><svg><use href="#i-receipt"/></svg></div>
-                <div style="flex:1;min-width:0;">
-                  <div class="nm">20260910-0007</div>
-                  <div class="sub">9/10/2026 9:35 AM • Cashier: Juan Dela Cruz</div>
+          </div>
+
+          <!-- Staff Performance -->
+          <div>
+            <div class="section-heading">Staff Performance</div>
+            <div class="staff-list">
+              <div class="staff-card">
+                <div class="staff-head">
+                  <div class="staff-avatar">M</div>
+                  <div class="staff-meta">
+                    <div class="staff-name">Maria Santos</div>
+                    <div class="staff-count">60 sales</div>
+                  </div>
+                  <div class="staff-amt">
+                    <div class="staff-total">₱11,580.00</div>
+                    <div class="staff-avg">Avg ₱193.00</div>
+                  </div>
                 </div>
-                <div class="amt">₱95.00</div>
+                <div class="staff-progress"><div class="fill" style="width:100%"></div></div>
               </div>
-              <div class="chiprow"><span class="pill pill-green">Paid</span><span class="chip-outline">GCash</span></div>
+              <div class="staff-card">
+                <div class="staff-head">
+                  <div class="staff-avatar">J</div>
+                  <div class="staff-meta">
+                    <div class="staff-name">Juan Cruz</div>
+                    <div class="staff-count">30 sales</div>
+                  </div>
+                  <div class="staff-amt">
+                    <div class="staff-total">₱5,790.00</div>
+                    <div class="staff-avg">Avg ₱193.00</div>
+                  </div>
+                </div>
+                <div class="staff-progress"><div class="fill" style="width:50%"></div></div>
+              </div>
+              <div class="staff-card">
+                <div class="staff-head">
+                  <div class="staff-avatar">A</div>
+                  <div class="staff-meta">
+                    <div class="staff-name">Ana Reyes</div>
+                    <div class="staff-count">12 sales</div>
+                  </div>
+                  <div class="staff-amt">
+                    <div class="staff-total">₱1,930.00</div>
+                    <div class="staff-avg">Avg ₱160.83</div>
+                  </div>
+                </div>
+                <div class="staff-progress"><div class="fill" style="width:17%"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Transactions -->
+          <div>
+            <div class="section-heading">Recent Transactions</div>
+            <div class="section-sub">Confirmed sales for the selected period</div>
+            <div class="txn-list">
+              <div class="txn-row">
+                <div class="txn-avatar"><svg><use href="#i-receipt"/></svg></div>
+                <div class="txn-main">
+                  <div class="txn-title">20260907-0103</div>
+                  <div class="txn-sub">9/7/2026 9:45 AM · Cashier: Maria Santos</div>
+                </div>
+                <div class="txn-trailing">
+                  <div class="txn-price">₱120.00</div>
+                </div>
+                <div class="txn-chips">
+                  <span class="pill pill-solid-green">Paid</span>
+                  <span class="pill pill-outline">Cash</span>
+                </div>
+              </div>
+              <div class="txn-row">
+                <div class="txn-avatar"><svg><use href="#i-receipt"/></svg></div>
+                <div class="txn-main">
+                  <div class="txn-title">20260907-0102</div>
+                  <div class="txn-sub">9/7/2026 9:30 AM · Cashier: Maria Santos</div>
+                </div>
+                <div class="txn-trailing">
+                  <div class="txn-price">₱450.00</div>
+                </div>
+                <div class="txn-chips">
+                  <span class="pill pill-solid-green">Paid</span>
+                  <span class="pill pill-outline">GCash</span>
+                </div>
+              </div>
+              <div class="txn-row">
+                <div class="txn-avatar"><svg><use href="#i-receipt"/></svg></div>
+                <div class="txn-main">
+                  <div class="txn-title">20260906-0089</div>
+                  <div class="txn-sub">9/6/2026 9:12 AM · Cashier: Juan Cruz</div>
+                </div>
+                <div class="txn-trailing">
+                  <div class="txn-price">₱80.00</div>
+                </div>
+                <div class="txn-chips">
+                  <span class="pill pill-amber">Pending</span>
+                  <span class="pill pill-outline">Cash</span>
+                </div>
+              </div>
             </div>
           </div>
 
         </div>
       </div>
     </div>
-    <div class="frame-notes">
-      <b>Mirrors sales_analytics_screen.dart:</b> AppHeader "Reports" (no toolbar actions — refresh is pull-to-refresh, export lives in the filter row). KpiGrid 2×2 with a primary Total Sales card, SalesPeriodSelector (Daily/Weekly/Monthly segmented + calendar toggle + ‹ date › navigator), Filters/Export action row, then sections: Sales Trend (MiniBarChart + Sales/Top legend), Payment Methods (donut + legend), Top Products and Sales by Category (horizontal bars), Staff Performance, and Recent Transactions (status + method chips). Staff also see a "Submit to Owner" option in the export sheet.
+    <div class="frame-notes" id="frameNotes">
+      Owner view: full analytics, export as PDF or Excel, and the option to open store settings.
     </div>
   </div>
 </div>
 
+<div class="overlay" id="overlay" onclick="closeSheets()"></div>
+
+<div class="bottom-sheet" id="filterSheet">
+  <div class="sheet-close" onclick="closeSheets()"><svg><use href="#i-close"/></svg></div>
+  <div class="sheet-title">Filters</div>
+  <div class="filter-field">
+    <label>Payment method</label>
+    <select class="filter-select">
+      <option>All methods</option>
+      <option>Cash</option>
+      <option>GCash</option>
+    </select>
+  </div>
+  <div class="filter-field">
+    <label>Payment status</label>
+    <select class="filter-select">
+      <option>All active</option>
+      <option>Pending</option>
+      <option>Confirmed</option>
+      <option>Failed</option>
+      <option>Cancelled</option>
+      <option>Refunded</option>
+    </select>
+  </div>
+  <div class="filter-actions">
+    <button class="btn btn-outlined" onclick="showToast('Filters cleared', 'info'); closeSheets()">Clear</button>
+    <button class="btn btn-primary" onclick="showToast('Filters applied', 'success'); closeSheets()">Apply</button>
+  </div>
+</div>
+
+<div class="bottom-sheet" id="exportSheet">
+  <div class="sheet-close" onclick="closeSheets()"><svg><use href="#i-close"/></svg></div>
+  <div class="sheet-title" id="sheetTitle">Export Report</div>
+  <div class="sheet-item" onclick="showToast('PDF exported', 'success'); closeSheets()">
+    <div class="icircle c-red"><svg><use href="#i-pdf"/></svg></div>
+    <div class="grow">
+      <div class="name">PDF</div>
+      <div class="sub">Print-friendly sales summary</div>
+    </div>
+    <svg style="width:18px;height:18px;fill:var(--text-3)"><use href="#i-chevron"/></svg>
+  </div>
+  <div class="sheet-item" onclick="showToast('Excel exported', 'success'); closeSheets()">
+    <div class="icircle c-green"><svg><use href="#i-table"/></svg></div>
+    <div class="grow">
+      <div class="name">Excel</div>
+      <div class="sub">Spreadsheet with summary and transactions</div>
+    </div>
+    <svg style="width:18px;height:18px;fill:var(--text-3)"><use href="#i-chevron"/></svg>
+  </div>
+  <div class="sheet-item" id="submitRow" style="display:none" onclick="showToast('Report submitted to Owner', 'success'); closeSheets()">
+    <div class="icircle c-blue"><svg><use href="#i-send"/></svg></div>
+    <div class="grow">
+      <div class="name">Submit to Owner</div>
+      <div class="sub">Staff workflow: generate PDF and send</div>
+    </div>
+    <svg style="width:18px;height:18px;fill:var(--text-3)"><use href="#i-chevron"/></svg>
+  </div>
+</div>
+
 <script src="mockup.js"></script>
+<script>
+const state = { role: 'owner' };
+
+function setRole(role) {
+  state.role = role;
+  document.getElementById('roleChip').textContent = role === 'owner' ? 'Owner' : 'Staff';
+  document.getElementById('roleChip').className = 'role-chip ' + (role === 'owner' ? 'role-owner' : 'role-staff');
+  document.getElementById('roleFlowText').textContent = role === 'owner'
+    ? 'Owner export menu: PDF and Excel only.'
+    : 'Staff export menu: PDF, Excel, and Submit to Owner.';
+  document.getElementById('frameLabel').textContent = 'Reports — ' + (role === 'owner' ? 'Owner' : 'Staff');
+  document.getElementById('avatar').textContent = role === 'owner' ? 'OW' : 'ST';
+  document.getElementById('sheetTitle').textContent = role === 'owner' ? 'Export Report' : 'Report';
+  document.getElementById('submitRow').style.display = role === 'owner' ? 'none' : 'flex';
+  document.getElementById('frameNotes').textContent = role === 'owner'
+    ? 'Owner view: full analytics, export as PDF or Excel, and the option to open store settings.'
+    : 'Staff view: full analytics, export as PDF or Excel, and submit to Owner from the same menu.';
+
+  document.querySelectorAll('#roleSwitcher .chip').forEach(c => c.classList.toggle('on', c.dataset.role === role));
+}
+
+function setPeriod(period) {
+  document.querySelectorAll('.segmented .segment').forEach(s => s.classList.toggle('on', s.dataset.period === period));
+  const labels = period === 'daily'
+    ? ['9/1', '9/2', '9/3', '9/4', '9/5', '9/6', '9/7']
+    : period === 'weekly'
+    ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    : ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
+  const bars = document.querySelectorAll('#trendBars .mini-bar');
+  bars.forEach((bar, i) => {
+    if (labels[i]) {
+      bar.querySelector('.label').textContent = labels[i];
+    }
+  });
+}
+
+function openFilter() {
+  document.getElementById('overlay').classList.add('show');
+  document.getElementById('filterSheet').classList.add('show');
+}
+
+function openExport() {
+  closeSheets();
+  document.getElementById('overlay').classList.add('show');
+  document.getElementById('exportSheet').classList.add('show');
+}
+
+function closeSheets() {
+  document.getElementById('overlay').classList.remove('show');
+  document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('show'));
+}
+</script>
 </body>
 </html>

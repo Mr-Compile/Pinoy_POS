@@ -8,6 +8,15 @@
 <style>
   .frames-legend { max-width: 900px; margin: 0 auto 24px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; color: var(--text-2); font-size: 13px; }
   .role-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; border: 1px solid var(--border); background: rgba(139,92,246,.16); color: var(--purple); border-color: rgba(139,92,246,.4); }
+  .dialog-overlay { position: absolute; inset: 0; top: 30px; background: rgba(0,0,0,.55); z-index: 50; display: none; align-items: center; justify-content: center; padding: 16px; }
+  .dialog-overlay.open { display: flex; }
+  .dialog { background: var(--surface); border: 1px solid var(--border); border-radius: 22px; width: 100%; max-width: 300px; box-shadow: 0 24px 64px rgba(0,0,0,.45); display: flex; flex-direction: column; }
+  .dialog-header { padding: 20px 20px 12px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .dialog-header h3 { font-size: 18px; font-weight: 800; color: var(--text); }
+  .dialog-header p { font-size: 13px; color: var(--text-3); line-height: 1.4; }
+  .dialog-body { padding: 0 20px; }
+  .dialog-actions { padding: 16px 20px 20px; display: flex; gap: 10px; }
+  .dialog-actions .btn { flex: 1; }
 </style>
 </head>
 <body>
@@ -58,37 +67,96 @@
           </div>
 
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button class="btn btn-primary" style="flex:1;" onclick="showToast('Default quota updated', 'success')">Change Default Quota</button>
-            <button class="btn btn-warn" style="flex:1;" onclick="showToast('All usage reset', 'info')">Reset All Usage</button>
+            <button class="btn btn-primary" style="flex:1;" onclick="openQuotaDialog('default')">Change Default Quota</button>
+            <button class="btn btn-warn" style="flex:1;" onclick="confirmResetAll()">Reset All Usage</button>
           </div>
 
           <div class="section-title">Per-user quotas</div>
           <div class="card" style="display:flex;align-items:center;gap:12px;padding:14px;">
             <div class="icircle solid-blue">J</div>
             <div class="grow"><div class="name">Juan Dela Cruz</div><div class="sub">Owner · 80 / 100 remaining</div></div>
-            <div class="aicon"><svg><use href="#i-edit"/></svg></div>
-            <div class="aicon"><svg><use href="#i-restart"/></svg></div>
+            <div class="aicon" onclick="openQuotaDialog('Juan Dela Cruz')"><svg><use href="#i-edit"/></svg></div>
+            <div class="aicon" onclick="confirmResetUser('Juan Dela Cruz')"><svg><use href="#i-restart"/></svg></div>
           </div>
           <div class="card" style="display:flex;align-items:center;gap:12px;padding:14px;margin-top:10px;">
             <div class="icircle solid-purple">A</div>
             <div class="grow"><div class="name">Ana Santos</div><div class="sub">Admin · 45 / 100 remaining</div></div>
-            <div class="aicon"><svg><use href="#i-edit"/></svg></div>
-            <div class="aicon"><svg><use href="#i-restart"/></svg></div>
+            <div class="aicon" onclick="openQuotaDialog('Ana Santos')"><svg><use href="#i-edit"/></svg></div>
+            <div class="aicon" onclick="confirmResetUser('Ana Santos')"><svg><use href="#i-restart"/></svg></div>
           </div>
           <div class="card" style="display:flex;align-items:center;gap:12px;padding:14px;margin-top:10px;">
             <div class="icircle solid-green">M</div>
             <div class="grow"><div class="name">Miguel Cruz</div><div class="sub">Staff · 92 / 100 remaining</div></div>
-            <div class="aicon"><svg><use href="#i-edit"/></svg></div>
-            <div class="aicon"><svg><use href="#i-restart"/></svg></div>
+            <div class="aicon" onclick="openQuotaDialog('Miguel Cruz')"><svg><use href="#i-edit"/></svg></div>
+            <div class="aicon" onclick="confirmResetUser('Miguel Cruz')"><svg><use href="#i-restart"/></svg></div>
           </div>
         </div>
       </div>
-      <button class="fab" style="position:absolute;bottom:16px;right:16px;" onclick="showToast('All usage reset', 'info')"><svg><use href="#i-restart"/></svg> Reset All Usage</button>
+
+      <!-- Quota edit dialog -->
+      <div class="dialog-overlay" id="quotaDialog" onclick="if(event.target===this)closeQuotaDialog()">
+        <div class="dialog" onclick="event.stopPropagation()">
+          <div class="dialog-header">
+            <div class="icircle c-purple"><svg width="20" height="20"><use href="#i-psych"/></svg></div>
+            <h3 id="quotaDialogTitle">Change Default Quota</h3>
+            <p id="quotaDialogHint">Daily AI query limit applied to all users without an override.</p>
+          </div>
+          <div class="dialog-body">
+            <div class="field" style="margin-top:0">
+              <label>Daily quota</label>
+              <input class="input" type="number" id="quotaValue" value="10" min="0">
+            </div>
+          </div>
+          <div class="dialog-actions">
+            <button class="btn btn-outlined" onclick="closeQuotaDialog()">Cancel</button>
+            <button class="btn btn-primary" onclick="saveQuota()">Save</button>
+          </div>
+        </div>
+      </div>
+
+      <button class="fab" style="position:absolute;bottom:16px;right:16px;" onclick="confirmResetAll()"><svg><use href="#i-restart"/></svg> Reset All Usage</button>
     </div>
     <div class="frame-notes">Top stat cards, Change Default Quota button, per-user list with edit and reset actions. FAB mirrors the Reset All Usage action on portrait mobile.</div>
   </div>
 </div>
 
 <script src="mockup.js"></script>
+<script>
+let quotaTarget = 'default';
+
+function openQuotaDialog(target) {
+  quotaTarget = target;
+  const isDefault = target === 'default';
+  document.getElementById('quotaDialogTitle').textContent = isDefault ? 'Change Default Quota' : 'Edit Quota — ' + target;
+  document.getElementById('quotaDialogHint').textContent = isDefault
+    ? 'Daily AI query limit applied to all users without an override.'
+    : 'Daily AI query limit for ' + target + ' only.';
+  document.getElementById('quotaDialog').classList.add('open');
+}
+function closeQuotaDialog() {
+  document.getElementById('quotaDialog').classList.remove('open');
+}
+function saveQuota() {
+  closeQuotaDialog();
+  showToast(quotaTarget === 'default' ? 'Default quota updated' : 'Quota updated for ' + quotaTarget, 'success');
+}
+function confirmResetAll() {
+  openDialog({
+    title: 'Reset all usage?',
+    message: "Today's AI usage counter resets to zero for every user. Quotas are unchanged.",
+    confirmLabel: 'Reset All',
+    destructive: true,
+    onConfirm: () => showToast('All usage reset', 'success')
+  });
+}
+function confirmResetUser(name) {
+  openDialog({
+    title: 'Reset usage?',
+    message: `Reset today's AI usage for ${name}?`,
+    confirmLabel: 'Reset',
+    onConfirm: () => showToast('Usage reset for ' + name, 'success')
+  });
+}
+</script>
 </body>
 </html>

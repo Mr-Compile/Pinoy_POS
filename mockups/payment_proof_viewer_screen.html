@@ -30,8 +30,11 @@
     <h1>Payment Proof Viewer — lib/ui/screens/payment_proof_viewer_screen.dart</h1>
     <p>GCash payment evidence with zoom/pan, download, and replace by owner/verifier.</p>
   </div>
-  <div style="display:flex;gap:8px;">
-    <span class="role-chip role-owner">Owner</span>
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <div class="chips" id="roleSwitcher">
+      <button class="chip on" data-role="owner" onclick="setRole('owner')">Owner</button>
+      <button class="chip" data-role="staff" onclick="setRole('staff')">Staff</button>
+    </div>
   </div>
   <button class="theme-toggle" onclick="toggleTheme()">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
@@ -39,15 +42,20 @@
   </button>
 </div>
 
+<div class="frames-legend">
+  <span class="role-chip role-owner" id="roleChip">Owner</span>
+  <span id="legendText">view_payment_evidence lets both roles open the viewer; replace requires verify_payments (Owner only).</span>
+</div>
+
 <div class="frames">
   <div class="frame-wrap">
-    <div class="frame-label">Payment Proof</div>
+    <div class="frame-label" id="frameLabel">Payment Proof — Owner</div>
     <div class="phone">
       <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
       <div class="appbar">
         <div class="back"><svg><use href="#i-back"/></svg></div>
         <div class="title"><h2>Payment Proof</h2></div>
-        <div class="act" onclick="showToast('Replace proof', 'info')" title="Replace proof"><svg><use href="#i-camera"/></svg></div>
+        <div class="act" id="replaceAct" onclick="showToast('Replace proof', 'info')" title="Replace proof"><svg><use href="#i-camera"/></svg></div>
       </div>
       <div class="screen">
         <div class="screen-body" style="padding:0;gap:0;">
@@ -64,10 +72,27 @@
         </div>
       </div>
     </div>
-    <div class="frame-notes">Zoom/pan image viewer, file metadata, download, and camera replace. Gated by view_payment_evidence; replace requires verify_payments.</div>
+    <div class="frame-notes" id="frameNotes">Zoom/pan image viewer, file metadata, download, and camera replace. Gated by view_payment_evidence; replace requires verify_payments (Owner only — Admin and own-sale Staff can no longer replace).</div>
   </div>
 </div>
 
 <script src="mockup.js"></script>
+<script>
+function setRole(role) {
+  const chip = document.getElementById('roleChip');
+  chip.textContent = role === 'owner' ? 'Owner' : 'Staff';
+  chip.className = 'role-chip ' + (role === 'owner' ? 'role-owner' : 'role-staff');
+  document.getElementById('frameLabel').textContent = 'Payment Proof — ' + (role === 'owner' ? 'Owner' : 'Staff');
+  document.getElementById('legendText').textContent = role === 'owner'
+    ? 'view_payment_evidence lets both roles open the viewer; replace requires verify_payments (Owner only).'
+    : 'Staff with view_payment_evidence can view and download, but the camera replace action is hidden.';
+  document.getElementById('frameNotes').textContent = role === 'owner'
+    ? 'Zoom/pan image viewer, file metadata, download, and camera replace. Gated by view_payment_evidence; replace requires verify_payments (Owner only — Admin and own-sale Staff can no longer replace).'
+    : 'Same viewer for Staff: image, metadata, and Download Image. The app bar replace action is hidden without verify_payments.';
+  document.getElementById('replaceAct').style.display = role === 'owner' ? 'flex' : 'none';
+  document.querySelectorAll('#roleSwitcher .chip').forEach(c => c.classList.toggle('on', c.dataset.role === role));
+}
+setRole('owner');
+</script>
 </body>
 </html>

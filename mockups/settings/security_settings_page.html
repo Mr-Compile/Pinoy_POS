@@ -13,7 +13,7 @@
   .tile + .tile { border-top: 1px solid var(--divider); }
   .tile .grow { flex: 1; }
 
-  /* In-phone dialog overlay (same pattern as dialogs_settings.html) */
+  /* In-phone dialog overlay */
   .phone-overlay {
     position: absolute;
     inset: 0;
@@ -60,6 +60,15 @@
   .phone-dialog .actions { display: flex; gap: 10px; margin-top: 16px; }
   .phone-dialog .actions .btn { flex: 1; }
   .fake-screen { opacity: .35; filter: blur(1px); }
+
+  /* Session-expiring countdown ring */
+  .countdown-ring { width: 100px; height: 100px; margin: 0 auto 18px; position: relative; }
+  .countdown-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .countdown-ring .track { fill: none; stroke: var(--border); stroke-width: 6; }
+  .countdown-ring .progress { fill: none; stroke: var(--warning); stroke-width: 6; stroke-linecap: round; stroke-dasharray: 283; stroke-dashoffset: 70; }
+  .countdown-ring .time { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; color: var(--text); }
+  .countdown-ring .time .num { font-size: 32px; font-weight: 700; }
+  .countdown-ring .time .unit { font-size: 11px; color: var(--text-3); }
 </style>
 </head>
 <body>
@@ -232,6 +241,54 @@
       </div>
     </div>
     <div class="frame-notes">Dropdown replaces the old free-text seconds field. Choices: 15 seconds, 30 seconds (default), 1 minute, 2 minutes — filtered to stay shorter than the current inactivity timeout.</div>
+  </div>
+
+  <!-- Session Expiring Dialog -->
+  <div class="frame-wrap">
+    <div class="frame-label">Session Expiring</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="appbar">
+        <div class="title"><h2>Dashboard</h2></div>
+      </div>
+      <div class="screen fake-screen">
+        <div class="screen-body">
+          <div class="card pad" style="display:flex;gap:14px;flex-wrap:wrap;">
+            <div class="card pad" style="flex:1;min-width:120px;background:var(--surface-elev);">
+              <div class="sub">Total Sales</div>
+              <div class="name" style="font-size:19px;margin-top:6px;">₱ 12,450.00</div>
+            </div>
+            <div class="card pad" style="flex:1;min-width:120px;background:var(--surface-elev);">
+              <div class="sub">Transactions</div>
+              <div class="name" style="font-size:19px;margin-top:6px;">86</div>
+            </div>
+          </div>
+          <div class="card pad" style="height:140px;background:var(--surface-elev);"></div>
+        </div>
+      </div>
+      <div class="phone-overlay">
+        <div class="phone-dialog">
+          <div class="dialog-icon solid-amber"><svg><use href="#i-timer"/></svg></div>
+          <h3>Session Expiring</h3>
+          <p style="text-align:center;">Are you still there?</p>
+          <div class="countdown-ring">
+            <svg viewBox="0 0 100 100">
+              <circle class="track" cx="50" cy="50" r="45"/>
+              <circle class="progress" cx="50" cy="50" r="45"/>
+            </svg>
+            <div class="time">
+              <div class="num">47</div>
+              <div class="unit">seconds</div>
+            </div>
+          </div>
+          <div class="actions">
+            <button class="btn btn-error" onclick="showToast('Logged out', 'error')">Log Out</button>
+            <button class="btn btn-primary" style="background:var(--success);border-color:var(--success);" onclick="showToast('Session extended', 'success')">Continue Session</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes">Mirrors <code>session_expiring_dialog.dart</code>: shown to all roles when the inactivity timer reaches the configured "Session warning" lead time. Countdown ring counts down; Log Out ends the session, Continue Session resets the timer.</div>
   </div>
 </div>
 

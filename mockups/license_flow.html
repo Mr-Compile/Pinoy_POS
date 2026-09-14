@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinoy POS — License Lock Flow (interactive)</title>
+<link rel="stylesheet" href="mockup.css">
+<style>
+  .layout { display: flex; gap: 32px; justify-content: center; align-items: flex-start; flex-wrap: wrap; }
+  .console { width: 380px; display: flex; flex-direction: column; gap: 14px; }
+  .console .card { padding: 14px; }
+  .console h3 { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 10px; }
+  .scn { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .scn button { padding: 9px 8px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-elev); color: var(--text-2); font-size: 12px; font-weight: 600; cursor: pointer; }
+  .scn button:hover { border-color: var(--primary); color: var(--text); }
+  .scn button.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .clockrow { display: flex; gap: 8px; }
+  .clockrow button { flex: 1; padding: 9px 4px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-elev); color: var(--text-2); font-size: 12px; font-weight: 600; cursor: pointer; }
+  .clockrow button:hover { border-color: var(--primary); color: var(--text); }
+  .clockrow button.rb { border-color: rgba(220,38,38,.5); color: var(--error); }
+  .insp { font-size: 12px; line-height: 1.9; color: var(--text-2); font-family: Consolas, monospace; }
+  .insp b { color: var(--text); }
+  .insp .st { font-weight: 800; }
+  .log { max-height: 170px; overflow-y: auto; font-size: 11.5px; line-height: 1.7; color: var(--text-3); font-family: Consolas, monospace; }
+  .log div { border-bottom: 1px dashed var(--divider); padding: 3px 0; }
+  .log .warn { color: var(--warning); }
+  .log .err { color: var(--error); }
+  .log .ok { color: var(--success); }
+
+  /* ── in-phone pieces ── */
+  .lic-banner { background: #FEF3C7; color: #78350F; padding: 9px 12px; display: flex; align-items: center; gap: 9px; font-size: 11.5px; font-weight: 600; flex-shrink: 0; }
+  :root[data-theme="dark"] .lic-banner { background: #3A2A0A; color: #FDE68A; }
+  .lic-banner svg { width: 16px; height: 16px; fill: var(--warning); flex-shrink: 0; }
+  .lic-banner button { background: none; border: none; color: var(--warning); font-weight: 800; font-size: 11.5px; cursor: pointer; white-space: nowrap; padding: 4px 6px; }
+  .lic-banner span { flex: 1; line-height: 1.4; }
+
+  .login-card { background: var(--surface); border-radius: var(--radius-card); padding: 26px 24px; box-shadow: 0 10px 28px rgba(0,0,0,.10); width: 100%; max-width: 330px; }
+  .login-logo { width: 82px; height: 82px; border-radius: 22px; background: var(--surface-elev); display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; cursor: pointer; user-select: none; box-shadow: 0 8px 24px rgba(37,99,199,.16); }
+  .login-logo svg { width: 52px; height: 52px; fill: var(--primary); }
+  .code-link { background: none; border: none; color: var(--text-3); font-size: 12.5px; font-weight: 600; cursor: pointer; margin-top: 10px; width: 100%; padding: 6px; }
+  .code-link:hover { color: var(--primary); }
+  .tap-hint { font-size: 10px; color: var(--text-3); text-align: center; margin-top: 6px; min-height: 13px; }
+
+  .lock-ic { width: 84px; height: 84px; border-radius: 50%; background: rgba(220,38,38,.12); display: flex; align-items: center; justify-content: center; margin: 0 auto; }
+  .lock-ic svg { width: 42px; height: 42px; fill: var(--error); }
+  .lock-title { font-size: 20px; font-weight: 800; color: var(--text); text-align: center; }
+  .lock-msg { font-size: 13px; color: var(--text-3); text-align: center; line-height: 1.55; }
+  .contact-card { display: flex; gap: 10px; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; width: 100%; text-align: left; }
+  .contact-card svg { width: 18px; height: 18px; fill: var(--primary); flex-shrink: 0; }
+  .contact-card .lbl { font-size: 11px; color: var(--text-3); }
+  .contact-card .val { font-size: 13px; font-weight: 700; color: var(--text); }
+
+  /* in-app dialogs (inside the phone frame) */
+  .ph-overlay { position: absolute; inset: 0; background: rgba(4,10,24,.55); display: flex; align-items: center; justify-content: center; padding: 24px; z-index: 20; }
+  .ph-dialog { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 18px; width: 100%; max-width: 300px; max-height: 90%; overflow-y: auto; }
+  .ph-dialog h3 { font-size: 16px; font-weight: 800; color: var(--text); text-align: center; }
+  .ph-dialog .dsub { font-size: 12px; color: var(--text-3); text-align: center; margin: 6px 0 14px; line-height: 1.5; }
+  .ph-dialog .field label { font-size: 11.5px; }
+  .ph-dialog .derr { color: var(--error); font-size: 11.5px; font-weight: 700; text-align: center; margin-top: 8px; min-height: 14px; }
+  .ph-dialog .actions { display: flex; gap: 8px; margin-top: 14px; }
+  .ph-dialog .actions .btn { margin-top: 0; padding: 11px; font-size: 12.5px; }
+
+  /* dev panel */
+  .dev-body { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+  .dev-body::-webkit-scrollbar { width: 4px; }
+  .dev-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  details.codegroup { border-top: 1px solid var(--divider); }
+  details.codegroup summary { list-style: none; display: flex; align-items: center; gap: 10px; padding: 11px 4px; cursor: pointer; }
+  details.codegroup summary::-webkit-details-marker { display: none; }
+  details.codegroup summary .grow { flex: 1; }
+  details.codegroup summary .arr { transition: transform .15s; color: var(--text-3); font-size: 12px; }
+  details.codegroup[open] summary .arr { transform: rotate(90deg); }
+  .codeitem { display: flex; align-items: center; justify-content: space-between; padding: 6px 4px 6px 26px; font-family: Consolas, monospace; font-size: 13px; font-weight: 700; letter-spacing: 2px; color: var(--text); }
+  .codeitem button { background: none; border: none; color: var(--text-3); font-size: 11px; cursor: pointer; font-family: inherit; font-weight: 600; letter-spacing: 0; }
+  .codeitem button:hover { color: var(--primary); }
+  .stat-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 12px; }
+  .stat-row .k { color: var(--text-3); }
+  .stat-row .v { font-weight: 700; color: var(--text); }
+  .danger { color: var(--error) !important; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="M20 2H4c-1 0-2 .9-2 2v3.01c0 .72.43 1.34 1 1.69V20c0 1.1 1.1 2 2 2h14c.9 0 2-.9 2-2V8.7c.57-.35 1-.97 1-1.69V4c0-1.1-1-2-2-2zm-5 12H9v-2h6v2zm5-7H4V4h16v3z"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></symbol>
+  <symbol id="i-shield-bad" viewBox="0 0 24 24"><path d="M12 1 3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1 6h2v6h-2V7zm0 8h2v2h-2v-2z"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm4.2 14.2L11 13V7h1.5v5.2l4.5 2.7-.8 1.3z"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84a.484.484 0 0 0-.48.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.488.488 0 0 0-.59.22L2.74 8.87c-.12.22 0 .49.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.39.3.61.22l2.39-.96c.5-.38 1.03-.7 1.62-.94l.36-2.54c.24-.05.48-.17.5-.41l.36-2.54c.59-.24 1.13-.58 1.62-.94l2.39.96c.22.08.49 0 .61-.22l1.92-3.32c.12-.22.07-.49-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6 3.6 1.62 3.6 3.6 3.6-1.62 3.6-3.6z"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M12 21l3.5-4.5c-.97-.74-2.18-1.16-3.5-1.16s-2.53.42-3.5 1.16L12 21zM12 3C7.31 3 3.07 4.69 0 7.55l1.93 2.43C4.48 7.9 8.01 6.4 12 6.4s7.52 1.5 10.07 3.58L24 7.55C20.93 4.69 16.69 3 12 3z"/></symbol>
+  <symbol id="i-batt" viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></symbol>
+  <symbol id="i-person" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></symbol>
+  <symbol id="i-cart" viewBox="0 0 24 24"><path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.13.12-.27.12-.42 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></symbol>
+</svg>
+
+<div class="page-head">
+  <div>
+    <h1>License Lock — interactive flow</h1>
+    <p>Live simulation of the developer license lock. Pick a scenario on the right, then click through the phone. Demo dev password: <b>dev123</b></p>
+  </div>
+  <button class="theme-toggle" onclick="toggleTheme()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
+    <span id="themeLabel">Light mode</span>
+  </button>
+</div>
+
+<div class="layout">
+  <div class="frame-wrap">
+    <div class="frame-label" id="frameLabel">Splash</div>
+    <div class="phone">
+      <div class="statusbar"><span id="simClock">—</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="screen" id="device"></div>
+      <div id="phOverlay"></div>
+    </div>
+    <div class="frame-notes">
+      Try these inside the phone:<br>
+      • <b>Tap the logo 7× fast</b> on login → developer gate<br>
+      • <b>"Have an unlock code?"</b> on login (armed only)<br>
+      • <b>Sign In</b> → in-app shell; banner shows ≤30 days<br>
+      • Locked → code field + "Developer access"<br>
+      • In-app gear → Settings has an <b>Unlock Code</b> tile
+    </div>
+  </div>
+
+  <div class="console">
+    <div class="card">
+      <h3>Scenarios</h3>
+      <div class="scn" id="scnBtns">
+        <button data-scn="fresh">Fresh install</button>
+        <button data-scn="active">Active — 60d left</button>
+        <button data-scn="warn">Warning — 10d left</button>
+        <button data-scn="expired">Expired — locked</button>
+        <button data-scn="tampered">Tampered blob</button>
+        <button data-scn="disarmed">Disarmed</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Simulated clock</h3>
+      <div class="clockrow">
+        <button onclick="advance(1)">+1 day</button>
+        <button onclick="advance(7)">+7 days</button>
+        <button onclick="advance(30)">+30 days</button>
+        <button class="rb" onclick="rollback()">⟲ −30d (rollback)</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>License state (evaluate())</h3>
+      <div class="insp" id="inspector">—</div>
+    </div>
+    <div class="card">
+      <h3>Event log</h3>
+      <div class="log" id="evlog"></div>
+    </div>
+  </div>
+</div>
+
+<script src="mockup.js"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════════
+   Simulated LicenseService — mirrors lib/services/license_service.dart.
+   Codes are generated by a deterministic demo hash (real app uses HMAC).
+   ══════════════════════════════════════════════════════════════════ */
+const DAY = 86400000, WARN_DAYS = 30;
+const GRANTS = { 90: 20, 365: 5 };           // days → code count
+const B32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+
+function h32(s, seed) {
+  let h = (0x811c9dc5 ^ seed) >>> 0;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193) >>> 0;
+  return h;
+}
+function unlockCode(days, i) {               // demo twin of LicenseService.unlockCode
+  const s = 'PINOY-POS:EXTEND:' + days + ':' + i;
+  const val = (BigInt(h32(s, 0)) << 8n) | BigInt(h32(s, 7) & 0xff);
+  let c = '';
+  for (let k = 0; k < 8; k++) c += B32[Number((val >> BigInt(35 - k * 5)) & 31n)];
+  return c.slice(0, 4) + '-' + c.slice(4);
+}
+const norm = s => s.trim().toUpperCase().replace(/[^0-9A-Z]/g, '');
+
+/* Device state — stands in for the signed secure-storage blob + marker. */
+const sim = {
+  now: new Date(2026, 8, 14, 12, 0),
+  marker: false,
+  blob: null,          // {armed, expiresAt, message, contact, pass, lastSeen, fails, lockoutUntil, sigOK}
+  screen: 'splash',
+  backTo: 'login',
+  logoTaps: [],        // timestamps for the 7-in-4s gesture
+  tamp: { fails: 0, until: 0 },  // attempt counter for tampered/untrusted state
+};
+
+function mkBlob(over = {}) {
+  return Object.assign({
+    armed: true, expiresAt: null,
+    message: "This system's license has expired. Please contact the developer to reactivate it.",
+    contact: 'Juan Dev · 0917 555 0123',
+    pass: 'dev123', lastSeen: sim.now.getTime(), fails: 0, lockoutUntil: 0, sigOK: true,
+  }, over);
+}
+
+/* ── evaluate() — same decision logic as LicenseService.evaluate ── */
+function evaluate() {
+  const wall = sim.now.getTime();
+  if (!sim.blob) return { state: sim.marker ? 'tampered' : 'notConfigured', eff: wall };
+  const b = sim.blob;
+  if (!b.sigOK) return { state: 'tampered', eff: wall };
+  const eff = Math.max(wall, b.lastSeen);            // watermark
+  if (eff > b.lastSeen) b.lastSeen = eff;
+  let state;
+  if (!b.armed || !b.expiresAt) state = 'inactive';
+  else state = eff < b.expiresAt ? 'active' : 'expired';
+  return {
+    state, eff, expiresAt: b.expiresAt, message: b.message,
+    contact: b.contact, hasPass: !!b.pass,
+    remaining: b.expiresAt ? Math.max(0, b.expiresAt - eff) : null,
+  };
+}
+const isLocked = st => st === 'expired' || st === 'tampered';
+const expiringSoon = st => st.state === 'active' && st.remaining <= WARN_DAYS * DAY;
+
+/* ── demo plumbing ── */
+const device = document.getElementById('device');
+const overlay = () => document.getElementById('phOverlay');
+function log(msg, cls) {
+  const el = document.getElementById('evlog');
+  el.insertAdjacentHTML('afterbegin', `<div class="${cls || ''}">${msg}</div>`);
+}
+function fmt(d) {
+  return new Date(d).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+function fmtDur(ms) {
+  if (ms <= 0) return 'Expired';
+  const d = Math.floor(ms / DAY), h = Math.floor(ms % DAY / 36e5);
+  if (d > 0) return d + 'd ' + h + 'h';
+  const m = Math.floor(ms % 36e5 / 6e4);
+  return Math.floor(ms / 36e5) + 'h ' + m + 'm';
+}
+function refreshInspector(st) {
+  const colors = { notConfigured: 'var(--text-3)', inactive: 'var(--info)', active: 'var(--success)', expired: 'var(--error)', tampered: 'var(--error)' };
+  document.getElementById('simClock').textContent = fmt(sim.now);
+  document.getElementById('inspector').innerHTML =
+    `state <b class="st" style="color:${colors[st.state]}">${st.state}</b><br>` +
+    `wall&nbsp;&nbsp;<b>${fmt(sim.now)}</b><br>` +
+    `eff&nbsp;&nbsp;&nbsp;<b>${fmt(st.eff)}</b> ${st.eff > sim.now.getTime() ? '(watermark)' : ''}<br>` +
+    `expiry <b>${st.expiresAt ? fmt(st.expiresAt) : '—'}</b><br>` +
+    `left&nbsp;&nbsp;<b>${st.remaining != null ? fmtDur(st.remaining) : '—'}</b><br>` +
+    `fails&nbsp;<b>${sim.blob ? sim.blob.fails : 0}/5</b>` +
+    (sim.blob && sim.blob.lockoutUntil > Math.max(sim.now.getTime(), sim.blob.lastSeen) ? ` · locked out` : '');
+}
+
+/* ── routing ── */
+function route() {
+  const st = evaluate();
+  refreshInspector(st);
+  if (isLocked(st.state)) return renderLock(st);
+  renderLogin(st);
+}
+function relog(label) { // SessionGuard tick: re-evaluate + enforce
+  const st = evaluate();
+  refreshInspector(st);
+  if (isLocked(st.state) && sim.screen !== 'lock') { closeOverlay(); log(label + ' → LOCKED, everyone signed out', 'err'); renderLock(st); }
+}
+
+/* ── screens ── */
+function renderSplash() {
+  sim.screen = 'splash';
+  document.getElementById('frameLabel').textContent = 'Splash';
+  device.innerHTML = `<div class="center-screen">
+    <div class="splash-logo"><svg><use href="#i-box"/></svg></div>
+    <div class="title" style="font-size:22px;font-weight:800;">Pinoy POS</div>
+    <div class="msg">Simple. Offline. Reliable.</div>
+    <div class="spinner" style="margin-top:14px;"></div>
+  </div>`;
+  setTimeout(route, 900);
+}
+
+function bannerHtml(st) {
+  if (!expiringSoon(st)) return '';
+  return `<div class="lic-banner"><svg><use href="#i-clock"/></svg>
+    <span>License expires in ${fmtDur(st.remaining)} (${fmt(st.expiresAt)}). Please contact your developer.</span>
+    <button onclick="openUnlockDlg()">Enter code</button></div>`;
+}
+
+function renderLogin(st) {
+  st = st || evaluate();
+  sim.screen = 'login';
+  document.getElementById('frameLabel').textContent = 'Login';
+  device.innerHTML = `${bannerHtml(st)}
+    <div class="center-screen">
+      <div class="login-card">
+        <div class="login-logo" id="logo" title=""><svg><use href="#i-box"/></svg></div>
+        <div class="tap-hint" id="tapHint"></div>
+        <div class="title" style="font-size:19px;font-weight:800;">Pinoy POS</div>
+        <div class="msg" style="margin:4px 0 20px;">Simple. Offline. Reliable.</div>
+        <div class="field"><label>Username</label><input class="input" id="u" value="owner"></div>
+        <div class="field"><label>Password</label><input class="input" id="p" type="password" value="password123"></div>
+        <button class="btn btn-primary" style="margin-top:20px;" onclick="doLogin()">Sign In</button>
+        ${st.state === 'active' ? '<button class="code-link" onclick="openUnlockDlg()">Have an unlock code?</button>' : ''}
+      </div>
+    </div>`;
+  document.getElementById('logo').addEventListener('click', logoTap);
+}
+
+function logoTap() {
+  const t = Date.now();
+  sim.logoTaps = sim.logoTaps.filter(x => t - x < 4000);
+  sim.logoTaps.push(t);
+  const hint = document.getElementById('tapHint');
+  if (hint) hint.textContent = sim.logoTaps.length >= 4 ? `${7 - sim.logoTaps.length} more…` : '';
+  if (sim.logoTaps.length >= 7) { sim.logoTaps = []; log('hidden gesture: 7 taps → developer gate'); openDevGate(); }
+}
+
+function doLogin() {
+  const st = evaluate(); refreshInspector(st);
+  if (isLocked(st.state)) { log('login blocked — license locked → lock screen', 'err'); return renderLock(st); }
+  log('login ok → app shell', 'ok'); renderApp(st);
+}
+
+function renderApp(st) {
+  st = st || evaluate();
+  sim.screen = 'app';
+  document.getElementById('frameLabel').textContent = 'App shell (POS)';
+  device.innerHTML = `
+    <div class="appbar"><div class="title"><h2>Pinoy POS</h2><div class="sub">Dashboard — Owner</div></div>
+      <div class="act" onclick="renderSettings()" title="Settings"><svg><use href="#i-gear"/></svg></div></div>
+    ${bannerHtml(st)}
+    <div class="screen-body">
+      <div class="stats">
+        <div class="stat"><div class="ic solid-blue"><svg><use href="#i-box"/></svg></div><div class="num">₱4.2k</div><div class="lbl">Today</div></div>
+        <div class="stat"><div class="ic solid-green"><svg><use href="#i-check"/></svg></div><div class="num">18</div><div class="lbl">Sales</div></div>
+        <div class="stat"><div class="ic solid-amber"><svg><use href="#i-clock"/></svg></div><div class="num">3</div><div class="lbl">Pending</div></div>
+      </div>
+      <div class="card"><div class="row"><div class="grow"><div class="name">20260914-0007</div><div class="sub">Walk-in · Cash</div></div><div class="val">₱240.00</div></div>
+      <div class="row"><div class="grow"><div class="name">20260914-0006</div><div class="sub">Maria · GCash</div></div><div class="val">₱95.00</div></div></div>
+      <button class="btn btn-outlined" onclick="log('signed out','warn');route()">Sign out (demo)</button>
+    </div>
+    <div class="bottomnav">
+      <div class="navitem sel"><div class="navicon"><svg><use href="#i-box"/></svg></div><div class="navlbl">Home</div></div>
+      <div class="navitem" onclick="showToast('POS tab — not part of this flow demo','info')"><div class="navicon"><svg><use href="#i-cart"/></svg></div><div class="navlbl">POS</div></div>
+      <div class="navitem" onclick="showToast('More tab — not part of this flow demo','info')"><div class="navicon"><svg><use href="#i-more"/></svg></div><div class="navlbl">More</div></div>
+    </div>`;
+}
+
+function renderSettings() {
+  const st = evaluate(); refreshInspector(st);
+  sim.screen = 'settings';
+  document.getElementById('frameLabel').textContent = 'Settings';
+  device.innerHTML = `
+    <div class="appbar"><div class="back" onclick="renderApp()"><svg><use href="#i-back"/></svg></div>
+      <div class="title"><h2>Settings</h2></div></div>
+    ${bannerHtml(st)}
+    <div class="screen-body">
+      <div class="section-title">Personal</div>
+      <div class="card">
+        <div class="row"><div class="isquare c-blue"><svg><use href="#i-person"/></svg></div><div class="grow"><div class="name">Profile</div><div class="sub">View and edit your profile</div></div></div>
+        <div class="row"><div class="isquare c-green"><svg><use href="#i-lock"/></svg></div><div class="grow"><div class="name">Security</div><div class="sub">Change your password</div></div></div>
+        ${st.state === 'active' ? `
+        <div class="row tap" onclick="openUnlockDlg()"><div class="isquare c-amber"><svg><use href="#i-key"/></svg></div>
+          <div class="grow"><div class="name">Unlock Code</div><div class="sub">Enter a developer code to extend the license</div></div>
+          <div class="trailing"><svg><use href="#i-key"/></svg></div></div>` : ''}
+      </div>
+      <button class="btn btn-outlined" onclick="route()">Sign out (demo)</button>
+    </div>`;
+}
+
+function renderLock(st) {
+  st = st || evaluate();
+  sim.screen = 'lock';
+  document.getElementById('frameLabel').textContent = 'LICENSE LOCKED';
+  const tamp = st.state === 'tampered';
+  device.innerHTML = `<div class="center-screen" style="gap:14px;">
+    <div class="lock-ic"><svg><use href="#${tamp ? 'i-shield-bad' : 'i-lock'}"/></svg></div>
+    <div class="lock-title">${tamp ? 'System Check Failed' : 'System Locked'}</div>
+    <div class="lock-msg">${escapeHtml(tamp ? 'This installation could not verify its license state. Please contact the developer.' : (st.message || 'License expired. Contact the developer.'))}</div>
+    ${st.contact ? `<div class="contact-card"><svg><use href="#i-phone"/></svg><div><div class="lbl">Contact the developer</div><div class="val">${escapeHtml(st.contact)}</div></div></div>` : ''}
+    <div style="width:100%;border-top:1px solid var(--divider);margin:6px 0;"></div>
+    <div class="field" style="width:100%;"><label>Unlock code</label>
+      <input class="input" id="lockCode" placeholder="XXXX-XXXX" style="text-transform:uppercase;letter-spacing:2px;"></div>
+    <div class="derr" id="lockErr"></div>
+    <button class="btn btn-primary" onclick="redeem(document.getElementById('lockCode').value, 'lockErr')">Unlock</button>
+    <button class="code-link" onclick="openDevGate()">Developer access</button>
+  </div>`;
+}
+
+/* ── unlock code redemption ── */
+function redeem(input, errId) {
+  const e = errId ? document.getElementById(errId) : null;
+  const st0 = evaluate();
+  if (!sim.blob && !sim.marker) { if (e) e.textContent = 'Invalid code.'; log('redeem on never-configured device → refused', 'err'); return; }
+  const fresh = !(sim.blob && sim.blob.sigOK);
+  const cfg = fresh ? mkBlob({ pass: null, message: '', contact: '' }) : sim.blob;
+  if (sim.blob && sim.blob.sigOK && !cfg.armed) { if (e) e.textContent = 'Invalid code.'; log('code rejected — license is disarmed (paid in full)', 'err'); return; }
+  const eff = Math.max(sim.now.getTime(), cfg.lastSeen);
+  const bag = fresh ? sim.tamp : { get fails() { return cfg.fails; }, set fails(v) { cfg.fails = v; }, get until() { return cfg.lockoutUntil; }, set until(v) { cfg.lockoutUntil = v; } };
+  if (bag.until > eff) { if (e) e.textContent = `Too many attempts. Try again in ${Math.ceil((bag.until - eff) / 60000)} min.`; return; }
+  const n = norm(input);
+  for (const [days, count] of Object.entries(GRANTS))
+    for (let i = 0; i < count; i++)
+      if (n === norm(unlockCode(+days, i))) {
+        cfg.expiresAt = Math.max(eff, cfg.expiresAt || 0) + days * DAY;   // STACK from deadline if in future
+        cfg.armed = true; cfg.fails = 0; cfg.lockoutUntil = 0; cfg.lastSeen = Math.max(cfg.lastSeen, eff); cfg.sigOK = true;
+        sim.blob = cfg; sim.marker = true; sim.tamp.fails = 0; sim.tamp.until = 0;
+        log(`code OK → +${days}d, new expiry ${fmt(cfg.expiresAt)}`, 'ok');
+        closeOverlay(); showToast(`License extended ${days} days → ${fmt(cfg.expiresAt)}`, 'success');
+        const st = evaluate(); refreshInspector(st);
+        return isLocked(st.state) ? renderLock(st) : (sim.screen === 'lock' ? renderLogin(st) : rerender());
+      }
+  bag.fails++; if (bag.fails >= 5) { bag.until = eff + 5 * 60000; bag.fails = 0; }
+  if (e) e.textContent = bag.until > eff ? 'Too many attempts. Locked for 5 min.' : 'The unlock code is not valid.';
+  log('bad code → fails ' + (bag.fails || 5) + '/5', 'warn');
+  refreshInspector(evaluate());
+}
+
+/* ── unlock dialog (banner / login link / settings tile) ── */
+function openUnlockDlg() {
+  overlay().innerHTML = `<div class="ph-overlay"><div class="ph-dialog">
+    <h3>Enter Unlock Code</h3>
+    <div class="dsub">Enter the code provided by the developer to extend the license.</div>
+    <div class="field"><label>Unlock code</label><input class="input" id="dlgCode" placeholder="XXXX-XXXX" style="text-transform:uppercase;letter-spacing:2px;"></div>
+    <div class="derr" id="dlgErr"></div>
+    <div class="actions"><button class="btn btn-outlined" onclick="closeOverlay()">Cancel</button>
+    <button class="btn btn-primary" onclick="redeem(document.getElementById('dlgCode').value,'dlgErr')">Unlock</button></div>
+  </div></div>`;
+  document.getElementById('dlgCode').focus();
+}
+function closeOverlay() { overlay().innerHTML = ''; }
+function rerender() {
+  const st = evaluate(); refreshInspector(st);
+  if (isLocked(st.state)) return renderLock(st);
+  if (sim.screen === 'panel') return;           // don't clobber unsaved panel edits
+  if (sim.screen === 'app') renderApp(st); else if (sim.screen === 'settings') renderSettings(); else renderLogin(st);
+}
+
+/* ── developer gate + panel ── */
+function devGateMode() {
+  if (sim.blob && sim.blob.sigOK) return sim.blob.pass ? 'verify' : 'setup';
+  if (sim.blob) return 'blocked';
+  return sim.marker ? 'blocked' : 'setup';
+}
+function openDevGate() {
+  const mode = devGateMode();
+  if (mode === 'blocked') {
+    return void openDialog({ title: 'Access Unavailable', message: 'The license state could not be verified. Use an unlock code to restore access.', confirmLabel: 'OK', cancelLabel: 'Close' });
+  }
+  overlay().innerHTML = `<div class="ph-overlay"><div class="ph-dialog">
+    <h3>${mode === 'setup' ? 'Create Developer Password' : 'Developer Access'}</h3>
+    <div class="dsub">${mode === 'setup' ? 'Set the password that protects the license controls.' : 'Enter the developer password to continue.'}</div>
+    ${mode === 'setup'
+      ? `<div class="field"><label>New password</label><input class="input" id="dp1" type="password" placeholder="At least 6 characters"></div>
+         <div class="field"><label>Confirm</label><input class="input" id="dp2" type="password"></div>`
+      : `<div class="field"><label>Password</label><input class="input" id="dp0" type="password" placeholder="dev123"></div>`}
+    <div class="derr" id="devErr"></div>
+    <div class="actions"><button class="btn btn-outlined" onclick="closeOverlay()">Cancel</button>
+    <button class="btn btn-primary" onclick="devSubmit('${mode}')">${mode === 'setup' ? 'Create' : 'Unlock'}</button></div>
+  </div></div>`;
+}
+function devSubmit(mode) {
+  const err = document.getElementById('devErr');
+  if (mode === 'setup') {
+    const a = document.getElementById('dp1').value, b = document.getElementById('dp2').value;
+    if (a.length < 6) return err.textContent = 'At least 6 characters';
+    if (a !== b) return err.textContent = 'Passwords do not match';
+    if (!sim.blob) sim.blob = mkBlob({ armed: false, pass: a });
+    else sim.blob.pass = a;
+    sim.marker = true;
+    log('developer password created', 'ok'); closeOverlay(); sim.backTo = sim.screen; renderPanel(); return;
+  }
+  const cfg = sim.blob;
+  const eff = Math.max(sim.now.getTime(), cfg.lastSeen);
+  if (cfg.lockoutUntil > eff) return err.textContent = `Too many attempts. Try again in ${Math.ceil((cfg.lockoutUntil - eff) / 60000)} min.`;
+  if (document.getElementById('dp0').value === cfg.pass) {
+    cfg.fails = 0; cfg.lockoutUntil = 0;
+    log('developer gate passed', 'ok'); closeOverlay(); sim.backTo = sim.screen; renderPanel(); return;
+  }
+  cfg.fails++; if (cfg.fails >= 5) { cfg.lockoutUntil = eff + 5 * 60000; cfg.fails = 0; }
+  err.textContent = cfg.lockoutUntil > eff ? 'Too many attempts. Locked for 5 min.' : 'Incorrect password.';
+  refreshInspector(evaluate());
+}
+
+function renderPanel() {
+  const st = evaluate(); refreshInspector(st);
+  sim.screen = 'panel';
+  document.getElementById('frameLabel').textContent = 'Developer panel';
+  const b = sim.blob || mkBlob({ armed: false, pass: null });
+  const labels = { notConfigured: ['Not configured', 'pill-grey'], inactive: ['Configured — not armed', 'pill-blue'], active: ['Armed — license is valid', 'pill-green'], expired: ['Expired — app is locked', 'pill-red'], tampered: ['Integrity check failed', 'pill-red'] };
+  const [lbl, pill] = labels[st.state];
+  const groups = Object.entries(GRANTS).map(([d, c]) => `
+    <details class="codegroup"><summary><div class="isquare c-amber" style="width:30px;height:30px;"><svg style="width:15px;height:15px;"><use href="#i-key"/></svg></div>
+      <div class="grow"><div class="name">${d == 90 ? '3 months' : d == 365 ? '1 year' : d + ' days'}</div><div class="sub">${c} codes · extends by ${d} days</div></div>
+      <span class="arr">▶</span></summary>
+      ${Array.from({ length: c }, (_, i) => `<div class="codeitem">${unlockCode(+d, i)}<button onclick="navigator.clipboard&&navigator.clipboard.writeText('${unlockCode(+d, i)}');showToast('Copied','info')">copy</button></div>`).join('')}
+    </details>`).join('');
+  device.innerHTML = `
+    <div class="appbar"><div class="back" onclick="sim.screen=sim.backTo;rerender()"><svg><use href="#i-back"/></svg></div>
+      <div class="title"><h2>License Control</h2><div class="sub">developer only</div></div></div>
+    <div class="dev-body">
+      <div class="card pad">
+        <div class="name" style="margin-bottom:8px;"><span class="pill ${pill}">${lbl}</span></div>
+        <div class="stat-row"><span class="k">Deadline</span><span class="v">${st.expiresAt ? fmt(st.expiresAt) : 'Not set'}</span></div>
+        <div class="stat-row"><span class="k">Time remaining</span><span class="v">${st.remaining != null ? fmtDur(st.remaining) : '—'}</span></div>
+        <div class="stat-row"><span class="k">Effective device time</span><span class="v">${fmt(st.eff)}</span></div>
+      </div>
+      <div class="card">
+        <div class="toggle-row" onclick="this.querySelector('.toggle-switch').classList.toggle('off');sim._armed=!sim._armed">
+          <div class="isquare c-blue"><svg><use href="#i-clock"/></svg></div>
+          <div class="grow"><div class="name">License enforcement</div><div class="sub" id="armSub">${b.armed ? 'The app locks when the deadline passes.' : 'Off — the app runs without a deadline.'}</div></div>
+          <div class="toggle"><div class="toggle-switch ${b.armed ? '' : 'off'}"></div></div>
+        </div>
+        <div class="row"><div class="grow"><div class="name">Deadline</div><input class="input" type="datetime-local" id="dExp" value="${b.expiresAt ? new Date(b.expiresAt - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ''}"></div></div>
+        <div class="row"><div class="grow"><div class="name">Lock screen message</div><textarea class="textarea" id="dMsg" style="min-height:56px;">${escapeHtml(b.message || '')}</textarea></div></div>
+        <div class="row"><div class="grow"><div class="name">Developer contact</div><input class="input" id="dContact" value="${escapeHtml(b.contact || '')}"></div></div>
+      </div>
+      <div class="card pad"><div class="name" style="margin-bottom:4px;">Unlock codes</div>
+        <div class="sub" style="margin-bottom:6px;">Dictate a code to the client — hand out a different one per client. Codes stack on the deadline. No internet needed.</div>
+        ${groups}</div>
+      <div class="card">
+        <div class="row tap" onclick="changePass()"><div class="isquare c-neutral"><svg><use href="#i-lock"/></svg></div><div class="grow"><div class="name">Change developer password</div><div class="sub">Required to open this panel</div></div></div>
+        <div class="row tap" onclick="paidInFull()"><div class="isquare c-red"><svg><use href="#i-check"/></svg></div><div class="grow"><div class="name danger">License paid in full</div><div class="sub">Removes the license entirely — no deadline, codes or password</div></div></div>
+      </div>
+      <button class="btn btn-primary" onclick="savePanel()">Save License Settings</button>
+      <div style="height:8px"></div>
+    </div>`;
+  sim._armed = b.armed;
+}
+
+function savePanel() {
+  if (!sim.blob) sim.blob = mkBlob({ pass: 'dev123' });
+  const b = sim.blob;
+  b.armed = !!sim._armed;
+  const v = document.getElementById('dExp').value;
+  b.expiresAt = v ? new Date(v).getTime() : null;
+  b.message = document.getElementById('dMsg').value.trim();
+  b.contact = document.getElementById('dContact').value.trim();
+  if (!b.pass) b.pass = 'dev123';
+  b.sigOK = true; sim.marker = true;
+  if (b.armed && !b.expiresAt) { showToast('Choose a deadline before arming', 'error'); return; }
+  log(`config saved — armed=${b.armed}, expiry=${b.expiresAt ? fmt(b.expiresAt) : '—'}`, 'ok');
+  showToast('License settings saved', 'success');
+  const st = evaluate(); refreshInspector(st);
+  if (isLocked(st.state)) return renderLock(st);
+  renderPanel();
+}
+
+function changePass() {
+  overlay().innerHTML = `<div class="ph-overlay"><div class="ph-dialog">
+    <h3>Change Developer Password</h3>
+    <div class="field"><label>Current</label><input class="input" id="cp0" type="password" placeholder="dev123"></div>
+    <div class="field"><label>New</label><input class="input" id="cp1" type="password" placeholder="At least 6 characters"></div>
+    <div class="field"><label>Confirm</label><input class="input" id="cp2" type="password"></div>
+    <div class="derr" id="cpErr"></div>
+    <div class="actions"><button class="btn btn-outlined" onclick="closeOverlay()">Cancel</button>
+    <button class="btn btn-primary" onclick="submitChangePass()">Change</button></div></div></div>`;
+}
+function submitChangePass() {
+  const e = document.getElementById('cpErr'), b = sim.blob;
+  if (document.getElementById('cp0').value !== (b && b.pass)) return e.textContent = 'Current password is incorrect.';
+  const n = document.getElementById('cp1').value;
+  if (n.length < 6) return e.textContent = 'At least 6 characters';
+  if (n !== document.getElementById('cp2').value) return e.textContent = 'Passwords do not match';
+  b.pass = n; closeOverlay(); showToast('Developer password updated', 'success'); log('developer password changed', 'ok');
+}
+
+function paidInFull() {
+  openDialog({
+    title: 'Remove License Entirely?', destructive: true, confirmLabel: 'Remove License', cancelLabel: 'Cancel',
+    message: 'Use this when the client has paid in full. It removes the deadline, developer password and all unlock state — the app behaves like a fresh install.',
+    onConfirm: () => {
+      sim.blob = null; sim.marker = false;
+      log('license cleared — device is like a fresh install', 'warn');
+      showToast('License removed', 'success');
+      sim.screen = sim.backTo; rerender();
+    }
+  });
+}
+
+/* ── scenarios + clock ── */
+const SCN = {
+  fresh: () => { sim.blob = null; sim.marker = false; },
+  active: () => { sim.marker = true; sim.blob = mkBlob({ expiresAt: sim.now.getTime() + 60 * DAY }); },
+  warn: () => { sim.marker = true; sim.blob = mkBlob({ expiresAt: sim.now.getTime() + 10 * DAY }); },
+  expired: () => { sim.marker = true; sim.blob = mkBlob({ expiresAt: sim.now.getTime() - 2 * DAY, lastSeen: sim.now.getTime() }); },
+  tampered: () => { sim.marker = true; sim.blob = mkBlob({ expiresAt: sim.now.getTime() + 30 * DAY, sigOK: false }); },
+  disarmed: () => { sim.marker = true; sim.blob = mkBlob({ armed: false, expiresAt: sim.now.getTime() + 20 * DAY }); },
+};
+function setScenario(name) {
+  document.querySelectorAll('#scnBtns button').forEach(b => b.classList.toggle('on', b.dataset.scn === name));
+  SCN[name](); sim.screen = 'splash'; sim.logoTaps = []; sim._armed = undefined; sim.tamp.fails = 0; sim.tamp.until = 0; overlay().innerHTML = '';
+  log(`scenario → ${name}`, 'warn'); renderSplash();
+}
+document.querySelectorAll('#scnBtns button').forEach(b => b.addEventListener('click', () => setScenario(b.dataset.scn)));
+
+function advance(days) {
+  sim.now = new Date(sim.now.getTime() + days * DAY);
+  log(`clock +${days}d → ${fmt(sim.now)}`); relog('SessionGuard tick'); if (sim.screen === 'splash') route(); else rerender();
+}
+function rollback() {
+  sim.now = new Date(sim.now.getTime() - 30 * DAY);
+  const st = evaluate();
+  log(`clock −30d attempted — watermark holds effectiveNow at ${fmt(st.eff)}`, 'err');
+  if (sim.screen === 'splash') route(); else rerender();
+}
+
+/* boot */
+setScenario('warn');
+</script>
+</body>
+</html>

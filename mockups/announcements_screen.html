@@ -17,6 +17,19 @@
   .announcement .body { font-size: 13px; color: var(--text-2); line-height: 1.5; }
   .announcement .foot { font-size: 11px; color: var(--text-3); margin-top: 8px; }
   #announcementList { display: flex; flex-direction: column; gap: 14px; }
+  .dialog-overlay { position: absolute; inset: 0; top: 30px; background: rgba(0,0,0,.55); z-index: 50; display: none; align-items: center; justify-content: center; padding: 16px; }
+  .dialog-overlay.open { display: flex; }
+  .dialog { background: var(--surface); border: 1px solid var(--border); border-radius: 22px; width: 100%; max-width: 310px; max-height: 520px; overflow-y: auto; box-shadow: 0 24px 64px rgba(0,0,0,.45); display: flex; flex-direction: column; }
+  .dialog-header { padding: 20px 20px 12px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .dialog-header h3 { font-size: 18px; font-weight: 800; color: var(--text); }
+  .dialog-header p { font-size: 13px; color: var(--text-3); line-height: 1.4; }
+  .dialog-body { padding: 0 20px; }
+  .dialog-actions { padding: 16px 20px 20px; display: flex; gap: 10px; }
+  .dialog-actions .btn { flex: 1; }
+  .view-body { font-size: 13px; color: var(--text-2); line-height: 1.55; padding: 4px 0 8px; }
+  .view-foot { font-size: 11.5px; color: var(--text-3); padding-top: 10px; border-top: 1px solid var(--divider); }
+  .pin-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; }
+  .pin-row .label { font-size: 13px; font-weight: 600; color: var(--text-2); }
 </style>
 </head>
 <body>
@@ -64,7 +77,54 @@
           <div id="announcementPager"></div>
         </div>
       </div>
-      <button class="fab" style="position:absolute;bottom:16px;right:16px;" onclick="showToast('Add announcement', 'info')"><svg><use href="#i-add"/></svg></button>
+      <!-- Add/Edit Announcement dialog -->
+      <div class="dialog-overlay" id="announcementDialog" onclick="if(event.target===this)closeAnnouncementModal()">
+        <div class="dialog" onclick="event.stopPropagation()">
+          <div class="dialog-header">
+            <div class="icircle c-amber"><svg width="20" height="20"><use href="#i-campaign"/></svg></div>
+            <h3 id="announcementDialogTitle">New Announcement</h3>
+            <p id="announcementDialogHint">Write the announcement and tap Save. Staff see it in Notifications.</p>
+          </div>
+          <div class="dialog-body">
+            <div class="field" style="margin-top:0">
+              <label>Title</label>
+              <input class="input" type="text" id="announcementTitle" placeholder="Announcement title">
+            </div>
+            <div class="field" style="margin-top:12px">
+              <label>Message</label>
+              <textarea class="textarea" id="announcementBody" placeholder="Write the announcement here..." style="min-height:80px;"></textarea>
+            </div>
+            <div class="pin-row">
+              <span class="label">Pin to top</span>
+              <div class="toggle-switch off" id="announcementPinned" onclick="this.classList.toggle('off')"></div>
+            </div>
+          </div>
+          <div class="dialog-actions">
+            <button class="btn btn-outlined" onclick="closeAnnouncementModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="saveAnnouncement()">Save</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- View Announcement dialog -->
+      <div class="dialog-overlay" id="announcementViewDialog" onclick="if(event.target===this)closeAnnouncementView()">
+        <div class="dialog" onclick="event.stopPropagation()">
+          <div class="dialog-header">
+            <div class="icircle c-blue"><svg width="20" height="20"><use href="#i-campaign"/></svg></div>
+            <h3 id="announcementViewTitle">Announcement</h3>
+          </div>
+          <div class="dialog-body">
+            <div class="view-body" id="viewBody"></div>
+            <div class="view-foot" id="viewFoot"></div>
+          </div>
+          <div class="dialog-actions">
+            <button class="btn btn-outlined" onclick="closeAnnouncementView()">Close</button>
+            <button class="btn btn-primary" onclick="editViewedAnnouncement()">Edit</button>
+          </div>
+        </div>
+      </div>
+
+      <button class="fab" style="position:absolute;bottom:16px;right:16px;" onclick="openAnnouncementModal()"><svg><use href="#i-add"/></svg></button>
     </div>
     <div class="frame-notes">Owner can pin, edit, delete, and add announcements. Staff receive the content via notifications (no screen access). FAB is the primary create action on portrait mobile.</div>
   </div>
@@ -134,14 +194,80 @@ function renderAnnouncements() {
       <div class="body">${escapeHtml(a.body)}</div>
       <div class="foot">Posted: ${a.posted}${a.pinned ? ' · Pinned' : ''}</div>
       <div class="row" style="justify-content:flex-end;gap:8px;padding:10px 0 0;">
-        <div class="aicon" onclick="showToast('View announcement', 'info')"><svg><use href="#i-visibility"/></svg></div>
-        <div class="aicon" onclick="showToast('Edit announcement', 'info')"><svg><use href="#i-edit"/></svg></div>
-        <div class="aicon del" onclick="showToast('Delete announcement', 'error')"><svg><use href="#i-delete"/></svg></div>
+        <div class="aicon" onclick="openAnnouncementView(${a.id})"><svg><use href="#i-visibility"/></svg></div>
+        <div class="aicon" onclick="openAnnouncementModal(${a.id})"><svg><use href="#i-edit"/></svg></div>
+        <div class="aicon del" onclick="confirmDeleteAnnouncement(${a.id})"><svg><use href="#i-delete"/></svg></div>
       </div>
     </div>
   `).join('');
 
   pager.innerHTML = pagerHtml(total, currentPage, PAGE_SIZE, 'goPage', 'standalone');
+}
+
+let editingId = null;
+let viewingId = null;
+
+function openAnnouncementModal(id) {
+  editingId = id || null;
+  const a = id ? announcementData.find(x => x.id === id) : null;
+  document.getElementById('announcementDialogTitle').textContent = a ? 'Edit Announcement' : 'New Announcement';
+  document.getElementById('announcementTitle').value = a ? a.title : '';
+  document.getElementById('announcementBody').value = a ? a.body : '';
+  document.getElementById('announcementPinned').classList.toggle('off', !(a && a.pinned));
+  document.getElementById('announcementDialog').classList.add('open');
+}
+
+function closeAnnouncementModal() {
+  document.getElementById('announcementDialog').classList.remove('open');
+  editingId = null;
+}
+
+function saveAnnouncement() {
+  const title = document.getElementById('announcementTitle').value.trim() || 'Untitled announcement';
+  const body = document.getElementById('announcementBody').value.trim() || '—';
+  const pinned = !document.getElementById('announcementPinned').classList.contains('off');
+  if (editingId) {
+    const a = announcementData.find(x => x.id === editingId);
+    if (a) { a.title = title; a.body = body; a.pinned = pinned; }
+    showToast('Announcement updated', 'success');
+  } else {
+    announcementData.unshift({ id: Math.max(...announcementData.map(x => x.id)) + 1, title, body, posted: '2026-09-10 09:41', pinned });
+    showToast('Announcement posted to staff notifications', 'success');
+  }
+  closeAnnouncementModal();
+  renderAnnouncements();
+}
+
+function openAnnouncementView(id) {
+  const a = announcementData.find(x => x.id === id);
+  if (!a) return;
+  viewingId = id;
+  document.getElementById('announcementViewTitle').textContent = a.title;
+  document.getElementById('viewBody').textContent = a.body;
+  document.getElementById('viewFoot').textContent = 'Posted: ' + a.posted + (a.pinned ? ' · Pinned' : '');
+  document.getElementById('announcementViewDialog').classList.add('open');
+}
+
+function closeAnnouncementView() {
+  document.getElementById('announcementViewDialog').classList.remove('open');
+  viewingId = null;
+}
+
+function editViewedAnnouncement() {
+  const id = viewingId;
+  closeAnnouncementView();
+  openAnnouncementModal(id);
+}
+
+function confirmDeleteAnnouncement(id) {
+  const a = announcementData.find(x => x.id === id);
+  openDialog({
+    title: 'Delete announcement?',
+    message: `Remove the announcement "${a.title}"?`,
+    confirmLabel: 'Delete',
+    destructive: true,
+    onConfirm: () => { announcementData.splice(announcementData.indexOf(a), 1); renderAnnouncements(); showToast('Announcement deleted', 'info'); }
+  });
 }
 
 renderAnnouncements();

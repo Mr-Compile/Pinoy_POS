@@ -16,6 +16,20 @@
   .fab svg { width: 24px; height: 24px; fill: #fff; }
   /* Matches ResponsiveCreateAction.fabClearance = 88 so the pager clears the FAB */
   .screen-body.has-fab { padding-bottom: 88px; }
+
+  .dialog-overlay { position: absolute; inset: 0; top: 30px; background: rgba(0,0,0,.55); z-index: 50; display: none; align-items: center; justify-content: center; padding: 16px; }
+  .dialog-overlay.open { display: flex; }
+  .dialog { background: var(--surface); border: 1px solid var(--border); border-radius: 22px; width: 100%; max-width: 310px; max-height: 520px; overflow-y: auto; box-shadow: 0 24px 64px rgba(0,0,0,.45); display: flex; flex-direction: column; }
+  .dialog-header { padding: 20px 20px 12px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .dialog-header h3 { font-size: 18px; font-weight: 800; color: var(--text); }
+  .dialog-header p { font-size: 13px; color: var(--text-3); line-height: 1.4; }
+  .dialog-body { padding: 0 20px; }
+  .dialog-actions { padding: 16px 20px 20px; display: flex; gap: 10px; }
+  .dialog-actions .btn { flex: 1; }
+  .view-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--divider); }
+  .view-row:last-child { border-bottom: none; }
+  .view-row .label { font-size: 13px; color: var(--text-2); }
+  .view-row .value { font-size: 13px; font-weight: 700; color: var(--text); text-align: right; }
 </style>
 </head>
 <body>
@@ -80,7 +94,66 @@
           <div id="userPager"></div>
         </div>
       </div>
-      <button class="fab" style="position:absolute;bottom:16px;right:16px;" onclick="showToast('Add user', 'info')" aria-label="Add user"><svg><use href="#i-add"/></svg></button>
+      <!-- Add/Edit User dialog -->
+      <div class="dialog-overlay" id="userDialog" onclick="if(event.target===this)closeUserModal()">
+        <div class="dialog" onclick="event.stopPropagation()">
+          <div class="dialog-header">
+            <div class="icircle c-purple"><svg width="20" height="20"><use href="#i-person"/></svg></div>
+            <h3 id="userDialogTitle">Add User</h3>
+            <p id="userDialogHint">Enter the account details and tap Save.</p>
+          </div>
+          <div class="dialog-body">
+            <div class="field" style="margin-top:0">
+              <label>Full Name</label>
+              <input class="input" type="text" id="userFullName" placeholder="Juan Dela Cruz">
+            </div>
+            <div class="field" style="margin-top:12px">
+              <label>Username</label>
+              <input class="input" type="text" id="userUsername" placeholder="juan.d">
+            </div>
+            <div class="field" style="margin-top:12px">
+              <label>Role</label>
+              <select class="select" id="userRole">
+                <option value="staff">Staff</option>
+                <option value="admin">Admin</option>
+                <option value="owner">Owner</option>
+              </select>
+            </div>
+            <div class="field" style="margin-top:12px">
+              <label>Status</label>
+              <select class="select" id="userStatus">
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+          </div>
+          <div class="dialog-actions">
+            <button class="btn btn-outlined" onclick="closeUserModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="saveUser()">Save</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- View User dialog -->
+      <div class="dialog-overlay" id="userViewDialog" onclick="if(event.target===this)closeUserView()">
+        <div class="dialog" onclick="event.stopPropagation()">
+          <div class="dialog-header">
+            <div class="icircle c-blue"><svg width="20" height="20"><use href="#i-person"/></svg></div>
+            <h3 id="userViewTitle">User</h3>
+          </div>
+          <div class="dialog-body">
+            <div class="view-row"><span class="label">Username</span><span class="value" id="viewUsername"></span></div>
+            <div class="view-row"><span class="label">Role</span><span class="value" id="viewRole"></span></div>
+            <div class="view-row"><span class="label">Status</span><span class="value" id="viewStatus"></span></div>
+          </div>
+          <div class="dialog-actions">
+            <button class="btn btn-outlined" onclick="closeUserView()">Close</button>
+            <button class="btn btn-primary" onclick="editViewedUser()">Edit</button>
+          </div>
+        </div>
+      </div>
+
+      <button class="fab" style="position:absolute;bottom:16px;right:16px;" onclick="openUserModal()" aria-label="Add user"><svg><use href="#i-add"/></svg></button>
     </div>
     <div class="frame-notes">Admins can add, edit, reset passwords, activate/deactivate, and delete users. Search and the role filter reset the pager to page 1; lists page at 10 rows. The plus-only FAB floats above the content — the list keeps 88px bottom clearance so the pager is never covered. Self account cannot be deleted or deactivated.</div>
   </div>
@@ -148,10 +221,10 @@
     const pageItems = list.slice(start, start + PAGE_SIZE);
 
     container.innerHTML = pageItems.map(u => `
-      <div class="card row tap user-row" data-role="${u.role}" data-status="${u.isActive ? 'active' : 'inactive'}" onclick="showToast('User detail', 'info')">
+      <div class="card row tap user-row" data-role="${u.role}" data-status="${u.isActive ? 'active' : 'inactive'}" onclick="openUserView(${u.id})">
         <div class="icircle ${u.isActive ? roleColor[u.role] : 'solid-grey'}">${escapeHtml(u.name[0])}</div>
         <div class="grow"><div class="name">${escapeHtml(u.name)}</div><div class="sub">@${escapeHtml(u.username)} · ${roleLabel[u.role]} · ${u.isActive ? 'Active' : 'Inactive'}</div></div>
-        <div class="aicon" onclick="userMenu(event, ${u.isActive}, ${u.isSelf === true})"><svg><use href="#i-more"/></svg></div>
+        <div class="aicon" onclick="userMenu(event, ${u.id})"><svg><use href="#i-more"/></svg></div>
       </div>
     `).join('');
 
@@ -165,19 +238,113 @@
 
   function ic(id) { return `<svg viewBox="0 0 24 24"><use href="#${id}"/></svg>`; }
 
-  function userMenu(event, isActive, isSelf) {
+  let editingUserId = null;
+  let viewingUserId = null;
+
+  function userMenu(event, id) {
+    event.stopPropagation();
+    const u = users.find(x => x.id === id);
+    if (!u) return;
     const items = [
-      { label: 'View', icon: ic('i-eye'), action: "showToast('View user', 'info')" },
-      { label: 'Edit', icon: ic('i-edit'), action: "showToast('Edit user', 'info')" },
-      { label: 'Reset Password', icon: ic('i-lock'), action: "showToast('Reset password', 'info')" },
+      { label: 'View', icon: ic('i-eye'), action: `openUserView(${id})` },
+      { label: 'Edit', icon: ic('i-edit'), action: `openUserModal(${id})` },
+      { label: 'Reset Password', icon: ic('i-lock'), action: `confirmReset(${id})` },
     ];
-    if (!isSelf) {
+    if (!u.isSelf) {
       items.push(
-        { label: isActive ? 'Deactivate' : 'Activate', icon: isActive ? ic('i-block') : ic('i-person'), action: "showToast('Toggle status', 'info')", cls: isActive ? 'warn' : '' },
-        { label: 'Delete', icon: ic('i-delete'), action: "showToast('Delete user', 'info')", cls: 'del' },
+        { label: u.isActive ? 'Deactivate' : 'Activate', icon: u.isActive ? ic('i-block') : ic('i-person'), action: `confirmToggle(${id})`, cls: u.isActive ? 'warn' : '' },
+        { label: 'Delete', icon: ic('i-delete'), action: `confirmDelete(${id})`, cls: 'del' },
       );
     }
     showMenu(event, items);
+  }
+
+  function openUserModal(id) {
+    editingUserId = id || null;
+    const u = id ? users.find(x => x.id === id) : null;
+    document.getElementById('userDialogTitle').textContent = u ? 'Edit User' : 'Add User';
+    document.getElementById('userDialogHint').textContent = u ? 'Update the account details and tap Save.' : 'Enter the account details and tap Save. A temporary password is generated.';
+    document.getElementById('userFullName').value = u ? u.name : '';
+    document.getElementById('userUsername').value = u ? u.username : '';
+    document.getElementById('userRole').value = u ? u.role : 'staff';
+    document.getElementById('userStatus').value = u ? (u.isActive ? 'active' : 'inactive') : 'active';
+    document.getElementById('userDialog').classList.add('open');
+  }
+
+  function closeUserModal() {
+    document.getElementById('userDialog').classList.remove('open');
+    editingUserId = null;
+  }
+
+  function saveUser() {
+    const name = document.getElementById('userFullName').value.trim() || 'New User';
+    const username = document.getElementById('userUsername').value.trim() || name.split(' ')[0].toLowerCase();
+    const role = document.getElementById('userRole').value;
+    const isActive = document.getElementById('userStatus').value === 'active';
+    if (editingUserId) {
+      const u = users.find(x => x.id === editingUserId);
+      if (u) { u.name = name; u.username = username; u.role = role; u.isActive = isActive; }
+      showToast('User updated', 'success');
+    } else {
+      users.push({ id: Math.max(...users.map(x => x.id)) + 1, name, username, role, isActive });
+      showToast('User created with a temporary password', 'success');
+    }
+    closeUserModal();
+    renderUsers();
+  }
+
+  function openUserView(id) {
+    const u = users.find(x => x.id === id);
+    if (!u) return;
+    viewingUserId = id;
+    document.getElementById('userViewTitle').textContent = u.name;
+    document.getElementById('viewUsername').textContent = '@' + u.username;
+    document.getElementById('viewRole').textContent = roleLabel[u.role];
+    document.getElementById('viewStatus').textContent = u.isActive ? 'Active' : 'Inactive';
+    document.getElementById('userViewDialog').classList.add('open');
+  }
+
+  function closeUserView() {
+    document.getElementById('userViewDialog').classList.remove('open');
+    viewingUserId = null;
+  }
+
+  function editViewedUser() {
+    const id = viewingUserId;
+    closeUserView();
+    openUserModal(id);
+  }
+
+  function confirmReset(id) {
+    const u = users.find(x => x.id === id);
+    openDialog({
+      title: 'Reset password?',
+      message: `A new temporary password will be generated for ${u.name}. They must change it on next login.`,
+      confirmLabel: 'Reset',
+      onConfirm: () => showToast('Temporary password generated', 'success')
+    });
+  }
+
+  function confirmToggle(id) {
+    const u = users.find(x => x.id === id);
+    openDialog({
+      title: u.isActive ? 'Deactivate user?' : 'Activate user?',
+      message: u.isActive ? `${u.name} will no longer be able to log in.` : `${u.name} will be able to log in again.`,
+      confirmLabel: u.isActive ? 'Deactivate' : 'Activate',
+      destructive: u.isActive,
+      onConfirm: () => { u.isActive = !u.isActive; renderUsers(); showToast(u.isActive ? 'User activated' : 'User deactivated', 'success'); }
+    });
+  }
+
+  function confirmDelete(id) {
+    const u = users.find(x => x.id === id);
+    openDialog({
+      title: 'Delete user?',
+      message: `Remove ${u.name} from the team? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => { users.splice(users.indexOf(u), 1); renderUsers(); showToast('User deleted', 'info'); }
+    });
   }
 
   renderUsers();

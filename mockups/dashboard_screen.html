@@ -89,6 +89,23 @@
   .log-row .title { font-size: 13px; font-weight: 700; color: var(--text); }
   .log-row .meta { font-size: 11px; color: var(--text-3); margin-top: 2px; }
 
+  /* Avatar profile dropdown */
+  .dd-overlay { position: absolute; inset: 0; background: rgba(0,0,0,.35); z-index: 30; display: none; }
+  .avatar-menu { position: absolute; top: 74px; right: 10px; width: max-content; min-width: 190px; max-width: 260px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 16px 40px rgba(0,0,0,.30); z-index: 31; overflow: hidden; display: none; }
+  .phone.menu-open .dd-overlay, .phone.menu-open .avatar-menu { display: block; }
+  .avatar-menu .menu-head { padding: 14px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--divider); }
+  .avatar-lg { width: 44px; height: 44px; border-radius: 50%; background: var(--primary); color: #fff; font-size: 15px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .avatar-menu .user-name { font-size: 14px; font-weight: 700; color: var(--text); }
+  .avatar-menu .role-wrap { margin-top: 4px; }
+  .menu-item { padding: 13px 16px; display: flex; align-items: center; gap: 12px; cursor: pointer; }
+  .menu-item + .menu-item { border-top: 1px solid var(--divider); }
+  .menu-item .ic { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(75,130,233,.16); }
+  .menu-item .ic svg { width: 16px; height: 16px; fill: var(--info); }
+  .menu-item.logout .ic { background: rgba(220,38,38,.16); }
+  .menu-item.logout .ic svg { fill: var(--error); }
+  .menu-item.logout .label { color: var(--error); }
+  .menu-item .label { flex: 1; font-size: 13.5px; font-weight: 600; color: var(--text); }
+
   .hidden { display: none; }
 </style>
 </head>
@@ -118,6 +135,7 @@
   <symbol id="i-shield-check" viewBox="0 0 24 24"><path d="M12 1 3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></symbol>
   <symbol id="i-check-circle" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></symbol>
   <symbol id="i-download" viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></symbol>
+  <symbol id="i-logout" viewBox="0 0 24 24"><path d="m17 8-1.41 1.41L17.17 11H9v2h8.17l-1.58 1.59L17 16l4-4-4-4zM5 5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h7v-2H5V5z"/></symbol>
 </svg>
 
 <div class="page-head">
@@ -144,12 +162,12 @@
 <div class="frames">
   <div class="frame-wrap">
     <div class="frame-label" id="frameLabel">Dashboard — Owner</div>
-    <div class="phone">
+    <div class="phone" id="dashPhone">
       <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
       <div class="appbar">
         <div class="title"><h2>Dashboard</h2><div class="sub" id="roleSubtitle">Pinoy POS</div></div>
         <div class="act"><div class="bell-wrap"><svg><use href="#i-bell"/></svg><span class="badge">2</span></div></div>
-        <div class="avatar" id="avatar">OW</div>
+        <div class="avatar" id="avatar" onclick="toggleAvatarMenu()">OW</div>
       </div>
       <div class="screen">
         <div class="screen-body">
@@ -325,6 +343,30 @@
         <div class="navitem"><span class="navicon"><svg><use href="#i-receipt"/></svg></span><span class="navlbl">Sales</span></div>
         <div class="navitem"><span class="navicon"><svg><use href="#i-more"/></svg></span><span class="navlbl">More</span></div>
       </div>
+
+      <!-- Avatar profile dropdown -->
+      <div class="dd-overlay" onclick="toggleAvatarMenu()"></div>
+      <div class="avatar-menu">
+        <div class="menu-head">
+          <div class="avatar-lg" id="menuAvatar">OW</div>
+          <div>
+            <div class="user-name" id="menuName">Juan Dela Cruz</div>
+            <div class="role-wrap"><span class="pill pill-green" id="menuRole">Owner</span></div>
+          </div>
+        </div>
+        <div class="menu-item" onclick="toggleAvatarMenu();showToast('Open Profile', 'info')">
+          <div class="ic"><svg><use href="#i-person"/></svg></div>
+          <div class="label">Profile</div>
+        </div>
+        <div class="menu-item" onclick="toggleAvatarMenu();showToast('Open Settings', 'info')">
+          <div class="ic"><svg><use href="#i-gear"/></svg></div>
+          <div class="label">Settings</div>
+        </div>
+        <div class="menu-item logout" onclick="toggleAvatarMenu();confirmLogout()">
+          <div class="ic"><svg><use href="#i-logout"/></svg></div>
+          <div class="label">Logout</div>
+        </div>
+      </div>
     </div>
     <div class="frame-notes" id="frameNotes">Owner sees total sales, trend, payment breakdown, top products, staff performance, low stock, and recent activity. Admin sees system overview. Staff sees own sales only.</div>
   </div>
@@ -338,12 +380,28 @@ function selectChip(el, group) {
   el.classList.add('on');
 }
 
+function toggleAvatarMenu() {
+  document.getElementById('dashPhone').classList.toggle('menu-open');
+}
+
+function confirmLogout() {
+  openDialog({
+    title: 'Log out?',
+    message: 'You will need to sign in again to continue.',
+    confirmLabel: 'Log Out',
+    destructive: true,
+    onConfirm: () => showToast('Logged out', 'info')
+  });
+}
+
 const roleData = {
   owner: {
     chipClass: 'role-owner',
     text: 'Full business dashboard: sales, trend, payments, top products, staff, low stock, recent activity.',
     subtitle: 'Pinoy POS',
     avatar: 'OW',
+    menuName: 'Juan Dela Cruz',
+    menuRole: 'Owner',
     notes: 'Owner sees total sales, trend, payment breakdown, top products, staff performance, low stock, and recent activity.',
     nav: [
       { icon: '#i-dash', label: 'Dashboard', sel: true },
@@ -358,6 +416,8 @@ const roleData = {
     text: 'System overview: status hero, user counts, users-by-role donut, health, attention items, activity. No business sales data.',
     subtitle: 'System Overview',
     avatar: 'AD',
+    menuName: 'Alex Tan',
+    menuRole: 'System Admin',
     notes: 'Admin sees a system status hero, user stats, a users-by-role donut, system health (backup · Groq AI · exports), needs-attention items, and recent system activity. No sales data.',
     nav: [
       { icon: '#i-dash', label: 'Dashboard', sel: true },
@@ -372,6 +432,8 @@ const roleData = {
     text: 'My Work dashboard: own sales trend, quick actions, low stock, recent activity.',
     subtitle: 'My Work',
     avatar: 'ST',
+    menuName: 'Maria Reyes',
+    menuRole: 'Staff',
     notes: 'Staff sees My Sales, low stock, and own recent activity. No business-wide analytics or staff performance.',
     nav: [
       { icon: '#i-dash', label: 'Dashboard', sel: true },
@@ -396,6 +458,10 @@ function setRole(role) {
   document.getElementById('frameLabel').textContent = 'Dashboard — ' + data.subtitle;
   document.getElementById('roleSubtitle').textContent = data.subtitle;
   document.getElementById('avatar').textContent = data.avatar;
+  document.getElementById('menuAvatar').textContent = data.avatar;
+  document.getElementById('menuName').textContent = data.menuName;
+  document.getElementById('menuRole').textContent = data.menuRole;
+  document.getElementById('dashPhone').classList.remove('menu-open');
   document.getElementById('frameNotes').textContent = data.notes;
 
   document.getElementById('ownerContent').classList.toggle('hidden', role !== 'owner');

@@ -68,6 +68,31 @@
 
   .notes { font-size: 13.5px; line-height: 1.5; color: var(--text); }
   .actions-card { display: flex; flex-direction: column; gap: 12px; }
+
+  .role-switcher { display: flex; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 4px; }
+  .role-switcher button { border: none; background: transparent; color: var(--text-3); border-radius: 20px; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .role-switcher button.on { background: var(--primary); color: #fff; }
+  .role-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; border: 1px solid var(--border); }
+  .role-owner { background: rgba(75,130,233,.16); color: var(--info); border-color: rgba(75,130,233,.4); }
+  .role-staff { background: rgba(22,163,74,.16); color: var(--success); border-color: rgba(22,163,74,.4); }
+  .frames-legend { max-width: 900px; margin: 0 auto 24px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; color: var(--text-2); font-size: 13px; }
+
+  /* In-phone confirmation overlay */
+  .phone-overlay { position: absolute; inset: 0; top: 30px; background: rgba(0,0,0,.55); z-index: 50; display: none; align-items: center; justify-content: center; padding: 20px; }
+  .phone-overlay.open { display: flex; }
+  .phone-dialog { width: 100%; max-width: 310px; background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 22px; box-shadow: 0 20px 50px rgba(0,0,0,.4); }
+  .phone-dialog .dialog-icon { width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; }
+  .phone-dialog .dialog-icon svg { width: 28px; height: 28px; fill: #fff; }
+  .phone-dialog h3 { color: var(--text); font-size: 18px; font-weight: 700; text-align: center; margin-bottom: 8px; }
+  .phone-dialog p { color: var(--text-3); font-size: 13px; line-height: 1.5; text-align: center; margin-bottom: 18px; }
+  .phone-dialog .d-actions { display: flex; gap: 10px; }
+  .phone-dialog .d-actions .btn { flex: 1; }
+  .summary-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--divider); }
+  .summary-row:last-child { border-bottom: none; }
+  .summary-row .label { font-size: 12px; color: var(--text-3); }
+  .summary-row .value { font-size: 13px; font-weight: 700; color: var(--text); }
+  .staff-note { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 10px; background: rgba(217,119,6,.10); border: 1px solid rgba(217,119,6,.25); font-size: 12px; color: var(--text-2); line-height: 1.45; margin-top: 12px; }
+  .staff-note svg { width: 15px; height: 15px; fill: var(--warning); flex-shrink: 0; margin-top: 1px; }
 </style>
 </head>
 <body>
@@ -93,7 +118,11 @@
 <div class="page-head">
   <div>
     <h1>Sale Details — lib/ui/screens/sale_detail_screen.dart</h1>
-    <p>Sale detail dashboard with status banner, transaction overview, total card, items, payment info, payment proof, notes, and print/download actions.</p>
+    <p>Sale detail dashboard with status banner, transaction overview, total card, items, payment info, payment proof, notes, and print/download actions. Confirm/Reject is gated by <code>verify_payments</code> (Owner only).</p>
+  </div>
+  <div class="role-switcher">
+    <button class="on" data-role="owner" onclick="setRole('owner')">Owner</button>
+    <button data-role="staff" onclick="setRole('staff')">Staff</button>
   </div>
   <button class="theme-toggle" onclick="toggleTheme()">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
@@ -101,9 +130,14 @@
   </button>
 </div>
 
+<div class="frames-legend">
+  <span class="role-chip role-owner" id="roleChip">Owner</span>
+  <span id="legendText">Owner has <code>verify_payments</code>: Confirm opens a summary dialog, Reject asks for confirmation.</span>
+</div>
+
 <div class="frames">
   <div class="frame-wrap">
-    <div class="frame-label">Sale Details</div>
+    <div class="frame-label" id="frameLabel">Sale Details — Owner</div>
     <div class="phone">
       <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
       <div class="appbar">
@@ -124,9 +158,13 @@
               </div>
               <div class="total-pill">₱210.00</div>
             </div>
-            <div class="status-actions">
-              <button class="btn btn-success">Confirm</button>
-              <button class="btn btn-error">Reject</button>
+            <div class="status-actions" id="bannerActions">
+              <button class="btn btn-success" onclick="openConfirmDialog()">Confirm</button>
+              <button class="btn btn-error" onclick="confirmReject()">Reject</button>
+            </div>
+            <div class="staff-note" id="bannerStaffNote" style="display:none;">
+              <svg><use href="#i-hourglass"/></svg>
+              <span>Waiting for the Owner to verify this GCash payment. Confirm and Reject require <code>verify_payments</code>.</span>
             </div>
           </div>
 
@@ -212,9 +250,13 @@
               <div class="lead"><div class="ic solid-amber"><svg><use href="#i-hourglass"/></svg></div><span class="l">Status</span></div>
               <div class="r"><span class="pill pill-solid-amber">Pending</span></div>
             </div>
-            <div class="status-actions" style="margin-top:12px;">
-              <button class="btn btn-success">Confirm</button>
-              <button class="btn btn-error">Reject</button>
+            <div class="status-actions" id="paymentActions" style="margin-top:12px;">
+              <button class="btn btn-success" onclick="openConfirmDialog()">Confirm</button>
+              <button class="btn btn-error" onclick="confirmReject()">Reject</button>
+            </div>
+            <div class="staff-note" id="paymentStaffNote" style="display:none;">
+              <svg><use href="#i-hourglass"/></svg>
+              <span>Only the Owner can confirm or reject pending GCash payments.</span>
             </div>
           </div>
 
@@ -239,6 +281,24 @@
 
         </div>
       </div>
+
+      <!-- Owner GCash confirmation dialog -->
+      <div class="phone-overlay" id="gcashConfirm" onclick="if(event.target===this)closeConfirmDialog()">
+        <div class="phone-dialog" onclick="event.stopPropagation()">
+          <div class="dialog-icon solid-blue"><svg><use href="#i-wallet"/></svg></div>
+          <h3>Confirm GCash Payment</h3>
+          <p>Are you sure you want to confirm this pending GCash payment?</p>
+          <div class="card pad" style="margin-bottom:16px;">
+            <div class="summary-row"><span class="label">Amount</span><span class="value">₱210.00</span></div>
+            <div class="summary-row"><span class="label">Reference</span><span class="value">1234-5678-90</span></div>
+            <div class="summary-row"><span class="label">Payment Method</span><span class="pill pill-green" style="font-size:10.5px;">GCash</span></div>
+          </div>
+          <div class="d-actions">
+            <button class="btn btn-outlined" onclick="closeConfirmDialog()">Cancel</button>
+            <button class="btn btn-primary" onclick="applyConfirm()">Confirm</button>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="frame-notes">
       <b>Mirrors sale_detail_screen.dart:</b> custom AppBar with back, receipt number title + date, print &amp; download actions. Body uses a stacked dashboard of theme-aware cards: Pending status banner with Confirm/Reject (when <code>verify_payments</code>), transaction overview tiles (receipt, date/time, customer/Guest), total + subtotal/discount/tax breakdown, items list with product thumbnails, payment method/reference/customer/status, payment-proof preview, notes, and View Receipt / Download PDF bottom actions. Tablet/desktop shows two-column top (overview + total), and the proof/notes/actions can be adjacent.
@@ -247,5 +307,58 @@
 </div>
 
 <script src="mockup.js"></script>
+<script>
+const roleData = {
+  owner: {
+    chipClass: 'role-owner', chip: 'Owner',
+    legend: 'Owner has verify_payments: Confirm opens a summary dialog, Reject asks for confirmation.',
+    label: 'Sale Details — Owner',
+    canVerify: true
+  },
+  staff: {
+    chipClass: 'role-staff', chip: 'Staff',
+    legend: 'Staff lack verify_payments: Confirm/Reject are hidden and replaced with an awaiting-verification note.',
+    label: 'Sale Details — Staff',
+    canVerify: false
+  }
+};
+
+function setRole(role) {
+  const d = roleData[role];
+  if (!d) return;
+  document.querySelectorAll('.role-switcher button').forEach(b => b.classList.toggle('on', b.dataset.role === role));
+  const chip = document.getElementById('roleChip');
+  chip.className = 'role-chip ' + d.chipClass;
+  chip.textContent = d.chip;
+  document.getElementById('legendText').innerHTML = d.legend;
+  document.getElementById('frameLabel').textContent = d.label;
+  document.getElementById('bannerActions').style.display = d.canVerify ? 'flex' : 'none';
+  document.getElementById('paymentActions').style.display = d.canVerify ? 'flex' : 'none';
+  document.getElementById('bannerStaffNote').style.display = d.canVerify ? 'none' : 'flex';
+  document.getElementById('paymentStaffNote').style.display = d.canVerify ? 'none' : 'flex';
+}
+
+function openConfirmDialog() {
+  document.getElementById('gcashConfirm').classList.add('open');
+}
+function closeConfirmDialog() {
+  document.getElementById('gcashConfirm').classList.remove('open');
+}
+function applyConfirm() {
+  closeConfirmDialog();
+  showToast('GCash payment confirmed', 'success');
+}
+function confirmReject() {
+  openDialog({
+    title: 'Reject GCash payment?',
+    message: 'The sale will stay pending until the staff submits a new payment proof.',
+    confirmLabel: 'Reject',
+    destructive: true,
+    onConfirm: () => showToast('Payment rejected', 'error')
+  });
+}
+
+setRole('owner');
+</script>
 </body>
 </html>
