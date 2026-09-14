@@ -215,17 +215,17 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
         subtitle: _roleLabel,
       ),
       floatingActionButton: createFab,
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (_stockSummary.total > 0) _buildStatsStrip(),
-          _buildToolbar(toolbarAction),
-          Expanded(
-            child: _filteredProducts.isEmpty
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (_stockSummary.total > 0) _buildStatsStrip(),
+            _buildToolbar(toolbarAction),
+            _filteredProducts.isEmpty
                 ? _buildEmptyState()
                 : _buildProductList(canEdit, canDelete, bottomClearance),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -534,48 +534,49 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
             '${filtered.length} items',
             listAccent,
           ),
-          Expanded(
-            child: ListView.separated(
-              padding: EdgeInsets.fromLTRB(
-                Spacing.md,
-                Spacing.sm,
-                Spacing.md,
-                bottomClearance + Spacing.md,
-              ),
-              itemCount: pageItems.length + (totalPages > 1 ? 1 : 0),
-              separatorBuilder: (context, index) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                if (index == pageItems.length) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: Spacing.sm,
-                      vertical: Spacing.sm,
-                    ),
-                    child: PaginationBar(
-                      totalItems: filtered.length,
-                      currentPage: effectivePage,
-                      pageSize: _pageSize,
-                      onPageChanged: _goToPage,
-                    ),
-                  );
-                }
-                final product = pageItems[index];
-                final category = _categories.firstWhere(
-                  (c) => c.id == product.categoryId,
-                  orElse: () => Category(
-                    id: 0,
-                    name: 'Uncategorized',
-                    createdAt: DateTime.now(),
+          ListView.separated(
+            shrinkWrap: true,
+            primary: false,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(
+              Spacing.md,
+              Spacing.sm,
+              Spacing.md,
+              bottomClearance + Spacing.md,
+            ),
+            itemCount: pageItems.length + (totalPages > 1 ? 1 : 0),
+            separatorBuilder: (context, index) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              if (index == pageItems.length) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: Spacing.sm,
+                    vertical: Spacing.sm,
+                  ),
+                  child: PaginationBar(
+                    totalItems: filtered.length,
+                    currentPage: effectivePage,
+                    pageSize: _pageSize,
+                    onPageChanged: _goToPage,
                   ),
                 );
-                return _buildProductRow(
-                  product,
-                  category,
-                  canEdit,
-                  canDelete,
-                );
-              },
-            ),
+              }
+              final product = pageItems[index];
+              final category = _categories.firstWhere(
+                (c) => c.id == product.categoryId,
+                orElse: () => Category(
+                  id: 0,
+                  name: 'Uncategorized',
+                  createdAt: DateTime.now(),
+                ),
+              );
+              return _buildProductRow(
+                product,
+                category,
+                canEdit,
+                canDelete,
+              );
+            },
           ),
         ],
       ),

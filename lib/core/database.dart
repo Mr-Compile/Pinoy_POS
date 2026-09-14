@@ -298,7 +298,7 @@ class DatabaseHelper {
     // Migration from v12 -> v13: add AI quota table and default AI quota
     // column to settings. Seed an ai_quota row for every existing user.
     if (oldVersion < 13) {
-      await db.execute('ALTER TABLE settings ADD COLUMN ai_daily_quota INTEGER NOT NULL DEFAULT 20');
+      await db.execute('ALTER TABLE settings ADD COLUMN ai_daily_quota INTEGER NOT NULL DEFAULT ${AppConstants.defaultDailyAIQuota}');
 
       await db.execute('''
         CREATE TABLE IF NOT EXISTS ai_quota (
@@ -363,7 +363,7 @@ class DatabaseHelper {
             gcash_payment_proof_requirement TEXT NOT NULL DEFAULT 'optional',
             gcash_verification_mode TEXT NOT NULL DEFAULT 'immediate',
             gcash_reference_min_length INTEGER NOT NULL DEFAULT 6,
-            ai_daily_quota INTEGER NOT NULL DEFAULT 20,
+            ai_daily_quota INTEGER NOT NULL DEFAULT ${AppConstants.defaultDailyAIQuota},
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
           )
@@ -850,7 +850,7 @@ class DatabaseHelper {
         gcash_qr_image_path TEXT,
         gcash_qr_image_type TEXT,
         gcash_qr_preview_path TEXT,
-        ai_daily_quota INTEGER NOT NULL DEFAULT 20,
+        ai_daily_quota INTEGER NOT NULL DEFAULT ${AppConstants.defaultDailyAIQuota},
         inactivity_timeout_minutes INTEGER NOT NULL DEFAULT 15,
         session_warning_seconds INTEGER NOT NULL DEFAULT 30,
         auto_backup_enabled INTEGER NOT NULL DEFAULT 0,

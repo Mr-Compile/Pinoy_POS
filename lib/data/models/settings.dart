@@ -1,4 +1,6 @@
-﻿class Settings {
+﻿import 'package:pinoy_pos/core/constants.dart';
+
+class Settings {
   static const Object _sentinel = Object();
 
   final int? id;
@@ -49,7 +51,7 @@
     this.gcashQrImagePath,
     this.gcashQrImageType,
     this.gcashQrPreviewPath,
-    this.aiDailyQuota = 20,
+    this.aiDailyQuota = AppConstants.defaultDailyAIQuota,
     this.inactivityTimeoutMinutes = 15,
     this.sessionWarningSeconds = 30,
     this.autoBackupEnabled = false,
@@ -115,21 +117,17 @@
       return false;
     }
 
+    // Tolerant on purpose: a missing or malformed timestamp column (e.g. a
+    // settings table restored from a legacy/damaged backup) must not fail
+    // the entire settings load — the caller sees the epoch as "unset".
     DateTime parseDateTime(String key) {
       final value = map[key];
       if (value is DateTime) return value;
-      if (value is! String) {
-        throw FormatException(
-          'Settings row field "$key" must be a date string, got $value.',
-        );
+      if (value is String) {
+        final parsed = DateTime.tryParse(value);
+        if (parsed != null) return parsed;
       }
-      try {
-        return DateTime.parse(value);
-      } catch (e) {
-        throw FormatException(
-          'Settings row field "$key" has invalid date "$value".',
-        );
-      }
+      return DateTime.fromMillisecondsSinceEpoch(0);
     }
 
     return Settings(
@@ -154,7 +152,8 @@
       gcashQrImagePath: stringOrNull('gcash_qr_image_path'),
       gcashQrImageType: stringOrNull('gcash_qr_image_type'),
       gcashQrPreviewPath: stringOrNull('gcash_qr_preview_path'),
-      aiDailyQuota: intOrNull('ai_daily_quota') ?? 20,
+      aiDailyQuota:
+          intOrNull('ai_daily_quota') ?? AppConstants.defaultDailyAIQuota,
       inactivityTimeoutMinutes: intOrNull('inactivity_timeout_minutes') ?? 15,
       sessionWarningSeconds: intOrNull('session_warning_seconds') ?? 30,
       autoBackupEnabled: boolFromInt('auto_backup_enabled'),

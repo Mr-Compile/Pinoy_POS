@@ -409,13 +409,13 @@ class _StockScreenState extends ConsumerState<StockScreen> {
       floatingActionButton: createFab,
       body: _products.isEmpty
           ? _buildNoProductsState()
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildStatsStrip(),
-                _buildToolbar(toolbarAction),
-                Expanded(
-                  child: _filteredProducts.isEmpty
+          : SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildStatsStrip(),
+                  _buildToolbar(toolbarAction),
+                  _filteredProducts.isEmpty
                       ? _buildEmptyFilterState()
                       : _buildStockList(
                           canAddStock,
@@ -423,8 +423,8 @@ class _StockScreenState extends ConsumerState<StockScreen> {
                           canViewStock,
                           bottomClearance,
                         ),
-                ),
-              ],
+                ],
+              ),
             ),
     );
   }
@@ -747,40 +747,41 @@ class _StockScreenState extends ConsumerState<StockScreen> {
             '${filtered.length} items',
             headColor,
           ),
-          Expanded(
-            child: ListView.separated(
-              padding: EdgeInsets.fromLTRB(
-                Spacing.md,
-                Spacing.sm,
-                Spacing.md,
-                bottomClearance + Spacing.md,
-              ),
-              itemCount: pageItems.length + (totalPages > 1 ? 1 : 0),
-              separatorBuilder: (context, index) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                if (index == pageItems.length) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: Spacing.sm,
-                      vertical: Spacing.sm,
-                    ),
-                    child: PaginationBar(
-                      totalItems: filtered.length,
-                      currentPage: effectivePage,
-                      pageSize: _pageSize,
-                      onPageChanged: _goToPage,
-                    ),
-                  );
-                }
-                final product = pageItems[index];
-                return _buildStockRow(
-                  product,
-                  canAddStock,
-                  canAdjustStock,
-                  canViewStock,
-                );
-              },
+          ListView.separated(
+            shrinkWrap: true,
+            primary: false,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(
+              Spacing.md,
+              Spacing.sm,
+              Spacing.md,
+              bottomClearance + Spacing.md,
             ),
+            itemCount: pageItems.length + (totalPages > 1 ? 1 : 0),
+            separatorBuilder: (context, index) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              if (index == pageItems.length) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: Spacing.sm,
+                    vertical: Spacing.sm,
+                  ),
+                  child: PaginationBar(
+                    totalItems: filtered.length,
+                    currentPage: effectivePage,
+                    pageSize: _pageSize,
+                    onPageChanged: _goToPage,
+                  ),
+                );
+              }
+              final product = pageItems[index];
+              return _buildStockRow(
+                product,
+                canAddStock,
+                canAdjustStock,
+                canViewStock,
+              );
+            },
           ),
         ],
       ),

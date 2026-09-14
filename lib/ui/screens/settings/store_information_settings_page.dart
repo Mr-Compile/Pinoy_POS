@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/modal_result.dart';
+import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
@@ -15,7 +16,8 @@ import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 
 /// Store Information settings sub-page — business settings (Owner only).
 ///
-/// Requires `edit_settings` permission. Shows store name, address,
+/// Requires business-Owner privileges (see
+/// [SessionManager.canEditBusinessSettings]). Shows store name, address,
 /// contact, receipt footer, and currency — all editable via dialogs.
 class StoreInformationSettingsPage extends ConsumerStatefulWidget {
   const StoreInformationSettingsPage({super.key});
@@ -63,6 +65,20 @@ class _StoreInformationSettingsPageState
 
   @override
   Widget build(BuildContext context) {
+    if (!SessionManager().canEditBusinessSettings()) {
+      return const Scaffold(
+        appBar: AppHeader(
+          title: 'Store Information',
+          showBackButton: true,
+        ),
+        body: ErrorState(
+          title: 'Access Denied',
+          message:
+              'You do not have permission to access Store Information.',
+        ),
+      );
+    }
+
     if (_isLoading) {
       return Scaffold(
         appBar: const AppHeader(

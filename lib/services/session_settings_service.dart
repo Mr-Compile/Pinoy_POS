@@ -15,13 +15,43 @@ class SessionSettingsService {
   static const int defaultWarningSeconds = 30;
   static const Duration maxSessionLifetime = Duration(hours: 8);
 
-  Future<Duration> getEffectiveInactivityTimeout(User user) async {
-    if (user.inactivityTimeoutMinutes != null) {
-      return Duration(minutes: user.inactivityTimeoutMinutes!);
-    }
+  /// A stored timeout of 0 minutes means the session never ends due to
+  /// inactivity. The absolute [maxSessionLifetime] still applies.
+  static const int unlimitedInactivityMinutes = 0;
 
-    final settings = await _settingsRepository.getSettings();
-    final minutes = settings?.inactivityTimeoutMinutes ?? _defaultInactivityTimeoutMinutes;
+  /// The choices offered by the inactivity-timeout dropdowns, in minutes.
+  static const List<int> inactivityTimeoutChoices = [
+    3,
+    15,
+    30,
+    60,
+    unlimitedInactivityMinutes,
+  ];
+
+  /// Display label for a stored inactivity timeout in minutes.
+  static String inactivityTimeoutLabel(int minutes) => switch (minutes) {
+        unlimitedInactivityMinutes => 'Unlimited',
+        60 => '1 hour',
+        _ => '$minutes minutes',
+      };
+
+  /// The choices offered by the session-warning dropdown, in seconds.
+  static const List<int> sessionWarningChoices = [15, 30, 60, 120];
+
+  /// Display label for a stored session warning in seconds.
+  static String sessionWarningLabel(int seconds) => switch (seconds) {
+        60 => '1 minute',
+        120 => '2 minutes',
+        _ => '$seconds seconds',
+      };
+
+  /// The effective inactivity timeout for [user], or `null` when the
+  /// session is unlimited and never expires due to inactivity.
+  Future<Duration?> getEffectiveInactivityTimeout(User user) async {
+    final minutes = user.inactivityTimeoutMinutes ??
+        (await _settingsRepository.getSettings())?.inactivityTimeoutMinutes ??
+        _defaultInactivityTimeoutMinutes;
+    if (minutes <= unlimitedInactivityMinutes) return null;
     return Duration(minutes: minutes);
   }
 
@@ -41,10 +71,11 @@ class SessionSettingsService {
   /// inactivity timeout so the warning can never be equal to or greater
   /// than the timeout itself.
   ///
-  /// Returns [Duration.zero] when the effective timeout is too short to
-  /// leave any room for a warning (the session then expires without one).
+  /// Returns [Duration.zero] when the effective timeout is unlimited or too
+  /// short to leave any room for a warning (no warning is ever shown).
   Future<Duration> getEffectiveWarningThreshold(User user) async {
     final timeout = await getEffectiveInactivityTimeout(user);
+    if (timeout == null) return Duration.zero;
     var warning = await getWarningThreshold();
     if (warning >= timeout) {
       warning = timeout - const Duration(seconds: 1);

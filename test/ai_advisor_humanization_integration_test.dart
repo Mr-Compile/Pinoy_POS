@@ -13,7 +13,6 @@ import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/services/ai_advisor_service.dart';
 import 'package:pinoy_pos/services/ai_response_policy.dart';
 import 'package:pinoy_pos/services/ai_skill_service.dart';
-import 'package:pinoy_pos/services/ai_skill_service.dart';
 import 'package:pinoy_pos/services/ai_usage_service.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
 import 'package:pinoy_pos/services/business_intelligence_service.dart';

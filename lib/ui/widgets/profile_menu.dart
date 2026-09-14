@@ -113,6 +113,10 @@ class _ProfileMenuState extends ConsumerState<ProfileMenu> {
               _safePush(const ProfileScreen());
             },
             onSettings: () {
+              // Entry is intentionally unconditional: SettingsScreen is a
+              // universal hub whose personal tiles (Profile, PIN, Appearance,
+              // Security) are needed by every role. System tiles gate
+              // themselves on their own permissions.
               Navigator.of(context, rootNavigator: true).pop();
               _safePush(const SettingsScreen());
             },

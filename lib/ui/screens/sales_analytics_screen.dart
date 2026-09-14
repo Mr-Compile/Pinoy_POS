@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/breakpoints.dart';
 import 'package:pinoy_pos/core/currency_utils.dart';
+import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/data/models/sales_period.dart';
@@ -433,12 +434,22 @@ class _SalesAnalyticsScreenState extends ConsumerState<SalesAnalyticsScreen> {
             ],
           ),
         ),
+        // Store information is Owner-owned business identity. Staff see a
+        // muted hint instead of the action; the page and service layer both
+        // re-check canEditBusinessSettings regardless.
         if (state.storeInfo == null)
-          TextButton.icon(
-            onPressed: _openStoreSettings,
-            icon: const Icon(Icons.storefront),
-            label: const Text('Set store'),
-          ),
+          SessionManager().canEditBusinessSettings()
+              ? TextButton.icon(
+                  onPressed: _openStoreSettings,
+                  icon: const Icon(Icons.storefront),
+                  label: const Text('Set store'),
+                )
+              : Text(
+                  'Store info not set — contact your Owner.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                ),
       ],
     );
   }

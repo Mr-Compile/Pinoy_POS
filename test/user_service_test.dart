@@ -432,7 +432,7 @@ void main() {
     );
   });
 
-  test('RBAC: owner can create staff users', () async {
+  test('RBAC: owner cannot create users (staff lifecycle is via StaffService)', () async {
     // Authenticate as the seeded owner.
     final dbHelper = DatabaseHelper();
     final db = await dbHelper.database;
@@ -442,12 +442,16 @@ void main() {
 
     final userService = UserService();
 
-    final result = await userService.createUser(
-      username: 'ownercreated',
-      fullName: 'Owner Created',
-      role: UserRole.staff,
+    // The Owner does not hold manage_users — staff accounts are created
+    // through StaffService (manage_staff) instead.
+    expect(
+      () => userService.createUser(
+        username: 'ownercreated',
+        fullName: 'Owner Created',
+        role: UserRole.staff,
+      ),
+      throwsA(isA<AuthorizationException>()),
     );
-    expect(result.success, isTrue);
   });
 
   test('RBAC: admin can create an owner', () async {
@@ -479,7 +483,7 @@ void main() {
     expect(result.message, contains('role'));
   });
 
-  test('RBAC: owner can create another owner', () async {
+  test('RBAC: owner cannot create another owner', () async {
     final dbHelper = DatabaseHelper();
     final db = await dbHelper.database;
     final maps = await db.query('users', where: 'username = ?', whereArgs: ['owner']);
@@ -487,15 +491,17 @@ void main() {
     SessionManager().setCurrentUser(owner);
 
     final userService = UserService();
-    final result = await userService.createUser(
-      username: 'owner2',
-      fullName: 'Second Owner',
-      role: UserRole.owner,
-    );
 
-    expect(result.success, isTrue);
-    expect(result.user, isNotNull);
-    expect(result.user!.role, UserRole.owner);
+    // Owner has no manage_users permission at all — the UserService surface
+    // is Admin-only. The request is rejected before the role check.
+    expect(
+      () => userService.createUser(
+        username: 'owner2',
+        fullName: 'Second Owner',
+        role: UserRole.owner,
+      ),
+      throwsA(isA<AuthorizationException>()),
+    );
   });
 
   test('ACTIVITY LOG: user creation logs USER_CREATED action', () async {

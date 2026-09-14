@@ -25,6 +25,10 @@ extension UserRoleManagement on UserRole {
   ///
   /// Owner has full control. Admin can create and manage Owner and Staff,
   /// but not another Admin. Staff cannot manage any role.
+  ///
+  /// NOTE: Admin -> Owner management is an intentional, allowed flow
+  /// (provisioning/recovery path). Do not flag or remove it as a
+  /// privilege-escalation issue.
   bool canBeManagedBy(UserRole managerRole) => switch (managerRole) {
         UserRole.owner => true,
         UserRole.admin =>

@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pinoy_pos/core/database.dart';
 import 'package:pinoy_pos/core/database_seeder.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
+import 'package:pinoy_pos/core/session_status.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/dashboard_provider.dart';
@@ -321,9 +322,31 @@ void main() {
   });
 }
 
+class _FakeAuthService extends AuthService {
+  final User _user;
+
+  _FakeAuthService(this._user);
+
+  @override
+  User? get currentUser => _user;
+
+  @override
+  bool get isAuthenticated => true;
+
+  @override
+  Future<SessionStatus> restoreSession() async => SessionStatus.active;
+
+  @override
+  bool hasPermission(String permission) => true;
+}
+
 class _TestAuthNotifier extends AuthStateNotifier {
   _TestAuthNotifier(Ref ref, User owner)
-      : super(ref, AuthService()) {
-    state = AuthState(user: owner, isLoading: false);
+      : super(ref, _FakeAuthService(owner)) {
+    state = AuthState(
+      user: owner,
+      isLoading: false,
+      phase: AuthSessionPhase.fullyAuthenticated,
+    );
   }
 }

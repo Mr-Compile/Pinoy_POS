@@ -21,7 +21,8 @@ import 'package:pinoy_pos/ui/widgets/loading_state.dart';
 /// Full-screen GCash payment evidence viewer. Requires `view_payment_evidence`.
 ///
 /// GCash payment proofs are always images. The viewer shows the detected
-/// file type and provides Download Image and Replace actions.
+/// file type and provides Download Image and Replace actions. Replacing
+/// evidence requires `verify_payments`.
 class PaymentProofViewerScreen extends ConsumerStatefulWidget {
   final Sale sale;
 
@@ -134,9 +135,8 @@ class _PaymentProofViewerScreenState
     final canVerify = ref
         .read(authStateProvider.notifier)
         .hasPermission('verify_payments');
-    final isOwn = ref.read(authStateProvider).user?.id == _sale.userId;
 
-    if (!canVerify && !isOwn) {
+    if (!canVerify) {
       AppDialogService.accessDenied(context);
       return;
     }
@@ -207,9 +207,8 @@ class _PaymentProofViewerScreenState
     final canVerify = ref
         .read(authStateProvider.notifier)
         .hasPermission('verify_payments');
-    final isOwn = ref.read(authStateProvider).user?.id == _sale.userId;
 
-    final replaceAction = (canVerify || isOwn) && !_isLoading && _error == null
+    final replaceAction = canVerify && !_isLoading && _error == null
         ? IconButton(
             onPressed: _isReplacing ? null : _replaceProof,
             icon: const Icon(Icons.camera_alt),

@@ -8,6 +8,7 @@ import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/user_provider.dart';
+import 'package:pinoy_pos/services/session_settings_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_form.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
@@ -306,13 +307,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                   label: 'Inactivity timeout',
                   hint: 'Use store default',
                   prefixIcon: Icons.timer_outlined,
-                  items: const [
-                    DropdownMenuItem(value: null, child: Text('Use store default')),
-                    DropdownMenuItem(value: 5, child: Text('5 minutes')),
-                    DropdownMenuItem(value: 15, child: Text('15 minutes')),
-                    DropdownMenuItem(value: 30, child: Text('30 minutes')),
-                    DropdownMenuItem(value: 60, child: Text('60 minutes')),
-                  ],
+                  items: _inactivityTimeoutItems(user.inactivityTimeoutMinutes),
                   initialValue: state.value<int>('inactivityTimeout', user.inactivityTimeoutMinutes),
                   onChanged: (value) {
                     state.setValue<int>('inactivityTimeout', value);
@@ -422,6 +417,23 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     }
   }
 
+  /// Inactivity-timeout dropdown items: the shared choices plus a legacy
+  /// stored [current] value (e.g. 5) so editing never drops it.
+  List<DropdownMenuItem<int>> _inactivityTimeoutItems(int? current) {
+    final choices = [...SessionSettingsService.inactivityTimeoutChoices];
+    if (current != null && !choices.contains(current)) {
+      choices.add(current);
+    }
+    return [
+      const DropdownMenuItem(value: null, child: Text('Use store default')),
+      for (final minutes in choices)
+        DropdownMenuItem(
+          value: minutes,
+          child: Text(SessionSettingsService.inactivityTimeoutLabel(minutes)),
+        ),
+    ];
+  }
+
   // ── ADD USER ─────────────────────────────────────────────────────────
 
   Future<void> _showAddUserDialog() async {
@@ -525,13 +537,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                     label: 'Inactivity timeout',
                     hint: 'Use store default',
                     prefixIcon: Icons.timer_outlined,
-                    items: const [
-                      DropdownMenuItem(value: null, child: Text('Use store default')),
-                      DropdownMenuItem(value: 5, child: Text('5 minutes')),
-                      DropdownMenuItem(value: 15, child: Text('15 minutes')),
-                      DropdownMenuItem(value: 30, child: Text('30 minutes')),
-                      DropdownMenuItem(value: 60, child: Text('60 minutes')),
-                    ],
+                    items: _inactivityTimeoutItems(null),
                     initialValue: state.value<int>('inactivityTimeout'),
                     onChanged: (value) {
                       state.setValue<int>('inactivityTimeout', value);
@@ -1050,7 +1056,9 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
               if (user.inactivityTimeoutMinutes != null)
                 _buildViewRow(
                   'Inactivity timeout',
-                  '${user.inactivityTimeoutMinutes} minutes',
+                  SessionSettingsService.inactivityTimeoutLabel(
+                    user.inactivityTimeoutMinutes!,
+                  ),
                 ),
               if (user.mustChangePassword)
                 _buildViewRow('Password', 'Temporary password'),

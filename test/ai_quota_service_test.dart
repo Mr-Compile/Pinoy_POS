@@ -1,6 +1,7 @@
 ﻿import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import 'package:pinoy_pos/core/constants.dart';
 import 'package:pinoy_pos/core/database.dart';
 import 'package:pinoy_pos/core/database_seeder.dart';
 import 'package:pinoy_pos/core/security.dart';
@@ -121,7 +122,7 @@ void main() {
   });
 
   group('Daily enforcement', () {
-    test('new user has default quota of 20', () async {
+    test('new user gets the configured default quota', () async {
       await authenticateAsAdmin();
       final userService = UserService();
 
@@ -136,7 +137,7 @@ void main() {
       final aiQuotaService = AIQuotaService();
       final quota = await aiQuotaService.getQuotaForUser(result.user!.id!);
 
-      expect(quota.dailyQuota, 20);
+      expect(quota.dailyQuota, AppConstants.defaultDailyAIQuota);
       expect(quota.dailyUsage, 0);
     });
 

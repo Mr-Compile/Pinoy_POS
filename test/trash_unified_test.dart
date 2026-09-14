@@ -412,4 +412,41 @@ void main() {
     expect(find.text('Merchant QR'), findsNothing);
     expect(find.text('Sale Day'), findsNothing);
   });
+
+  testWidgets('admin with view_settings does not see merchant QR trash',
+      (WidgetTester tester) async {
+    final admin = User(
+      id: 2,
+      username: 'admin',
+      passwordHash: '',
+      role: UserRole.admin,
+      fullName: 'Admin User',
+      createdAt: now,
+      isActive: true,
+      mustChangePassword: false,
+    );
+    SessionManager().setCurrentUser(admin);
+
+    final adminAuth = _LimitedFakeAuthService(
+      admin,
+      {
+        'view_trash',
+        'restore_trash',
+        'view_users',
+        'delete_users',
+        'view_settings',
+        'edit_settings',
+      },
+    );
+
+    await pumpTrashScreen(tester, authService: adminAuth);
+
+    // Admin sees the types they can act on.
+    expect(find.text('Staff One'), findsOneWidget);
+
+    // Merchant QR is an Owner-only business asset and stays hidden even
+    // though Admin holds view_settings/edit_settings.
+    expect(find.text('Merchant QR'), findsNothing);
+    expect(find.text('QR'), findsNothing);
+  });
 }

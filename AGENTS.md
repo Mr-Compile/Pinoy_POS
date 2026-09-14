@@ -1,4 +1,4 @@
-# Pinoy POS Agent Notes
+﻿# Pinoy POS Agent Notes
 
 ## Responsive CRUD Action Placement
 
@@ -7,22 +7,22 @@
 The primary Add/Create action for a CRUD module lives in exactly one place
 per layout:
 
-- **Compact width + portrait** → compact icon-only `FloatingActionButton`
+- **Compact width + portrait** â†’ compact icon-only `FloatingActionButton`
   (plus sign only, no text label).
 - **Every other layout** (compact landscape, tablet, desktop, resized
-  windows) → labeled `AppButton` inside the screen's `CrudToolbar`.
+  windows) â†’ labeled `AppButton` inside the screen's `CrudToolbar`.
 - **`AppHeader` never hosts a module create action.** It keeps title,
   back, theme toggle, notification bell, and profile menu only.
 
 ### API (`lib/ui/widgets/responsive_create_action.dart`)
 
 - `ResponsiveCreateAction(label, icon, onPressed, tooltip?, color?)`
-  - `isFabLayout(context)` — true only for compact width AND portrait.
-  - `contentAction(context)` — toolbar button, `null` on FAB layouts.
-  - `fab(context)` — FAB, `null` on non-FAB layouts. Per-label `heroTag`.
+  - `isFabLayout(context)` â€” true only for compact width AND portrait.
+  - `contentAction(context)` â€” toolbar button, `null` on FAB layouts.
+  - `fab(context)` â€” FAB, `null` on non-FAB layouts. Per-label `heroTag`.
     `color` defaults to `AppButtonColor.primary`; other roles resolve to
     semantic background/foreground pairs (e.g. `warning` for Reset All).
-  - `contentBottomClearance(context)` — `fabClearance` (88) on FAB layouts,
+  - `contentBottomClearance(context)` â€” `fabClearance` (88) on FAB layouts,
     else 0. Add it to scrollable list bottom padding so the last item
     clears the FAB.
   - Permission gating stays at the call site: construct the object only
@@ -30,25 +30,25 @@ per layout:
 - `CrudToolbar(search?, controls, pinnedControls, primaryAction, padding, maxSearchWidth)`
   - Compact: search stacked above a horizontally scrollable controls row
     with pinned controls and the primary action pinned right.
-  - Medium+: single row — capped search (`Flexible` + `ConstrainedBox`),
+  - Medium+: single row â€” capped search (`Flexible` + `ConstrainedBox`),
     scrollable `controls` in `Expanded`, `pinnedControls` and
     `primaryAction` trailing.
 
 ### Screens migrated
 
-- `products_screen.dart` — toolbar: search + category dropdown + Add Product.
-- `categories_screen.dart` — toolbar: search + status chips + Add Category;
+- `products_screen.dart` â€” toolbar: search + category dropdown + Add Product.
+- `categories_screen.dart` â€” toolbar: search + status chips + Add Category;
   a lone action row renders when the list is empty so the action stays
   reachable. Refresh stays in the header as a secondary icon.
-- `users_screen.dart` — toolbar: search + pinned refresh + Add User; role
+- `users_screen.dart` â€” toolbar: search + pinned refresh + Add User; role
   chips remain on their own row.
-- `staff_management_screen.dart` — toolbar: search + filter chips +
+- `staff_management_screen.dart` â€” toolbar: search + filter chips +
   pinned sort menu + Add Staff.
-- `stock_screen.dart` — toolbar: search + stock chips + divider +
+- `stock_screen.dart` â€” toolbar: search + stock chips + divider +
   category chips + Add Stock.
-- `report_submissions_screen.dart` — owner-only toolbar: Import.
-- `announcements_screen.dart` — toolbar: pinned refresh + Add Announcement.
-- `ai_quota_management_page.dart` — Reset All Usage uses the same
+- `report_submissions_screen.dart` â€” owner-only toolbar: Import.
+- `announcements_screen.dart` â€” toolbar: pinned refresh + Add Announcement.
+- `ai_quota_management_page.dart` â€” Reset All Usage uses the same
   component (warning color); FAB only on compact portrait, content button
   next to "Change Default Quota" otherwise.
 
@@ -216,7 +216,7 @@ Result: `flutter analyze` reports no issues; `flutter test` passes 232/232 tests
 
 ### Remaining Known Gaps
 
-- Currency display is still hardcoded to `₱` in several screens (`pos_screen.dart`, `sales_screen.dart`, `products_screen.dart`, `trash_screen.dart`, etc.). A central `CurrencyUtils` helper and a pass through the POS/product flows is still needed.
+- Currency display is still hardcoded to `â‚±` in several screens (`pos_screen.dart`, `sales_screen.dart`, `products_screen.dart`, `trash_screen.dart`, etc.). A central `CurrencyUtils` helper and a pass through the POS/product flows is still needed.
 - `lib/ui/screens/reports_screen.dart` is dead code and should be removed or rewired.
 - The Settings > Reports hub filters (date, staff, payment method) are not yet wired to real filtered export queries.
 - Responsive/tablet/desktop break points and visual regressions should be smoke-tested on actual devices after the color palette change.
@@ -307,7 +307,7 @@ Use `AppDialogForm<T>` for every form dialog:
 
 ### Files Added/Changed
 
-- `lib/ui/widgets/app_dialog_form.dart` — new reusable widget that owns controller lifecycle and dialog state.
+- `lib/ui/widgets/app_dialog_form.dart` â€” new reusable widget that owns controller lifecycle and dialog state.
 - Refactored dialog forms:
   - `lib/ui/screens/products_screen.dart`
   - `lib/ui/screens/categories_screen.dart`
@@ -344,6 +344,7 @@ Result: `flutter analyze` reports no issues; `flutter test` passes 232/232 tests
 - **Staff report submissions notify Owners.** `ReportService.submitReport()` creates a `report_submitted` notification for every Owner account.
 - **Backup packages include image directories.** `BackupService` now zips `payment_evidence/`, `gcash_qr/`, and `images/` and restores them.
 - **`RouteGuard` uses `AccessDeniedScreen`.** Unauthorized navigation now pushes the dedicated screen instead of a generic dialog.
+- **Admin creating/managing Owner accounts is INTENTIONAL — do not "fix".** `UserRoleManagement.canBeManagedBy` deliberately grants Admin -> Owner (create, edit, reset password, deactivate). This is an allowed provisioning/recovery flow, not a privilege-escalation bug. Audits must not flag or remove it.
 
 ## Verification
 
@@ -436,8 +437,9 @@ The trash feature had several architectural gaps:
 ### Changes Made
 
 - `lib/core/session_manager.dart`
-  - Added `manage_users`, `edit_users`, `delete_users`, `reset_password`, `toggle_user_active`, `view_users`, and `empty_trash` to Owner.
+  - Added `view_users`, `delete_users`, and `empty_trash` to Owner.
   - Added `view_users` to Admin.
+  - NOTE (corrected): an earlier revision of this section also granted the Owner `manage_users`/`edit_users`/`reset_password`/`toggle_user_active`. Those were removed as dead grants â€” no Owner-reachable path calls `UserService`. The staff lifecycle runs on `manage_staff` via `StaffService`; `view_users`/`delete_users` are retained because `TrashService.moveToTrash`/`restoreByEntity`/`permanentDeleteByEntity` require them for `user` entities.
 
 - `lib/services/trash_service.dart`
   - Rewrote `moveToTrash`, `restoreByEntity`, `restoreFromTrash`, `permanentDelete`, and `emptyTrash` to be the single authority for soft-delete/restore/permanent-delete.
@@ -517,10 +519,10 @@ Results:
 
 All data-entry fields use the shared components in `lib/ui/widgets/app_input_fields.dart`:
 
-- `AppTextFormField` — general labeled/hinted text or number input (supports label, hint, helperText, prefixIcon/prefix/prefixText, suffixIcon/suffix/suffixText, keyboardType, validators, obscureText, etc.).
-- `AppPasswordField` — any password/PIN-style secret input; owns the visibility-toggle suffix icon and supports `isLoading` to disable it.
-- `AppDropdownField<T>` — dropdowns that match the text-field design (same filled surface, radius, border, icon colors).
-- `AppSearchField` — compact search bars with a leading search icon and optional `onClear` button.
+- `AppTextFormField` â€” general labeled/hinted text or number input (supports label, hint, helperText, prefixIcon/prefix/prefixText, suffixIcon/suffix/suffixText, keyboardType, validators, obscureText, etc.).
+- `AppPasswordField` â€” any password/PIN-style secret input; owns the visibility-toggle suffix icon and supports `isLoading` to disable it.
+- `AppDropdownField<T>` â€” dropdowns that match the text-field design (same filled surface, radius, border, icon colors).
+- `AppSearchField` â€” compact search bars with a leading search icon and optional `onClear` button.
 
 ### Visual source of truth
 
@@ -528,7 +530,7 @@ All data-entry fields use the shared components in `lib/ui/widgets/app_input_fie
 
 ### Rules
 
-- Never set `border:`/`enabledBorder:`/`focusedBorder:`/`errorBorder:`/`borderRadius` inside `InputDecoration` at call sites — the theme owns them.
+- Never set `border:`/`enabledBorder:`/`focusedBorder:`/`errorBorder:`/`borderRadius` inside `InputDecoration` at call sites â€” the theme owns them.
 - Do not re-implement password visibility toggles; use `AppPasswordField`.
 - Specialized fields that keep a custom widget (AI chat composers, imperative `errorText` fields like the SuperAdmin password) must still omit explicit border overrides so the theme applies.
 - Icon colors come from `prefixIconColor`/`suffixIconColor` theme states; only pass a fully styled `prefix`/`suffix` widget when the default state colors are not appropriate (e.g., login's always-primary icons).
@@ -556,7 +558,7 @@ flutter test test/app_input_fields_test.dart
 - `lib/services/dashboard_service.dart`
   - Added `sealed class DashboardData`; `OwnerDashboardData`, `AdminDashboardData`, and `StaffDashboardData` are its subtypes. `getDashboard` returns `Future<DashboardData?>`, so the UI switches on the payload type instead of the live session role (removes the `owner!`/`admin!`/`staff!` crash risk on mid-load account changes).
   - `AdminDashboardData` dropped the nullable `analytics` field and gained `exportCount`, `lastExportAt`, `aiConfigured`, `aiModel`, and `aiQueriesToday`.
-  - `getAdminDashboard` no longer fetches sales analytics; it loads export-history summary, Groq configuration status (best-effort — secure storage can throw on platforms without a keychain), and today's AI query usage across active users.
+  - `getAdminDashboard` no longer fetches sales analytics; it loads export-history summary, Groq configuration status (best-effort â€” secure storage can throw on platforms without a keychain), and today's AI query usage across active users.
 
 - `lib/providers/dashboard_provider.dart`
   - Added `DashboardDenied` state so an authenticated user without `view_dashboard` sees an access-denied view instead of "Not authenticated".
@@ -571,7 +573,7 @@ flutter test test/app_input_fields_test.dart
   - All dashboard quick actions now route through `RouteGuard.pushIfAuthorized` for consistent permission checks and denied-attempt logging.
 
 - Tests
-  - `test/analytics_dashboard_test.dart` — added "Admin dashboard returns system metrics only".
+  - `test/analytics_dashboard_test.dart` â€” added "Admin dashboard returns system metrics only".
 
 ### Verification
 
@@ -597,10 +599,10 @@ flutter test --concurrency=1
 
 `lib/core/app_theme.dart` now contains:
 
-- `AppColorTokens` — the exact requested foundation palette (`primaryBlue`, `darkBackground`, `darkSurface`, `lightBackground`, `textPrimary`, etc.).
-- `AppSemanticColors` — primary, success, warning, error, info, neutral, disabled roles plus theme-aware `resolve`/`resolveSurface`/`contrastFor` helpers.
-- `AppColors` — `ColorScheme` built directly from those tokens for both light and dark, with component themes for cards, buttons, inputs, dialog, navigation, FAB, chips, list tiles.
-- `AppRadius` — `xs`, `sm`, `md`, `lg`, `xl`, `xxl` plus semantic aliases (`chip`, `control`, `input`, `card`, `dialog`, `fab`, `menu`).
+- `AppColorTokens` â€” the exact requested foundation palette (`primaryBlue`, `darkBackground`, `darkSurface`, `lightBackground`, `textPrimary`, etc.).
+- `AppSemanticColors` â€” primary, success, warning, error, info, neutral, disabled roles plus theme-aware `resolve`/`resolveSurface`/`contrastFor` helpers.
+- `AppColors` â€” `ColorScheme` built directly from those tokens for both light and dark, with component themes for cards, buttons, inputs, dialog, navigation, FAB, chips, list tiles.
+- `AppRadius` â€” `xs`, `sm`, `md`, `lg`, `xl`, `xxl` plus semantic aliases (`chip`, `control`, `input`, `card`, `dialog`, `fab`, `menu`).
 
 ### Theme rules enforced
 
@@ -655,7 +657,7 @@ Separately, the GCash verification model was inconsistent:
   - `showGcashVerificationDialog` uses `AppDialogForm` + `ModalResult<User>`; shows amount, operator, and method; collects verifier username/password; cancel/dismiss returns cancelled so the caller aborts without touching the cart.
 
 - `lib/services/sales_service.dart`
-  - `createSale` accepts `verifiedByUserId`. When the operator requires verification, a missing or unauthorized verifier throws `PaymentValidationException` **before** the sale is inserted — no pending row, no stock deduction, cart preserved. On success the sale is `confirmed` with `verified_at`/`verified_by` set.
+  - `createSale` accepts `verifiedByUserId`. When the operator requires verification, a missing or unauthorized verifier throws `PaymentValidationException` **before** the sale is inserted â€” no pending row, no stock deduction, cart preserved. On success the sale is `confirmed` with `verified_at`/`verified_by` set.
   - New sales are never created as `pending`; `getPendingPayments`/`confirmGcashPayment`/`rejectGcashPayment` remain for legacy pending rows.
   - `_canVerify` delegates to `PaymentVerificationService.currentUserCanVerify`.
 
@@ -692,12 +694,12 @@ Result: `flutter analyze` reports no issues; `flutter test` passes 312/312 tests
 
 ```text
 OWNER
-POS → GCash → Confirm → DONE (no verification)
+POS â†’ GCash â†’ Confirm â†’ DONE (no verification)
 
 STAFF
-POS → GCash → Verify (Owner/Admin credentials) → APPROVED → DONE
-                                    ↓
-                            REJECT/CANCEL → NO SALE, CART REMAINS
+POS â†’ GCash â†’ Verify (Owner credentials) â†’ APPROVED â†’ DONE
+                                    â†“
+                            REJECT/CANCEL â†’ NO SALE, CART REMAINS
 ```
 
 
@@ -713,7 +715,7 @@ POS → GCash → Verify (Owner/Admin credentials) → APPROVED → DONE
 
 - `lib/services/session_timeout_service.dart`
   - Added a warning phase between "idle" and "expired": the inactivity timer now fires at `timeout - warningThreshold`, enters the warning window (`onWarning` callback), and arms a final countdown timer that fires `onInactivityTimeout` at the absolute deadline.
-  - `userDidInteract` is ignored while the warning is active — the countdown requires an explicit choice; stray taps/keys do not silently extend the session.
+  - `userDidInteract` is ignored while the warning is active â€” the countdown requires an explicit choice; stray taps/keys do not silently extend the session.
   - `continueSession()` clears the warning, resets the inactivity clock to the full configured timeout, and persists the new activity timestamp.
   - `isWarningActive` / `inactivityDeadlineAt` exposed for the UI.
   - All timers cancelled together; `endSession` and lifecycle pause clear the warning flag.
@@ -729,8 +731,8 @@ POS → GCash → Verify (Owner/Admin credentials) → APPROVED → DONE
 - `lib/ui/widgets/app_countdown_ring.dart` (new)
   - Reusable circular countdown indicator: full-track + remaining-arc
     `CircularProgressIndicator` pair with a centered label, warning-semantic
-    color, theme-aware track. Pure view — owns no timer; callers pass the
-    remaining fraction (0.0–1.0).
+    color, theme-aware track. Pure view â€” owns no timer; callers pass the
+    remaining fraction (0.0â€“1.0).
 
 - `lib/ui/dialogs/session_expiring_dialog.dart` (new)
   - "Session Expiring" modal on the existing `AppDialog` design (warning type, non-dismissible, no close button).
@@ -808,9 +810,9 @@ Result: lutter analyze clean on changed files (one pre-existing info-level lint
 ### What Changed
 
 - lib/core/security.dart
-  - Removed SecurityHelper.generateReceiptNumber() (timestamp + random RCP� values). SaleRepository.nextReceiptNumber is now the single authoritative generator.
+  - Removed SecurityHelper.generateReceiptNumber() (timestamp + random RCPï¿½ values). SaleRepository.nextReceiptNumber is now the single authoritative generator.
 - lib/data/dao/sale_dao.dart
-  - getMaxReceiptSequence(datePrefix, {txn}) returns MAX(CAST(substr(receipt_number, 10) AS INTEGER)) for rows matching 'YYYYMMDD-%'. All rows count (confirmed, voided, cancelled, soft-deleted) so consumed numbers are never reused; legacy RCP� rows never match the prefix.
+  - getMaxReceiptSequence(datePrefix, {txn}) returns MAX(CAST(substr(receipt_number, 10) AS INTEGER)) for rows matching 'YYYYMMDD-%'. All rows count (confirmed, voided, cancelled, soft-deleted) so consumed numbers are never reused; legacy RCPï¿½ rows never match the prefix.
 - lib/data/repositories/sale_repository.dart
   - 
 extReceiptNumber(businessDate, {txn}) formats YYYYMMDD-NNNN using the **local** business date (
@@ -820,12 +822,12 @@ eceiptDatePrefix uses 	oLocal()), zero-padded to 4 digits.
   - The insert retries up to 3 times on DatabaseException.isUniqueConstraintError() (the 
 eceipt_number TEXT UNIQUE column is the final duplicate guard); on conflict it re-reads the table and takes the next free sequence rather than failing.
 - 	est/receipt_number_test.dart (new, 12 tests)
-  - Format YYYYMMDD-0001 first sale, same-day increment, regex format, continuation from persisted rows, next-day reset to 0001, legacy RCP� rows ignored, createSale skipping a taken number, voided-sale numbers not reused, search by full/date/sequence, created_at ordering, and failed-sale lifecycle (no number consumed).
+  - Format YYYYMMDD-0001 first sale, same-day increment, regex format, continuation from persisted rows, next-day reset to 0001, legacy RCPï¿½ rows ignored, createSale skipping a taken number, voided-sale numbers not reused, search by full/date/sequence, created_at ordering, and failed-sale lifecycle (no number consumed).
 
 ### Unchanged
 
 - No schema migration needed: 
-eceipt_number TEXT UNIQUE already exists; historical RCP� numbers are preserved and cannot collide with the new format.
+eceipt_number TEXT UNIQUE already exists; historical RCPï¿½ numbers are preserved and cannot collide with the new format.
 - All UI surfaces already render sale.receiptNumber (sales list 'Sale #', transaction list, sale detail, receipt screen/PDF, dashboard, reports export, AI navigation), so the new format flows through without display changes.
 - Search already covers 
 eceipt_number LIKE in getFilteredSales/getConfirmedSalesForRange, so 20260908, 20260908-0007, and  007 all match.
@@ -844,32 +846,32 @@ Result: lutter analyze clean on changed files; 12/12 new tests pass and all sal
 
 ### Audit Findings
 
-- `GcashPaymentScreen` already split compact/wide via `layoutClassFor`, scrolled safely, and enforced settings-driven validation, but `PaymentQrService` only detected QR bounds for cropping — the payload was never decoded.
+- `GcashPaymentScreen` already split compact/wide via `layoutClassFor`, scrolled safely, and enforced settings-driven validation, but `PaymentQrService` only detected QR bounds for cropping â€” the payload was never decoded.
 - The QR was capped at 220 px on phones and merchant identity came only from manually configured `storeName`/`storePhone`; nothing distinguished QR-decoded data from configured data.
 - No QR-amount vs POS-total handling existed.
 
 ### Changes Made
 
 - `lib/data/models/decoded_payment_qr.dart` (new)
-  - `DecodedPaymentQr` model: `rawPayload`, `status` (`notDetected` / `unreadable` / `decodedUnparsed` / `recognized`), `detectionSource`, `paymentNetwork`, `merchantName`, `merchantCity`, `countryCode`, `currencyCode`, `amount`, `accountIdentifier`, `mobileNumber`, `qrReference`, `isStatic`, `crcValid`. Missing fields stay null — nothing is fabricated.
+  - `DecodedPaymentQr` model: `rawPayload`, `status` (`notDetected` / `unreadable` / `decodedUnparsed` / `recognized`), `detectionSource`, `paymentNetwork`, `merchantName`, `merchantCity`, `countryCode`, `currencyCode`, `amount`, `accountIdentifier`, `mobileNumber`, `qrReference`, `isStatic`, `crcValid`. Missing fields stay null â€” nothing is fabricated.
 
 - `lib/services/payment_qr_parser.dart` (new)
   - Pure-Dart EMVCo MPM TLV parser (the standard behind QR Ph / GCash / InstaPay codes).
-  - Extracts payload format, point of initiation (static/dynamic), merchant account templates (tags 02-51), MCC, currency (608 → PHP), amount, country, merchant name (59), city (60), additional-data mobile (62.02) and QR-carried reference (62.01/62.05).
+  - Extracts payload format, point of initiation (static/dynamic), merchant account templates (tags 02-51), MCC, currency (608 â†’ PHP), amount, country, merchant name (59), city (60), additional-data mobile (62.02) and QR-carried reference (62.01/62.05).
   - PH mobile numbers are only reported when a field actually encodes one (masked values like `955241****` are normalized to `+63 955 241 ****`); unrelated values are never converted into a mobile number.
   - CRC-16/CCITT-FALSE is verified when present and reported as `crcValid` without discarding parsed fields.
 
 - `lib/services/payment_qr_service.dart`
   - New `decodePaymentQr(relativePath)`: ZXing `QRCodeMultiReader` results now expose payload `text` (bounds logic unchanged); falls back to `qr_code_dart_decoder`, then feeds the payload through `PaymentQrParser`.
-  - Pipeline: QR image → decoder → raw payload → EMVCo parser → `DecodedPaymentQr` → UI state.
+  - Pipeline: QR image â†’ decoder â†’ raw payload â†’ EMVCo parser â†’ `DecodedPaymentQr` â†’ UI state.
 
 - `lib/providers/service_providers.dart` / `lib/providers/payment_settings_provider.dart`
   - `paymentQrServiceProvider` and `paymentQrDecodeProvider` (family keyed by image path, cached per path).
 
 - `lib/ui/screens/gcash_payment_screen.dart`
-  - Portrait hierarchy: Total Due → Scan to Pay QR card → Payment Details → Customer/Payment info → Order Summary → Review Payment → secure note.
+  - Portrait hierarchy: Total Due â†’ Scan to Pay QR card â†’ Payment Details â†’ Customer/Payment info â†’ Order Summary â†’ Review Payment â†’ secure note.
   - QR sized at 78% of available width clamped to 220-320 px (was 55% capped at 220 px), centered, `BoxFit.contain`, full-resolution decode, tap-to-enlarge into the existing pinch/zoom `AppPaymentQrViewer`.
-  - Live decode-status chip in the QR card header: `Reading QR…` (non-blocking spinner), `Merchant details detected`, `Payment QR recognized`, `QR detected — details unavailable`, `Unable to read QR code`.
+  - Live decode-status chip in the QR card header: `Reading QRâ€¦` (non-blocking spinner), `Merchant details detected`, `Payment QR recognized`, `QR detected â€” details unavailable`, `Unable to read QR code`.
   - New `Payment Details` card shows only fields that exist: Merchant, Mobile, Account, Network, Amount in QR, QR Reference, marked `Detected from QR` when payload-derived. Configured `storeName`/`storePhone` remain as fallback when the QR encodes nothing.
   - QR-encoded amount is compared against the POS total; a mismatch shows a warning banner while the POS total stays authoritative.
   - Wide layout restructured: QR + configure action on the left; amount, payment details, inputs, order summary and primary action on the right.
@@ -884,9 +886,9 @@ flutter test test/payment_qr_parser_test.dart test/payment_qr_service_test.dart
 ```
 
 Results:
-- Scoped `flutter analyze` — No issues found.
-- `payment_qr_parser_test.dart` — 10/10 passed (QR Ph payload, dynamic amount, CRC pass/fail, non-payment payloads, no-fabrication, masked mobile normalization).
-- `payment_qr_service_test.dart` — 11/11 passed, including an end-to-end decode of a generated EMVCo QR image.
+- Scoped `flutter analyze` â€” No issues found.
+- `payment_qr_parser_test.dart` â€” 10/10 passed (QR Ph payload, dynamic amount, CRC pass/fail, non-payment payloads, no-fabrication, masked mobile normalization).
+- `payment_qr_service_test.dart` â€” 11/11 passed, including an end-to-end decode of a generated EMVCo QR image.
 
 ### Environment Notes (pre-existing, unrelated)
 
@@ -908,11 +910,11 @@ Results:
 - `lib/services/report_service.dart`
   - `submitReport` now requires `submit_reports` and `createdBy == currentUser.id`.
   - `getMyReports` returns `[]` for non-author roles (Owner/Admin).
-  - `importReport` requires `submit_reports` — importing a report file creates an `export_history` record authored by the current user, so it is staff-only.
+  - `importReport` requires `submit_reports` â€” importing a report file creates an `export_history` record authored by the current user, so it is staff-only.
 
 - `lib/services/report_export_service.dart`
   - `submitSalesReport` returns `null` early without `submit_reports` (service-layer guard, not just UI).
-  - `exportSalesReport` still records an `export_history` `generated` row — that table doubles as the export audit log (used by the admin dashboard export count); those rows never surface as "My Reports" or staff submissions.
+  - `exportSalesReport` still records an `export_history` `generated` row â€” that table doubles as the export audit log (used by the admin dashboard export count); those rows never surface as "My Reports" or staff submissions.
 
 - `lib/ui/screens/more_screen.dart`
   - "My Reports" entry gated on `submit_reports` (staff-only). "Submitted Reports" remains `view_report_submissions` (owner-only).
@@ -930,7 +932,7 @@ Results:
 - `lib/services/sales_import_service.dart` (new) + `salesImportServiceProvider`
   - `previewSalesImport(fileName, bytes)` parses/validates CSV (required columns: `date`, `total`; optional: `payment_method`, `payment_status`, `cash_received`, `customer`, `reference`, `receipt_number`, `notes`).
   - `importSales(preview)` inserts valid rows inside a transaction, generates `YYYYMMDD-NNNN` receipt numbers when absent, skips duplicate receipt numbers (UNIQUE conflict), and logs `import_sales` to the activity log.
-  - Throws `AuthorizationException('import_sales')` for non-owners. No `export_history` writes — imports never create report records.
+  - Throws `AuthorizationException('import_sales')` for non-owners. No `export_history` writes â€” imports never create report records.
 
 - `lib/services/sales_analytics_service.dart`
   - `getAnalyticsForBounds` accepts optional `paymentMethod`/`paymentStatus` so the Sales screen exports exactly the filtered slice it shows.
@@ -943,8 +945,8 @@ Results:
 
 ### Verification
 
-- `dart analyze lib test` — no issues.
-- `flutter test` — 433 tests pass (97 in the reports/sales/RBAC batch + 336 remainder), including 12 new tests in `test/report_workflow_test.dart` covering owner-submission denial, staff submit->owner inbox, More-entry filtering, CSV preview validation, owner-only import gating, duplicate receipt skipping, and "import creates no report records".
+- `dart analyze lib test` â€” no issues.
+- `flutter test` â€” 433 tests pass (97 in the reports/sales/RBAC batch + 336 remainder), including 12 new tests in `test/report_workflow_test.dart` covering owner-submission denial, staff submit->owner inbox, More-entry filtering, CSV preview validation, owner-only import gating, duplicate receipt skipping, and "import creates no report records".
 
 ### Notes
 
@@ -957,31 +959,31 @@ Results:
 
 - `lib/ui/widgets/app_detail_row.dart` (new)
   - Shared read-only detail row: `AppIconSquare` (38px, tinted 0.16) + label (`bodyMedium`, `onSurfaceVariant`) + value (`titleSmall`, w700, optional `valueColor`, end-aligned, ellipsizes). Use it for label/value rows inside view/detail dialogs so every screen renders the same `.isquare`-style row.
-- `categories_screen.dart` — view modal rows now carry icons: Name = category icon in its badge color, Products = `inventory_2_outlined` (primary), Status = `check_circle_outline`/`pause_circle_outline` in the status color.
-- `products_screen.dart` — view modal rows: Category = `label_outline` in the category badge color, Price = `payments_outlined` (primary), Stock = `inventory_2_outlined` (status color), Status = `error_outline`/`warning_amber_outlined`/`check_circle_outline`.
-- `stock_screen.dart` — stock view rows: Current Stock = `inventory_2_outlined` (status color), Minimum Level = `production_quantity_limits` (primary), Status = same stock-status icon set.
-- `mockups/categories_screen.html`, `products_screen.html`, `stock_screen.html` — `.view-row` markup gained a `.lead > .isquare` group (30px) so the HTML mockups match the Flutter dialogs; status/stock icons swap class+glyph by state.
+- `categories_screen.dart` â€” view modal rows now carry icons: Name = category icon in its badge color, Products = `inventory_2_outlined` (primary), Status = `check_circle_outline`/`pause_circle_outline` in the status color.
+- `products_screen.dart` â€” view modal rows: Category = `label_outline` in the category badge color, Price = `payments_outlined` (primary), Stock = `inventory_2_outlined` (status color), Status = `error_outline`/`warning_amber_outlined`/`check_circle_outline`.
+- `stock_screen.dart` â€” stock view rows: Current Stock = `inventory_2_outlined` (status color), Minimum Level = `production_quantity_limits` (primary), Status = same stock-status icon set.
+- `mockups/categories_screen.html`, `products_screen.html`, `stock_screen.html` â€” `.view-row` markup gained a `.lead > .isquare` group (30px) so the HTML mockups match the Flutter dialogs; status/stock icons swap class+glyph by state.
 
 ### Verification
 
-- `dart analyze` on the four touched Dart files — no issues.
-- `flutter test test/responsive_create_action_test.dart` — 6/6 pass.
+- `dart analyze` on the four touched Dart files â€” no issues.
+- `flutter test test/responsive_create_action_test.dart` â€” 6/6 pass.
 
 ## Automated Database Backup
 
 ### What changed
 
-- `lib/core/constants.dart` — DB version bumped to 25.
-- `lib/core/database.dart` — migration v24→v25 adds `auto_backup_*` columns to `settings`.
-- `lib/data/models/settings.dart` — added `autoBackupEnabled`, `autoBackupFrequency`, `autoBackupTime`, `autoBackupLastRun`.
-- `lib/data/models/auto_backup_settings.dart` — new DTO for the schedule with `nextRun`/`computeNextRun` helpers.
-- `lib/services/settings_service.dart` — `getAutoBackupSettings()` and `updateAutoBackupSettings()` (gated by `backup_restore`).
-- `lib/services/backup_service.dart` — new `exportAutomaticBackup()` that reuses the export pipeline without a logged-in session and without a per-user notification.
-- `lib/services/auto_backup_service.dart` — reads the schedule from `SettingsRepository` (no UI session), runs when due, records `auto_backup_last_run` on success, and sends `backup` notifications to all active Owners and Admins.
-- `lib/services/auto_backup_scheduler.dart` — `WidgetsBindingObserver` timer; checks on startup, resume, and every 15 minutes while the app is open. Skipped on web.
-- `lib/main.dart` — starts the scheduler in `_MyAppState` and disposes it.
-- `lib/providers/service_providers.dart` — adds `autoBackupServiceProvider`.
-- `lib/ui/screens/backup_restore_screen.dart` — new "Automated Backup" card with enable toggle, frequency dropdown (3/7 days/monthly), time picker, next-run status, and save action.
+- `lib/core/constants.dart` â€” DB version bumped to 25.
+- `lib/core/database.dart` â€” migration v24â†’v25 adds `auto_backup_*` columns to `settings`.
+- `lib/data/models/settings.dart` â€” added `autoBackupEnabled`, `autoBackupFrequency`, `autoBackupTime`, `autoBackupLastRun`.
+- `lib/data/models/auto_backup_settings.dart` â€” new DTO for the schedule with `nextRun`/`computeNextRun` helpers.
+- `lib/services/settings_service.dart` â€” `getAutoBackupSettings()` and `updateAutoBackupSettings()` (gated by `backup_restore`).
+- `lib/services/backup_service.dart` â€” new `exportAutomaticBackup()` that reuses the export pipeline without a logged-in session and without a per-user notification.
+- `lib/services/auto_backup_service.dart` â€” reads the schedule from `SettingsRepository` (no UI session), runs when due, records `auto_backup_last_run` on success, and sends `backup` notifications to all active Owners and Admins.
+- `lib/services/auto_backup_scheduler.dart` â€” `WidgetsBindingObserver` timer; checks on startup, resume, and every 15 minutes while the app is open. Skipped on web.
+- `lib/main.dart` â€” starts the scheduler in `_MyAppState` and disposes it.
+- `lib/providers/service_providers.dart` â€” adds `autoBackupServiceProvider`.
+- `lib/ui/screens/backup_restore_screen.dart` â€” new "Automated Backup" card with enable toggle, frequency dropdown (3/7 days/monthly), time picker, next-run status, and save action.
 
 ### Behavior
 
@@ -992,9 +994,9 @@ Results:
 
 ### Verification
 
-- `flutter analyze` — no issues.
-- `flutter test test/backup_service_test.dart test/backup_service_integration_test.dart test/backup_validation_test.dart test/auto_backup_settings_test.dart` — pass.
-- `test/auto_backup_settings_test.dart` — schedule math (3 days, 7 days, monthly, clamping, catch-up, disabled, time respect).
+- `flutter analyze` â€” no issues.
+- `flutter test test/backup_service_test.dart test/backup_service_integration_test.dart test/backup_validation_test.dart test/auto_backup_settings_test.dart` â€” pass.
+- `test/auto_backup_settings_test.dart` â€” schedule math (3 days, 7 days, monthly, clamping, catch-up, disabled, time respect).
 
 ## Automated Backup Schedule Anchor Fix + Daily Frequency
 
@@ -1006,43 +1008,43 @@ future (its catch-up loop advances past `now`), while
 before `now`. The two conditions were mutually exclusive, so the scheduled
 backup could never fire. `auto_backup_last_run` therefore stayed null
 forever, and with no persisted anchor the next run was recomputed from the
-current date on every check — the displayed "Next backup" drifted forward
+current date on every check â€” the displayed "Next backup" drifted forward
 day by day (e.g. always "3 days from today").
 
 ### Changes Made
 
-- `lib/core/constants.dart` — DB version bumped to 26.
-- `lib/core/database.dart` — migration v25→v26 adds
+- `lib/core/constants.dart` â€” DB version bumped to 26.
+- `lib/core/database.dart` â€” migration v25â†’v26 adds
   `auto_backup_scheduled_at TEXT` to `settings` and backfills it with
   `COALESCE(auto_backup_last_run, updated_at)` so existing schedules get a
   fixed anchor; the column was also added to `_createTables`.
-- `lib/data/models/settings.dart` — added `autoBackupScheduledAt`
+- `lib/data/models/settings.dart` â€” added `autoBackupScheduledAt`
   (toMap/fromMap/copyWith).
-- `lib/data/models/auto_backup_settings.dart` — added `scheduledAt`. The
+- `lib/data/models/auto_backup_settings.dart` â€” added `scheduledAt`. The
   schedule grid now anchors on the later of `lastRun` and `scheduledAt`
   instead of the current date. `computeNextRun` (display) returns the first
   slot after max(anchor, now); `computePendingRun` (scheduler) returns the
   first slot after the anchor and is due once reached. Added `isDue` and a
   `daily` frequency (+1 day).
-- `lib/services/settings_service.dart` — `updateAutoBackupSettings` stamps
+- `lib/services/settings_service.dart` â€” `updateAutoBackupSettings` stamps
   `auto_backup_scheduled_at` with the save time; `getAutoBackupSettings`
   returns it.
-- `lib/services/auto_backup_service.dart` — `runIfDue` now evaluates the
+- `lib/services/auto_backup_service.dart` â€” `runIfDue` now evaluates the
   pending run (first slot after the anchor) and runs the backup when it is
   due; it self-heals a missing anchor by persisting `scheduled_at = now`.
-- `lib/ui/screens/backup_restore_screen.dart` — added "Every day" to the
+- `lib/ui/screens/backup_restore_screen.dart` â€” added "Every day" to the
   frequency dropdown; editing the toggle/frequency/time re-anchors the
   local preview to now so it matches what saving will produce; the status
   line shows a "backup is due" message when a pending slot has been reached.
-- `mockups/automated_backup_screen.html` — added the "Every day" option and
+- `mockups/automated_backup_screen.html` â€” added the "Every day" option and
   aligned the next-backup preview JS with the anchored grid logic.
-- `test/auto_backup_settings_test.dart` — added anchor-stability, pending
+- `test/auto_backup_settings_test.dart` â€” added anchor-stability, pending
   run, `isDue`, and daily-frequency cases.
 
 ### Verification
 
-- `flutter analyze` — no issues.
-- `flutter test` — 435/435 pass (includes `auto_backup_settings_test.dart`,
+- `flutter analyze` â€” no issues.
+- `flutter test` â€” 435/435 pass (includes `auto_backup_settings_test.dart`,
   21/21).
 
 ## Circular PIN Dial + Set PIN Screen
@@ -1051,8 +1053,8 @@ day by day (e.g. always "3 days from today").
 
 - `lib/ui/widgets/pin_keypad.dart`
   - Digit keys are now 80px circles (was rounded squares) with
-    dial-style letter hints under 2–9 (ABC/DEF/.../WXYZ).
-  - While held, a key fills with `primary` and scales to 0.94 —
+    dial-style letter hints under 2â€“9 (ABC/DEF/.../WXYZ).
+  - While held, a key fills with `primary` and scales to 0.94 â€”
     implemented via `GestureDetector` + `AnimatedContainer`/
     `AnimatedScale`, not InkWell, to match the mockup press state.
   - Backspace is a ghost circle: transparent until pressed.
@@ -1066,7 +1068,7 @@ day by day (e.g. always "3 days from today").
   - Now a `StatefulWidget`; empty dots render as rings
     (`onSurfaceVariant` border, transparent fill) instead of solid
     muted dots.
-  - New `success` flag — filled dots resolve to
+  - New `success` flag â€” filled dots resolve to
     `AppSemanticColors.success` for the theme.
   - `PinIndicatorsState.shake()` (via `GlobalKey`) plays a decaying
     horizontal sine shake (~450ms) for wrong/mismatched PINs.
@@ -1075,18 +1077,18 @@ day by day (e.g. always "3 days from today").
 
 - `lib/ui/screens/pin_lock_screen.dart`
   - Wrong PIN now shakes the dots, shows all slots in error red, and
-    swaps the prompt for an inline "Incorrect PIN — try again" line
+    swaps the prompt for an inline "Incorrect PIN â€” try again" line
     behind the existing `AppDialogService.error` dialog.
 
 - `lib/ui/screens/settings/set_pin_screen.dart` (new)
   - Full-screen two-step create/confirm flow replacing the old
     New PIN / Confirm PIN dialog.
-  - Step 1 captures 4–6 digits; the check key enables at 4. Step 2
+  - Step 1 captures 4â€“6 digits; the check key enables at 4. Step 2
     re-enters; match saves via `authStateProvider.updateProfile`,
     flashes success dots, then shows the success dialog and pops.
-  - Mismatch shakes red, shows "PINs didn't match — start over",
+  - Mismatch shakes red, shows "PINs didn't match â€” start over",
     and restarts at step 1. No dialog for this recoverable error.
-  - `AppHeader` shows `Step N of 2 — Create/Confirm` as `subtitle`;
+  - `AppHeader` shows `Step N of 2 â€” Create/Confirm` as `subtitle`;
     Cancel is a plain `TextButton`.
 
 - `lib/ui/screens/settings/pin_settings_page.dart`
@@ -1103,13 +1105,13 @@ day by day (e.g. always "3 days from today").
 - `test/pin_flow_test.dart` (new)
   - 13 widget tests: keypad rendering/letters/callbacks, disabled
     inertness, check-key enable gating, indicator fill/error/shake,
-    and the full SetPinScreen create → confirm save, mismatch
+    and the full SetPinScreen create â†’ confirm save, mismatch
     restart, and 6-digit cap.
 
 ### Verification
 
-- `flutter analyze` — no issues.
-- `flutter test` — 448/448 pass (includes `pin_flow_test.dart`, 13/13).
+- `flutter analyze` â€” no issues.
+- `flutter test` â€” 448/448 pass (includes `pin_flow_test.dart`, 13/13).
 
 ## AI Advisor Adaptive Follow-Up Chips
 
@@ -1117,7 +1119,7 @@ day by day (e.g. always "3 days from today").
 
 - `lib/services/business_intelligence_service.dart`
   - Added `generateFollowUpSuggestions(userQuery, {role, exclude, maxSuggestions})`
-    — a pure local computation that re-runs `detectIntent` on the user's
+    â€” a pure local computation that re-runs `detectIntent` on the user's
     latest query and maps the detected intent to a curated pool of
     next-step questions per role (Owner/Admin/Staff).
   - Already-asked questions are filtered out (normalized: case, whitespace,
@@ -1127,7 +1129,7 @@ day by day (e.g. always "3 days from today").
     chip always resolves to a real data-backed intent.
 
 - `lib/services/ai_advisor_service.dart`
-  - Added `getFollowUpSuggestions(userQuery, {exclude})` — permission-gated
+  - Added `getFollowUpSuggestions(userQuery, {exclude})` â€” permission-gated
     pass-through to the BI layer. No API call, no quota usage.
 
 - `lib/providers/ai_advisor_provider.dart`
@@ -1141,7 +1143,7 @@ day by day (e.g. always "3 days from today").
 - `lib/ui/widgets/ai_assistant_message.dart`
   - `_SuggestionChips` is now the public `AISuggestionChips`; tapping a
     chip routes through `sendQuery` like a typed message.
-  - Structured-response suggestions moved out of the bubble — the chat
+  - Structured-response suggestions moved out of the bubble â€” the chat
     lists render them below it for consistent placement.
 
 - `lib/ui/screens/ai_advisor_screen.dart` / `lib/ui/widgets/ai_chat_panel.dart`
@@ -1150,17 +1152,17 @@ day by day (e.g. always "3 days from today").
     align with the bubble edge (34px screen / 32px panel).
 
 - Tests
-  - `test/ai_followup_suggestions_test.dart` — 13 tests: per-role pools,
+  - `test/ai_followup_suggestions_test.dart` â€” 13 tests: per-role pools,
     intent mapping, dedup/normalization, maxSuggestions, session-role
     fallback, and provider wiring.
-  - `test/ai_advisor_humanization_integration_test.dart` — injected a
+  - `test/ai_advisor_humanization_integration_test.dart` â€” injected a
     no-op `AISkillService` stub so the skill-guidance asset loader never
     runs inside tests (fixes post-completion async failures).
 
 ### Verification
 
-- `dart analyze` on all touched files — no issues.
-- `flutter test test/ai_followup_suggestions_test.dart test/ai_advisor_humanization_integration_test.dart test/ai_navigation_service_test.dart` — all pass.
+- `dart analyze` on all touched files â€” no issues.
+- `flutter test test/ai_followup_suggestions_test.dart test/ai_advisor_humanization_integration_test.dart test/ai_navigation_service_test.dart` â€” all pass.
 
 ## AI Advisor Skill-Based Responses + Audit Signals
 
@@ -1184,7 +1186,7 @@ day by day (e.g. always "3 days from today").
     `the-fool` (audit/critical reasoning), `marketing-psychology`
     (owner recommendations), `monitoring-expert` and `debugging-wizard`
     (admin intents).
-  - `selectSkillNames(query, intent, role)` — pure routing; max 2 skills
+  - `selectSkillNames(query, intent, role)` â€” pure routing; max 2 skills
     injected (tone + one domain skill).
   - `parseSkillFile` strips fenced code, `references/` links, and
     agent-tool mentions before injection; bodies capped at ~1400 chars.
@@ -1200,12 +1202,12 @@ day by day (e.g. always "3 days from today").
     level): baseline mean/stddev, today z-score, same-weekday comparison,
     and payment-mix shift >= 10 points. Needs >= 7 baseline days.
 
-- `pubspec.yaml` — `assets/Skill/` added to bundled assets.
+- `pubspec.yaml` â€” `assets/Skill/` added to bundled assets.
 
-- `test/ai_skill_service_test.dart` (new) — 12 tests: frontmatter parsing,
+- `test/ai_skill_service_test.dart` (new) â€” 12 tests: frontmatter parsing,
   body cleaning, role/intent routing, injection cap.
 - `test/ai_advisor_humanization_integration_test.dart` /
-  `test/ai_followup_suggestions_test.dart` — advisor constructions inject
+  `test/ai_followup_suggestions_test.dart` â€” advisor constructions inject
   `_FakeSkillService` so tests never touch the asset bundle.
 
 ### Verification
@@ -1216,3 +1218,147 @@ flutter test test/ai_skill_service_test.dart test/ai_response_policy_test.dart t
 ```
 
 Result: `flutter analyze` clean; focused suite 40/40 pass.
+
+## Payment Settings Load Failure + Owner RBAC Repair Pass
+
+### Root Cause
+
+`Failed to load payment settings` on the owner-only Payment Settings page
+was a stale cached error, not a permission denial:
+
+1. `settingsProvider` / `paymentSettingsProvider` are plain
+   `FutureProvider`s (no autoDispose anywhere in `lib/providers/`), so
+   once watched they keep state for the app lifetime. `dashboard_screen.dart`
+   and `security_settings_page.dart` keep `settingsProvider` permanently
+   alive.
+2. On logout/session expiry, `logout()` cleared `SessionManager` then
+   invalidated `settingsServiceProvider`. Dependents recomputed while the
+   old screens were still mounted (navigation happens after) so both
+   `getSettings()` and `getPaymentSettings()` threw
+   `AuthorizationException` against the null user — cached as AsyncError.
+3. On the next login only `dashboardProvider` and
+   `notificationCountProvider` were invalidated, so the cached error was
+   served to the next session until Retry or app restart.
+
+Secondary failure paths: `Settings.fromMap` threw `FormatException` when
+`created_at`/`updated_at` were missing/NULL/malformed (e.g. settings row
+from a legacy or damaged backup), and `getGroqApiKeyRaw()` threw
+`no such column: groq_api_key` on databases missing the v5 migration.
+
+### Changes Made
+
+- `lib/core/session_manager.dart`
+  - Added `_sessionLocked` flag: `hasPermission` returns false while the
+    session is PIN-locked or pending a forced password change (the user
+    record stays populated so those flows can resolve it).
+    `setCurrentUser`/`clearCurrentUser`/`resetForTest` reset the flag;
+    `setSessionLocked` is driven by the auth layer.
+  - Removed `verify_payments` from `_systemAdminPermissions`: the grant
+    was dead — `PaymentVerificationService.canRoleVerify` only accepts the
+    Owner — and the stale comment claiming Admin verification still existed
+    was corrected.
+
+- `lib/providers/auth_provider.dart`
+  - New `_invalidateSessionStartProviders()` (dashboard, notification
+    count, `settingsServiceProvider`, `settingsProvider`,
+    `paymentSettingsProvider`) replaces the duplicated two-line blocks in
+    `login`, `loginWithPin`, `verifyPin`, and `changePassword` — a new
+    session can no longer inherit cached errors or stale settings.
+  - New `_syncSessionLock(phase)` keeps `SessionManager.isSessionLocked`
+    in step with the auth phase across `_init`, `login`,
+    `changePassword`, `lockSession`, `verifyPin`, `loginWithPin`.
+
+- `lib/services/settings_service.dart`
+  - `getPaymentSettings()` now requires `create_sales` OR
+    `verify_payments` — System Admin (which only held the read via
+    `view_settings`/`edit_settings`) can no longer read the Owner's
+    payment configuration.
+  - `updateSettings()` admin GCash guard now denies when there is no
+    existing settings row to diff against.
+  - `_migrateGroqApiKey()` is best-effort (try/catch) — a missing column or
+    secure-storage failure can no longer fail the whole settings load.
+
+- `lib/data/dao/settings_dao.dart` — `getGroqApiKeyRaw()` returns null
+  instead of throwing when the column is absent.
+
+- `lib/data/models/settings.dart` — `fromMap` date parsing is tolerant:
+  missing/null/malformed `created_at`/`updated_at` fall back to epoch.
+
+- `lib/ui/screens/payment_settings_page.dart` — the load ErrorState now
+  includes the underlying error (`Failed to load payment settings: $error`),
+  matching the POS dialog so the cause is diagnosable.
+
+- `lib/services/sales_service.dart` — removed the no-op
+  `on AuthorizationException catch (_) { rethrow; }` wrapper.
+
+- Tests: `test/session_manager_test.dart` gained lock-denial, lock-reset,
+  and admin/owner `verify_payments` cases; `test/settings_model_test.dart`
+  (new) covers the tolerant `fromMap` date parsing.
+
+### Verification
+
+```powershell
+flutter analyze
+flutter test
+```
+
+Result: `flutter analyze` clean; 486/488 tests pass. The two failures are
+unrelated uncommitted WIP: `defaultDailyAIQuota` was changed 20 to 10 in
+`constants.dart` (breaks `ai_quota_service_test`), and the in-flight
+`products_screen.dart`/`empty_state.dart` scroll refactor breaks the
+`owner_screens_test` empty-state expectation.
+
+### Remaining Notes
+
+- `getSettings()` still admits `use_ai_advisor` callers (Staff) — needed
+  by the AI flows and the Security page session section; only
+  `groqApiKey` is stripped. Narrowing it further would require a scoped
+  provider for the staff-readable fields.
+- `gcash_verification_mode` value `owner_admin` is a legacy name; only the
+  Owner can verify regardless of the stored mode.
+
+## Inactivity Timeout Dropdown + Unlimited Option
+
+### What Changed
+
+- `inactivity_timeout_minutes = 0` now means **Unlimited** — the session
+  never expires due to inactivity. The 8-hour absolute
+  `SessionSettingsService.maxSessionLifetime` still applies, so "Unlimited"
+  only removes the idle lock/logout, not the hard session cap.
+- `lib/services/session_settings_service.dart`
+  - `getEffectiveInactivityTimeout` now returns `Duration?`; `null` means
+    unlimited (any stored value <= 0).
+  - `getEffectiveWarningThreshold` returns `Duration.zero` when unlimited
+    (no warning window exists).
+  - New shared constants/helpers used by every dropdown:
+    `unlimitedInactivityMinutes` (0), `inactivityTimeoutChoices`
+    (3, 15, 30, 60, 0), and `inactivityTimeoutLabel(minutes)`
+    ("3 minutes" … "1 hour", "Unlimited").
+- `lib/services/session_timeout_service.dart`
+  - `_inactivityTimeout` is nullable; when null no inactivity or warning
+    timer is armed and `inactivityDeadlineAt` returns null. The absolute
+    expiry timer and pause/resume activity persistence are unchanged.
+- `lib/services/auth_service.dart`
+  - `restoreSession` skips the inactivity check when the effective timeout
+    is null (still enforces the absolute `sessionExpiresAt`).
+- `lib/ui/screens/settings/security_settings_page.dart`
+  - The Admin "Inactivity timeout" dialog is now an `AppDropdownField`
+    with the shared choices instead of a free-text minutes field. A
+    previously stored custom value is appended as an extra item so saving
+    never silently rewrites it.
+  - The "Session warning" tile is disabled while the timeout is Unlimited
+    and shows "Not applicable with an unlimited timeout".
+- `lib/ui/screens/users_screen.dart`
+  - The per-user override dropdown (add + edit user) uses the same shared
+    choices plus "Use store default" (null); a legacy stored value (e.g.
+    5) is appended as an extra item. The view dialog shows the shared
+    label (e.g. "Unlimited", "1 hour").
+
+### Verification
+
+```powershell
+flutter analyze
+flutter test
+```
+
+Result: `flutter analyze` clean; 491/491 tests pass.

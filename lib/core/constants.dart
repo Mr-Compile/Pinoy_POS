@@ -15,7 +15,7 @@ class AppConstants {
 
   // AI
   static const int maxDailyAIQueries = 10; // Legacy fallback; prefer aiDailyQuota from Settings.
-  static const int defaultDailyAIQuota = 20;
+  static const int defaultDailyAIQuota =10;
   static const int maxDailyAIQuota = 1000;
 
   // Security

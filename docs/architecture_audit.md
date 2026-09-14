@@ -149,7 +149,7 @@ The cycles are currently used for cross-provider invalidation but increase coupl
 - `SecurityHelper` uses unsalted SHA-256 for passwords and PINs. (`lib/core/security.dart:8–32`)
 - `AppSecurityConstants` hardcodes `superAdminPassword = 'SuperAdmin'`. (`lib/core/app_security_constants.dart:10`)
 - `AppConstants.defaultTemporaryPassword = '@Password123'` is used in seeding and user reset. (`lib/core/constants.dart:25`)
-- `maxDailyAIQueries = 10` is marked legacy and not used anywhere; the real default is `aiDailyQuota = 20`.
+- `maxDailyAIQueries = 10` is marked legacy and not used anywhere; the real default is `AppConstants.defaultDailyAIQuota` (10).
 
 ### 7. DAO / database inconsistencies
 
@@ -460,7 +460,7 @@ Scope: `lib/core/session_manager.dart`, `lib/core/route_guard.dart`, `lib/core/a
 | `lib/core/database.dart` | Bumped `databaseVersion` to 19; added `gcash_qr_image_path` and `gcash_qr_image_type` columns to `settings`; `_migrateSettingsV19()` adds the columns to existing databases | Persist the merchant QR image |
 | `lib/data/models/settings.dart` | Added `gcashQrImagePath` and `gcashQrImageType` fields, plus `toMap`, `fromMap`, and `copyWith` support | Model keeps the new columns in sync with the DB |
 | `lib/data/models/payment_settings.dart` | Added `gcashQrImagePath` and `gcashQrImageType` to `PaymentSettings.fromSettings()` | POS flow can read the QR without touching full settings |
-| `lib/services/settings_service.dart` | Added `updateGcashQrImage()` and `clearGcashQrImage()` using `ImageService` and file cleanup | Owner/Admin can upload, replace, or remove the QR image |
+| `lib/services/settings_service.dart` | Added `updateGcashQrImage()` and `clearGcashQrImage()` using `ImageService` and file cleanup | Owner can upload, replace, or remove the QR image |
 | `lib/ui/screens/payment_settings_page.dart` | Added a "Merchant QR Code" section with image preview, Upload/Change, and Remove buttons | UI for managing the QR image |
 | `lib/ui/screens/gcash_payment_screen.dart` | `_buildMerchantQrCard()` displays the configured QR image with scan instructions during the GCash payment flow | Customers can scan the merchant QR before entering the reference number |
 | `lib/services/backup_service.dart` | `_packageBackupZip()` now copies `payment_evidence/`, `gcash_qr/`, and `images/`; restore extracts `gcash_qr/` and `images/` as well | Backup includes the QR image and product/profile images |

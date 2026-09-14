@@ -48,7 +48,9 @@ class SessionTimeoutService {
   final DateTime Function() _clock;
 
   User? _user;
-  Duration _inactivityTimeout = const Duration(minutes: 15);
+  /// Null means the inactivity timeout is unlimited — no inactivity
+  /// deadline or warning is ever armed.
+  Duration? _inactivityTimeout = const Duration(minutes: 15);
   Duration _warningThreshold = Duration.zero;
   DateTime? _lastActivityAt;
   DateTime? _sessionExpiresAt;
@@ -68,9 +70,14 @@ class SessionTimeoutService {
   Duration get warningThreshold => _warningThreshold;
 
   /// The absolute moment the inactivity deadline is reached (the moment the
-  /// warning countdown hits zero). Null when no session is running.
-  DateTime? get inactivityDeadlineAt =>
-      _lastActivityAt?.add(_inactivityTimeout);
+  /// warning countdown hits zero). Null when no session is running or the
+  /// inactivity timeout is unlimited.
+  DateTime? get inactivityDeadlineAt {
+    final timeout = _inactivityTimeout;
+    final lastActivity = _lastActivityAt;
+    if (timeout == null || lastActivity == null) return null;
+    return lastActivity.add(timeout);
+  }
 
   /// Starts or resumes the session timer for [user].
   ///
@@ -160,6 +167,7 @@ class SessionTimeoutService {
   void _restartInactivityTimer() {
     _inactivityTimer?.cancel();
     _inactivityTimer = null;
+    if (_inactivityTimeout == null) return;
     final remaining = _remainingInactivity();
     if (remaining <= Duration.zero) {
       _handleInactivityTimeout();
@@ -224,9 +232,10 @@ class SessionTimeoutService {
   }
 
   Duration _remainingInactivity() {
+    final timeout = _inactivityTimeout ?? Duration.zero;
     final lastActivity = _lastActivityAt;
-    if (lastActivity == null) return _inactivityTimeout;
-    final remaining = _inactivityTimeout - _clock().difference(lastActivity);
+    if (lastActivity == null) return timeout;
+    final remaining = timeout - _clock().difference(lastActivity);
     return remaining;
   }
 
@@ -244,8 +253,9 @@ class SessionTimeoutService {
       return;
     }
 
-    final inactivityExpired =
-        now.difference(_lastActivityAt!) > _inactivityTimeout;
+    final inactivityTimeout = _inactivityTimeout;
+    final inactivityExpired = inactivityTimeout != null &&
+        now.difference(_lastActivityAt!) > inactivityTimeout;
     if (inactivityExpired) {
       onInactivityTimeout();
       return;

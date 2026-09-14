@@ -72,11 +72,18 @@ class TrashService {
   }
 
   /// Returns all visible trash items.
+  ///
+  /// Merchant QR entries are a business-Owner asset (see
+  /// [SessionManager.canEditBusinessSettings]) and are never returned to
+  /// other roles, even ones holding `view_settings`.
   Future<List<TrashItem>> getAllTrash() async {
     if (!_sessionManager.hasPermission('view_trash')) {
       return [];
     }
-    final items = await _trashRepository.getAll();
+    var items = await _trashRepository.getAll();
+    if (!_sessionManager.canEditBusinessSettings()) {
+      items = items.where((i) => i.entityType != _entityQr).toList();
+    }
     return _withDeletedByNames(items);
   }
 
@@ -647,11 +654,7 @@ class TrashService {
 
   /// Returns the number of items currently in trash.
   Future<int> getTrashCount() async {
-    if (!_sessionManager.hasPermission('view_trash')) {
-      return 0;
-    }
-    final items = await _trashRepository.getAll();
-    return items.length;
+    return (await getAllTrash()).length;
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────

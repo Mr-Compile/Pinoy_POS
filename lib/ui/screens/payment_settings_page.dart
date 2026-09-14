@@ -51,7 +51,7 @@ class PaymentSettingsPage extends ConsumerWidget {
         loading: () => const LoadingState(),
         error: (error, _) => ErrorState(
           title: 'Failed to Load',
-          message: 'Failed to load payment settings.',
+          message: 'Failed to load payment settings: $error',
           onRetry: () => ref.invalidate(settingsProvider),
         ),
         data: (settings) => _PaymentSettingsForm(

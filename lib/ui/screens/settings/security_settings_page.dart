@@ -8,6 +8,7 @@ import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/providers/user_provider.dart';
 import 'package:pinoy_pos/services/password_strength_service.dart';
+import 'package:pinoy_pos/services/session_settings_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_form.dart';
@@ -85,7 +86,9 @@ class SecuritySettingsPage extends ConsumerWidget {
                       title: const Text('Inactivity timeout'),
                       subtitle: settingsAsync.when(
                         data: (settings) => Text(
-                          '${settings.inactivityTimeoutMinutes} minutes',
+                          SessionSettingsService.inactivityTimeoutLabel(
+                            settings.inactivityTimeoutMinutes,
+                          ),
                         ),
                         loading: () => const Text('Loading…'),
                         error: (_, _) => const Text('Unable to load'),
@@ -97,9 +100,17 @@ class SecuritySettingsPage extends ConsumerWidget {
                     ListTile(
                       leading: const Icon(Icons.notification_important_outlined),
                       title: const Text('Session warning'),
+                      enabled: (settingsAsync.valueOrNull
+                                  ?.inactivityTimeoutMinutes ??
+                              15) >
+                          SessionSettingsService.unlimitedInactivityMinutes,
                       subtitle: settingsAsync.when(
                         data: (settings) => Text(
-                          'Warn ${settings.sessionWarningSeconds} seconds before logout',
+                          settings.inactivityTimeoutMinutes <=
+                                  SessionSettingsService
+                                      .unlimitedInactivityMinutes
+                              ? 'Not applicable with an unlimited timeout'
+                              : 'Warn ${SessionSettingsService.sessionWarningLabel(settings.sessionWarningSeconds)} before logout',
                         ),
                         loading: () => const Text('Loading…'),
                         error: (_, _) => const Text('Unable to load'),
@@ -264,6 +275,16 @@ class SecuritySettingsPage extends ConsumerWidget {
     AsyncValue<Settings> settingsAsync,
   ) async {
     final current = settingsAsync.valueOrNull?.inactivityTimeoutMinutes ?? 15;
+    // Keep a previously stored custom value selectable so saving never
+    // silently rewrites it; sort it in among the finite choices with
+    // Unlimited last.
+    final choices = [...SessionSettingsService.inactivityTimeoutChoices];
+    if (!choices.contains(current)) {
+      choices.add(current);
+      choices.sort(
+        (a, b) => a == 0 ? 1 : b == 0 ? -1 : a.compareTo(b),
+      );
+    }
     final result = await showDialog<ModalResult<void>>(
       context: context,
       useRootNavigator: true,
@@ -271,39 +292,37 @@ class SecuritySettingsPage extends ConsumerWidget {
         type: AppDialogType.info,
         title: 'Inactivity Timeout',
         childBuilder: (context, state) {
-          final minutesController = state.textController(
-            'minutes',
-            text: current.toString(),
-          );
-
           return Form(
             key: state.formKey,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Minutes of inactivity before the app locks. '
-                  'This is the store default; a per-user override can be set in User Management.',
+                  'How long the app waits for input before locking. '
+                  'Unlimited never locks on idle — the 8-hour maximum session '
+                  'length still applies. This is the store default; a per-user '
+                  'override can be set in User Management.',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 12),
-                AppTextFormField(
-                  controller: minutesController,
-                  label: 'Minutes',
-                  hint: 'e.g. 15',
+                AppDropdownField<int>(
+                  label: 'Timeout',
                   prefixIcon: Icons.timer_outlined,
-                  keyboardType: TextInputType.number,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Minutes is required';
-                    }
-                    final minutes = int.tryParse(value.trim());
-                    if (minutes == null || minutes < 1 || minutes > 480) {
-                      return 'Enter a number between 1 and 480';
-                    }
-                    return null;
+                  items: [
+                    for (final minutes in choices)
+                      DropdownMenuItem(
+                        value: minutes,
+                        child: Text(
+                          SessionSettingsService.inactivityTimeoutLabel(
+                            minutes,
+                          ),
+                        ),
+                      ),
+                  ],
+                  initialValue: current,
+                  onChanged: (value) {
+                    state.setValue<int>('timeoutMinutes', value ?? current);
                   },
-                  onChanged: (_) => state.markChanged(),
                 ),
               ],
             ),
@@ -325,7 +344,7 @@ class SecuritySettingsPage extends ConsumerWidget {
               state.setSaving(true);
 
               final minutes =
-                  int.parse(state.textController('minutes').text.trim());
+                  state.value<int>('timeoutMinutes', current) ?? current;
               final settings = settingsAsync.valueOrNull;
               if (settings == null) {
                 state.setSaving(false);
@@ -375,9 +394,17 @@ class SecuritySettingsPage extends ConsumerWidget {
   ) async {
     final currentSettings = settingsAsync.valueOrNull;
     final current = currentSettings?.sessionWarningSeconds ?? 30;
-    // The warning must always be shorter than the inactivity timeout.
-    final maxSeconds =
-        ((currentSettings?.inactivityTimeoutMinutes ?? 15) * 60) - 1;
+    // The warning must always be shorter than the inactivity timeout, so
+    // choices are filtered against it. (An unlimited timeout disables the
+    // tile, so this dialog is unreachable then.)
+    final timeoutMinutes = currentSettings?.inactivityTimeoutMinutes ?? 15;
+    final choices = SessionSettingsService.sessionWarningChoices
+        .where((seconds) => seconds < timeoutMinutes * 60)
+        .toList();
+    if (!choices.contains(current)) {
+      choices.add(current);
+      choices.sort();
+    }
     final result = await showDialog<ModalResult<void>>(
       context: context,
       useRootNavigator: true,
@@ -385,44 +412,34 @@ class SecuritySettingsPage extends ConsumerWidget {
         type: AppDialogType.info,
         title: 'Session Warning',
         childBuilder: (context, state) {
-          final secondsController = state.textController(
-            'seconds',
-            text: current.toString(),
-          );
-
           return Form(
             key: state.formKey,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'How many seconds before automatic logout the '
-                  '"Session Expiring" warning appears. Must be shorter '
-                  'than the inactivity timeout.',
+                  'How long before automatic logout the '
+                  '"Session Expiring" warning appears. It always stays '
+                  'shorter than the inactivity timeout.',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 12),
-                AppTextFormField(
-                  controller: secondsController,
-                  label: 'Seconds',
-                  hint: 'e.g. 30',
-                  prefixIcon: Icons.timer_outlined,
-                  keyboardType: TextInputType.number,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Seconds is required';
-                    }
-                    final seconds = int.tryParse(value.trim());
-                    if (seconds == null || seconds < 5) {
-                      return 'Enter at least 5 seconds';
-                    }
-                    if (seconds > maxSeconds) {
-                      return 'Must be less than the inactivity timeout '
-                          '($maxSeconds seconds)';
-                    }
-                    return null;
+                AppDropdownField<int>(
+                  label: 'Warn before logout',
+                  prefixIcon: Icons.notification_important_outlined,
+                  items: [
+                    for (final seconds in choices)
+                      DropdownMenuItem(
+                        value: seconds,
+                        child: Text(
+                          SessionSettingsService.sessionWarningLabel(seconds),
+                        ),
+                      ),
+                  ],
+                  initialValue: current,
+                  onChanged: (value) {
+                    state.setValue<int>('warningSeconds', value ?? current);
                   },
-                  onChanged: (_) => state.markChanged(),
                 ),
               ],
             ),
@@ -444,7 +461,7 @@ class SecuritySettingsPage extends ConsumerWidget {
               state.setSaving(true);
 
               final seconds =
-                  int.parse(state.textController('seconds').text.trim());
+                  state.value<int>('warningSeconds', current) ?? current;
               final settings = settingsAsync.valueOrNull;
               if (settings == null) {
                 state.setSaving(false);

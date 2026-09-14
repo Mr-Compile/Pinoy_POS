@@ -64,7 +64,9 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
       if (authNotifier.hasPermission('view_products')) 'product',
       if (authNotifier.hasPermission('view_categories')) 'category',
       if (authNotifier.hasPermission('view_users')) 'user',
-      if (authNotifier.hasPermission('view_settings')) 'merchant_qr',
+      if (authNotifier.hasPermission('view_settings') &&
+          SessionManager().canEditBusinessSettings())
+        'merchant_qr',
       if (authNotifier.hasPermission('view_announcements')) 'announcement',
     ];
   }
@@ -455,11 +457,23 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
         showNotificationBell: !_selectionMode,
         showProfileMenu: !_selectionMode,
       ),
-      body: Column(
-        children: [
-          _buildToolbar(authNotifier),
-          _buildTypeFilter(),
-          Expanded(child: _buildBody()),
+      body: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(child: _buildToolbar(authNotifier)),
+          SliverToBoxAdapter(child: _buildTypeFilter()),
+          if (_filteredItems.isEmpty)
+            SliverToBoxAdapter(child: _buildEmptyBody())
+          else
+            SliverPadding(
+              padding: const EdgeInsets.all(16),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) =>
+                      _buildTrashCard(_filteredItems[index]),
+                  childCount: _filteredItems.length,
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -513,23 +527,15 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
     );
   }
 
-  Widget _buildBody() {
-    if (_filteredItems.isEmpty) {
-      final hasSearch = _searchController.text.trim().isNotEmpty;
-      return EmptyState(
-        icon: Icons.delete_outline,
-        title: hasSearch ? 'No matching records found.' : 'Trash is empty.',
-        message: hasSearch
-            ? 'Try a different search term.'
-            : 'Deleted products, categories, users, QR images, and '
-                  'announcements will appear here.',
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _filteredItems.length,
-      itemBuilder: (context, index) => _buildTrashCard(_filteredItems[index]),
+  Widget _buildEmptyBody() {
+    final hasSearch = _searchController.text.trim().isNotEmpty;
+    return EmptyState(
+      icon: Icons.delete_outline,
+      title: hasSearch ? 'No matching records found.' : 'Trash is empty.',
+      message: hasSearch
+          ? 'Try a different search term.'
+          : 'Deleted products, categories, users, QR images, and '
+                'announcements will appear here.',
     );
   }
 

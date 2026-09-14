@@ -22,44 +22,59 @@ class ErrorState extends StatelessWidget {
     final primaryLabel = primaryActionLabel ?? 'Retry';
     final primaryIcon = onPrimaryAction != null ? null : const Icon(Icons.refresh);
 
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Theme.of(context).colorScheme.error,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleLarge,
-              textAlign: TextAlign.center,
-            ),
-            if (message != null) ...[
-              const SizedBox(height: 8),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final content = Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 64,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              const SizedBox(height: 16),
               Text(
-                message!,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                title,
+                style: Theme.of(context).textTheme.titleLarge,
                 textAlign: TextAlign.center,
               ),
+              if (message != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  message!,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color:
+                            Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+              if (primary != null) ...[
+                const SizedBox(height: 24),
+                FilledButton.icon(
+                  onPressed: primary,
+                  icon: primaryIcon,
+                  label: Text(primaryLabel),
+                ),
+              ],
             ],
-            if (primary != null) ...[
-              const SizedBox(height: 24),
-              FilledButton.icon(
-                onPressed: primary,
-                icon: primaryIcon,
-                label: Text(primaryLabel),
-              ),
-            ],
-          ],
-        ),
-      ),
+          ),
+        );
+
+        if (!constraints.hasBoundedHeight) {
+          return Center(child: content);
+        }
+
+        return SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: content,
+          ),
+        );
+      },
     );
   }
 }

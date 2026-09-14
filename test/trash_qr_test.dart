@@ -180,4 +180,27 @@ void main() {
       1,
     );
   });
+
+  test('getAllTrash hides merchant QR entries from non-owner roles',
+      () async {
+    final qrPath = await writeQrFile();
+    await TrashService().moveQrToTrash(qrPath, 'image/png');
+
+    SessionManager().setCurrentUser(
+      User(
+        id: 99,
+        username: 'admin',
+        passwordHash: '',
+        role: UserRole.admin,
+        fullName: 'Admin User',
+        createdAt: DateTime.now(),
+        isActive: true,
+        mustChangePassword: false,
+      ),
+    );
+
+    final items = await TrashService().getAllTrash();
+    expect(items.where((i) => i.entityType == 'merchant_qr'), isEmpty);
+    expect(await TrashService().getTrashCount(), items.length);
+  });
 }

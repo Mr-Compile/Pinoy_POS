@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/core/session_status.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
 import 'package:pinoy_pos/data/models/user.dart';
@@ -6,6 +7,7 @@ import 'package:pinoy_pos/providers/ai_advisor_provider.dart';
 import 'package:pinoy_pos/providers/cart_provider.dart';
 import 'package:pinoy_pos/providers/dashboard_provider.dart';
 import 'package:pinoy_pos/providers/notification_provider.dart';
+import 'package:pinoy_pos/providers/payment_settings_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/providers/user_provider.dart';
 import 'package:pinoy_pos/services/user_service.dart';
@@ -102,6 +104,33 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
       isLoading: false,
       phase: phase,
     );
+    _syncSessionLock(phase);
+  }
+
+  /// Mirrors the auth phase into [SessionManager]'s lock flag so
+  /// service-level permission checks fail while the session is PIN-locked
+  /// or pending a forced password change, even though the user record is
+  /// still populated for those flows.
+  void _syncSessionLock(AuthSessionPhase phase) {
+    SessionManager().setSessionLocked(
+      _authService.currentUser != null &&
+          phase != AuthSessionPhase.fullyAuthenticated,
+    );
+  }
+
+  /// Invalidates providers that cache per-session data so a fresh login
+  /// never observes the previous session's state — including the
+  /// AuthorizationException a provider may have cached when it was
+  /// invalidated mid-logout while the user was already cleared.
+  /// `settingsServiceProvider` is included because [settingsProvider] and
+  /// [paymentSettingsProvider] watch it and are not autoDispose: without
+  /// this they would serve the stale error to the next session.
+  void _invalidateSessionStartProviders() {
+    _ref.container.invalidate(dashboardProvider);
+    _ref.container.invalidate(notificationCountProvider);
+    _ref.container.invalidate(settingsServiceProvider);
+    _ref.container.invalidate(settingsProvider);
+    _ref.container.invalidate(paymentSettingsProvider);
   }
 
   AuthSessionPhase _resolveActivePhase(User user) {
@@ -136,14 +165,14 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
           isLoading: false,
           phase: phase,
         );
+        _syncSessionLock(phase);
         // Invalidate providers that hold per-user cached state so they
         // reload with the new user’s data.  Without this, the dashboard
         // and notification badge show stale data (or the "Not
         // authenticated" error left over from the previous logout).
         // Container-level: `dashboardProvider` watches `authStateProvider`,
         // so element-level `_ref.invalidate` throws CircularDependencyError.
-        _ref.container.invalidate(dashboardProvider);
-        _ref.container.invalidate(notificationCountProvider);
+        _invalidateSessionStartProviders();
       case LoginResult.invalidCredentials:
         state = state.copyWith(isLoading: false, error: 'Username or password is incorrect.');
       case LoginResult.inactiveAccount:
@@ -164,9 +193,9 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
           isLoading: false,
           phase: AuthSessionPhase.fullyAuthenticated,
         );
+        _syncSessionLock(AuthSessionPhase.fullyAuthenticated);
         // Reload per-user cached state for the new session.
-        _ref.container.invalidate(dashboardProvider);
-        _ref.container.invalidate(notificationCountProvider);
+        _invalidateSessionStartProviders();
       } else {
         state = state.copyWith(isLoading: false, error: 'Incorrect username or PIN.');
       }
@@ -202,6 +231,7 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
         error: null,
       );
       await _authService.setPinVerified(false);
+      SessionManager().setSessionLocked(true);
       return;
     }
     await logout();
@@ -250,9 +280,9 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
         error: null,
       );
       await _authService.setPinVerified(phase == AuthSessionPhase.fullyAuthenticated);
+      _syncSessionLock(phase);
       // Reload per-user cached state after password change.
-      _ref.container.invalidate(dashboardProvider);
-      _ref.container.invalidate(notificationCountProvider);
+      _invalidateSessionStartProviders();
     }
     return result;
   }
@@ -268,9 +298,9 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
         phase: AuthSessionPhase.fullyAuthenticated,
         error: null,
       );
+      _syncSessionLock(AuthSessionPhase.fullyAuthenticated);
       // Reload per-user cached state after PIN verification.
-      _ref.container.invalidate(dashboardProvider);
-      _ref.container.invalidate(notificationCountProvider);
+      _invalidateSessionStartProviders();
     }
     return result;
   }

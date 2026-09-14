@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'helpers/secure_storage_test_helper.dart';
 
+import 'package:pinoy_pos/core/authorization_exception.dart';
 import 'package:pinoy_pos/core/database.dart';
 import 'package:pinoy_pos/core/database_seeder.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
@@ -106,14 +107,14 @@ void main() {
       expect(await svc.getTotalProducts(), isA<int>());
     });
 
-    test('ReportService exposes user metrics to owner', () async {
+    test('ReportService user and backup metrics are Admin-only', () async {
       await authAsOwner();
       final svc = ReportService();
 
-      // Owner has manage_users. backup_restore is Admin-only, so
-      // getLastBackupPath returns null.
-      expect(await svc.getTotalUsers(), greaterThanOrEqualTo(1));
-      expect(await svc.getActiveUsers(), greaterThanOrEqualTo(1));
+      // manage_users and backup_restore are Admin-only, so the Owner gets
+      // fail-closed empty results from these system-metric methods.
+      expect(await svc.getTotalUsers(), 0);
+      expect(await svc.getActiveUsers(), 0);
       expect(await svc.getLastBackupPath(), isNull);
       expect(await svc.getLastBackupDate(), isNull);
     });
@@ -467,6 +468,35 @@ void main() {
       final reloaded = await svc2.getSettings();
       expect(reloaded.storeName, 'My New Store');
     });
+
+    test('updateSettings rejects business-identity changes from Admin',
+        () async {
+      final authService = AuthService();
+      final result = await authService.login('admin', 'admin123');
+      expect(result, LoginResult.success);
+
+      final svc = SettingsService();
+      final settings = await svc.getSettings();
+
+      // Business-identity fields are Owner-only even though Admin holds
+      // edit_settings for system configuration.
+      expect(
+        () => svc.updateSettings(
+          settings.copyWith(storeName: 'Admin Override'),
+        ),
+        throwsA(isA<AuthorizationException>()),
+      );
+      expect(
+        () => svc.updateSettings(settings.copyWith(currency: 'USD')),
+        throwsA(isA<AuthorizationException>()),
+      );
+
+      // System fields (e.g. AI quota) remain writable by Admin.
+      final ok = await svc.updateSettings(
+        settings.copyWith(aiDailyQuota: settings.aiDailyQuota),
+      );
+      expect(ok, isTrue);
+    });
   });
 
   // ─── AI Usage ─────────────────────────────────────────────────────────
@@ -704,8 +734,7 @@ void main() {
         'view_ai_advisor', 'view_settings', 'edit_settings',
         'view_notifications', 'view_profile', 'view_more',
         'manage_staff', 'view_staff_performance', 'view_report_submissions',
-        'manage_users', 'edit_users', 'delete_users',
-        'reset_password', 'toggle_user_active', 'view_users', 'empty_trash',
+        'delete_users', 'view_users', 'empty_trash',
       ];
 
       for (final perm in expected) {
@@ -713,17 +742,25 @@ void main() {
       }
     });
 
-    test('Owner has user management permissions', () async {
+    test('Owner keeps user-trash permissions but not user-admin ones', () async {
       await authAsOwner();
       final sm = SessionManager();
 
-      const userPerms = [
-        'manage_users', 'edit_users', 'delete_users',
-        'reset_password', 'toggle_user_active', 'view_users',
-      ];
-
-      for (final perm in userPerms) {
+      // Required by the staff trash lifecycle:
+      // softDeleteStaff -> TrashService.moveToTrash('user') -> delete_users;
+      // restore -> restore_trash + view_users; Trash Users tab -> view_users.
+      const retained = ['view_users', 'delete_users'];
+      for (final perm in retained) {
         expect(sm.hasPermission(perm), isTrue, reason: 'Missing: $perm');
+      }
+
+      // Admin-surface permissions — nothing the Owner can reach calls
+      // UserService, so these were removed as dead grants.
+      const removed = [
+        'manage_users', 'edit_users', 'reset_password', 'toggle_user_active',
+      ];
+      for (final perm in removed) {
+        expect(sm.hasPermission(perm), isFalse, reason: 'Should be removed: $perm');
       }
     });
   });

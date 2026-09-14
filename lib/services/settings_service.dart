@@ -3,7 +3,6 @@ import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/auto_backup_settings.dart';
 import 'package:pinoy_pos/data/models/payment_settings.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
-import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/data/repositories/settings_repository.dart';
 import 'package:pinoy_pos/services/groq_service.dart';
 import 'package:pinoy_pos/services/image_service.dart';
@@ -86,11 +85,13 @@ class SettingsService {
   ///
   /// This is intentionally scoped so that Staff (who have `create_sales`)
   /// can read the GCash rules without receiving sensitive store
-  /// configuration such as the Groq API key.
+  /// configuration such as the Groq API key. `verify_payments` is included
+  /// so the Owner — the only authorized verifier — can load the rules from
+  /// the verification path. System Admin has neither permission and cannot
+  /// read the Owner's payment configuration.
   Future<PaymentSettings> getPaymentSettings() async {
     if (!_sessionManager.hasPermission('create_sales') &&
-        !_sessionManager.hasPermission('view_settings') &&
-        !_sessionManager.hasPermission('edit_settings')) {
+        !_sessionManager.hasPermission('verify_payments')) {
       throw AuthorizationException('create_sales');
     }
 
@@ -154,15 +155,18 @@ class SettingsService {
       throw AuthorizationException('edit_settings');
     }
 
-    // GCash payment settings are business-Owner only. Admins (who also have
-    // edit_settings) may still use this method for AI/system settings, but
-    // they must not be able to change the Owner's payment configuration.
-    if (_sessionManager.currentUser?.role == UserRole.admin) {
+    // Business-identity and GCash payment settings are business-Owner only.
+    // Admins (who also have edit_settings) may still use this method for
+    // AI/system settings, but they must not change the Owner's store
+    // information or payment configuration.
+    if (!_sessionManager.canEditBusinessSettings()) {
       final current = await _settingsRepository.getSettings();
-      if (current != null && _gcashSettingsDiffer(current, settings)) {
+      if (current == null ||
+          _gcashSettingsDiffer(current, settings) ||
+          _businessIdentityDiffer(current, settings)) {
         throw AuthorizationException(
           'edit_settings',
-          'Only the Owner can change GCash payment settings.',
+          'Only the Owner can change store information and payment settings.',
         );
       }
     }
@@ -210,6 +214,16 @@ class SettingsService {
         a.gcashQrImagePath != b.gcashQrImagePath ||
         a.gcashQrImageType != b.gcashQrImageType ||
         a.gcashQrPreviewPath != b.gcashQrPreviewPath;
+  }
+
+  /// Returns true if any business-identity field (store name, address,
+  /// contact, currency, receipt footer) differs between [a] and [b].
+  bool _businessIdentityDiffer(Settings a, Settings b) {
+    return a.storeName != b.storeName ||
+        a.storeAddress != b.storeAddress ||
+        a.storePhone != b.storePhone ||
+        a.currency != b.currency ||
+        a.receiptFooter != b.receiptFooter;
   }
 
   /// Picks and stores a GCash merchant QR image, then writes the relative
@@ -326,22 +340,31 @@ class SettingsService {
   /// [flutter_secure_storage] and clears the column.
   ///
   /// If the secure-storage key already exists, it overwrites the DB copy only.
+  ///
+  /// Best-effort: a missing `groq_api_key` column (unmigrated or damaged
+  /// database) or a secure-storage platform failure must not break the
+  /// settings read path — the returned [Settings] already exposes
+  /// `groqApiKey == null`.
   Future<bool> _migrateGroqApiKey() async {
-    final dbKey = await _settingsRepository.getGroqApiKeyRaw();
-    if (dbKey == null || dbKey.isEmpty) return false;
+    try {
+      final dbKey = await _settingsRepository.getGroqApiKeyRaw();
+      if (dbKey == null || dbKey.isEmpty) return false;
 
-    final settings = await _settingsRepository.getSettings();
-    if (settings == null) return false;
+      final settings = await _settingsRepository.getSettings();
+      if (settings == null) return false;
 
-    final secureKey = await _secureStorage.read(key: _groqApiKeySecureKey);
-    if (secureKey == null || secureKey.isEmpty) {
-      await _secureStorage.write(key: _groqApiKeySecureKey, value: dbKey);
+      final secureKey = await _secureStorage.read(key: _groqApiKeySecureKey);
+      if (secureKey == null || secureKey.isEmpty) {
+        await _secureStorage.write(key: _groqApiKeySecureKey, value: dbKey);
+      }
+
+      await _settingsRepository.update(
+        settings.copyWith(groqApiKey: null, updatedAt: DateTime.now()),
+      );
+      return true;
+    } catch (_) {
+      return false;
     }
-
-    await _settingsRepository.update(
-      settings.copyWith(groqApiKey: null, updatedAt: DateTime.now()),
-    );
-    return true;
   }
 
   Future<String> getTheme() async {

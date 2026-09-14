@@ -21,6 +21,7 @@ class SessionManager {
   factory SessionManager() => _instance;
 
   User? _currentUser;
+  bool _sessionLocked = false;
 
   /// The currently authenticated user, or null when logged out.
   User? get currentUser => _currentUser;
@@ -28,22 +29,38 @@ class SessionManager {
   /// Whether a user is currently authenticated.
   bool get isAuthenticated => _currentUser != null;
 
+  /// Whether the session is in a non-fully-authenticated phase (PIN lock or
+  /// forced password change). While locked, [hasPermission] always returns
+  /// false even though [currentUser] is still populated — the user record is
+  /// kept so the PIN/password-change flows can resolve it.
+  bool get isSessionLocked => _sessionLocked;
+
   /// Sets the currently authenticated user. Called by [AuthService] after a
-  /// successful login or session restore.
+  /// successful login or session restore. A fresh user starts unlocked; the
+  /// caller applies [setSessionLocked] when the auth phase requires it.
   void setCurrentUser(User user) {
     _currentUser = user;
+    _sessionLocked = false;
   }
 
   /// Clears the currently authenticated user. Called by [AuthService] on
   /// logout or when a session is invalidated.
   void clearCurrentUser() {
     _currentUser = null;
+    _sessionLocked = false;
+  }
+
+  /// Marks the session as locked (PIN lock / forced password change) or
+  /// unlocked. Called by the auth layer when the auth phase transitions.
+  void setSessionLocked(bool locked) {
+    _sessionLocked = locked;
   }
 
   /// Resets the singleton state for testing.
   @visibleForTesting
   static void resetForTest() {
     _instance._currentUser = null;
+    _instance._sessionLocked = false;
   }
 
   /// Returns true if the current user has the given [permission].
@@ -54,6 +71,9 @@ class SessionManager {
   bool hasPermission(String permission) {
     final user = _currentUser;
     if (user == null) return false;
+    // A locked session (PIN lock / forced password change) must not satisfy
+    // service-level permission checks — only the auth flow itself may run.
+    if (_sessionLocked) return false;
 
     switch (user.role) {
       case UserRole.owner:
@@ -77,6 +97,18 @@ class SessionManager {
   /// Owner (Business Owner) — manages store operations, business decisions,
   /// and business continuity. The Owner uses the AI Business Advisor for
   /// business-wide analytics (sales, products, inventory, trends).
+  ///
+  /// Staff account lifecycle runs entirely through `manage_staff` and
+  /// [StaffService] (create, edit, reset password, activate, delete,
+  /// restore). The Owner does NOT hold `manage_users` / `edit_users` /
+  /// `reset_password` / `toggle_user_active` — those are Admin-surface
+  /// permissions enforced by [UserService] and were removed as dead grants.
+  ///
+  /// `view_users`, `delete_users`, `restore_trash`, and `empty_trash` are
+  /// retained because they are load-bearing for the user-trash lifecycle:
+  /// `StaffService.softDeleteStaff` -> `TrashService.moveToTrash('user')`
+  /// requires `delete_users`, restore requires `view_users`, and the Trash
+  /// screen's Users tab is gated on `view_users`.
   ///
   /// System administration tasks (backups, AI configuration / quota,
   /// session timeout, and global system settings) are reserved for the
@@ -108,6 +140,9 @@ class SessionManager {
     'view_activity_logs',
     'view_ai_advisor',
     'use_ai_advisor',
+    // view_settings = system-settings destinations (dashboard quick action,
+    // AI nav 'settings', SettingsService.getSettings). SettingsScreen itself
+    // is a universal hub for all roles; each system tile gates individually.
     'view_settings',
     'edit_settings',
     'manage_staff',
@@ -116,11 +151,7 @@ class SessionManager {
     'view_profile',
     'view_more',
     'view_report_submissions',
-    'manage_users',
-    'edit_users',
     'delete_users',
-    'reset_password',
-    'toggle_user_active',
     'view_users',
     'empty_trash',
   ];
@@ -134,10 +165,10 @@ class SessionManager {
   /// (`manage_ai_config`), AI quotas (`manage_ai_quota`), and global session
   /// timeout (`manage_session_settings`).
   ///
-  /// `verify_payments` is granted so the Admin can act as an authorized
-  /// verifier for Staff-tendered GCash payments at the point of sale (when
-  /// the configured verification policy includes Admin). It does not grant
-  /// access to the sales list or sale detail screens.
+  /// The Admin has no `verify_payments` grant: Owner is the only authorized
+  /// verifier for Staff-tendered GCash payments (see
+  /// [PaymentVerificationService.canRoleVerify]). The previous grant was a
+  /// dead permission — Admin could never actually confirm or reject.
   ///
   /// AI access: Admin can CONFIGURE the Groq AI integration
   /// (`manage_ai_config`) and USE the AI System Assistant (`use_ai_advisor`)
@@ -151,6 +182,9 @@ class SessionManager {
     'delete_users',
     'reset_password',
     'toggle_user_active',
+    // view_settings = system-settings destinations (dashboard quick action,
+    // AI nav 'settings', SettingsService.getSettings). SettingsScreen itself
+    // is a universal hub for all roles; each system tile gates individually.
     'view_settings',
     'edit_settings',
     'backup_restore',
@@ -159,7 +193,6 @@ class SessionManager {
     'manage_session_settings',
     'view_ai_advisor',
     'use_ai_advisor',
-    'verify_payments',
     'view_trash',
     'restore_trash',
     'view_activity_logs',
@@ -172,6 +205,11 @@ class SessionManager {
   /// Staff (Operational User) — daily cashier and inventory operations.
   /// Can view products/categories, add stock, create sales, view own
   /// sales/reports, and manage their own profile.
+  ///
+  /// Catalog writes are Owner-only: Staff hold `view_categories` for
+  /// read-only browsing but not `change_category_status` — toggling a
+  /// category active/inactive mutates the catalog and hides its products
+  /// from POS, which is not a cashier responsibility.
   ///
   /// `submit_reports` is Staff-only by business rule: Staff generate and
   /// submit reports to the Owner. The Owner reviews submissions and must
@@ -187,7 +225,6 @@ class SessionManager {
     'view_pos',
     'view_products',
     'view_categories',
-    'change_category_status',
     'view_stock',
     'add_stock',
     'view_sales',

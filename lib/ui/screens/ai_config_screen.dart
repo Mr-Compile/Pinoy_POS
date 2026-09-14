@@ -42,6 +42,7 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
   bool _isSaving = false;
   bool _isTesting = false;
   bool _isRefreshingModels = false;
+  bool _isVerifying = false;
   bool _isConfigured = false;
   String? _loadError;
 
@@ -51,6 +52,10 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
   // Connection status: null = unknown, true = connected, false = failed.
   bool? _connectionStatus;
   String? _connectionMessage;
+
+  /// Increments each time a new connection check begins so a stale
+  /// auto-verify cannot overwrite the result of a newer check.
+  int _connectionCheckGeneration = 0;
 
   // Available models from Groq.
   List<GroqModel> _availableModels = [];
@@ -92,7 +97,20 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
         // Load cached models if available.
         final cached = settingsService.getCachedModels();
         if (cached.isNotEmpty) {
-          setState(() => _availableModels = cached);
+          // Models were fetched earlier in this session, so the
+          // connection was already verified — restore both.
+          setState(() {
+            _availableModels = cached;
+            _connectionStatus = true;
+            _connectionMessage =
+                'Connected. ${cached.length} models available.';
+          });
+        } else if (configured) {
+          // The model cache lives in memory only and is wiped when the
+          // settings service is recreated (logout/login, app restart).
+          // Re-verify the saved key so the status card and model list
+          // reflect the real connection state.
+          _autoVerifyConnection();
         }
       }
     } catch (e, st) {
@@ -101,6 +119,77 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
         setState(() {
           _isLoading = false;
           _loadError = 'Failed to load AI configuration.';
+        });
+      }
+    }
+  }
+
+  // ── Auto-Verify Connection ────────────────────────────────────────────
+
+  /// Silently re-verifies the saved Groq key and repopulates the model
+  /// list when the in-memory cache is empty (e.g. after logout/login or
+  /// an app restart).
+  ///
+  /// If the saved model is no longer among the active models returned by
+  /// Groq, the recommended model is auto-selected and persisted so the
+  /// AI Advisor keeps working without manual reconfiguration.
+  Future<void> _autoVerifyConnection() async {
+    final generation = ++_connectionCheckGeneration;
+    setState(() => _isVerifying = true);
+
+    bool isCurrent() => mounted && generation == _connectionCheckGeneration;
+
+    try {
+      final settingsService = ref.read(settingsServiceProvider);
+      final result = await settingsService.refreshModels();
+      if (!isCurrent()) return;
+
+      if (!result.success) {
+        setState(() {
+          _isVerifying = false;
+          _connectionStatus = false;
+          _connectionMessage = result.errorMessage ??
+              'The connection could not be verified.';
+        });
+        return;
+      }
+
+      var message = 'Connected. ${result.models.length} models available.';
+      var resolvedModel = _selectedModel;
+      var modelChanged = false;
+
+      final selectedAvailable = result.models
+          .any((m) => m.id == _selectedModel && m.active);
+      if (!selectedAvailable && result.models.isNotEmpty) {
+        resolvedModel = settingsService.getRecommendedModel(result.models);
+        modelChanged = resolvedModel != _selectedModel;
+        if (modelChanged) {
+          final savedKey = await settingsService.getGroqApiKey();
+          if (savedKey != null && savedKey.isNotEmpty) {
+            await settingsService.saveGroqConfig(
+                apiKey: savedKey, model: resolvedModel);
+            message =
+                'Connected. Auto-selected "$resolvedModel" as the default model.';
+          }
+        }
+      }
+
+      if (!isCurrent()) return;
+      setState(() {
+        _isVerifying = false;
+        _connectionStatus = true;
+        _connectionMessage = message;
+        _availableModels = result.models;
+        _selectedModel = resolvedModel;
+      });
+      if (modelChanged) await _notifyChatProvider();
+    } catch (e, st) {
+      _log('autoVerifyConnection failed', e, st);
+      if (isCurrent()) {
+        setState(() {
+          _isVerifying = false;
+          _connectionStatus = false;
+          _connectionMessage = 'The connection could not be verified.';
         });
       }
     }
@@ -142,8 +231,10 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
       keyToTest = keyInput;
     }
 
+    _connectionCheckGeneration++;
     setState(() {
       _isTesting = true;
+      _isVerifying = false;
       _connectionStatus = null;
       _connectionMessage = null;
     });
@@ -375,6 +466,7 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
 
     if (confirmed != true || !mounted) return;
 
+    _connectionCheckGeneration++;
     setState(() => _isSaving = true);
     try {
       final settingsService = ref.read(settingsServiceProvider);
@@ -383,6 +475,7 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
         setState(() {
           _isSaving = false;
           _isConfigured = false;
+          _isVerifying = false;
           _connectionStatus = null;
           _connectionMessage = null;
           _availableModels = [];
@@ -515,13 +608,15 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
             : _isConfigured
                 ? Icons.info_outline
                 : Icons.help_outline;
-    final statusText = isConnected
-        ? 'Connected'
-        : isFailed
-            ? 'Connection Failed'
-            : _isConfigured
-                ? 'Configured (not tested)'
-                : 'Not Configured';
+    final statusText = _isVerifying
+        ? 'Checking connection...'
+        : isConnected
+            ? 'Connected'
+            : isFailed
+                ? 'Connection Failed'
+                : _isConfigured
+                    ? 'Configured (not tested)'
+                    : 'Not Configured';
 
     return AppCard(
       child: Padding(
@@ -533,7 +628,17 @@ class _AIConfigScreenState extends ConsumerState<AIConfigScreen> {
             const SizedBox(height: 12),
             Row(
               children: [
-                Icon(statusIcon, color: statusColor, size: 28),
+                if (_isVerifying)
+                  SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: statusColor,
+                    ),
+                  )
+                else
+                  Icon(statusIcon, color: statusColor, size: 28),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(

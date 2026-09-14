@@ -3,7 +3,6 @@ import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/database.dart';
 import 'package:pinoy_pos/core/payment_validation_exception.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
-import 'package:pinoy_pos/data/models/payment_settings.dart';
 import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/data/models/sale_item.dart';
 import 'package:pinoy_pos/data/models/user.dart';
@@ -316,13 +315,8 @@ class SalesService {
     _validateCart(items, totalAmount);
 
     // Load payment settings so GCash rules are applied immediately.
-    final PaymentSettings paymentSettings;
-    try {
-      paymentSettings = await _settingsService.getPaymentSettings();
-    } on AuthorizationException catch (_) {
-      // Staff must be able to read payment settings to create a sale.
-      rethrow;
-    }
+    // Staff must be able to read payment settings to create a sale.
+    final paymentSettings = await _settingsService.getPaymentSettings();
 
     var received = cashReceived ?? totalAmount;
     final trimmedReference = referenceNumber?.trim();
@@ -673,7 +667,7 @@ class SalesService {
     return _verificationService.currentUserCanVerify();
   }
 
-  /// Returns all GCash payments that are pending owner/admin verification.
+  /// Returns all GCash payments that are pending owner verification.
   Future<List<Sale>> getPendingPayments() async {
     if (!await _canVerify()) {
       return [];
@@ -681,7 +675,7 @@ class SalesService {
     return _saleRepository.getPendingPayments(limit: 500);
   }
 
-  /// Confirm a pending GCash payment. Only Owner/Admin can confirm.
+  /// Confirm a pending GCash payment. Only the Owner can confirm.
   ///
   /// Returns true when the sale is updated to confirmed, or false if the
   /// sale is not in a pending state.
@@ -723,7 +717,7 @@ class SalesService {
   /// Reject a pending GCash payment. Restores stock, sets the payment status
   /// to 'cancelled', and removes any associated payment evidence.
   ///
-  /// Only Owner/Admin can reject.
+  /// Only the Owner can reject.
   Future<bool> rejectGcashPayment(int saleId, {String? reason}) async {
     if (!await _canVerify()) {
       await _activityLogService.logActivity(
@@ -788,9 +782,10 @@ class SalesService {
     });
   }
 
-  /// Replace the payment evidence for a sale (e.g. when the cashier retakes
-  /// a photo before the sale is committed, or when an owner/admin requests
-  /// clearer evidence for a pending payment).
+  /// Replace the payment evidence for a sale (e.g. when the owner requests
+  /// clearer evidence for a pending payment). Requires `verify_payments`;
+  /// the only caller is [PaymentProofViewerScreen], which is itself gated
+  /// by `view_payment_evidence`.
   ///
   /// Returns the new relative path, or null if the update failed.
   Future<String?> replacePaymentProof(
@@ -801,13 +796,7 @@ class SalesService {
     final sale = await _saleRepository.getById(saleId, txn: txn);
     if (sale == null) return null;
 
-    final currentUser = _sessionManager.currentUser;
-    final userId = currentUser?.id;
-    final canVerify = _sessionManager.hasPermission('verify_payments');
-    final isOwn = userId != null && userId == sale.userId;
-
-    if (!canVerify &&
-        !(isOwn && _sessionManager.hasPermission('create_sales'))) {
+    if (!_sessionManager.hasPermission('verify_payments')) {
       await _activityLogService.logActivity(
         action: 'unauthorized_replace_payment_proof',
         entity: 'sale',

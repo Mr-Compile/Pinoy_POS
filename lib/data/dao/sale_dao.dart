@@ -220,7 +220,7 @@ class SaleDao extends BaseDao<Sale> {
     return maps.map((map) => fromMap(map)).toList();
   }
 
-  /// Returns pending GCash payments awaiting owner/admin verification.
+  /// Returns pending GCash payments awaiting owner verification.
   Future<List<Sale>> getPendingPayments({int limit = 200}) async {
     final database = await db;
     final maps = await database.query(
