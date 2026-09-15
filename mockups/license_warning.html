@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinoy POS — License Warning & Owner License Page</title>
+<link rel="stylesheet" href="mockup.css">
+<style>
+  .layout { display: flex; gap: 32px; justify-content: center; align-items: flex-start; flex-wrap: wrap; }
+  .console { width: 380px; display: flex; flex-direction: column; gap: 14px; }
+  .console .card { padding: 14px; }
+  .console h3 { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 10px; }
+  .scn { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .scn button { padding: 9px 6px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-elev); color: var(--text-2); font-size: 12px; font-weight: 600; cursor: pointer; }
+  .scn button:hover { border-color: var(--primary); color: var(--text); }
+  .scn button.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .scn button.lock { border-color: rgba(220,38,38,.5); color: var(--error); }
+  .scn button.lock.on { background: var(--error); border-color: var(--error); color: #fff; }
+  .segrow { display: flex; gap: 8px; }
+  .segrow button { flex: 1; padding: 9px 4px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-elev); color: var(--text-2); font-size: 12px; font-weight: 600; cursor: pointer; }
+  .segrow button:hover { border-color: var(--primary); color: var(--text); }
+  .segrow button.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .insp { font-size: 12px; line-height: 1.9; color: var(--text-2); font-family: Consolas, monospace; }
+  .insp b { color: var(--text); }
+
+  /* ── proposed notice tiers (maps to a single LicenseNotice widget) ── */
+  .lic { display: flex; align-items: center; gap: 10px; padding: 10px 12px 10px 14px; flex-shrink: 0; border-left: 4px solid transparent; }
+  .lic .nic { width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .lic .nic svg { width: 16px; height: 16px; }
+  .lic .nb { flex: 1; min-width: 0; line-height: 1.35; }
+  .lic .nt { font-size: 12.5px; font-weight: 800; }
+  .lic .ns { font-size: 11px; margin-top: 1px; }
+  .lic .nbtn { border: none; border-radius: 20px; padding: 0 14px; min-height: 40px; font-size: 12px; font-weight: 800; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+
+  .lic.calm { background: var(--surface-hi); border-left-color: transparent; }
+  .lic.calm .nic { background: rgba(140,154,184,.18); } .lic.calm .nic svg { fill: var(--text-3); }
+  .lic.calm .nt { color: var(--text-2); } .lic.calm .ns { color: var(--text-3); }
+  .lic.calm .nbtn { background: transparent; border: 1px solid var(--border); color: var(--text-2); min-height: 36px; }
+
+  .lic.warn { background: #FEF3C7; border-left-color: #D97706; }
+  :root[data-theme="dark"] .lic.warn { background: #3A2A0A; }
+  .lic.warn .nic { background: rgba(217,119,6,.18); } .lic.warn .nic svg { fill: var(--warning); }
+  .lic.warn .nt { color: #78350F; } .lic.warn .ns { color: rgba(120,53,15,.75); }
+  :root[data-theme="dark"] .lic.warn .nt { color: #FDE68A; } :root[data-theme="dark"] .lic.warn .ns { color: rgba(253,230,138,.7); }
+  .lic.warn .nbtn { background: var(--warning); color: #fff; }
+  .lic.warn .nbtn:hover { filter: brightness(.92); }
+
+  .lic.crit { background: #FEE2E2; border-left-color: #DC2626; }
+  :root[data-theme="dark"] .lic.crit { background: #3A1518; }
+  .lic.crit .nic { background: rgba(220,38,38,.18); } .lic.crit .nic svg { fill: var(--error); }
+  .lic.crit .nt { color: #7F1D1D; } .lic.crit .ns { color: rgba(127,29,29,.75); }
+  :root[data-theme="dark"] .lic.crit .nt { color: #FECACA; } :root[data-theme="dark"] .lic.crit .ns { color: rgba(254,202,202,.7); }
+  .lic.crit .nbtn { background: var(--error); color: #fff; }
+  .lic.crit .nbtn:hover { filter: brightness(.92); }
+
+  /* current implementation (for the comparison frame) */
+  .lic-now { background: #FEF3C7; color: #78350F; padding: 9px 12px; display: flex; align-items: center; gap: 9px; font-size: 11.5px; font-weight: 600; flex-shrink: 0; }
+  :root[data-theme="dark"] .lic-now { background: #3A2A0A; color: #FDE68A; }
+  .lic-now svg { width: 16px; height: 16px; fill: var(--warning); flex-shrink: 0; }
+  .lic-now span { flex: 1; line-height: 1.4; }
+  .lic-now button { background: none; border: none; color: var(--warning); font-weight: 800; font-size: 11.5px; cursor: pointer; white-space: nowrap; padding: 4px 6px; }
+
+  /* login card (shared w/ license_flow.html) */
+  .login-card { background: var(--surface); border-radius: var(--radius-card); padding: 26px 24px; box-shadow: 0 10px 28px rgba(0,0,0,.10); width: 100%; max-width: 330px; }
+  .login-logo { width: 82px; height: 82px; border-radius: 22px; background: var(--surface-elev); display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; box-shadow: 0 8px 24px rgba(37,99,199,.16); }
+  .login-logo svg { width: 52px; height: 52px; fill: var(--primary); }
+  .code-link { background: none; border: none; color: var(--text-3); font-size: 12.5px; font-weight: 600; cursor: pointer; margin-top: 10px; width: 100%; padding: 6px; }
+
+  /* lock screen bits */
+  .lock-ic { width: 84px; height: 84px; border-radius: 50%; background: rgba(220,38,38,.12); display: flex; align-items: center; justify-content: center; margin: 0 auto; }
+  .lock-ic svg { width: 42px; height: 42px; fill: var(--error); }
+  .lock-title { font-size: 20px; font-weight: 800; color: var(--text); text-align: center; }
+  .lock-msg { font-size: 13px; color: var(--text-3); text-align: center; line-height: 1.55; }
+  .contact-card { display: flex; gap: 10px; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; width: 100%; text-align: left; }
+  .contact-card svg { width: 18px; height: 18px; fill: var(--primary); flex-shrink: 0; }
+  .contact-card .lbl { font-size: 11px; color: var(--text-3); }
+  .contact-card .val { font-size: 13px; font-weight: 700; color: var(--text); }
+
+  /* wide (desktop) frame */
+  .wide { width: 700px; max-width: 100%; background: var(--bg); border-radius: 18px; border: 1px solid var(--border); overflow: hidden; box-shadow: 0 24px 64px rgba(0,0,0,.35); }
+  .wide .appbar { padding: 12px 18px; }
+  .wide .page { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+  .wide .lic .nb { max-width: 560px; }
+
+  .cmp { display: flex; gap: 40px; justify-content: center; flex-wrap: wrap; margin-top: 8px; }
+  .cmp-label { font-size: 12px; font-weight: 800; color: var(--text-3); text-transform: uppercase; letter-spacing: .5px; text-align: center; }
+
+  /* owner license status page */
+  .big-days { font-size: 34px; font-weight: 800; color: var(--text); line-height: 1.05; }
+  .big-days small { font-size: 14px; font-weight: 700; color: var(--text-3); }
+  .pbar { height: 6px; border-radius: 3px; background: var(--surface-hi); overflow: hidden; margin-top: 10px; }
+  .pbar i { display: block; height: 100%; border-radius: 3px; }
+  .stat-row { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; font-size: 12px; }
+  .stat-row .k { color: var(--text-3); }
+  .stat-row .v { font-weight: 700; color: var(--text); text-align: right; }
+  .evt { display: flex; gap: 10px; padding: 10px 14px; align-items: flex-start; }
+  .evt + .evt { border-top: 1px solid var(--divider); }
+  .evt .dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .evt .grow { flex: 1; min-width: 0; }
+  .evt .when { font-size: 11px; color: var(--text-3); white-space: nowrap; }
+  .audit { max-width: 900px; margin: 34px auto 0; }
+  .audit .card { padding: 4px 0; }
+  .audit .row { align-items: flex-start; }
+  .audit .row .n { width: 26px; height: 26px; border-radius: 8px; background: var(--surface-elev); color: var(--text-2); font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .audit code { font-family: Consolas, monospace; font-size: 11px; background: var(--surface-elev); padding: 1px 5px; border-radius: 5px; color: var(--text-2); }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="M20 2H4c-1 0-2 .9-2 2v3.01c0 .72.43 1.34 1 1.69V20c0 1.1 1.1 2 2 2h14c.9 0 2-.9 2-2V8.7c.57-.35 1-.97 1-1.69V4c0-1.1-1-2-2-2zm-5 12H9v-2h6v2zm5-7H4V4h16v3z"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm4.2 14.2L11 13V7h1.5v5.2l4.5 2.7-.8 1.3z"/></symbol>
+  <symbol id="i-hourglass" viewBox="0 0 24 24"><path d="M6 2v6h.01L6 8.01 10 12l-4 4 .01.01H6V22h12v-5.99h-.01L18 16l-4-4 4-3.99-.01-.01H18V2H6zm10 14.5V20H8v-3.5l4-4 4 4zm-4-5 4-4V4H8v3.5l4 4z"/></symbol>
+  <symbol id="i-alarm" viewBox="0 0 24 24"><path d="M22 5.72l-4.6-3.86-1.29 1.53 4.6 3.86L22 5.72zM7.88 3.39 6.6 1.86 2 5.71l1.29 1.53 4.59-3.85zM12.5 8H11v6l4.75 2.85.75-1.23-4-2.37V8zM12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9c4.97 0 9-4.03 9-9s-4.03-9-9-9zm0 16c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2-.9 2-2 2z"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84a.484.484 0 0 0-.48.41l-.36 2.54c-.59.24-1.13.57-1.62.94l2.39.96c.22.08.49 0 .61-.22l1.92-3.32c.12-.22.07-.49-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6 3.6-1.62 3.6-3.6z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></symbol>
+  <symbol id="i-cart" viewBox="0 0 24 24"><path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.13.12-.27.12-.42 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M12 21l3.5-4.5c-.97-.74-2.18-1.16-3.5-1.16s-2.53.42-3.5 1.16L12 21zM12 3C7.31 3 3.07 4.69 0 7.55l1.93 2.43C4.48 7.9 8.01 6.4 12 6.4s7.52 1.5 10.07 3.58L24 7.55C20.93 4.69 16.69 3 12 3z"/></symbol>
+  <symbol id="i-batt" viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></symbol>
+</svg>
+
+<div class="page-head">
+  <div>
+    <h1>License Warning Notice — severity tiers + owner page</h1>
+    <p>Implemented as <code>license_notice.dart</code> (calm / warn / critical tiers) and <code>license_status_screen.dart</code> (Owner-only page under Settings → System / Management → License). Pick a time-left value and a context to see what renders. All colors map to <code>AppSemanticColors</code> tokens.</p>
+  </div>
+  <button class="theme-toggle" onclick="toggleTheme()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
+    <span id="themeLabel">Light mode</span>
+  </button>
+</div>
+
+<div class="layout">
+  <div class="frame-wrap">
+    <div class="frame-label" id="frameLabel">App shell</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="screen" id="device"></div>
+    </div>
+    <div class="frame-notes">
+      The notice sits <b>above</b> the app bar — it's a global status, not part of the screen.<br>
+      On <b>Login</b> the proposal moves it out of the card to the top of the page.
+    </div>
+  </div>
+
+  <div class="console">
+    <div class="card">
+      <h3>Time remaining</h3>
+      <div class="scn" id="remBtns">
+        <button data-rem="45d">45 days</button>
+        <button data-rem="20d">20 days</button>
+        <button data-rem="6d">6 days</button>
+        <button data-rem="2d">2 days</button>
+        <button data-rem="18h">18 hours</button>
+        <button data-rem="40m">40 min</button>
+        <button data-rem="expired" class="lock">Expired</button>
+        <button data-rem="tampered" class="lock">Tampered</button>
+        <button data-rem="off">Disarmed</button>
+        <button data-rem="none">No license</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>License term (label + warning window)</h3>
+      <div class="segrow" id="termBtns">
+        <button data-term="30">30-day → "Trial" · warns last 7d</button>
+        <button data-term="365" class="on">1-year → "License" · warns last 30d</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Context</h3>
+      <div class="segrow" id="ctxBtns" style="flex-wrap:wrap;">
+        <button data-ctx="app" class="on">App shell</button>
+        <button data-ctx="login">Login</button>
+        <button data-ctx="settings">Settings</button>
+        <button data-ctx="license">Owner page</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>evaluate() → tier</h3>
+      <div class="insp" id="inspector">—</div>
+    </div>
+  </div>
+</div>
+
+<div class="cmp">
+  <div class="frame-wrap">
+    <div class="cmp-label">Current — one tier, one line</div>
+    <div class="phone" style="height:420px;">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="screen">
+        <div class="appbar"><div class="title"><h2>Pinoy POS</h2><div class="sub">Dashboard — Owner</div></div>
+          <div class="act"><svg><use href="#i-gear"/></svg></div></div>
+        <div class="lic-now"><svg><use href="#i-clock"/></svg>
+          <span>License expires in 6 days (Sep 21, 2:30 PM). Please contact your developer.</span>
+          <button>Enter code</button></div>
+        <div class="screen-body"><div class="card pad"><div class="name" style="color:var(--text-3);font-weight:600;">…content…</div></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="frame-wrap">
+    <div class="cmp-label">Proposed — same state (6 days)</div>
+    <div class="phone" style="height:420px;">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="screen">
+        <div class="lic warn"><div class="nic"><svg><use href="#i-clock"/></svg></div>
+          <div class="nb"><div class="nt">License expires in 6 days</div>
+          <div class="ns">Locks Sep 21, 2:30 PM · Enter a code to extend</div></div>
+          <button class="nbtn">Enter code</button></div>
+        <div class="appbar"><div class="title"><h2>Pinoy POS</h2><div class="sub">Dashboard — Owner</div></div>
+          <div class="act"><svg><use href="#i-gear"/></svg></div></div>
+        <div class="screen-body"><div class="card pad"><div class="name" style="color:var(--text-3);font-weight:600;">…content…</div></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="audit">
+  <h2 class="section-head">Wide layout — strip stays readable</h2>
+  <p class="muted">On tablet/desktop the notice keeps its hierarchy; the text column is capped instead of stretching the button to the far edge.</p>
+  <div class="wide" style="margin-top:12px;">
+    <div class="lic crit"><div class="nic"><svg><use href="#i-alarm"/></svg></div>
+      <div class="nb"><div class="nt">License locks in 18 hours</div>
+      <div class="ns">Tomorrow, 2:30 PM · Enter an unlock code or contact Juan Dev · 0917 555 0123</div></div>
+      <button class="nbtn">Enter code</button></div>
+    <div class="appbar"><div class="title"><h2>Pinoy POS</h2><div class="sub">Dashboard — Owner</div></div>
+      <div class="act"><svg><use href="#i-gear"/></svg></div></div>
+    <div class="page">
+      <div class="stats">
+        <div class="stat"><div class="ic solid-blue"><svg><use href="#i-box"/></svg></div><div class="num">₱4.2k</div><div class="lbl">Today</div></div>
+        <div class="stat"><div class="ic solid-green"><svg><use href="#i-check"/></svg></div><div class="num">18</div><div class="lbl">Sales</div></div>
+        <div class="stat"><div class="ic solid-amber"><svg><use href="#i-clock"/></svg></div><div class="num">3</div><div class="lbl">Pending</div></div>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="section-head" style="margin-top:34px;">Audit — before this change</h2>
+  <p class="muted">Implemented: <code>license_notice.dart</code> (one widget, three tiers — <code>LicenseNoticeTier.calm/warn/critical</code>) mounted in <code>app_shell.dart</code> and at the top of <code>login_screen.dart</code>; <code>license_status_screen.dart</code> (owner page) reachable from Settings → System / Management → <b>License</b>. The signed activity log lives in the license blob (<code>LicenseStatus.events</code>).</p>
+  <div class="card" style="margin-top:12px;">
+    <div class="row"><div class="n">1</div><div class="grow"><div class="name">No urgency escalation</div><div class="sub">Same amber at 30 days and 30 minutes. Proposal adds a critical tier (error tokens + alarm icon + "locks in Xh" copy) for the final ~48 hours.</div></div></div>
+    <div class="row"><div class="n">2</div><div class="grow"><div class="name">Remaining time is mid-sentence</div><div class="sub">The Level-1 fact ("6 days") is buried in a full sentence. Proposal: bold title line carries the countdown; sub-line carries deadline + action hint.</div></div></div>
+    <div class="row"><div class="n">3</div><div class="grow"><div class="name">Login renders it inside the card</div><div class="sub">Clipped by card radius, reads as part of the form. Proposal: same strip, page-top, consistent with the app shell.</div></div></div>
+    <div class="row"><div class="n">4</div><div class="grow"><div class="name">"Enter code" tap target is ~36px</div><div class="sub">Shrink-wrapped TextButton. Proposal: 40px filled pill (warning/error solid) — easier to hit, clearly the primary action.</div></div></div>
+    <div class="row"><div class="n">5</div><div class="grow"><div class="name">Developer contact only on the lock screen</div><div class="sub">Critical tier surfaces <code>contactInfo</code> inline so staff can act before the lock engages.</div></div></div>
+    <div class="row"><div class="n">6</div><div class="grow"><div class="name">Two widgets, duplicated logic</div><div class="sub">Chip and banner share the same enter-code flow. Proposal: one <code>LicenseNotice</code> widget with a severity parameter (calm / warn / critical).</div></div></div>
+    <div class="row"><div class="n">7</div><div class="grow"><div class="name">Deliberate: no dismiss button</div><div class="sub">Kept from the current design — the lock must never land silently, so the notice can't be swiped away.</div></div></div>
+    <div class="row"><div class="n">8</div><div class="grow"><div class="name">Owner can't see license status</div><div class="sub">Today only the hidden dev panel shows deadline/state, and <code>activity_logs</code> can't hold license events (it requires a signed-in actor). Proposal: Settings → System → <b>License</b> tile (Owner) → status + enter-code + signed recent-activity log stored in the license blob.</div></div></div>
+  </div>
+</div>
+
+<script src="mockup.js"></script>
+<script>
+const DAY = 86400000, HOUR = 3600000;
+const sim = { rem: 20 * DAY, term: 365, ctx: 'app' };
+const CONTACT = 'Juan Dev · 0917 555 0123';
+const EXP = new Date(2026, 8, 21, 14, 30); // demo deadline: Sep 21, 2:30 PM
+
+/* mirrors LicenseExpiryBanner.formatRemaining */
+function fmtRem(ms) {
+  const d = Math.floor(ms / DAY);
+  if (d >= 2) return d + ' days';
+  if (d === 1) return '1 day';
+  const h = Math.floor(ms / HOUR);
+  if (h >= 2) return h + ' hours';
+  if (h === 1) return '1 hour';
+  return 'less than an hour';
+}
+function fmtDeadline(d) {
+  return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+/* mirrors LicenseStatus.warningThreshold: quarter of term, clamped 1d–30d */
+function warnThreshold(termDays) {
+  const q = termDays / 4;
+  return Math.min(30, Math.max(1, q)) * DAY;
+}
+const CRIT = 48 * HOUR; // proposed critical threshold
+const isTrial = () => sim.term <= 45;
+const label = () => isTrial() ? 'Trial' : 'License';
+
+/* tier: none | off | tampered | calm | warn | crit | expired — mirrors LicenseNotice.tierFor + LicenseLockState */
+function tier() {
+  if (sim.rem === 'none' || sim.rem === 'off' || sim.rem === 'tampered') return sim.rem;
+  if (sim.rem <= 0) return 'expired';
+  if (sim.rem <= CRIT) return 'crit';
+  if (sim.rem <= warnThreshold(sim.term)) return 'warn';
+  return 'calm';
+}
+
+function noticeHtml() {
+  const t = tier(), L = label();
+  if (t === 'none' || t === 'off' || t === 'tampered' || t === 'expired') return '';
+  const dl = fmtDeadline(EXP);
+  if (t === 'calm') return `<div class="lic calm"><div class="nic"><svg><use href="#i-hourglass"/></svg></div>
+    <div class="nb"><div class="nt">${L} · ${fmtRem(sim.rem)} left</div>
+    <div class="ns">Renews ${dl}</div></div>
+    <button class="nbtn" onclick="openDlg()">Enter code</button></div>`;
+  if (t === 'warn') return `<div class="lic warn"><div class="nic"><svg><use href="#i-clock"/></svg></div>
+    <div class="nb"><div class="nt">${L} expires in ${fmtRem(sim.rem)}</div>
+    <div class="ns">Locks ${dl} · Enter a code to extend</div></div>
+    <button class="nbtn" onclick="openDlg()">Enter code</button></div>`;
+  const soon = sim.rem < DAY;
+  return `<div class="lic crit"><div class="nic"><svg><use href="#i-alarm"/></svg></div>
+    <div class="nb"><div class="nt">${L} locks ${soon ? 'in ' + fmtRem(sim.rem) : 'in ' + fmtRem(sim.rem)}</div>
+    <div class="ns">${soon ? 'Today' : 'Soon'}, ${dl.split(',')[1] || ''} · Enter a code or contact ${CONTACT}</div></div>
+    <button class="nbtn" onclick="openDlg()">Enter code</button></div>`;
+}
+
+function renderApp() {
+  document.getElementById('frameLabel').textContent = 'App shell';
+  const t = tier();
+  if (t === 'expired' || t === 'tampered') return renderLock();
+  const dim = t === 'off' || t === 'none' ? '<div class="card pad"><div class="sub">No armed license — no notice rendered.</div></div>' : '';
+  document.getElementById('device').innerHTML = `
+    ${noticeHtml()}
+    <div class="appbar"><div class="title"><h2>Pinoy POS</h2><div class="sub">Dashboard — Owner</div></div>
+      <div class="act" title="Settings"><svg><use href="#i-gear"/></svg></div></div>
+    <div class="screen-body">
+      <div class="stats">
+        <div class="stat"><div class="ic solid-blue"><svg><use href="#i-box"/></svg></div><div class="num">₱4.2k</div><div class="lbl">Today</div></div>
+        <div class="stat"><div class="ic solid-green"><svg><use href="#i-check"/></svg></div><div class="num">18</div><div class="lbl">Sales</div></div>
+        <div class="stat"><div class="ic solid-amber"><svg><use href="#i-clock"/></svg></div><div class="num">3</div><div class="lbl">Pending</div></div>
+      </div>
+      ${dim}
+      <div class="card"><div class="row"><div class="grow"><div class="name">20260915-0007</div><div class="sub">Walk-in · Cash</div></div><div class="val">₱240.00</div></div>
+      <div class="row"><div class="grow"><div class="name">20260915-0006</div><div class="sub">Maria · GCash</div></div><div class="val">₱95.00</div></div></div>
+    </div>
+    <div class="bottomnav">
+      <div class="navitem sel"><div class="navicon"><svg><use href="#i-box"/></svg></div><div class="navlbl">Home</div></div>
+      <div class="navitem"><div class="navicon"><svg><use href="#i-cart"/></svg></div><div class="navlbl">POS</div></div>
+      <div class="navitem"><div class="navicon"><svg><use href="#i-more"/></svg></div><div class="navlbl">More</div></div>
+    </div>`;
+}
+
+function renderLogin() {
+  document.getElementById('frameLabel').textContent = 'Login — notice moved out of the card';
+  const t = tier();
+  if (t === 'expired' || t === 'tampered') return renderLock();
+  document.getElementById('device').innerHTML = `
+    ${noticeHtml()}
+    <div class="center-screen">
+      <div class="login-card">
+        <div class="login-logo"><svg><use href="#i-box"/></svg></div>
+        <div class="title" style="font-size:19px;font-weight:800;">Pinoy POS</div>
+        <div class="msg" style="margin:4px 0 20px;">Simple. Offline. Reliable.</div>
+        <div class="field"><label>Username</label><input class="input" value="owner"></div>
+        <div class="field"><label>Password</label><input class="input" type="password" value="password123"></div>
+        <button class="btn btn-primary" style="margin-top:20px;" onclick="sim.ctx='app';syncBtns();render()">Sign In</button>
+        ${(t === 'calm' || t === 'warn' || t === 'crit') ? '<button class="code-link" onclick="openDlg()">Have an unlock code?</button>' : ''}
+      </div>
+    </div>`;
+}
+
+/* ── Settings → System / Management list (Owner) ── */
+function settingsSub() {
+  // mirrors _licenseSubtitle() in settings_screen.dart
+  const t = tier(), L = label();
+  if (t === 'calm' || t === 'warn' || t === 'crit') return `${L} · ${fmtRem(sim.rem)} left`;
+  if (t === 'expired') return 'Expired — the app is locked';
+  if (t === 'tampered') return 'Integrity check failed';
+  if (t === 'off') return 'Configured — enforcement off';
+  return 'No license configured';
+}
+function tile(icon, name, sub, hl) {
+  return `<div class="row" ${hl ? 'style="background:rgba(37,99,235,.08);border-radius:10px;cursor:pointer;" onclick="sim.ctx=\'license\';syncBtns();render()"' : ''}>
+    <div class="isquare ${hl ? 'c-purple' : 'c-grey'}" style="width:34px;height:34px;border-radius:10px;"><svg><use href="${icon}"/></svg></div>
+    <div class="grow"><div class="name">${name}</div><div class="sub">${sub}</div></div>
+    <div class="sub">›</div></div>`;
+}
+function renderSettings() {
+  document.getElementById('frameLabel').textContent = 'Settings — Owner sees the License tile';
+  document.getElementById('device').innerHTML = `
+    ${noticeHtml()}
+    <div class="appbar"><div class="title"><h2>Settings</h2><div class="sub">Owner</div></div></div>
+    <div class="screen-body">
+      <div class="section-title">Personal</div>
+      <div class="card">
+        ${tile('#i-person', 'Profile', 'View and edit your profile information')}
+        ${tile('#i-lock', 'Security', 'Change your password')}
+        ${tile('#i-gear', 'Appearance', 'Theme mode and display preferences')}
+      </div>
+      <div class="section-title">System / Management</div>
+      <div class="card">
+        ${tile('#i-box', 'Store Information', 'Store name, address, contact, receipt footer, currency')}
+        ${tile('#i-cart', 'Payment Settings', 'GCash, customer, proof, and verification rules')}
+        ${tile('#i-check', 'License', settingsSub(), true)}
+        ${tile('#i-gear', 'Backup & Restore', 'Create, restore, and manage database backups')}
+        ${tile('#i-clock', 'Activity Logs', 'View system and account activity history')}
+      </div>
+      <div class="sub" style="padding:0 4px;">License tile is Owner-only — Admin and Staff don't see it. Tap it to open the status page.</div>
+    </div>
+    <div class="bottomnav">
+      <div class="navitem"><div class="navicon"><svg><use href="#i-box"/></svg></div><div class="navlbl">Home</div></div>
+      <div class="navitem"><div class="navicon"><svg><use href="#i-cart"/></svg></div><div class="navlbl">POS</div></div>
+      <div class="navitem sel"><div class="navicon"><svg><use href="#i-more"/></svg></div><div class="navlbl">More</div></div>
+    </div>`;
+}
+
+/* ── owner-facing page: Settings → License (license_status_screen.dart) ── */
+function evt(dot, name, sub, when) {
+  return `<div class="evt"><div class="dot" style="background:${dot}"></div>
+    <div class="grow"><div class="name" style="font-size:13px;">${name}</div><div class="sub">${sub}</div></div>
+    <div class="when">${when}</div></div>`;
+}
+function renderLicense() {
+  document.getElementById('frameLabel').textContent = 'Owner page — Settings → License';
+  const t = tier(), L = label();
+
+  // notConfigured → full-page EmptyState, nothing else renders.
+  if (t === 'none') {
+    document.getElementById('device').innerHTML = `
+      <div class="appbar"><div class="back"><svg><use href="#i-back"/></svg></div>
+        <div class="title"><h2>License</h2><div class="sub">Owner</div></div></div>
+      <div class="center-screen">
+        <div class="icircle lg" style="background:var(--surface-elev);"><svg style="fill:var(--primary);"><use href="#i-check"/></svg></div>
+        <div class="name" style="font-size:17px;font-weight:800;">No license configured</div>
+        <div class="sub" style="max-width:230px;text-align:center;">No developer license has been set on this device. The app runs without restrictions.</div>
+      </div>`;
+    return;
+  }
+
+  const pct = typeof sim.rem === 'number' && sim.rem > 0
+    ? Math.max(0, Math.min(100, Math.round(sim.rem / (sim.term * DAY) * 100))) : 0;
+  const barColor = t === 'crit' || t === 'expired' || t === 'tampered' ? 'var(--error)' : t === 'warn' ? 'var(--warning)' : 'var(--success)';
+  const pillFor = {
+    calm: ['pill-green', 'Active'],
+    warn: ['pill-amber', 'Expiring soon'],
+    crit: ['pill-red', 'Locks soon'],
+    expired: ['pill-red', 'Expired — locked'],
+    tampered: ['pill-red', 'Integrity check failed'],
+    off: ['pill-grey', 'Enforcement off'],
+  }[t];
+  const headline = { calm: fmtRem(sim.rem), warn: fmtRem(sim.rem), crit: fmtRem(sim.rem),
+    expired: 'Expired', tampered: 'Locked', off: 'Not armed' }[t];
+  const hasBar = t === 'calm' || t === 'warn' || t === 'crit' || t === 'expired';
+  const offNote = t === 'off' ? 'Enforcement is off — the app runs without restrictions.'
+    : t === 'tampered' ? 'License state could not be verified.' : '';
+  const btnKind = t === 'crit' || t === 'expired' || t === 'tampered' ? 'btn-primary' : 'btn-outlined';
+  const showBtn = t !== 'off'; // active / expired / tampered can redeem; disarmed refuses codes
+
+  const statusCard = `<div class="card pad">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <span class="pill ${pillFor[0]}">${pillFor[1]}</span>
+        ${hasBar ? `<span class="sub">${L}</span>` : ''}</div>
+      <div class="big-days" style="margin-top:10px;">${headline} ${t === 'calm' || t === 'warn' || t === 'crit' ? '<small>remaining</small>' : ''}</div>
+      ${hasBar ? `<div class="pbar"><i style="width:${t === 'expired' ? 0 : pct}%;background:${barColor};"></i></div>`
+        : `<div class="sub" style="margin-top:6px;">${offNote}</div>`}
+      <div class="stat-row" style="margin-top:10px;"><span class="k">Deadline</span><span class="v">${t === 'off' || t === 'tampered' ? 'Not set' : fmtDeadline(EXP)}</span></div>
+      <div class="stat-row"><span class="k">Armed since</span><span class="v">${t === 'off' || t === 'tampered' ? '—' : 'Sep 1, 2026'}</span></div>
+      ${hasBar && t !== 'expired' ? `<div class="stat-row"><span class="k">Warning window</span><span class="v">Last ${warnThreshold(sim.term) / DAY} days of the term</span></div>` : ''}
+      <div class="stat-row"><span class="k">Developer contact</span><span class="v">${t === 'tampered' ? '—' : CONTACT}</span></div>
+    </div>
+    ${showBtn ? `<button class="btn ${btnKind}" onclick="openDlg()" style="margin-top:12px;">
+      <svg><use href="#i-key"/></svg> Enter unlock code</button>` : ''}`;
+
+  // Stored signed events + derived milestones (warning window, expiry) —
+  // mirrors _activityFor() in license_status_screen.dart.
+  const armed = evt('var(--info)', `${L} armed`, `Term: ${sim.term} days`, 'Sep 1, 3:40 PM');
+  const redeemed = evt('var(--success)', 'Unlock code redeemed', '+90 days', 'Sep 10, 9:12 AM');
+  const events = [
+    t === 'expired' ? evt('var(--error)', 'License expired — app locked', 'All users signed out', 'Sep 21, 2:30 PM') : '',
+    (t === 'warn' || t === 'crit' || t === 'expired') ? evt('var(--warning)', 'Entered warning window', `Less than ${warnThreshold(sim.term) / DAY} days left`, 'Sep 14, 2:30 PM') : '',
+    t === 'off' ? evt('var(--text-3)', 'Enforcement turned off', 'Deadline cleared — config kept', 'Sep 15, 10:05 AM') : '',
+    (t !== 'off' && t !== 'tampered') ? redeemed : '',
+    t === 'tampered' ? '' : armed,
+  ].join('');
+  const eventsCard = `
+      <div class="section-title" style="padding-left:4px;">Recent activity</div>
+      <div class="card">${events || '<div class="evt"><div class="grow"><div class="sub">No license activity recorded yet.</div></div></div>'}</div>
+      <div class="sub" style="padding:0 4px;">Signed log — kept inside the license store, so it survives sign-outs and can't be edited without failing the integrity check. Arm/disarm/clear stay in the hidden developer panel.</div>`;
+
+  document.getElementById('device').innerHTML = `
+    <div class="appbar"><div class="back"><svg><use href="#i-back"/></svg></div>
+      <div class="title"><h2>License</h2><div class="sub">Owner</div></div></div>
+    <div class="screen-body">
+      ${statusCard}
+      ${eventsCard}
+    </div>`;
+}
+
+function renderLock() {
+  document.getElementById('frameLabel').textContent = 'LICENSE LOCKED';
+  const L = label();
+  document.getElementById('device').innerHTML = `<div class="center-screen" style="gap:14px;">
+    <div class="lock-ic"><svg><use href="#i-lock"/></svg></div>
+    <div class="lock-title">${isTrial() ? 'Trial Ended' : 'System Locked'}</div>
+    <div class="lock-msg">${isTrial() ? 'The trial period has ended. Please contact the developer to activate it.' : "This system's license has expired. Please contact the developer to reactivate it."}</div>
+    <div class="contact-card"><svg><use href="#i-phone"/></svg><div><div class="lbl">Contact the developer</div><div class="val">${CONTACT}</div></div></div>
+    <div style="width:100%;border-top:1px solid var(--divider);margin:6px 0;"></div>
+    <div class="field" style="width:100%;"><label>Unlock code</label>
+      <input class="input" placeholder="XXXX-XXXX" style="text-transform:uppercase;letter-spacing:2px;"></div>
+    <button class="btn btn-primary" onclick="showToast('Demo only — see license_flow.html for the interactive redeem flow','info')">Unlock</button>
+    <button class="code-link">Developer access</button>
+  </div>`;
+}
+
+function openDlg() {
+  openDialog({
+    title: 'Enter Unlock Code',
+    message: 'Enter the code provided by the developer to extend the license. (Demo dialog — see license_flow.html for the working simulation.)',
+    confirmLabel: 'Unlock', cancelLabel: 'Cancel',
+    onConfirm: () => showToast('Code entry is simulated in license_flow.html', 'info'),
+  });
+}
+
+function inspect() {
+  const t = tier();
+  const map = {
+    none: ['notConfigured', 'renders nothing', 'owner page shows the empty state'],
+    off: ['inactive (disarmed)', 'renders nothing', 'redeemUnlockCode refuses codes while disarmed'],
+    tampered: ['tampered → isLocked', 'LicenseLockedScreen replaces the stack', 'owner page shows "Integrity check failed" + no activity'],
+    expired: ['expired → isLocked', 'LicenseLockedScreen replaces the stack', 'SessionGuard pushes lock, logs everyone out'],
+    calm: ['active · outside warning window', 'LicenseNoticeTier.calm', `warns when ≤ ${warnThreshold(sim.term) / DAY}d left`],
+    warn: ['active · isExpiringSoon', 'LicenseNoticeTier.warn', `warning window = ${warnThreshold(sim.term) / DAY}d (¼ term, clamped)`],
+    crit: ['active · isCritical', 'LicenseNoticeTier.critical', '≤ 48h left → error tokens + contact inline'],
+  };
+  const [state, widget, note] = map[t];
+  document.getElementById('inspector').innerHTML =
+    `state&nbsp;&nbsp;<b>${state}</b><br>` +
+    `tier&nbsp;&nbsp;&nbsp;<b>${t}</b><br>` +
+    `widget <b>${widget}</b><br>` +
+    `term&nbsp;&nbsp;<b>${sim.term}d → "${label()}"</b><br>` +
+    `ctx&nbsp;&nbsp;&nbsp;<b>${sim.ctx}</b><br>` +
+    `note&nbsp;&nbsp;${note}`;
+}
+
+function render() {
+  if (sim.ctx === 'login') renderLogin();
+  else if (sim.ctx === 'settings') renderSettings();
+  else if (sim.ctx === 'license') renderLicense();
+  else renderApp();
+  inspect();
+}
+
+const REMS = { '45d': 45 * DAY, '20d': 20 * DAY, '6d': 6 * DAY, '2d': 2 * DAY, '18h': 18 * HOUR, '40m': 40 * 60000, 'expired': -1, 'tampered': 'tampered', 'off': 'off', 'none': 'none' };
+function syncBtns() {
+  document.querySelectorAll('#remBtns button').forEach(b =>
+    b.classList.toggle('on', REMS[b.dataset.rem] === sim.rem));
+  document.querySelectorAll('#termBtns button').forEach(b =>
+    b.classList.toggle('on', +b.dataset.term === sim.term));
+  document.querySelectorAll('#ctxBtns button').forEach(b =>
+    b.classList.toggle('on', b.dataset.ctx === sim.ctx));
+}
+document.querySelectorAll('#remBtns button').forEach(b =>
+  b.addEventListener('click', () => { sim.rem = REMS[b.dataset.rem]; syncBtns(); render(); }));
+document.querySelectorAll('#termBtns button').forEach(b =>
+  b.addEventListener('click', () => { sim.term = +b.dataset.term; syncBtns(); render(); }));
+document.querySelectorAll('#ctxBtns button').forEach(b =>
+  b.addEventListener('click', () => { sim.ctx = b.dataset.ctx; syncBtns(); render(); }));
+
+syncBtns(); render();
+</script>
+</body>
+</html>

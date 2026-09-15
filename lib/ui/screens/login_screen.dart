@@ -16,8 +16,7 @@ import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/app_logo.dart';
 import 'package:pinoy_pos/ui/widgets/developer_access_gate.dart';
-import 'package:pinoy_pos/ui/widgets/license_countdown_chip.dart';
-import 'package:pinoy_pos/ui/widgets/license_expiry_banner.dart';
+import 'package:pinoy_pos/ui/widgets/license_notice.dart';
 import 'package:pinoy_pos/ui/widgets/theme_toggle.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -83,10 +82,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     // A locked license blocks login entirely — route to the lock screen.
     if (ref.read(licenseStatusProvider).isLocked) {
-      await Navigator.of(context).pushAndRemoveUntil(
-        LicenseLockedScreen.route(),
-        (_) => false,
-      );
+      await Navigator.of(
+        context,
+      ).pushAndRemoveUntil(LicenseLockedScreen.route(), (_) => false);
       return;
     }
 
@@ -131,7 +129,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         await AppDialogService.error(
           context,
           title: 'Account Unavailable',
-          message: 'Your account is currently inactive. Please contact an administrator.',
+          message:
+              'Your account is currently inactive. Please contact an administrator.',
         );
       case LoginResult.error:
         await AppDialogService.error(
@@ -176,117 +175,123 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
         body: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final isWide =
-                  layoutClassFor(constraints.maxWidth).isAtLeastMedium;
-              final horizontalPadding = isWide ? 48.0 : 16.0;
-              final cardPadding = isWide ? 48.0 : 28.0;
-              final iconContainerSize = isWide ? 112.0 : 92.0;
-              final iconSize = isWide ? 76.0 : 60.0;
+          child: Column(
+            children: [
+              const LicenseNotice(),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isWide = layoutClassFor(
+                      constraints.maxWidth,
+                    ).isAtLeastMedium;
+                    final horizontalPadding = isWide ? 48.0 : 16.0;
+                    final cardPadding = isWide ? 48.0 : 28.0;
+                    final iconContainerSize = isWide ? 112.0 : 92.0;
+                    final iconSize = isWide ? 76.0 : 60.0;
 
-              return Stack(
-                children: [
-                  Center(
-                    child: SingleChildScrollView(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: horizontalPadding,
-                        vertical: 24,
-                      ),
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 420),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: colorScheme.surface,
-                            borderRadius: BorderRadius.circular(AppRadius.card),
-                            boxShadow: [
-                              BoxShadow(
-                                color: colorScheme.shadow.withValues(
-                                  alpha: isDark ? 0.18 : 0.10,
+                    return Stack(
+                      children: [
+                        Center(
+                          child: SingleChildScrollView(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: horizontalPadding,
+                              vertical: 24,
+                            ),
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 420),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: colorScheme.surface,
+                                  borderRadius: BorderRadius.circular(
+                                    AppRadius.card,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: colorScheme.shadow.withValues(
+                                        alpha: isDark ? 0.18 : 0.10,
+                                      ),
+                                      blurRadius: 28,
+                                      offset: const Offset(0, 10),
+                                    ),
+                                  ],
                                 ),
-                                blurRadius: 28,
-                                offset: const Offset(0, 10),
-                              ),
-                            ],
-                          ),
-                          child: Padding(
-                            padding: EdgeInsets.all(cardPadding),
-                            child: Form(
-                              key: _formKey,
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  DeveloperAccessGate(
-                                    child: _IconContainer(
-                                      size: iconContainerSize,
-                                      iconSize: iconSize,
-                                      isDark: isDark,
+                                child: Padding(
+                                  padding: EdgeInsets.all(cardPadding),
+                                  child: Form(
+                                    key: _formKey,
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        DeveloperAccessGate(
+                                          child: _IconContainer(
+                                            size: iconContainerSize,
+                                            iconSize: iconSize,
+                                            isDark: isDark,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 20),
+                                        Text(
+                                          AppConstants.appName,
+                                          style:
+                                              AppTypography.headlineSmallBold(
+                                                context,
+                                              ).copyWith(
+                                                color: colorScheme.onSurface,
+                                              ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'Simple. Offline. Reliable.',
+                                          style:
+                                              AppTypography.bodyMedium(
+                                                context,
+                                              ).copyWith(
+                                                color: colorScheme
+                                                    .onSurfaceVariant,
+                                              ),
+                                        ),
+                                        const SizedBox(height: 40),
+                                        _buildUsernameField(),
+                                        const SizedBox(height: 16),
+                                        _buildPasswordField(
+                                          authState.isLoading,
+                                        ),
+                                        const SizedBox(height: 32),
+                                        AppButton.gradient(
+                                          label: 'Sign In',
+                                          onPressed: _login,
+                                          isLoading: authState.isLoading,
+                                          fullWidth: true,
+                                        ),
+                                        if (licenseStatus.state ==
+                                            LicenseLockState.active) ...[
+                                          const SizedBox(height: 8),
+                                          AppButton.text(
+                                            label: 'Have an unlock code?',
+                                            size: AppButtonSize.small,
+                                            color: AppButtonColor.neutral,
+                                            onPressed: _enterUnlockCode,
+                                          ),
+                                        ],
+                                      ],
                                     ),
                                   ),
-                                  const SizedBox(height: 20),
-                                  Text(
-                                    AppConstants.appName,
-                                    style: AppTypography.headlineSmallBold(context)
-                                        .copyWith(color: colorScheme.onSurface),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Simple. Offline. Reliable.',
-                                    style: AppTypography.bodyMedium(context)
-                                        .copyWith(color: colorScheme.onSurfaceVariant),
-                                  ),
-                                  if (licenseStatus.isExpiringSoon) ...[
-                                    const SizedBox(height: 20),
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(
-                                          AppRadius.card),
-                                      child: const LicenseExpiryBanner(),
-                                    ),
-                                  ] else if (licenseStatus.showCountdown) ...[
-                                    const SizedBox(height: 20),
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(
-                                          AppRadius.card),
-                                      child: const LicenseCountdownChip(),
-                                    ),
-                                  ],
-                                  const SizedBox(height: 40),
-                                  _buildUsernameField(),
-                                  const SizedBox(height: 16),
-                                  _buildPasswordField(authState.isLoading),
-                                  const SizedBox(height: 32),
-                                  AppButton.gradient(
-                    label: 'Sign In',
-                    onPressed: _login,
-                    isLoading: authState.isLoading,
-                    fullWidth: true,
-                  ),
-                                  if (licenseStatus.state ==
-                                      LicenseLockState.active) ...[
-                                    const SizedBox(height: 8),
-                                    AppButton.text(
-                                      label: 'Have an unlock code?',
-                                      size: AppButtonSize.small,
-                                      color: AppButtonColor.neutral,
-                                      onPressed: _enterUnlockCode,
-                                    ),
-                                  ],
-                                ],
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                    ),
-                  ),
-                  const Positioned(
-                    top: 8,
-                    right: 8,
-                    child: ThemeToggle(),
-                  ),
-                ],
-              );
-            },
+                        const Positioned(
+                          top: 8,
+                          right: 8,
+                          child: ThemeToggle(),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -332,7 +337,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       onFieldSubmitted: isLoading ? null : (_) => _login(),
     );
   }
-
 }
 
 class _IconContainer extends StatelessWidget {
@@ -367,10 +371,7 @@ class _IconContainer extends StatelessWidget {
         ],
       ),
       padding: const EdgeInsets.all(16),
-      child: AppIcon(
-        size: iconSize,
-        forceDark: isDark,
-      ),
+      child: AppIcon(size: iconSize, forceDark: isDark),
     );
   }
 }

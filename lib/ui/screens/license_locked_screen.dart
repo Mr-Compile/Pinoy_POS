@@ -78,10 +78,8 @@ class _LicenseLockedScreenState extends ConsumerState<LicenseLockedScreen> {
         : (status.message.isNotEmpty
             ? status.message
             : status.isTrial
-                ? 'The trial period has ended. Please contact the '
-                    'developer to activate it.'
-                : 'This system\'s license has expired. Please contact the '
-                    'developer to reactivate it.');
+                ? LicenseService.trialLockMessage
+                : LicenseService.defaultLockMessage);
 
     return PopScope(
       canPop: false,

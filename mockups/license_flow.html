@@ -34,6 +34,31 @@
   .lic-banner button { background: none; border: none; color: var(--warning); font-weight: 800; font-size: 11.5px; cursor: pointer; white-space: nowrap; padding: 4px 6px; }
   .lic-banner span { flex: 1; line-height: 1.4; }
 
+  /* ── LicenseNotice tiers (license_notice.dart) ── */
+  .lic { display: flex; align-items: center; gap: 10px; padding: 10px 12px 10px 14px; flex-shrink: 0; border-left: 4px solid transparent; }
+  .lic .nic { width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .lic .nic svg { width: 16px; height: 16px; }
+  .lic .nb { flex: 1; min-width: 0; line-height: 1.35; }
+  .lic .nt { font-size: 12.5px; font-weight: 800; }
+  .lic .ns { font-size: 11px; margin-top: 1px; }
+  .lic .nbtn { border: none; border-radius: 20px; padding: 0 14px; min-height: 40px; font-size: 12px; font-weight: 800; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+  .lic.calm { background: var(--surface-hi); }
+  .lic.calm .nic { background: rgba(140,154,184,.18); } .lic.calm .nic svg { fill: var(--text-3); }
+  .lic.calm .nt { color: var(--text-2); } .lic.calm .ns { color: var(--text-3); }
+  .lic.calm .nbtn { background: transparent; border: 1px solid var(--border); color: var(--text-2); min-height: 36px; }
+  .lic.warn { background: #FEF3C7; border-left-color: #D97706; }
+  :root[data-theme="dark"] .lic.warn { background: #3A2A0A; }
+  .lic.warn .nic { background: rgba(217,119,6,.18); } .lic.warn .nic svg { fill: var(--warning); }
+  .lic.warn .nt { color: #78350F; } .lic.warn .ns { color: rgba(120,53,15,.75); }
+  :root[data-theme="dark"] .lic.warn .nt { color: #FDE68A; } :root[data-theme="dark"] .lic.warn .ns { color: rgba(253,230,138,.7); }
+  .lic.warn .nbtn { background: var(--warning); color: #fff; }
+  .lic.crit { background: #FEE2E2; border-left-color: #DC2626; }
+  :root[data-theme="dark"] .lic.crit { background: #3A1518; }
+  .lic.crit .nic { background: rgba(220,38,38,.18); } .lic.crit .nic svg { fill: var(--error); }
+  .lic.crit .nt { color: #7F1D1D; } .lic.crit .ns { color: rgba(127,29,29,.75); }
+  :root[data-theme="dark"] .lic.crit .nt { color: #FECACA; } :root[data-theme="dark"] .lic.crit .ns { color: rgba(254,202,202,.7); }
+  .lic.crit .nbtn { background: var(--error); color: #fff; }
+
   .login-card { background: var(--surface); border-radius: var(--radius-card); padding: 26px 24px; box-shadow: 0 10px 28px rgba(0,0,0,.10); width: 100%; max-width: 330px; }
   .login-logo { width: 82px; height: 82px; border-radius: 22px; background: var(--surface-elev); display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; cursor: pointer; user-select: none; box-shadow: 0 8px 24px rgba(37,99,199,.16); }
   .login-logo svg { width: 52px; height: 52px; fill: var(--primary); }
@@ -87,6 +112,8 @@
   <symbol id="i-shield-bad" viewBox="0 0 24 24"><path d="M12 1 3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1 6h2v6h-2V7zm0 8h2v2h-2v-2z"/></symbol>
   <symbol id="i-key" viewBox="0 0 24 24"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></symbol>
   <symbol id="i-clock" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm4.2 14.2L11 13V7h1.5v5.2l4.5 2.7-.8 1.3z"/></symbol>
+  <symbol id="i-hourglass" viewBox="0 0 24 24"><path d="M6 2v6h.01L6 8.01 10 12l-4 4 .01.01H6V22h12v-5.99h-.01L18 16l-4-4 4-3.99-.01-.01H18V2H6zm10 14.5V20H8v-3.5l4-4 4 4zm-4-5 4-4V4H8v3.5l4 4z"/></symbol>
+  <symbol id="i-alarm" viewBox="0 0 24 24"><path d="M22 5.72l-4.6-3.86-1.29 1.53 4.6 3.86L22 5.72zM7.88 3.39 6.6 1.86 2 5.71l1.29 1.53 4.59-3.85zM12.5 8H11v6l4.75 2.85.75-1.23-4-2.37V8zM12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9c4.97 0 9-4.03 9-9s-4.03-9-9-9zm0 16c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7 7-3.13 7-7 7z"/></symbol>
   <symbol id="i-phone" viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></symbol>
   <symbol id="i-gear" viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84a.484.484 0 0 0-.48.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.488.488 0 0 0-.59.22L2.74 8.87c-.12.22 0 .49.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.39.3.61.22l2.39-.96c.5-.38 1.03-.7 1.62-.94l.36-2.54c.24-.05.48-.17.5-.41l.36-2.54c.59-.24 1.13-.58 1.62-.94l2.39.96c.22.08.49 0 .61-.22l1.92-3.32c.12-.22.07-.49-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6 3.6 1.62 3.6 3.6 3.6-1.62 3.6-3.6z"/></symbol>
   <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M12 21l3.5-4.5c-.97-.74-2.18-1.16-3.5-1.16s-2.53.42-3.5 1.16L12 21zM12 3C7.31 3 3.07 4.69 0 7.55l1.93 2.43C4.48 7.9 8.01 6.4 12 6.4s7.52 1.5 10.07 3.58L24 7.55C20.93 4.69 16.69 3 12 3z"/></symbol>
@@ -165,9 +192,14 @@
    Simulated LicenseService — mirrors lib/services/license_service.dart.
    Codes are generated by a deterministic demo hash (real app uses HMAC).
    ══════════════════════════════════════════════════════════════════ */
-const DAY = 86400000, WARN_DAYS = 30;
-const GRANTS = { 90: 20, 365: 5 };           // days → code count
+const DAY = 86400000, WARN_DAYS = 30, CRIT = 48 * 3600000;
+const GRANTS = { 30: 25, 90: 20, 365: 5 };   // days → code count
 const B32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+const MSG = {                                // LicenseService lock-message presets
+  expired: "This system's license has expired. Please contact the developer to reactivate it.",
+  trial: 'The trial period has ended. Please contact the developer to activate it.',
+  balance: 'Please settle the remaining balance to reactivate the system.',
+};
 
 function h32(s, seed) {
   let h = (0x811c9dc5 ^ seed) >>> 0;
@@ -197,7 +229,7 @@ const sim = {
 function mkBlob(over = {}) {
   return Object.assign({
     armed: true, expiresAt: null,
-    message: "This system's license has expired. Please contact the developer to reactivate it.",
+    message: MSG.expired,
     contact: 'Juan Dev · 0917 555 0123',
     pass: 'dev123', lastSeen: sim.now.getTime(), fails: 0, lockoutUntil: 0, sigOK: true,
   }, over);
@@ -279,11 +311,27 @@ function renderSplash() {
   setTimeout(route, 900);
 }
 
+/* mirrors LicenseNotice — calm / warn / critical tiers */
 function bannerHtml(st) {
-  if (!expiringSoon(st)) return '';
-  return `<div class="lic-banner"><svg><use href="#i-clock"/></svg>
-    <span>License expires in ${fmtDur(st.remaining)} (${fmt(st.expiresAt)}). Please contact your developer.</span>
-    <button onclick="openUnlockDlg()">Enter code</button></div>`;
+  if (st.state !== 'active') return '';
+  const dl = fmt(st.expiresAt);
+  if (!expiringSoon(st)) {
+    return `<div class="lic calm"><div class="nic"><svg><use href="#i-hourglass"/></svg></div>
+      <div class="nb"><div class="nt">License · ${fmtDur(st.remaining)} left</div>
+      <div class="ns">Renews ${dl}</div></div>
+      <button class="nbtn" onclick="openUnlockDlg()">Enter code</button></div>`;
+  }
+  if (st.remaining > CRIT) {
+    return `<div class="lic warn"><div class="nic"><svg><use href="#i-clock"/></svg></div>
+      <div class="nb"><div class="nt">License expires in ${fmtDur(st.remaining)}</div>
+      <div class="ns">Locks ${dl} · Enter a code to extend</div></div>
+      <button class="nbtn" onclick="openUnlockDlg()">Enter code</button></div>`;
+  }
+  const soon = st.remaining < DAY;
+  return `<div class="lic crit"><div class="nic"><svg><use href="#i-alarm"/></svg></div>
+    <div class="nb"><div class="nt">License locks in ${fmtDur(st.remaining)}</div>
+    <div class="ns">${soon ? 'Today' : 'Soon'} · Enter a code or contact ${st.contact || 'your developer'}</div></div>
+    <button class="nbtn" onclick="openUnlockDlg()">Enter code</button></div>`;
 }
 
 function renderLogin(st) {
@@ -512,7 +560,12 @@ function renderPanel() {
           <div class="toggle"><div class="toggle-switch ${b.armed ? '' : 'off'}"></div></div>
         </div>
         <div class="row"><div class="grow"><div class="name">Deadline</div><input class="input" type="datetime-local" id="dExp" value="${b.expiresAt ? new Date(b.expiresAt - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ''}"></div></div>
-        <div class="row"><div class="grow"><div class="name">Lock screen message</div><textarea class="textarea" id="dMsg" style="min-height:56px;">${escapeHtml(b.message || '')}</textarea></div></div>
+        <div class="row"><div class="grow"><div class="name">Lock screen message</div><textarea class="textarea" id="dMsg" style="min-height:56px;">${escapeHtml(b.message || MSG.expired)}</textarea>
+          <div class="chips" style="margin-top:6px;">
+            <button class="chip" onclick="setMsg('expired')">License expired</button>
+            <button class="chip" onclick="setMsg('trial')">Trial ended</button>
+            <button class="chip" onclick="setMsg('balance')">Balance due</button>
+          </div></div></div>
         <div class="row"><div class="grow"><div class="name">Developer contact</div><input class="input" id="dContact" value="${escapeHtml(b.contact || '')}"></div></div>
       </div>
       <div class="card pad"><div class="name" style="margin-bottom:4px;">Unlock codes</div>
@@ -527,6 +580,8 @@ function renderPanel() {
     </div>`;
   sim._armed = b.armed;
 }
+
+function setMsg(k) { document.getElementById('dMsg').value = MSG[k]; }
 
 function savePanel() {
   if (!sim.blob) sim.blob = mkBlob({ pass: 'dev123' });

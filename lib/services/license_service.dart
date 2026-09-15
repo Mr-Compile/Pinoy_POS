@@ -20,7 +20,7 @@ abstract class LicenseStore {
 /// open and edit it.
 class SecureLicenseStore implements LicenseStore {
   SecureLicenseStore([SecureStorageService? storage])
-      : _storage = storage ?? SecureStorageService();
+    : _storage = storage ?? SecureStorageService();
 
   final SecureStorageService _storage;
 
@@ -98,6 +98,32 @@ class DevAuthResponse {
   bool get isOk => result == DevAuthResult.ok;
 }
 
+/// License lifecycle events persisted inside the signed blob.
+///
+/// [warning] and [expired] are never stored — the owner status screen
+/// derives them from the deadline so they cannot be forged by replaying
+/// or editing the blob.
+enum LicenseEventType {
+  armed,
+  disarmed,
+  redeemed,
+  passwordSet,
+  passwordChanged,
+  warning,
+  expired,
+}
+
+/// One entry in the signed license activity log.
+class LicenseEvent {
+  const LicenseEvent({required this.type, required this.at, this.detail = ''});
+
+  final LicenseEventType type;
+  final DateTime at;
+
+  /// Short human-readable context, e.g. `'90-day term'` or `'+30 days'`.
+  final String detail;
+}
+
 /// Result of redeeming an unlock code on the lock screen.
 class LicenseRedeemResult {
   const LicenseRedeemResult._({
@@ -111,12 +137,11 @@ class LicenseRedeemResult {
   factory LicenseRedeemResult.success({
     required int daysGranted,
     required DateTime newExpiry,
-  }) =>
-      LicenseRedeemResult._(
-        success: true,
-        daysGranted: daysGranted,
-        newExpiry: newExpiry,
-      );
+  }) => LicenseRedeemResult._(
+    success: true,
+    daysGranted: daysGranted,
+    newExpiry: newExpiry,
+  );
 
   factory LicenseRedeemResult.invalid() =>
       const LicenseRedeemResult._(success: false);
@@ -148,12 +173,13 @@ class LicenseStatus {
     this.contactInfo = '',
     this.hasDeveloperPassword = false,
     this.redeemedCodes = const <String>{},
+    this.events = const <LicenseEvent>[],
   });
 
   factory LicenseStatus.evaluating() => LicenseStatus(
-        state: LicenseLockState.evaluating,
-        effectiveNow: DateTime.fromMillisecondsSinceEpoch(0),
-      );
+    state: LicenseLockState.evaluating,
+    effectiveNow: DateTime.fromMillisecondsSinceEpoch(0),
+  );
 
   final LicenseLockState state;
 
@@ -176,14 +202,18 @@ class LicenseStatus {
   /// Codes are single-use — the developer panel marks these as spent.
   final Set<String> redeemedCodes;
 
+  /// Signed license activity log, newest first. Read-only for the owner
+  /// status screen — the developer panel records entries on arm, disarm,
+  /// redeem and password changes.
+  final List<LicenseEvent> events;
+
   bool isCodeRedeemed(int days, int index) =>
       redeemedCodes.contains('$days:$index');
 
   bool get isEvaluating => state == LicenseLockState.evaluating;
 
   bool get isLocked =>
-      state == LicenseLockState.expired ||
-      state == LicenseLockState.tampered;
+      state == LicenseLockState.expired || state == LicenseLockState.tampered;
 
   /// Total length of the current armed term, when known.
   Duration? get totalTerm {
@@ -221,10 +251,16 @@ class LicenseStatus {
       state == LicenseLockState.active &&
       (remaining ?? Duration.zero) <= warningThreshold;
 
+  /// Inside the warning window AND inside [LicenseService.criticalWindow]
+  /// — the last stretch before the lock engages. Drives the red tier of
+  /// the license notice.
+  bool get isCritical =>
+      isExpiringSoon &&
+      (remaining ?? Duration.zero) <= LicenseService.criticalWindow;
+
   /// Armed and inside the term but outside the warning window — the
   /// quiet countdown indicator shows instead of the alarm banner.
-  bool get showCountdown =>
-      state == LicenseLockState.active && !isExpiringSoon;
+  bool get showCountdown => state == LicenseLockState.active && !isExpiringSoon;
 
   /// Time left before the lock engages, or null when not armed.
   Duration? get remaining {
@@ -248,7 +284,9 @@ class _LicenseConfig {
     this.failedAttempts = 0,
     this.lockoutUntilMs = 0,
     List<String>? redeemedCodes,
-  }) : redeemedCodes = redeemedCodes ?? <String>[];
+    List<LicenseEvent>? events,
+  }) : redeemedCodes = redeemedCodes ?? <String>[],
+       events = events ?? <LicenseEvent>[];
 
   bool armed;
   int? expiresAtMs;
@@ -264,20 +302,34 @@ class _LicenseConfig {
   /// Kept sorted so the signature stays stable.
   List<String> redeemedCodes;
 
+  /// Chronological (oldest-first) activity log, covered by the HMAC
+  /// signature like every other field. Capped at
+  /// [LicenseService._maxEvents].
+  List<LicenseEvent> events;
+
   /// Canonical payload — keys are always emitted in this order so the
   /// signature is stable across writes.
   Map<String, Object?> toPayload() => {
-        'armed': armed,
-        'expiresAtMs': expiresAtMs,
-        'armedAtMs': armedAtMs,
-        'message': message,
-        'contactInfo': contactInfo,
-        'devPasswordHash': devPasswordHash,
-        'lastSeenAtMs': lastSeenAtMs,
-        'failedAttempts': failedAttempts,
-        'lockoutUntilMs': lockoutUntilMs,
-        'redeemedCodes': redeemedCodes,
-      };
+    'armed': armed,
+    'expiresAtMs': expiresAtMs,
+    'armedAtMs': armedAtMs,
+    'message': message,
+    'contactInfo': contactInfo,
+    'devPasswordHash': devPasswordHash,
+    'lastSeenAtMs': lastSeenAtMs,
+    'failedAttempts': failedAttempts,
+    'lockoutUntilMs': lockoutUntilMs,
+    'redeemedCodes': redeemedCodes,
+    'events': events
+        .map(
+          (e) => <String, Object?>{
+            't': e.at.millisecondsSinceEpoch,
+            'e': e.type.name,
+            'd': e.detail,
+          },
+        )
+        .toList(),
+  };
 
   static _LicenseConfig? fromPayload(Map<String, Object?> map) {
     try {
@@ -291,10 +343,27 @@ class _LicenseConfig {
         lastSeenAtMs: (map['lastSeenAtMs'] as num?)?.toInt() ?? 0,
         failedAttempts: (map['failedAttempts'] as num?)?.toInt() ?? 0,
         lockoutUntilMs: (map['lockoutUntilMs'] as num?)?.toInt() ?? 0,
-        redeemedCodes: (map['redeemedCodes'] as List?)
+        redeemedCodes:
+            (map['redeemedCodes'] as List?)
                 ?.map((e) => e.toString())
                 .toList() ??
             <String>[],
+        events:
+            (map['events'] as List?)
+                ?.map((e) {
+                  if (e is! Map) return null;
+                  final t = (e['t'] as num?)?.toInt();
+                  final type = LicenseEventType.values.asNameMap()[e['e']];
+                  if (t == null || type == null) return null;
+                  return LicenseEvent(
+                    type: type,
+                    at: DateTime.fromMillisecondsSinceEpoch(t),
+                    detail: (e['d'] as String?) ?? '',
+                  );
+                })
+                .whereType<LicenseEvent>()
+                .toList() ??
+            <LicenseEvent>[],
       );
     } catch (_) {
       return null;
@@ -342,9 +411,9 @@ class LicenseService {
     LicenseStore? stateStore,
     LicenseStore? markerStore,
     DateTime Function()? clock,
-  })  : _stateStore = stateStore ?? SecureLicenseStore(),
-        _markerStore = markerStore ?? SharedPrefsLicenseStore(),
-        _clock = clock ?? DateTime.now;
+  }) : _stateStore = stateStore ?? SecureLicenseStore(),
+       _markerStore = markerStore ?? SharedPrefsLicenseStore(),
+       _clock = clock ?? DateTime.now;
 
   static const String _stateKey = 'pinoy_pos.license_state.v1';
   static const String _markerKey = 'pinoy_pos.license_configured.v1';
@@ -367,8 +436,35 @@ class LicenseService {
   /// gets at least this much notice before it locks.
   static const Duration _minWarningWindow = Duration(days: 1);
 
+  /// Last stretch before the lock engages — inside the warning window,
+  /// the license notice escalates to the red tier once the remaining
+  /// time drops below this.
+  static const Duration criticalWindow = Duration(hours: 48);
+
+  /// Cap on the signed activity log — bounded so the blob never grows
+  /// without limit; oldest entries drop off first.
+  static const int _maxEvents = 25;
+
   /// Terms at or below this are presented as a trial in the UI copy.
   static const Duration trialMaxTerm = Duration(days: 45);
+
+  /// Pre-filled lock-screen messages. The developer panel auto-fills
+  /// [defaultLockMessage] when no message is stored and offers the rest
+  /// as one-tap presets, so a fresh setup only needs the developer's
+  /// name and number.
+  static const String defaultLockMessage =
+      "This system's license has expired. Please contact the developer to reactivate it.";
+  static const String trialLockMessage =
+      'The trial period has ended. Please contact the developer to activate it.';
+  static const String balanceDueLockMessage =
+      'Please settle the remaining balance to reactivate the system.';
+
+  /// (label, text) quick-fill options under the panel's message field.
+  static const List<(String, String)> lockMessagePresets = [
+    ('License expired', defaultLockMessage),
+    ('Trial ended', trialLockMessage),
+    ('Balance due', balanceDueLockMessage),
+  ];
 
   /// Day grants → number of distinct codes available for each. The codes
   /// are deterministic, so all of them can be listed in the developer
@@ -427,6 +523,7 @@ class LicenseService {
       contactInfo: cfg.contactInfo,
       hasDeveloperPassword: cfg.devPasswordHash.isNotEmpty,
       redeemedCodes: cfg.redeemedCodes.toSet(),
+      events: List.unmodifiable(cfg.events.reversed),
     );
   }
 
@@ -482,9 +579,10 @@ class LicenseService {
   Future<bool> initializeDeveloperPassword(String password) async {
     if (await developerGateMode() != DevGateMode.setup) return false;
     final loaded = await _load();
-    final cfg = (loaded.signatureValid ? loaded.config : null) ??
-        _LicenseConfig();
+    final cfg =
+        (loaded.signatureValid ? loaded.config : null) ?? _LicenseConfig();
     cfg.devPasswordHash = SecurityHelper.hashPassword(password);
+    _recordEvent(cfg, LicenseEventType.passwordSet);
     await _persist(cfg);
     return true;
   }
@@ -527,6 +625,7 @@ class LicenseService {
     final loaded = await _load();
     final cfg = loaded.config!;
     cfg.devPasswordHash = SecurityHelper.hashPassword(next);
+    _recordEvent(cfg, LicenseEventType.passwordChanged);
     await _persist(cfg);
     return const DevAuthResponse(result: DevAuthResult.ok);
   }
@@ -542,8 +641,8 @@ class LicenseService {
     String contactInfo = '',
   }) async {
     final loaded = await _load();
-    final cfg = (loaded.signatureValid ? loaded.config : null) ??
-        _LicenseConfig();
+    final cfg =
+        (loaded.signatureValid ? loaded.config : null) ?? _LicenseConfig();
     final newExpiresAtMs = expiresAt?.millisecondsSinceEpoch;
     if (armed) {
       // A new deadline starts a fresh term — the warning window is
@@ -551,8 +650,19 @@ class LicenseService {
       // original term start.
       if (!cfg.armed || cfg.expiresAtMs != newExpiresAtMs) {
         cfg.armedAtMs = _clock().millisecondsSinceEpoch;
+        final term = Duration(
+          milliseconds: (newExpiresAtMs ?? 0) - _effectiveNowMs(cfg),
+        );
+        _recordEvent(
+          cfg,
+          LicenseEventType.armed,
+          term.inDays >= 1
+              ? '${term.inDays}-day term'
+              : '${term.inHours}-hour term',
+        );
       }
     } else {
+      if (cfg.armed) _recordEvent(cfg, LicenseEventType.disarmed);
       cfg.armedAtMs = 0;
     }
     cfg.armed = armed;
@@ -582,9 +692,10 @@ class LicenseService {
   /// (0-based, must be below `unlockGrants[days]`). Deterministic — no
   /// generation step or server needed.
   String unlockCode(int days, int index) {
-    final digest = Hmac(sha256, utf8.encode(_unlockSecret))
-        .convert(utf8.encode('PINOY-POS:EXTEND:$days:$index'))
-        .bytes;
+    final digest = Hmac(
+      sha256,
+      utf8.encode(_unlockSecret),
+    ).convert(utf8.encode('PINOY-POS:EXTEND:$days:$index')).bytes;
     var value = 0;
     for (var i = 0; i < 5; i++) {
       value = (value << 8) | digest[i];
@@ -654,6 +765,7 @@ class LicenseService {
             ..lockoutUntilMs = 0
             ..lastSeenAtMs = max(cfg.lastSeenAtMs, nowMs)
             ..redeemedCodes = (redeemed.toList()..sort());
+          _recordEvent(cfg, LicenseEventType.redeemed, '+${grant.key} days');
           await _persist(cfg);
           await _persistRedeemedMirror(redeemed);
           return LicenseRedeemResult.success(
@@ -750,9 +862,7 @@ class LicenseService {
   }
 
   Future<void> _persistRedeemedMirror(Set<String> redeemed) async {
-    final payload = <String, Object?>{
-      'redeemed': redeemed.toList()..sort(),
-    };
+    final payload = <String, Object?>{'redeemed': redeemed.toList()..sort()};
     try {
       await _markerStore.write(
         _redeemedKey,
@@ -763,15 +873,38 @@ class LicenseService {
     }
   }
 
-  static String _sign(Map<String, Object?> payload) =>
-      Hmac(sha256, utf8.encode(_stateSecret))
-          .convert(utf8.encode(jsonEncode(payload)))
-          .toString();
+  static String _sign(Map<String, Object?> payload) => Hmac(
+    sha256,
+    utf8.encode(_stateSecret),
+  ).convert(utf8.encode(jsonEncode(payload))).toString();
 
   /// Effective "now" in milliseconds — the wall clock clamped to the
   /// monotonic watermark so lockouts cannot be dodged by rewinding time.
   int _effectiveNowMs(_LicenseConfig cfg) =>
       max(_clock().millisecondsSinceEpoch, cfg.lastSeenAtMs);
+
+  /// Appends a signed activity-log entry to [cfg] (kept oldest-first) and
+  /// trims to [_maxEvents]. Called only on explicit lifecycle actions —
+  /// arming, disarming, redeeming, password changes — never from
+  /// [evaluate], so the periodic watermark write cannot spam the log.
+  /// Timestamps use the effective clock so a wound-back wall clock cannot
+  /// reorder events.
+  void _recordEvent(
+    _LicenseConfig cfg,
+    LicenseEventType type, [
+    String detail = '',
+  ]) {
+    cfg.events.add(
+      LicenseEvent(
+        type: type,
+        at: DateTime.fromMillisecondsSinceEpoch(_effectiveNowMs(cfg)),
+        detail: detail,
+      ),
+    );
+    if (cfg.events.length > _maxEvents) {
+      cfg.events.removeRange(0, cfg.events.length - _maxEvents);
+    }
+  }
 
   Duration? _lockoutRemaining(_LicenseConfig cfg) {
     final remaining = cfg.lockoutUntilMs - _effectiveNowMs(cfg);

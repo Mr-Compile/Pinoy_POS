@@ -54,7 +54,9 @@ class _DeveloperLicenseScreenState
     _armed = status.state == LicenseLockState.active ||
         status.state == LicenseLockState.expired;
     _expiry = status.expiresAt;
-    _messageController.text = status.message;
+    _messageController.text = status.message.isEmpty
+        ? LicenseService.defaultLockMessage
+        : status.message;
     _contactController.text = status.contactInfo;
   }
 
@@ -268,6 +270,20 @@ class _DeveloperLicenseScreenState
             hint:
                 'e.g. Please settle the remaining balance to reactivate the system.',
             maxLines: 2,
+          ),
+          const SizedBox(height: Spacing.xs),
+          Wrap(
+            spacing: Spacing.xs,
+            runSpacing: Spacing.xs,
+            children: [
+              for (final (label, text) in LicenseService.lockMessagePresets)
+                ActionChip(
+                  label: Text(label),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () =>
+                      setState(() => _messageController.text = text),
+                ),
+            ],
           ),
           const SizedBox(height: Spacing.md),
           AppTextFormField(

@@ -24,10 +24,10 @@ void main() {
   late LicenseService service;
 
   LicenseService buildService() => LicenseService(
-        stateStore: stateStore,
-        markerStore: markerStore,
-        clock: () => now,
-      );
+    stateStore: stateStore,
+    markerStore: markerStore,
+    clock: () => now,
+  );
 
   setUp(() {
     stateStore = MemoryLicenseStore();
@@ -72,18 +72,20 @@ void main() {
       expect(status.isLocked, isTrue);
     });
 
-    test('expires mid-window when the clock advances past the deadline',
-        () async {
-      await service.saveConfig(
-        armed: true,
-        expiresAt: now.add(const Duration(hours: 1)),
-      );
-      now = now.add(const Duration(hours: 2));
+    test(
+      'expires mid-window when the clock advances past the deadline',
+      () async {
+        await service.saveConfig(
+          armed: true,
+          expiresAt: now.add(const Duration(hours: 1)),
+        );
+        now = now.add(const Duration(hours: 2));
 
-      final status = await service.evaluate();
-      expect(status.state, LicenseLockState.expired);
-      expect(status.isLocked, isTrue);
-    });
+        final status = await service.evaluate();
+        expect(status.state, LicenseLockState.expired);
+        expect(status.isLocked, isTrue);
+      },
+    );
 
     test('disarmed config is inactive even past a stored deadline', () async {
       await service.saveConfig(
@@ -144,8 +146,7 @@ void main() {
       expect(status.isExpiringSoon, isTrue);
     });
 
-    test('a status without armedAt falls back to the 30-day window',
-        () async {
+    test('a status without armedAt falls back to the 30-day window', () async {
       final status = LicenseStatus(
         state: LicenseLockState.active,
         effectiveNow: now,
@@ -191,8 +192,7 @@ void main() {
       expect(status.isTrial, isTrue);
     });
 
-    test('re-saving the same deadline keeps the original term start',
-        () async {
+    test('re-saving the same deadline keeps the original term start', () async {
       final expiry = now.add(const Duration(days: 30));
       await service.saveConfig(armed: true, expiresAt: expiry);
       final armedAt = (await service.evaluate()).armedAt;
@@ -241,8 +241,7 @@ void main() {
       now = now.add(const Duration(days: 28)); // 2 days left — warning on
       expect((await service.evaluate()).isExpiringSoon, isTrue);
 
-      final result =
-          await service.redeemUnlockCode(service.unlockCode(90, 0));
+      final result = await service.redeemUnlockCode(service.unlockCode(90, 0));
       expect(result.success, isTrue);
 
       final status = await service.evaluate();
@@ -286,25 +285,27 @@ void main() {
       expect(status.effectiveNow.isAfter(now), isTrue);
     });
 
-    test('a rolled-back clock cannot revive an about-to-expire license',
-        () async {
-      await service.saveConfig(
-        armed: true,
-        expiresAt: now.add(const Duration(days: 30)),
-      );
+    test(
+      'a rolled-back clock cannot revive an about-to-expire license',
+      () async {
+        await service.saveConfig(
+          armed: true,
+          expiresAt: now.add(const Duration(days: 30)),
+        );
 
-      // Advance real time to just before expiry — watermark follows.
-      now = now.add(const Duration(days: 29));
-      await service.evaluate();
+        // Advance real time to just before expiry — watermark follows.
+        now = now.add(const Duration(days: 29));
+        await service.evaluate();
 
-      // Client rolls the clock back to install day.
-      now = DateTime(2026, 9, 14, 12, 0);
-      final status = await service.evaluate();
+        // Client rolls the clock back to install day.
+        now = DateTime(2026, 9, 14, 12, 0);
+        final status = await service.evaluate();
 
-      // Still nearly expired — remaining is measured from the watermark.
-      expect(status.state, LicenseLockState.active);
-      expect(status.remaining!.inDays, lessThanOrEqualTo(1));
-    });
+        // Still nearly expired — remaining is measured from the watermark.
+        expect(status.state, LicenseLockState.active);
+        expect(status.remaining!.inDays, lessThanOrEqualTo(1));
+      },
+    );
   });
 
   group('tamper detection', () {
@@ -342,8 +343,10 @@ void main() {
         armed: true,
         expiresAt: now.add(const Duration(days: 30)),
       );
-      stateStore.data['pinoy_pos.license_state.v1'] =
-          jsonEncode({'data': {'armed': false}, 'sig': 'deadbeef'});
+      stateStore.data['pinoy_pos.license_state.v1'] = jsonEncode({
+        'data': {'armed': false},
+        'sig': 'deadbeef',
+      });
 
       expect((await service.evaluate()).state, LicenseLockState.tampered);
     });
@@ -397,8 +400,10 @@ void main() {
       final bad = await service.changeDeveloperPassword('wrong', 'newpass1');
       expect(bad.isOk, isFalse);
 
-      final good =
-          await service.changeDeveloperPassword('devpass123', 'newpass1');
+      final good = await service.changeDeveloperPassword(
+        'devpass123',
+        'newpass1',
+      );
       expect(good.isOk, isTrue);
       expect(
         (await service.verifyDeveloperPassword('newpass1')).result,
@@ -506,17 +511,13 @@ void main() {
       final deadline = now.add(const Duration(days: 10));
       await service.saveConfig(armed: true, expiresAt: deadline);
 
-      final result = await service.redeemUnlockCode(
-        service.unlockCode(90, 0),
-      );
+      final result = await service.redeemUnlockCode(service.unlockCode(90, 0));
 
       expect(result.success, isTrue);
       // 10 remaining days + 90 granted = ~100 days, not 90.
       expect(
         result.newExpiry!.millisecondsSinceEpoch,
-        deadline
-            .add(const Duration(days: 90))
-            .millisecondsSinceEpoch,
+        deadline.add(const Duration(days: 90)).millisecondsSinceEpoch,
       );
       final status = await service.evaluate();
       expect(status.state, LicenseLockState.active);
@@ -529,13 +530,13 @@ void main() {
         expiresAt: now.subtract(const Duration(days: 2)),
       );
 
-      final result = await service.redeemUnlockCode(
-        service.unlockCode(365, 0),
-      );
+      final result = await service.redeemUnlockCode(service.unlockCode(365, 0));
 
       expect(result.success, isTrue);
-      expect(result.newExpiry!.isAfter(now.add(const Duration(days: 364))),
-          isTrue);
+      expect(
+        result.newExpiry!.isAfter(now.add(const Duration(days: 364))),
+        isTrue,
+      );
     });
 
     test('a code cannot re-arm a disarmed (paid in full) license', () async {
@@ -545,8 +546,7 @@ void main() {
       );
       await service.saveConfig(armed: false, expiresAt: null);
 
-      final result =
-          await service.redeemUnlockCode(service.unlockCode(90, 0));
+      final result = await service.redeemUnlockCode(service.unlockCode(90, 0));
       expect(result.success, isFalse);
       expect((await service.evaluate()).state, LicenseLockState.inactive);
     });
@@ -567,24 +567,26 @@ void main() {
       expect((await service.evaluate()).isLocked, isTrue);
     });
 
-    test('redemption works after the blob was deleted (tamper recovery)',
-        () async {
-      await service.saveConfig(
-        armed: true,
-        expiresAt: now.add(const Duration(days: 1)),
-      );
-      await stateStore.delete('pinoy_pos.license_state.v1');
-      expect((await service.evaluate()).state, LicenseLockState.tampered);
+    test(
+      'redemption works after the blob was deleted (tamper recovery)',
+      () async {
+        await service.saveConfig(
+          armed: true,
+          expiresAt: now.add(const Duration(days: 1)),
+        );
+        await stateStore.delete('pinoy_pos.license_state.v1');
+        expect((await service.evaluate()).state, LicenseLockState.tampered);
 
-      final result =
-          await service.redeemUnlockCode(service.unlockCode(90, 0));
-      expect(result.success, isTrue);
-      expect((await service.evaluate()).state, LicenseLockState.active);
-    });
+        final result = await service.redeemUnlockCode(
+          service.unlockCode(90, 0),
+        );
+        expect(result.success, isTrue);
+        expect((await service.evaluate()).state, LicenseLockState.active);
+      },
+    );
 
     test('redemption on a never-configured device is refused', () async {
-      final result =
-          await service.redeemUnlockCode(service.unlockCode(90, 0));
+      final result = await service.redeemUnlockCode(service.unlockCode(90, 0));
       expect(result.success, isFalse);
     });
 
@@ -596,8 +598,7 @@ void main() {
       for (var i = 0; i < 5; i++) {
         await service.redeemUnlockCode('BAD0-COD$i');
       }
-      final res =
-          await service.redeemUnlockCode(service.unlockCode(90, 0));
+      final res = await service.redeemUnlockCode(service.unlockCode(90, 0));
       expect(res.success, isFalse);
       expect(res.retryAfter, isNotNull);
     });
@@ -628,6 +629,154 @@ void main() {
       final result = await service.redeemUnlockCode(code);
       expect(result.success, isTrue);
       expect(result.alreadyUsed, isFalse);
+    });
+  });
+
+  group('activity log', () {
+    test('arming records an armed event with the term length', () async {
+      await service.saveConfig(
+        armed: true,
+        expiresAt: now.add(const Duration(days: 90)),
+      );
+
+      final events = (await service.evaluate()).events;
+      expect(events, hasLength(1));
+      expect(events.single.type, LicenseEventType.armed);
+      expect(events.single.detail, '90-day term');
+    });
+
+    test(
+      're-saving the same armed deadline does not duplicate the event',
+      () async {
+        final expiresAt = now.add(const Duration(days: 30));
+        await service.saveConfig(armed: true, expiresAt: expiresAt);
+        await service.saveConfig(armed: true, expiresAt: expiresAt);
+
+        final events = (await service.evaluate()).events;
+        expect(
+          events.where((e) => e.type == LicenseEventType.armed),
+          hasLength(1),
+        );
+      },
+    );
+
+    test(
+      'disarming and re-arming record both transitions, newest first',
+      () async {
+        await service.saveConfig(
+          armed: true,
+          expiresAt: now.add(const Duration(days: 30)),
+        );
+        await service.saveConfig(armed: false);
+        await service.saveConfig(
+          armed: true,
+          expiresAt: now.add(const Duration(days: 60)),
+        );
+
+        final events = (await service.evaluate()).events;
+        expect(events.map((e) => e.type), [
+          LicenseEventType.armed,
+          LicenseEventType.disarmed,
+          LicenseEventType.armed,
+        ]);
+      },
+    );
+
+    test('redeeming a code records a redeemed event with the grant', () async {
+      await service.saveConfig(armed: true, expiresAt: now);
+      await service.redeemUnlockCode(service.unlockCode(30, 0));
+
+      final events = (await service.evaluate()).events;
+      expect(events.first.type, LicenseEventType.redeemed);
+      expect(events.first.detail, '+30 days');
+    });
+
+    test('password set and change are recorded', () async {
+      expect(await service.initializeDeveloperPassword('Str0ng!Pass'), isTrue);
+      expect(
+        (await service.changeDeveloperPassword(
+          'Str0ng!Pass',
+          'N3w!Passw0rd',
+        )).isOk,
+        isTrue,
+      );
+
+      final types = (await service.evaluate()).events
+          .map((e) => e.type)
+          .toList();
+      expect(types, [
+        LicenseEventType.passwordChanged,
+        LicenseEventType.passwordSet,
+      ]);
+    });
+
+    test(
+      'evaluate() never writes events — the log only grows on actions',
+      () async {
+        await service.saveConfig(
+          armed: true,
+          expiresAt: now.add(const Duration(days: 30)),
+        );
+        await service.evaluate();
+        await service.evaluate();
+        now = now.add(const Duration(minutes: 5));
+        await service.evaluate();
+
+        expect((await service.evaluate()).events, hasLength(1));
+      },
+    );
+
+    test('events survive a service restart over the same stores', () async {
+      await service.saveConfig(
+        armed: true,
+        expiresAt: now.add(const Duration(days: 30)),
+      );
+      final restarted = buildService();
+
+      final events = (await restarted.evaluate()).events;
+      expect(events.single.type, LicenseEventType.armed);
+    });
+
+    test('the log is capped and drops the oldest entries', () async {
+      // 15 arm/disarm pairs → 30 events; the cap keeps the newest 25.
+      for (var i = 0; i < 15; i++) {
+        await service.saveConfig(
+          armed: true,
+          expiresAt: now.add(const Duration(days: 30)),
+        );
+        await service.saveConfig(armed: false);
+      }
+
+      final events = (await service.evaluate()).events;
+      expect(events, hasLength(25));
+      expect(events.first.type, LicenseEventType.disarmed);
+      expect(events.last.type, LicenseEventType.disarmed);
+    });
+
+    test('a tampered blob exposes no activity', () async {
+      await service.saveConfig(
+        armed: true,
+        expiresAt: now.add(const Duration(days: 30)),
+      );
+      final raw = rawBlob()!;
+      stateStore.data['pinoy_pos.license_state.v1'] = raw.replaceFirst(
+        '"armed":true',
+        '"armed":false',
+      );
+
+      final status = await service.evaluate();
+      expect(status.state, LicenseLockState.tampered);
+      expect(status.events, isEmpty);
+    });
+
+    test('clearConfiguration wipes the log like a fresh install', () async {
+      await service.saveConfig(
+        armed: true,
+        expiresAt: now.add(const Duration(days: 30)),
+      );
+      await service.clearConfiguration();
+
+      expect((await service.evaluate()).events, isEmpty);
     });
   });
 }

@@ -1476,13 +1476,30 @@ and blocks login behind a full-screen lock page when the deadline passes.
   warningThreshold` = term/4 clamped to [1 day, `warningWindow` (30
   days)], so a 30-day trial warns only in its last ~7 days while a
   365-day term still warns at 30. Legacy blobs without `armedAtMs` fall
-  back to the full 30-day window. `LicenseExpiryBanner` (warning colors,
-  "Enter code") shows inside the threshold; `LicenseCountdownChip`
-  (neutral, "Trial · N days left" / "License · N days left", "Enter
-  code") shows while armed outside it — both mounted on the login card
-  and atop every AppShell tab. Terms of ≤ `trialMaxTerm` (45 days) read
-  as "Trial" in the banner copy and get "Trial Ended" on the lock screen.
-  The login screen also shows a "Have an unlock code?" link while armed.
+  back to the full 30-day window. One widget, `LicenseNotice`
+  (`LicenseNoticeTier.calm/warn/critical`), renders the strip: grey
+  "N days left" outside the window, amber "expires in N days" inside it,
+  red "locks in Xh" once `isCritical` (inside the window AND ≤
+  `criticalWindow` = 48h) with the developer contact inline. Mounted at
+  the top of the login page and atop every AppShell tab. Terms of ≤
+  `trialMaxTerm` (45 days) read as "Trial" in the notice copy and get
+  "Trial Ended" on the lock screen. The login card also shows a "Have an
+  unlock code?" link while armed.
+- **Owner status page.** Settings → System / Management → **License**
+  (Owner-only tile, `canEditBusinessSettings`) opens
+  `LicenseStatusScreen`: status pill, big remaining-time figure, term
+  progress bar, deadline/armed-since/warning-window/contact rows and an
+  "Enter unlock code" button. Read-only — arm/disarm/deadline/password
+  stay in the hidden developer panel. The tile subtitle mirrors the
+  countdown (`License · N days left`).
+- **Signed activity log.** The blob carries a bounded (`_maxEvents` = 25)
+  `events` list recorded on arm, disarm, code redemption and dev-password
+  set/change — never during `evaluate()`, so the watermark write can't
+  spam it. `LicenseStatus.events` exposes it newest-first; the owner page
+  merges it with derived milestones (warning-window entry at
+  `expiresAt − warningThreshold`, expiry at `expiresAt`) which are never
+  stored, so they can't be forged. Old blobs without `events` load fine
+  (missing key defaults to empty).
 - **Shared rate limit.** Password and unlock-code failures share a signed,
   persisted counter: 5 failures → 5-minute lockout (checked against the
   watermark, not the wall clock).
@@ -1501,30 +1518,40 @@ and blocks login behind a full-screen lock page when the deadline passes.
 ### Files
 
 - `lib/services/license_service.dart` — storage adapters, signed blob,
-  watermark, `armedAtMs` term tracking, `evaluate()`, `saveConfig`,
-  `developerGateMode`, `initialize/verify/changeDeveloperPassword`,
-  `unlockCode(days, index)`, `redeemUnlockCode` (stacking),
-  `clearConfiguration`, `warningWindow`, `trialMaxTerm`.
+  watermark, `armedAtMs` term tracking, signed `events` log (`LicenseEvent`
+  / `LicenseEventType`), `evaluate()`, `saveConfig`, `developerGateMode`,
+  `initialize/verify/changeDeveloperPassword`, `unlockCode(days, index)`,
+  `redeemUnlockCode` (stacking), `clearConfiguration`, `warningWindow`,
+  `criticalWindow`, `trialMaxTerm`, lock-message presets.
 - `lib/providers/license_provider.dart` — `licenseServiceProvider`,
   `licenseStatusProvider` (`LicenseStatusNotifier`, starts `evaluating`).
 - `lib/ui/dialogs/developer_access_dialog.dart` — setup/verify gate
   (`AppDialogForm`, inline errors, lockout messaging).
 - `lib/ui/dialogs/license_unlock_dialog.dart` — shared code-entry dialog
-  used by the banner and the login-screen link (pre-lock redemption).
-- `lib/ui/widgets/license_expiry_banner.dart` — warning strip driven by
-  `isExpiringSoon`, mounted in `login_screen.dart` (clipped to card
-  radius) and `app_shell.dart` (above the tab content on both layouts).
-- `lib/ui/widgets/license_countdown_chip.dart` — neutral countdown strip
-  driven by `showCountdown`, mounted in the same two spots.
+  used by the notice, the owner page, the Settings tile and the
+  login-screen link (pre-lock redemption).
+- `lib/ui/widgets/license_notice.dart` — single countdown strip with
+  three tiers (`LicenseNoticeTier`): calm (grey, `showCountdown`), warn
+  (amber, `isExpiringSoon`), critical (red, `isCritical` — last 48h with
+  dev contact inline). Mounted at the top of `login_screen.dart` and
+  above tab content in `app_shell.dart`. `LicenseNotice.enterCode` is the
+  shared redeem flow.
+- `lib/ui/screens/license_status_screen.dart` — Owner-only read-only
+  status page: pill, remaining figure, progress bar, info rows, unlock
+  button, signed + derived activity list. Guards itself with
+  `AccessDeniedScreen` when pushed directly.
 - `lib/ui/screens/developer_license_screen.dart` — hidden panel: status
-  card, arm switch, deadline picker, lock message, developer contact,
-  per-grant expandable code lists with copy, change password, "License
-  paid in full" (clear).
+  card, arm switch, deadline picker, lock message (auto-fill + preset
+  chips), developer contact, per-grant expandable code lists with copy,
+  change password, "License paid in full" (clear).
 - `lib/ui/screens/license_locked_screen.dart` — blocking screen (`PopScope
   canPop: false`): lock badge, message, contact card, unlock-code field,
   Unlock CTA, Developer access.
 - Wired into `splash_screen.dart`, `session_guard.dart`,
-  `login_screen.dart`, `app_shell.dart`.
+  `login_screen.dart`, `app_shell.dart`, `settings_screen.dart` (License
+  tile).
+- Mockups: `mockups/license_flow.html` (full lifecycle sim),
+  `mockups/license_warning.html` (tiers + Settings + owner page).
 
 ### Caveats
 
@@ -1543,12 +1570,13 @@ and blocks login behind a full-screen lock page when the deadline passes.
 
 ```powershell
 flutter analyze
-flutter test test/license_service_test.dart test/license_countdown_chip_test.dart
+flutter test test/license_service_test.dart test/license_notice_test.dart
 flutter test
 ```
 
-Result: `flutter analyze` clean; `license_service_test.dart` 42/42 pass
+Result: `flutter analyze` clean; `license_service_test.dart` 56/56 pass
 (evaluation, rollback, tamper, password, proportional warning window,
 term tracking, unlock codes — format, per-grant enumeration, stacking,
-disarm refusal, clear); `license_countdown_chip_test.dart` 5/5 pass;
-full suite 554/554 pass.
+disarm refusal, clear, signed activity log); `license_notice_test.dart`
+9/9 pass (all three tiers, hidden states, dialog wiring); full suite
+588/588 pass.
