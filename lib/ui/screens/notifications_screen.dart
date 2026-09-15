@@ -203,16 +203,33 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           ),
         ],
       ),
-      body: filtered.isEmpty
-          ? _buildEmptyState()
-          : ListView(
-              padding: const EdgeInsets.all(Spacing.lg),
-              children: [
-                _buildFilterChips(),
-                const SizedBox(height: Spacing.md),
-                ..._buildSectionedList(filtered),
-              ],
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              Spacing.lg,
+              Spacing.lg,
+              Spacing.lg,
+              0,
             ),
+            child: _buildFilterChips(),
+          ),
+          const SizedBox(height: Spacing.md),
+          Expanded(
+            child: filtered.isEmpty
+                ? _buildEmptyState()
+                : ListView(
+                    padding: const EdgeInsets.fromLTRB(
+                      Spacing.lg,
+                      0,
+                      Spacing.lg,
+                      Spacing.lg,
+                    ),
+                    children: _buildSectionedList(filtered),
+                  ),
+          ),
+        ],
+      ),
     );
   }
 
