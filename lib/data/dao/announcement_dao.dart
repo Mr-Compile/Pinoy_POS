@@ -21,11 +21,13 @@ class AnnouncementDao extends BaseDao<Announcement> {
 
   Future<List<Announcement>> getPinnedAnnouncements() async {
     final database = await db;
-    final maps = await database.query(
-      tableName,
-      where: 'is_pinned = 1 AND deleted_at IS NULL',
-      orderBy: 'created_at DESC',
-    );
+    final maps = await database.rawQuery('''
+      SELECT * FROM announcements
+      WHERE is_pinned = 1
+      AND deleted_at IS NULL
+      AND (expires_at IS NULL OR expires_at > datetime('now'))
+      ORDER BY created_at DESC
+    ''');
     return maps.map((map) => fromMap(map)).toList();
   }
 }

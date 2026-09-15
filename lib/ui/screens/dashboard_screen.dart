@@ -37,6 +37,7 @@ import 'package:pinoy_pos/ui/screens/backup_restore_screen.dart';
 import 'package:pinoy_pos/ui/screens/activity_logs_screen.dart';
 import 'package:pinoy_pos/ui/screens/ai_advisor_screen.dart';
 import 'package:pinoy_pos/ui/screens/ai_config_screen.dart';
+import 'package:pinoy_pos/ui/widgets/announcement_banner.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/dashboard_blocks.dart';
 import 'package:pinoy_pos/ui/widgets/donut_chart.dart';
@@ -124,6 +125,7 @@ class _DashboardLoadedView extends ConsumerWidget {
         children: [
           DashboardWelcome(user: user!),
           const SizedBox(height: Spacing.lg),
+          const AnnouncementBanner(),
           if (!isAdmin) ...[
             const SalesPeriodSelector(),
             const SizedBox(height: Spacing.lg),

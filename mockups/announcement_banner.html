@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinoy POS — Announcement Banner (pinned announcement on Dashboard)</title>
+<link rel="stylesheet" href="mockup.css">
+<style>
+  .frames-legend { max-width: 900px; margin: 0 auto 24px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; color: var(--text-2); font-size: 13px; }
+  .role-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; border: 1px solid var(--border); }
+  .role-owner { background: rgba(75,130,233,.16); color: var(--info); border-color: rgba(75,130,233,.4); }
+  .role-admin { background: rgba(139,92,246,.16); color: var(--purple); border-color: rgba(139,92,246,.4); }
+  .role-staff { background: rgba(22,163,74,.16); color: var(--success); border-color: rgba(22,163,74,.4); }
+
+  /* ── Announcement banner (semantic: info container) ─────────── */
+  .abanner { display: flex; gap: 10px; align-items: flex-start; padding: 12px 12px 12px 14px; border-radius: 14px; border: 1px solid rgba(75,130,233,.35); background: rgba(75,130,233,.10); cursor: pointer; flex-shrink: 0; }
+  :root[data-theme="light"] .abanner { background: #EEF4FF; border-color: #C7DBFF; }
+  .abanner .a-ic { width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: rgba(75,130,233,.18); }
+  :root[data-theme="light"] .abanner .a-ic { background: #D8E7FF; }
+  .abanner .a-ic svg { width: 16px; height: 16px; fill: var(--info); }
+  .abanner .a-body { flex: 1; min-width: 0; }
+  .abanner .a-head { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+  .abanner .a-title { font-size: 13px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .abanner .a-msg { font-size: 12px; color: var(--text-2); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .abanner .a-close { width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .abanner .a-close:hover { background: rgba(75,130,233,.18); }
+  .abanner .a-close svg { width: 13px; height: 13px; fill: var(--text-3); }
+  .abanner .a-pin { width: 12px; height: 12px; fill: var(--info); flex-shrink: 0; }
+  .abanner .a-more { font-size: 10.5px; font-weight: 700; color: var(--info); background: rgba(75,130,233,.16); border-radius: 10px; padding: 2px 7px; white-space: nowrap; }
+  :root[data-theme="light"] .abanner .a-more { background: #D8E7FF; }
+
+  /* Placeholder dashboard content blocks */
+  .hero { background: linear-gradient(135deg, var(--primary), var(--primary-strong)); border-radius: var(--radius-card); padding: 16px; color: #fff; flex-shrink: 0; }
+  .hero .label { font-size: 11.5px; opacity: .85; }
+  .hero .amount { font-size: 26px; font-weight: 800; margin: 4px 0; }
+  .hero .delta { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 700; background: rgba(255,255,255,.2); padding: 3px 9px; border-radius: 20px; }
+  .block { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 14px; flex-shrink: 0; }
+  .block .b-title { font-size: 13.5px; font-weight: 700; color: var(--text); margin-bottom: 10px; }
+  .skel { height: 12px; border-radius: 6px; background: var(--surface-elev); margin-bottom: 8px; }
+
+  /* Notification rows (Admin/Staff notifications screen) */
+  .notif { display: flex; gap: 12px; padding: 13px 14px; align-items: flex-start; }
+  .notif + .notif { border-top: 1px solid var(--divider); }
+  .notif .n-body { flex: 1; min-width: 0; }
+  .notif .n-title { font-size: 13.5px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 7px; }
+  .notif .n-title .unread-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); flex-shrink: 0; }
+  .notif .n-msg { font-size: 12.5px; color: var(--text-2); line-height: 1.45; margin-top: 3px; }
+  .notif .n-time { font-size: 11px; color: var(--text-3); margin-top: 6px; }
+  .notif.read .n-title { font-weight: 600; color: var(--text-2); }
+
+  /* Detail dialog opened by tapping the banner */
+  .dialog-overlay { position: absolute; inset: 0; top: 30px; background: rgba(0,0,0,.55); z-index: 50; display: none; align-items: center; justify-content: center; padding: 16px; }
+  .dialog-overlay.open { display: flex; }
+  .dialog { background: var(--surface); border: 1px solid var(--border); border-radius: 22px; width: 100%; max-width: 310px; box-shadow: 0 24px 64px rgba(0,0,0,.45); display: flex; flex-direction: column; }
+  .dialog-header { padding: 20px 20px 12px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .dialog-header h3 { font-size: 18px; font-weight: 800; color: var(--text); }
+  .dialog-body { padding: 0 20px; }
+  .dialog-actions { padding: 16px 20px 20px; display: flex; gap: 10px; }
+  .dialog-actions .btn { flex: 1; }
+  .view-body { font-size: 13px; color: var(--text-2); line-height: 1.55; padding: 4px 0 8px; }
+  .view-foot { font-size: 11.5px; color: var(--text-3); padding-top: 10px; border-top: 1px solid var(--divider); }
+
+  .welcome { flex-shrink: 0; }
+  .welcome .w-hi { font-size: 19px; font-weight: 800; color: var(--text); }
+  .welcome .w-sub { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M12 21l3.5-4.5c-.97-.74-2.18-1.16-3.5-1.16s-2.53.42-3.5 1.16L12 21zM12 3C7.31 3 3.07 4.69 0 7.55l1.93 2.43C4.48 7.9 8.01 6.4 12 6.4s7.52 1.5 10.07 3.58L24 7.55C20.93 4.69 16.69 3 12 3z"/></symbol>
+  <symbol id="i-batt" viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></symbol>
+  <symbol id="i-campaign" viewBox="0 0 24 24"><path d="M18 2H6c-1.1 0-2 .9-2 2v4c0 1.1.9 2 2 2h1v8c0 1.1.9 2 2 2h2c1.1 0 2-.9 2-2V10h5c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM4 11h2v2H4v-2z"/></symbol>
+  <symbol id="i-pushpin" viewBox="0 0 24 24"><path d="M16 12V4H17V2H7v2h1v8l-3 3v2h5v6h2v-6h5v-2l-3-3z"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></symbol>
+  <symbol id="i-dash" viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></symbol>
+  <symbol id="i-cart" viewBox="0 0 24 24"><path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.13.12-.27.12-.42 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/></symbol>
+  <symbol id="i-people" viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S6.66 5 8 5 6.34 5 5 5.5 6 4.67 7 5.5 7s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></symbol>
+</svg>
+
+<div class="page-head">
+  <div>
+    <h1>Announcement Banner — pinned announcements on Dashboard</h1>
+    <p>Pinned announcements render as a dismissible banner at the top of the Dashboard for every role. Unpinned announcements still arrive as notifications only. Admin now receives the same announcement notification Staff gets.</p>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <span class="role-chip role-owner">Owner</span>
+    <span class="role-chip role-admin">Admin</span>
+    <span class="role-chip role-staff">Staff</span>
+  </div>
+  <button class="theme-toggle" onclick="toggleTheme()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
+    <span id="themeLabel">Light mode</span>
+  </button>
+</div>
+
+<div class="frames-legend">
+  <b>Flow:</b> Owner posts announcement → Staff + Admin get a notification row. If <b>Pin to top</b> is on, it also renders as this banner on everyone's Dashboard until dismissed or unpinned.
+</div>
+
+<div class="frames">
+
+  <!-- ── Frame 1: Staff dashboard with pinned banner ─────────── -->
+  <div class="frame-wrap">
+    <div class="frame-label">Dashboard — Staff (banner visible)</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="appbar">
+        <div class="title"><h2>Dashboard</h2><div class="sub">Staff</div></div>
+        <div class="act"><span class="bell-wrap"><svg><use href="#i-bell"/></svg><span class="badge">2</span></span></div>
+        <div class="act"><svg><use href="#i-more"/></svg></div>
+      </div>
+      <div class="screen">
+        <div class="screen-body">
+          <div class="welcome"><div class="w-hi">Good morning, Maria</div><div class="w-sub">Tuesday, September 15</div></div>
+
+          <div class="abanner" id="staffBanner">
+            <div class="a-ic"><svg><use href="#i-campaign"/></svg></div>
+            <div class="a-body">
+              <div class="a-head"><svg class="a-pin"><use href="#i-pushpin"/></svg><span class="a-title">Store closed Sunday — fiesta</span><span class="a-more">+1 more</span></div>
+              <div class="a-msg">No operations on Sept 21 for the barangay fiesta. Regular hours resume Monday.</div>
+            </div>
+            <div class="a-close" onclick="event.stopPropagation();dismissBanner('staffBanner')" title="Dismiss"><svg><use href="#i-close"/></svg></div>
+          </div>
+
+          <div class="hero">
+            <div class="label">My Sales · Today</div>
+            <div class="amount">₱4,230.00</div>
+            <span class="delta">+12% vs yesterday</span>
+          </div>
+          <div class="block"><div class="b-title">Quick Actions</div><div class="skel" style="width:60%"></div><div class="skel" style="width:85%"></div><div class="skel" style="width:45%"></div></div>
+          <div class="block"><div class="b-title">Sales Trend</div><div class="skel"></div><div class="skel" style="width:70%"></div><div class="skel" style="width:80%;margin-bottom:0"></div></div>
+        </div>
+      </div>
+      <div class="bottomnav">
+        <div class="navitem sel"><div class="navicon"><svg><use href="#i-dash"/></svg></div><div class="navlbl">Home</div></div>
+        <div class="navitem"><div class="navicon"><svg><use href="#i-cart"/></svg></div><div class="navlbl">POS</div></div>
+        <div class="navitem"><div class="navicon"><svg><use href="#i-bell"/></svg></div><div class="navlbl">Alerts</div></div>
+        <div class="navitem"><div class="navicon"><svg><use href="#i-more"/></svg></div><div class="navlbl">More</div></div>
+      </div>
+    </div>
+    <div class="frame-notes">Banner sits <b>below the greeting, above all dashboard content</b>. Info-container semantic colors. "+1 more" appears when several announcements are pinned — tap the banner to page through them. X dismisses for this user only.</div>
+  </div>
+
+  <!-- ── Frame 2: Admin dashboard with banner ────────────────── -->
+  <div class="frame-wrap">
+    <div class="frame-label">Dashboard — Admin (banner visible)</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="appbar">
+        <div class="title"><h2>Dashboard</h2><div class="sub">System Admin</div></div>
+        <div class="act"><span class="bell-wrap"><svg><use href="#i-bell"/></svg><span class="badge">1</span></span></div>
+        <div class="act"><svg><use href="#i-more"/></svg></div>
+      </div>
+      <div class="screen">
+        <div class="screen-body">
+          <div class="welcome"><div class="w-hi">Welcome back, Jose</div><div class="w-sub">Tuesday, September 15</div></div>
+
+          <div class="abanner" id="adminBanner">
+            <div class="a-ic"><svg><use href="#i-campaign"/></svg></div>
+            <div class="a-body">
+              <div class="a-head"><svg class="a-pin"><use href="#i-pushpin"/></svg><span class="a-title">Store closed Sunday — fiesta</span><span class="a-more">+1 more</span></div>
+              <div class="a-msg">No operations on Sept 21 for the barangay fiesta. Regular hours resume Monday.</div>
+            </div>
+            <div class="a-close" onclick="event.stopPropagation();dismissBanner('adminBanner')" title="Dismiss"><svg><use href="#i-close"/></svg></div>
+          </div>
+
+          <div class="block"><div class="b-title">System Status</div><div class="skel" style="width:55%"></div><div class="skel" style="width:80%"></div></div>
+          <div class="block"><div class="b-title">Users by Role</div><div class="skel"></div><div class="skel" style="width:65%"></div><div class="skel" style="width:75%;margin-bottom:0"></div></div>
+        </div>
+      </div>
+      <div class="bottomnav">
+        <div class="navitem sel"><div class="navicon"><svg><use href="#i-dash"/></svg></div><div class="navlbl">Home</div></div>
+        <div class="navitem"><div class="navicon"><svg><use href="#i-people"/></svg></div><div class="navlbl">Users</div></div>
+        <div class="navitem"><div class="navicon"><svg><use href="#i-bell"/></svg></div><div class="navlbl">Alerts</div></div>
+        <div class="navitem"><div class="navicon"><svg><use href="#i-more"/></svg></div><div class="navlbl">More</div></div>
+      </div>
+    </div>
+    <div class="frame-notes">Admin sees the same banner. Admin still has <b>no Announcements screen</b> — tapping the banner opens a read-only detail dialog instead of navigating.</div>
+  </div>
+
+  <!-- ── Frame 3: Admin notifications — announcement arrives ── -->
+  <div class="frame-wrap">
+    <div class="frame-label">Notifications — Admin (new announcement)</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="appbar">
+        <div class="back"><svg><use href="#i-back"/></svg></div>
+        <div class="title"><h2>Notifications</h2><div class="sub">Admin</div></div>
+      </div>
+      <div class="screen">
+        <div class="screen-body" style="padding:0;gap:0">
+          <div class="card" style="border-radius:0;border-left:none;border-right:none;border-top:none">
+            <div class="notif">
+              <div class="icircle sm c-amber"><svg><use href="#i-campaign"/></svg></div>
+              <div class="n-body">
+                <div class="n-title"><span class="unread-dot"></span>New Announcement: Store closed Sunday — fiesta</div>
+                <div class="n-msg">No operations on Sept 21 for the barangay fiesta. Regular hours resume Monday.</div>
+                <div class="n-time">Just now</div>
+              </div>
+            </div>
+            <div class="notif">
+              <div class="icircle sm c-amber"><svg><use href="#i-campaign"/></svg></div>
+              <div class="n-body">
+                <div class="n-title"><span class="unread-dot"></span>New Announcement: Weekend promo</div>
+                <div class="n-msg">Pastil is 20% off this Saturday and Sunday. Stock up before the rush.</div>
+                <div class="n-time">2h ago</div>
+              </div>
+            </div>
+            <div class="notif read">
+              <div class="icircle sm c-neutral"><svg><use href="#i-bell"/></svg></div>
+              <div class="n-body">
+                <div class="n-title">Backup completed</div>
+                <div class="n-msg">Nightly backup finished successfully.</div>
+                <div class="n-time">Yesterday</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes"><b>New behavior:</b> Admin now receives the same "New Announcement" notification row Staff gets — full content included, since Admin can't open the Announcements screen. Unpinned announcements arrive <b>only</b> here; pinned ones also show the banner.</div>
+  </div>
+
+  <!-- ── Frame 4: Staff taps banner → detail dialog ──────────── -->
+  <div class="frame-wrap">
+    <div class="frame-label">Dashboard — tap banner → detail</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="appbar">
+        <div class="title"><h2>Dashboard</h2><div class="sub">Staff</div></div>
+        <div class="act"><span class="bell-wrap"><svg><use href="#i-bell"/></svg><span class="badge">2</span></span></div>
+        <div class="act"><svg><use href="#i-more"/></svg></div>
+      </div>
+      <div class="screen">
+        <div class="screen-body">
+          <div class="welcome"><div class="w-hi">Good morning, Maria</div><div class="w-sub">Tuesday, September 15</div></div>
+          <div class="abanner">
+            <div class="a-ic"><svg><use href="#i-campaign"/></svg></div>
+            <div class="a-body">
+              <div class="a-head"><svg class="a-pin"><use href="#i-pushpin"/></svg><span class="a-title">Store closed Sunday — fiesta</span><span class="a-more">+1 more</span></div>
+              <div class="a-msg">No operations on Sept 21 for the barangay fiesta. Regular hours resume Monday.</div>
+            </div>
+            <div class="a-close"><svg><use href="#i-close"/></svg></div>
+          </div>
+          <div class="hero"><div class="label">My Sales · Today</div><div class="amount">₱4,230.00</div><span class="delta">+12% vs yesterday</span></div>
+        </div>
+      </div>
+      <div class="dialog-overlay open">
+        <div class="dialog">
+          <div class="dialog-header">
+            <div class="icircle c-amber"><svg width="20" height="20"><use href="#i-campaign"/></svg></div>
+            <h3>Store closed Sunday — fiesta</h3>
+          </div>
+          <div class="dialog-body">
+            <div class="view-body">No operations on Sept 21 for the barangay fiesta. Regular hours resume Monday.</div>
+            <div class="view-foot">Posted: 2026-09-15 08:30 · Pinned to top · 1 of 2 pinned</div>
+          </div>
+          <div class="dialog-actions">
+            <button class="btn btn-outlined">‹ Prev</button>
+            <button class="btn btn-primary">Next ›</button>
+          </div>
+        </div>
+      </div>
+      <div class="bottomnav">
+        <div class="navitem sel"><div class="navicon"><svg><use href="#i-dash"/></svg></div><div class="navlbl">Home</div></div>
+        <div class="navitem"><div class="navicon"><svg><use href="#i-cart"/></svg></div><div class="navlbl">POS</div></div>
+        <div class="navitem"><div class="navicon"><svg><use href="#i-bell"/></svg></div><div class="navlbl">Alerts</div></div>
+        <div class="navitem"><div class="navicon"><svg><use href="#i-more"/></svg></div><div class="navlbl">More</div></div>
+      </div>
+    </div>
+    <div class="frame-notes">Tap opens a read-only dialog with the full announcement. When several are pinned, <b>Prev/Next</b> pages through them (the "+N more" chip). Owner's dialog could add an Edit shortcut.</div>
+  </div>
+
+</div>
+
+<script src="mockup.js"></script>
+<script>
+function dismissBanner(id) {
+  const el = document.getElementById(id);
+  if (el) {
+    el.style.display = 'none';
+    showToast('Announcement dismissed for you', 'info');
+  }
+}
+</script>
+</body>
+</html>

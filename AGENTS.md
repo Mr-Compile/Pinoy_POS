@@ -1,5 +1,50 @@
 ﻿# Pinoy POS Agent Notes
 
+## Announcement Banner + Admin Notifications
+
+### Rule
+
+Owner-posted announcements reach users through two channels:
+
+- **Every announcement** (pinned or not) creates a per-user `announcement`
+  notification for all active Staff **and** Admin users via
+  `AnnouncementService._notifyUsersOfNewAnnouncement`. The notification
+  carries the full content because neither role has `view_announcements`.
+  The Owner (author) receives no notification.
+- **Pinned announcements** additionally render as a dismissible
+  `AnnouncementBanner` at the top of the Dashboard for all roles,
+  mounted once in `_DashboardLoadedView` after `DashboardWelcome`.
+
+### API
+
+- `AnnouncementService.getBannerAnnouncements()` — pinned, non-expired,
+  non-deleted announcements; auth-only (NOT `view_announcements`-gated,
+  since the banner is how Staff/Admin read pinned content).
+- `AnnouncementService.getDismissedBannerIds()` /
+  `dismissBannerAnnouncement(id)` — per-user dismissal stored in
+  SharedPreferences under `dismissed_announcement_ids_<userId>` (multiple
+  accounts share a device, so dismissal is keyed by user).
+- `AnnouncementDao.getPinnedAnnouncements()` filters `expires_at` — an
+  expired pinned announcement must not keep showing the banner.
+- `lib/ui/widgets/announcement_banner.dart` — info-container semantic
+  colors, "+N more" chip when multiple pinned, tap opens a read-only
+  `AppDialog` with Prev/Next paging, close icon dismisses.
+
+### Verification
+
+```powershell
+flutter analyze
+flutter test test/announcement_banner_test.dart
+```
+
+### Notes
+
+- Widget tests must override `announcementServiceProvider` with an
+  in-memory fake: sqflite_ffi futures do not complete inside
+  `testWidgets`' fake-async zone (see `test/announcement_banner_test.dart`).
+- Admin still has no `view_announcements` permission; the banner's detail
+  dialog is the only announcement surface for Staff/Admin.
+
 ## Responsive CRUD Action Placement
 
 ### Rule
