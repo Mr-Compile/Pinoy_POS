@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/license_code_utils.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/providers/license_provider.dart';
 import 'package:pinoy_pos/ui/dialogs/developer_access_dialog.dart';
@@ -166,11 +166,7 @@ class _ActivationScreenState extends ConsumerState<ActivationScreen> {
                       hint: 'XXXX-XXXX',
                       prefixIcon: Icons.key_outlined,
                       textCapitalization: TextCapitalization.characters,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(
-                          RegExp('[0-9A-Za-z-]'),
-                        ),
-                      ],
+                      inputFormatters: [LicenseCodeInputFormatter()],
                       textInputAction: TextInputAction.done,
                       onFieldSubmitted: (_) => _activate(),
                     ),

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/license_code_utils.dart';
 import 'package:pinoy_pos/core/modal_result.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/services/license_service.dart';
@@ -42,9 +42,7 @@ Future<LicenseRedeemResult?> showLicenseUnlockDialog(
               hint: 'XXXX-XXXX',
               prefixIcon: Icons.key_outlined,
               textCapitalization: TextCapitalization.characters,
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp('[0-9A-Za-z-]')),
-              ],
+              inputFormatters: [LicenseCodeInputFormatter()],
               textInputAction: TextInputAction.done,
               validator: (value) => (value == null || value.trim().isEmpty)
                   ? 'Enter the unlock code'
