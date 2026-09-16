@@ -90,6 +90,8 @@ class _DeveloperLicenseScreenState
                         const SizedBox(height: Spacing.lg),
                         _buildUnlockCodesCard(status),
                         const SizedBox(height: Spacing.lg),
+                        _buildActivityCard(status),
+                        const SizedBox(height: Spacing.lg),
                         _buildSecurityCard(),
                         const SizedBox(height: Spacing.lg),
                         AppButton.gradient(
@@ -446,6 +448,112 @@ class _DeveloperLicenseScreenState
       context,
       title: 'Copied',
       message: '$code copied to clipboard.',
+    );
+  }
+
+  // ── Activity log ─────────────────────────────────────────────────────
+
+  /// The signed activity log from the license blob — developer-only.
+  /// The owner-facing License screen never shows it.
+  Widget _buildActivityCard(LicenseStatus status) {
+    final cs = Theme.of(context).colorScheme;
+    final events = status.events;
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Activity log', style: AppTypography.titleSmallBold(context)),
+          const SizedBox(height: Spacing.xs),
+          Text(
+            'Signed inside the license store — entries cannot be edited '
+            'without detection. Only visible here, never to the owner.',
+            style: AppTypography.bodySmall(
+              context,
+            ).copyWith(color: cs.onSurfaceVariant),
+          ),
+          const SizedBox(height: Spacing.sm),
+          if (events.isEmpty)
+            Text(
+              'No license activity recorded yet.',
+              style: AppTypography.bodySmall(
+                context,
+              ).copyWith(color: cs.onSurfaceVariant),
+            )
+          else
+            for (var i = 0; i < events.length; i++) ...[
+              if (i > 0) const Divider(height: Spacing.lg),
+              _buildEventRow(events[i]),
+            ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEventRow(LicenseEvent event) {
+    final cs = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
+
+    final (name, color) = switch (event.type) {
+      LicenseEventType.armed => ('License armed', AppSemanticColors.info),
+      LicenseEventType.disarmed => (
+          'Enforcement turned off',
+          AppSemanticColors.neutral,
+        ),
+      LicenseEventType.redeemed => (
+          'Unlock code redeemed',
+          AppSemanticColors.success,
+        ),
+      LicenseEventType.passwordSet => (
+          'Developer password created',
+          AppSemanticColors.purple,
+        ),
+      LicenseEventType.passwordChanged => (
+          'Developer password changed',
+          AppSemanticColors.purple,
+        ),
+      LicenseEventType.warning => (
+          'Entered warning window',
+          AppSemanticColors.warning,
+        ),
+      LicenseEventType.expired => (
+          'License expired — app locked',
+          AppSemanticColors.error,
+        ),
+    };
+    final dot = AppSemanticColors.resolve(color, brightness);
+
+    return Row(
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: Spacing.sm),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(name, style: AppTypography.bodySmallSemibold(context)),
+              if (event.detail.isNotEmpty)
+                Text(
+                  event.detail,
+                  style: AppTypography.labelSmall(
+                    context,
+                  ).copyWith(color: cs.onSurfaceVariant),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(width: Spacing.sm),
+        Text(
+          DateFormat('MMM d, h:mm a').format(event.at),
+          style: AppTypography.labelSmall(
+            context,
+          ).copyWith(color: cs.onSurfaceVariant),
+        ),
+      ],
     );
   }
 

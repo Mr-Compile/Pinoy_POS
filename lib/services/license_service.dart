@@ -202,9 +202,10 @@ class LicenseStatus {
   /// Codes are single-use — the developer panel marks these as spent.
   final Set<String> redeemedCodes;
 
-  /// Signed license activity log, newest first. Read-only for the owner
-  /// status screen — the developer panel records entries on arm, disarm,
-  /// redeem and password changes.
+  /// Signed license activity log, newest first. Read-only and surfaced
+  /// only in the hidden developer panel — the owner-facing license screen
+  /// never shows it. Entries are recorded on arm, disarm, redeem and
+  /// password changes.
   final List<LicenseEvent> events;
 
   bool isCodeRedeemed(int days, int index) =>

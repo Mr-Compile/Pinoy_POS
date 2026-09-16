@@ -19,11 +19,10 @@ import 'package:pinoy_pos/ui/widgets/license_notice.dart';
 /// gated by [SessionManager.canEditBusinessSettings] (Owner only); this
 /// screen double-checks in case it is ever pushed directly.
 ///
-/// Shows the armed term, days remaining, the deadline and the signed
-/// recent-activity log recorded inside the license blob itself — so it
-/// survives sign-outs and stays tamper-evident. Warning-window and
-/// expiry rows are derived from the deadline at display time and are
-/// never stored, so they cannot be forged by replaying an old blob.
+/// Shows the armed term, days remaining and the deadline. The signed
+/// activity log recorded inside the license blob is developer-only — it
+/// surfaces in the hidden developer panel, never here, so the owner
+/// cannot track the developer's actions.
 ///
 /// Enforcement controls (arm/disarm, deadline, developer password) stay
 /// in the hidden developer panel — the only action available here is
@@ -64,8 +63,6 @@ class LicenseStatusScreen extends ConsumerWidget {
           padding: const EdgeInsets.all(16),
           children: [
             _statusCard(context, ref, status),
-            const SizedBox(height: 24),
-            _activitySection(context, status),
           ],
         ),
       ),
@@ -258,156 +255,4 @@ class LicenseStatusScreen extends ConsumerWidget {
     );
   }
 
-  // ── Activity log ─────────────────────────────────────────────────────
-
-  /// Stored signed events plus the derived milestones (warning window
-  /// entry, expiry) — merged and sorted newest first.
-  List<LicenseEvent> _activityFor(LicenseStatus status) {
-    final events = List<LicenseEvent>.of(status.events);
-    final expiresAt = status.expiresAt;
-    if (expiresAt != null) {
-      final warnAt = expiresAt.subtract(status.warningThreshold);
-      if (!warnAt.isAfter(status.effectiveNow) &&
-          status.state != LicenseLockState.inactive) {
-        events.add(
-          LicenseEvent(
-            type: LicenseEventType.warning,
-            at: warnAt,
-            detail:
-                'Less than ${LicenseNotice.formatRemaining(status.warningThreshold)} '
-                'left',
-          ),
-        );
-      }
-      if (status.state == LicenseLockState.expired) {
-        events.add(
-          LicenseEvent(
-            type: LicenseEventType.expired,
-            at: expiresAt,
-            detail: 'All users signed out',
-          ),
-        );
-      }
-    }
-    events.sort((a, b) => b.at.compareTo(a.at));
-    return events;
-  }
-
-  Widget _activitySection(BuildContext context, LicenseStatus status) {
-    final cs = Theme.of(context).colorScheme;
-    final events = _activityFor(status);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Recent activity',
-          style: AppTypography.titleSmallBold(
-            context,
-          ).copyWith(color: cs.onSurfaceVariant),
-        ),
-        const SizedBox(height: Spacing.sm),
-        AppCard(
-          padding: EdgeInsets.zero,
-          child: events.isEmpty
-              ? Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    'No license activity recorded yet.',
-                    style: AppTypography.bodySmall(
-                      context,
-                    ).copyWith(color: cs.onSurfaceVariant),
-                  ),
-                )
-              : Column(
-                  children: [
-                    for (var i = 0; i < events.length; i++) ...[
-                      _eventRow(context, events[i]),
-                      if (i < events.length - 1)
-                        const Divider(height: 1, indent: 16, endIndent: 16),
-                    ],
-                  ],
-                ),
-        ),
-        const SizedBox(height: Spacing.sm),
-        Text(
-          'Recorded inside the signed license store — entries cannot be '
-          'edited without detection.',
-          style: AppTypography.labelSmall(
-            context,
-          ).copyWith(color: cs.onSurfaceVariant),
-        ),
-      ],
-    );
-  }
-
-  Widget _eventRow(BuildContext context, LicenseEvent event) {
-    final cs = Theme.of(context).colorScheme;
-    final brightness = Theme.of(context).brightness;
-
-    final (name, color) = switch (event.type) {
-      LicenseEventType.armed => ('License armed', AppSemanticColors.info),
-      LicenseEventType.disarmed => (
-        'Enforcement turned off',
-        AppSemanticColors.neutral,
-      ),
-      LicenseEventType.redeemed => (
-        'Unlock code redeemed',
-        AppSemanticColors.success,
-      ),
-      LicenseEventType.passwordSet => (
-        'Developer password created',
-        AppSemanticColors.purple,
-      ),
-      LicenseEventType.passwordChanged => (
-        'Developer password changed',
-        AppSemanticColors.purple,
-      ),
-      LicenseEventType.warning => (
-        'Entered warning window',
-        AppSemanticColors.warning,
-      ),
-      LicenseEventType.expired => (
-        'License expired — app locked',
-        AppSemanticColors.error,
-      ),
-    };
-    final dot = AppSemanticColors.resolve(color, brightness);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
-        children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: Spacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(name, style: AppTypography.bodySmallSemibold(context)),
-                if (event.detail.isNotEmpty)
-                  Text(
-                    event.detail,
-                    style: AppTypography.labelSmall(
-                      context,
-                    ).copyWith(color: cs.onSurfaceVariant),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(width: Spacing.sm),
-          Text(
-            DateFormat('MMM d, h:mm a').format(event.at),
-            style: AppTypography.labelSmall(
-              context,
-            ).copyWith(color: cs.onSurfaceVariant),
-          ),
-        ],
-      ),
-    );
-  }
 }
