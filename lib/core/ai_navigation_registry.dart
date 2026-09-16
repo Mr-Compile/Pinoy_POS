@@ -299,14 +299,14 @@ class AINavigationRegistry {
     const AIDestination(
       id: 'ai_quota',
       displayName: 'AI Quota Management',
-      description: 'Manage daily AI query quotas for users.',
+      description: 'Manage the daily AI query quota and per-user usage.',
       requiredPermission: 'manage_ai_quota',
       allowedRoles: [UserRole.admin],
       builder: _aiQuotaBuilder,
       howToSteps: [
         'Open Settings and select AI Quota Management.',
-        'Review the default and per-user quotas.',
-        'Edit a quota and confirm with the SuperAdmin password.',
+        'Review the daily quota and per-user usage.',
+        'Change the quota or reset usage, then confirm with the SuperAdmin password.',
       ],
       relatedDestinations: ['settings', 'users'],
     ),

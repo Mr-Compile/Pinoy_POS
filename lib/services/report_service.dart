@@ -246,7 +246,6 @@ class ReportService {
     DateTime? dateRangeStart,
     DateTime? dateRangeEnd,
     int? fileSize,
-    String? thumbnailPath,
     String? reportNumber,
   }) async {
     if (!_sessionManager.hasPermission('export_reports')) {
@@ -263,7 +262,6 @@ class ReportService {
         createdAt: DateTime.now(),
         status: ReportStatus.generated,
         fileSize: fileSize,
-        thumbnailPath: thumbnailPath,
         reportNumber: reportNumber,
       ));
     } catch (_) {

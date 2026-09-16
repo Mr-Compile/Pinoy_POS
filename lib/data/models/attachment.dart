@@ -14,7 +14,6 @@ class Attachment {
   final String mimeType;
   final String fileName;
   final String? attachmentType;
-  final bool isActive;
   final DateTime? deletedAt;
   final DateTime createdAt;
 
@@ -26,7 +25,6 @@ class Attachment {
     required this.mimeType,
     required this.fileName,
     this.attachmentType,
-    this.isActive = true,
     this.deletedAt,
     required this.createdAt,
   });
@@ -40,7 +38,6 @@ class Attachment {
       'mime_type': mimeType,
       'file_name': fileName,
       'attachment_type': attachmentType,
-      'is_active': isActive ? 1 : 0,
       'deleted_at': deletedAt?.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
     };
@@ -55,7 +52,6 @@ class Attachment {
       mimeType: map['mime_type'] as String,
       fileName: map['file_name'] as String,
       attachmentType: map['attachment_type'] as String?,
-      isActive: (map['is_active'] as int?) == 1,
       deletedAt: map['deleted_at'] != null
           ? DateTime.parse(map['deleted_at'] as String)
           : null,
@@ -71,7 +67,6 @@ class Attachment {
     String? mimeType,
     String? fileName,
     String? attachmentType,
-    bool? isActive,
     DateTime? deletedAt,
     DateTime? createdAt,
   }) {
@@ -83,7 +78,6 @@ class Attachment {
       mimeType: mimeType ?? this.mimeType,
       fileName: fileName ?? this.fileName,
       attachmentType: attachmentType ?? this.attachmentType,
-      isActive: isActive ?? this.isActive,
       deletedAt: deletedAt ?? this.deletedAt,
       createdAt: createdAt ?? this.createdAt,
     );

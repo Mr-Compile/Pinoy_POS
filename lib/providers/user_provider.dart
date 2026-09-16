@@ -116,7 +116,6 @@ class UserController extends StateNotifier<UserListState> {
     required String fullName,
     required UserRole role,
     String? pin,
-    int? inactivityTimeoutMinutes,
   }) {
     return _runMutation(
       () => _userService.createUser(
@@ -124,7 +123,6 @@ class UserController extends StateNotifier<UserListState> {
         fullName: fullName,
         role: role,
         pin: pin,
-        inactivityTimeoutMinutes: inactivityTimeoutMinutes,
       ),
       onSuccess: loadUsers,
     );
@@ -138,7 +136,6 @@ class UserController extends StateNotifier<UserListState> {
     String? fullName,
     UserRole? role,
     String? pin,
-    Object? inactivityTimeoutMinutes = User.inactivityTimeoutSentinel,
   }) {
     return _runMutation(
       () => _userService.updateUser(
@@ -147,7 +144,6 @@ class UserController extends StateNotifier<UserListState> {
         fullName: fullName,
         role: role,
         pin: pin,
-        inactivityTimeoutMinutes: inactivityTimeoutMinutes,
       ),
       onSuccess: () async {
         await loadUsers();

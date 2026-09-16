@@ -32,20 +32,6 @@ class AIQuotaDao extends BaseDao<AIQuota> {
     return maps.map((map) => fromMap(map)).toList();
   }
 
-  Future<void> updateByUserId(
-    int userId, {
-    required Map<String, dynamic> values,
-    DatabaseExecutor? txn,
-  }) async {
-    final executor = txn ?? await db;
-    await executor.update(
-      tableName,
-      values,
-      where: 'user_id = ?',
-      whereArgs: [userId],
-    );
-  }
-
   Future<void> resetDailyUsage(
     int userId, {
     required DateTime quotaDate,
@@ -90,20 +76,6 @@ class AIQuotaDao extends BaseDao<AIQuota> {
     await executor.update(
       tableName,
       {'daily_usage': dailyUsage},
-      where: 'user_id = ?',
-      whereArgs: [userId],
-    );
-  }
-
-  Future<void> updateDailyQuota(
-    int userId,
-    int dailyQuota, {
-    DatabaseExecutor? txn,
-  }) async {
-    final executor = txn ?? await db;
-    await executor.update(
-      tableName,
-      {'daily_quota': dailyQuota},
       where: 'user_id = ?',
       whereArgs: [userId],
     );

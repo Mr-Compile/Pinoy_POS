@@ -22,7 +22,6 @@ class ExportHistory {
   final DateTime? submittedAt;
   final DateTime? viewedAt;
   final int? fileSize;
-  final String? thumbnailPath;
   final String? reportNumber;
   final DateTime? deletedAt;
 
@@ -39,7 +38,6 @@ class ExportHistory {
     this.submittedAt,
     this.viewedAt,
     this.fileSize,
-    this.thumbnailPath,
     this.reportNumber,
     this.deletedAt,
   });
@@ -62,7 +60,6 @@ class ExportHistory {
       'submitted_at': submittedAt?.toIso8601String(),
       'viewed_at': viewedAt?.toIso8601String(),
       'file_size': fileSize,
-      'thumbnail_path': thumbnailPath,
       'report_number': reportNumber,
       'deleted_at': deletedAt?.toIso8601String(),
     };
@@ -90,7 +87,6 @@ class ExportHistory {
           ? DateTime.parse(map['viewed_at'] as String)
           : null,
       fileSize: map['file_size'] as int?,
-      thumbnailPath: map['thumbnail_path'] as String?,
       reportNumber: map['report_number'] as String?,
       deletedAt: map['deleted_at'] != null
           ? DateTime.parse(map['deleted_at'] as String)
@@ -111,7 +107,6 @@ class ExportHistory {
     DateTime? submittedAt,
     DateTime? viewedAt,
     int? fileSize,
-    String? thumbnailPath,
     String? reportNumber,
     DateTime? deletedAt,
   }) {
@@ -128,7 +123,6 @@ class ExportHistory {
       submittedAt: submittedAt ?? this.submittedAt,
       viewedAt: viewedAt ?? this.viewedAt,
       fileSize: fileSize ?? this.fileSize,
-      thumbnailPath: thumbnailPath ?? this.thumbnailPath,
       reportNumber: reportNumber ?? this.reportNumber,
       deletedAt: deletedAt ?? this.deletedAt,
     );

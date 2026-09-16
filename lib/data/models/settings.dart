@@ -9,7 +9,6 @@ class Settings {
   final String storePhone;
   final String currency;
   final String? receiptFooter;
-  final String? theme;
   final String? groqApiKey;
   final String? groqModel;
   final bool gcashEnabled;
@@ -39,7 +38,6 @@ class Settings {
     this.storePhone = '',
     this.currency = 'PHP',
     this.receiptFooter = AppConstants.defaultReceiptFooter,
-    this.theme,
     this.groqApiKey,
     this.groqModel,
     this.gcashEnabled = true,
@@ -71,7 +69,6 @@ class Settings {
       'store_phone': storePhone,
       'currency': currency,
       'receipt_footer': receiptFooter,
-      'theme': theme,
       'groq_api_key': null, // Stored in secure storage, never in the settings table
       'groq_model': groqModel,
       'gcash_enabled': gcashEnabled ? 1 : 0,
@@ -138,7 +135,6 @@ class Settings {
       currency: stringOrNull('currency') ?? 'PHP',
       receiptFooter:
           stringOrNull('receipt_footer') ?? AppConstants.defaultReceiptFooter,
-      theme: stringOrNull('theme'),
       groqApiKey: null, // Stored in flutter_secure_storage, never in memory from the DB
       groqModel: stringOrNull('groq_model'),
       gcashEnabled: boolFromInt('gcash_enabled'),
@@ -179,7 +175,6 @@ class Settings {
     String? storePhone,
     String? currency,
     String? receiptFooter,
-    String? theme,
     Object? groqApiKey = _sentinel,
     Object? groqModel = _sentinel,
     bool? gcashEnabled,
@@ -209,7 +204,6 @@ class Settings {
       storePhone: storePhone ?? this.storePhone,
       currency: currency ?? this.currency,
       receiptFooter: receiptFooter ?? this.receiptFooter,
-      theme: theme ?? this.theme,
       groqApiKey:
           groqApiKey == _sentinel ? this.groqApiKey : groqApiKey as String?,
       groqModel:

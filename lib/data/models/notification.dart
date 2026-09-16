@@ -6,7 +6,6 @@ class Notification {
   final int? userId;
   final bool isRead;
   final DateTime createdAt;
-  final DateTime? readAt;
 
   Notification({
     this.id,
@@ -16,7 +15,6 @@ class Notification {
     this.userId,
     this.isRead = false,
     required this.createdAt,
-    this.readAt,
   });
 
   Map<String, dynamic> toMap() {
@@ -28,7 +26,6 @@ class Notification {
       'user_id': userId,
       'is_read': isRead ? 1 : 0,
       'created_at': createdAt.toIso8601String(),
-      'read_at': readAt?.toIso8601String(),
     };
   }
 
@@ -41,9 +38,6 @@ class Notification {
       userId: map['user_id'] as int?,
       isRead: (map['is_read'] as int) == 1,
       createdAt: DateTime.parse(map['created_at'] as String),
-      readAt: map['read_at'] != null
-          ? DateTime.parse(map['read_at'] as String)
-          : null,
     );
   }
 
@@ -55,7 +49,6 @@ class Notification {
     int? userId,
     bool? isRead,
     DateTime? createdAt,
-    DateTime? readAt,
   }) {
     return Notification(
       id: id ?? this.id,
@@ -65,7 +58,6 @@ class Notification {
       userId: userId ?? this.userId,
       isRead: isRead ?? this.isRead,
       createdAt: createdAt ?? this.createdAt,
-      readAt: readAt ?? this.readAt,
     );
   }
 }

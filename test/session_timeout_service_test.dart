@@ -39,10 +39,10 @@ class _FakeSessionSettingsService extends SessionSettingsService {
   final Duration _warning;
 
   @override
-  Future<Duration> getEffectiveInactivityTimeout(User user) async => _timeout;
+  Future<Duration> getEffectiveInactivityTimeout() async => _timeout;
 
   @override
-  Future<Duration> getEffectiveWarningThreshold(User user) async => _warning;
+  Future<Duration> getEffectiveWarningThreshold() async => _warning;
 }
 
 void main() {

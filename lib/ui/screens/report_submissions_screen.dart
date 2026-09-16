@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -552,22 +550,6 @@ class _Thumbnail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final thumb = report.thumbnailPath;
-
-    if (thumb != null && thumb.isNotEmpty && !kIsWeb) {
-      final file = File(thumb);
-      if (file.existsSync()) {
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          child: Image.file(
-            file,
-            width: 56,
-            height: 72,
-            fit: BoxFit.cover,
-          ),
-        );
-      }
-    }
 
     return Container(
       width: 56,

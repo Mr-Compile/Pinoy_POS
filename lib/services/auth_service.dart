@@ -144,7 +144,7 @@ class AuthService {
     }
 
     final inactivityTimeout =
-        await _sessionSettingsService.getEffectiveInactivityTimeout(user);
+        await _sessionSettingsService.getEffectiveInactivityTimeout();
     final inactivityExpired = inactivityTimeout != null &&
         now.difference(metadata.lastActivityAt) > inactivityTimeout;
 

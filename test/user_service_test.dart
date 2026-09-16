@@ -64,7 +64,6 @@ void main() {
       'role': 'admin',
       'full_name': 'System Administrator',
       'is_active': 1,
-      'color_preference': null,
       'last_login': null,
       'created_at': now.toIso8601String(),
       'updated_at': now.toIso8601String(),

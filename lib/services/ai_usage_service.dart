@@ -82,7 +82,7 @@ class AIUsageService {
     return _aiQuotaService.getRemainingQueries();
   }
 
-  /// Returns the daily AI quota for the current user.
+  /// Returns the global daily AI quota.
   Future<int> getDailyQuota() async {
     if (!_sessionManager.hasPermission('use_ai_advisor')) {
       return 0;
@@ -90,8 +90,7 @@ class AIUsageService {
     if (_sessionManager.currentUser == null) {
       return 0;
     }
-    final quota = await _aiQuotaService.getQuotaForUser(_sessionManager.currentUser!.id!);
-    return quota.dailyQuota;
+    return _aiQuotaService.getDefaultQuota();
   }
 }
 

@@ -144,7 +144,6 @@ class UserService {
     required String fullName,
     required UserRole role,
     String? pin,
-    int? inactivityTimeoutMinutes,
   }) async {
     if (!_sessionManager.hasPermission('manage_users')) {
       throw AuthorizationException('manage_users');
@@ -195,7 +194,6 @@ class UserService {
       role: role,
       fullName: trimmedFullName,
       mustChangePassword: true,
-      inactivityTimeoutMinutes: inactivityTimeoutMinutes,
       createdAt: now,
       updatedAt: now,
     );
@@ -235,7 +233,6 @@ class UserService {
     UserRole? role,
     String? pin,
     String? profileImagePath,
-    Object? inactivityTimeoutMinutes = User.inactivityTimeoutSentinel,
   }) async {
     if (!_sessionManager.hasPermission('edit_users')) {
       throw AuthorizationException('edit_users');
@@ -315,7 +312,6 @@ class UserService {
       pin: newPin,
       pinLength: newPinLength,
       profileImagePath: newProfileImagePath,
-      inactivityTimeoutMinutes: inactivityTimeoutMinutes,
       updatedAt: DateTime.now(),
     );
 

@@ -52,10 +52,7 @@ class NotificationDao extends BaseDao<Notification> {
     final database = await db;
     await database.update(
       tableName,
-      {
-        'is_read': 1,
-        'read_at': DateTime.now().toIso8601String(),
-      },
+      {'is_read': 1},
       where: 'id = ? AND user_id = ?',
       whereArgs: [id, userId],
     );
@@ -65,10 +62,7 @@ class NotificationDao extends BaseDao<Notification> {
     final database = await db;
     await database.update(
       tableName,
-      {
-        'is_read': 1,
-        'read_at': DateTime.now().toIso8601String(),
-      },
+      {'is_read': 1},
       where: 'user_id = ? AND is_read = 0',
       whereArgs: [userId],
     );

@@ -86,9 +86,9 @@ class SessionTimeoutService {
   /// a fresh inactivity window. When false, the persisted timestamp is used.
   Future<void> startSession(User user, {required bool resetActivity}) async {
     _user = user;
-    _inactivityTimeout = await sessionSettingsService.getEffectiveInactivityTimeout(user);
+    _inactivityTimeout = await sessionSettingsService.getEffectiveInactivityTimeout();
     _warningThreshold =
-        await sessionSettingsService.getEffectiveWarningThreshold(user);
+        await sessionSettingsService.getEffectiveWarningThreshold();
     _sessionExpiresAt = authService.currentSessionMetadata?.sessionExpiresAt;
     _lastActivityAt = resetActivity
         ? _clock()

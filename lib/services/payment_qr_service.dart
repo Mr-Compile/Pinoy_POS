@@ -254,7 +254,44 @@ class PaymentQrService {
   /// Decodes QR codes using the ZXing multi-reader and returns the raw
   /// decode results (payload text plus finder points). Returns an empty list
   /// when nothing is found or decoding fails.
+  ///
+  /// Pass 1 decodes the image exactly as uploaded. When that finds nothing,
+  /// pass 2 retries on a contrast-boosted, 2x cubic-upscaled copy — real-
+  /// world uploads such as low-contrast JPEG screenshots of the GCash QR
+  /// card only become decodable after that enhancement. The enhanced copy
+  /// is built from a clone because `img.contrast` mutates its input in
+  /// place. Result points are mapped back into the original image's
+  /// coordinate space so crop bounds stay correct.
   Future<List<zxing.Result>> _decodeResultsWithZxing(img.Image image) async {
+    final direct = _decodeZxingBitmap(image);
+    if (direct.isNotEmpty) return direct;
+
+    const scale = 2;
+    final enhanced = img.copyResize(
+      img.contrast(img.Image.from(image), contrast: 150),
+      width: image.width * scale,
+      interpolation: img.Interpolation.cubic,
+    );
+    final enhancedResults = _decodeZxingBitmap(enhanced);
+    if (enhancedResults.isEmpty) return const [];
+
+    return enhancedResults
+        .map((result) => zxing.Result(
+              result.text,
+              result.rawBytes,
+              result.resultPoints
+                  ?.map((point) => point == null
+                      ? null
+                      : zxing.ResultPoint(point.x / scale, point.y / scale))
+                  .toList(),
+              result.barcodeFormat,
+            ))
+        .toList();
+  }
+
+  /// Single ZXing decode attempt on [image]. Returns an empty list when
+  /// nothing is found or decoding fails.
+  List<zxing.Result> _decodeZxingBitmap(img.Image image) {
     try {
       final rgbaImage = image.convert(
         format: img.Format.uint8,

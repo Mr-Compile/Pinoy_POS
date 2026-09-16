@@ -1,10 +1,10 @@
-import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/data/repositories/settings_repository.dart';
 
 /// Resolves session-timeout configuration.
 ///
-/// The effective inactivity timeout is the per-user override (if set),
-/// otherwise the store default from the `settings` table.
+/// Session settings are global: the effective inactivity timeout always
+/// comes from the store-wide `settings` table. There is no per-user
+/// override.
 ///
 /// This service does not perform permission checks because it is used by
 /// the auth/session flow before the session is fully established.
@@ -45,12 +45,12 @@ class SessionSettingsService {
         _ => '$seconds seconds',
       };
 
-  /// The effective inactivity timeout for [user], or `null` when the
-  /// session is unlimited and never expires due to inactivity.
-  Future<Duration?> getEffectiveInactivityTimeout(User user) async {
-    final minutes = user.inactivityTimeoutMinutes ??
+  /// The global inactivity timeout, or `null` when the session is
+  /// unlimited and never expires due to inactivity.
+  Future<Duration?> getEffectiveInactivityTimeout() async {
+    final minutes =
         (await _settingsRepository.getSettings())?.inactivityTimeoutMinutes ??
-        _defaultInactivityTimeoutMinutes;
+            _defaultInactivityTimeoutMinutes;
     if (minutes <= unlimitedInactivityMinutes) return null;
     return Duration(minutes: minutes);
   }
@@ -67,14 +67,14 @@ class SessionSettingsService {
     return Duration(seconds: seconds < 0 ? 0 : seconds);
   }
 
-  /// The warning threshold for [user], clamped below the effective
-  /// inactivity timeout so the warning can never be equal to or greater
-  /// than the timeout itself.
+  /// The warning threshold, clamped below the effective inactivity
+  /// timeout so the warning can never be equal to or greater than the
+  /// timeout itself.
   ///
   /// Returns [Duration.zero] when the effective timeout is unlimited or too
   /// short to leave any room for a warning (no warning is ever shown).
-  Future<Duration> getEffectiveWarningThreshold(User user) async {
-    final timeout = await getEffectiveInactivityTimeout(user);
+  Future<Duration> getEffectiveWarningThreshold() async {
+    final timeout = await getEffectiveInactivityTimeout();
     if (timeout == null) return Duration.zero;
     var warning = await getWarningThreshold();
     if (warning >= timeout) {

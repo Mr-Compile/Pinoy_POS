@@ -1017,7 +1017,6 @@ class TrashService {
         'pin_length': user.pinLength,
         'role': user.role.name,
         'full_name': user.fullName,
-        'color_preference': user.colorPreference,
         'profile_image_path': user.profileImagePath,
         'is_active': user.isActive ? 1 : 0,
         'must_change_password': user.mustChangePassword ? 1 : 0,

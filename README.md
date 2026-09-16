@@ -129,7 +129,7 @@ Test files:
 The AI Advisor calls the Groq chat completions endpoint. Configure it from Settings → AI Configuration (System Admin only):
 
 1. Get an API key from [console.groq.com](https://console.groq.com).
-2. Enter the key and a model id (for example, `llama-3.3-70b-versatile`).
+2. Enter the key and a model id (defaults to `openai/gpt-oss-120b`).
 3. Save. The key is stored locally in the `settings` table.
 
 Each user is limited to `maxDailyAIQueries` (10) queries per day, tracked in the `ai_usage` table. The advisor requires an internet connection.

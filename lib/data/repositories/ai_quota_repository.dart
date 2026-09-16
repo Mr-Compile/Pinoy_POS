@@ -25,13 +25,6 @@ class AIQuotaRepository {
   Future<List<AIQuota>> getForActiveUsers({DatabaseExecutor? txn}) =>
       _aiQuotaDao.getForActiveUsers(txn: txn);
 
-  Future<void> updateByUserId(
-    int userId, {
-    required Map<String, dynamic> values,
-    DatabaseExecutor? txn,
-  }) =>
-      _aiQuotaDao.updateByUserId(userId, values: values, txn: txn);
-
   Future<void> resetDailyUsage(
     int userId, {
     required DateTime quotaDate,
@@ -62,11 +55,4 @@ class AIQuotaRepository {
     DatabaseExecutor? txn,
   }) =>
       _aiQuotaDao.updateDailyUsage(userId, dailyUsage, txn: txn);
-
-  Future<void> updateDailyQuota(
-    int userId,
-    int dailyQuota, {
-    DatabaseExecutor? txn,
-  }) =>
-      _aiQuotaDao.updateDailyQuota(userId, dailyQuota, txn: txn);
 }

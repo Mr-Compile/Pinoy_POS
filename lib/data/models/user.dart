@@ -42,10 +42,6 @@ extension UserRoleManagement on UserRole {
 }
 
 class User {
-  /// Sentinel used by [copyWith] to keep the existing value unchanged.
-  /// Pass `inactivityTimeoutSentinel` explicitly to clear the override.
-  static const Object inactivityTimeoutSentinel = Object();
-
   final int? id;
   final String username;
   final String passwordHash;
@@ -53,13 +49,11 @@ class User {
   final int? pinLength;
   final UserRole role;
   final String fullName;
-  final String colorPreference;
   final String? profileImagePath;
   final bool isActive;
   final bool mustChangePassword;
   final bool hasChangedUsername;
   final DateTime? lastLogin;
-  final int? inactivityTimeoutMinutes;
   final DateTime createdAt;
   final DateTime? updatedAt;
   final DateTime? deletedAt;
@@ -72,13 +66,11 @@ class User {
     this.pinLength,
     required this.role,
     required this.fullName,
-    this.colorPreference = 'green',
     this.profileImagePath,
     this.isActive = true,
     this.mustChangePassword = false,
     this.hasChangedUsername = false,
     this.lastLogin,
-    this.inactivityTimeoutMinutes,
     required this.createdAt,
     this.updatedAt,
     this.deletedAt,
@@ -93,13 +85,11 @@ class User {
       'pin_length': pinLength,
       'role': role.name,
       'full_name': fullName,
-      'color_preference': colorPreference,
       'profile_image_path': profileImagePath,
       'is_active': isActive ? 1 : 0,
       'must_change_password': mustChangePassword ? 1 : 0,
       'has_changed_username': hasChangedUsername ? 1 : 0,
       'last_login': lastLogin?.toIso8601String(),
-      'inactivity_timeout_minutes': inactivityTimeoutMinutes,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
       'deleted_at': deletedAt?.toIso8601String(),
@@ -118,7 +108,6 @@ class User {
         orElse: () => UserRole.staff,
       ),
       fullName: map['full_name'] as String,
-      colorPreference: (map['color_preference'] as String?) ?? 'green',
       profileImagePath: map['profile_image_path'] as String?,
       isActive: (map['is_active'] as int) == 1,
       mustChangePassword: (map['must_change_password'] as int?) == 1,
@@ -126,9 +115,6 @@ class User {
       lastLogin: map['last_login'] != null
           ? DateTime.parse(map['last_login'] as String)
           : null,
-      inactivityTimeoutMinutes: map['inactivity_timeout_minutes'] is int
-          ? map['inactivity_timeout_minutes'] as int
-          : int.tryParse(map['inactivity_timeout_minutes']?.toString() ?? ''),
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: map['updated_at'] != null
           ? DateTime.parse(map['updated_at'] as String)
@@ -147,13 +133,11 @@ class User {
     int? pinLength,
     UserRole? role,
     String? fullName,
-    String? colorPreference,
     String? profileImagePath,
     bool? isActive,
     bool? mustChangePassword,
     bool? hasChangedUsername,
     DateTime? lastLogin,
-    Object? inactivityTimeoutMinutes = inactivityTimeoutSentinel,
     DateTime? createdAt,
     DateTime? updatedAt,
     DateTime? deletedAt,
@@ -166,15 +150,11 @@ class User {
       pinLength: pinLength ?? this.pinLength,
       role: role ?? this.role,
       fullName: fullName ?? this.fullName,
-      colorPreference: colorPreference ?? this.colorPreference,
       profileImagePath: profileImagePath ?? this.profileImagePath,
       isActive: isActive ?? this.isActive,
       mustChangePassword: mustChangePassword ?? this.mustChangePassword,
       hasChangedUsername: hasChangedUsername ?? this.hasChangedUsername,
       lastLogin: lastLogin ?? this.lastLogin,
-      inactivityTimeoutMinutes: inactivityTimeoutMinutes == inactivityTimeoutSentinel
-          ? this.inactivityTimeoutMinutes
-          : inactivityTimeoutMinutes as int?,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,

@@ -200,7 +200,7 @@ class SettingsScreen extends ConsumerWidget {
         _SettingsEntry(
           icon: Icons.rule_outlined,
           title: 'AI Quota Management',
-          subtitle: 'Manage default and per-user AI query quotas',
+          subtitle: 'Manage the daily AI query quota and usage',
           onTap: (context) async {
             final verified = await showSuperAdminVerificationDialog(context);
             if (verified == true && context.mounted) {

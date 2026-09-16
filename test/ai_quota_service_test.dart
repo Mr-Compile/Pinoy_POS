@@ -49,7 +49,6 @@ void main() {
       'role': 'admin',
       'full_name': 'System Administrator',
       'is_active': 1,
-      'color_preference': null,
       'last_login': null,
       'created_at': now.toIso8601String(),
       'updated_at': now.toIso8601String(),
@@ -75,7 +74,7 @@ void main() {
       final columns = await db.rawQuery('PRAGMA table_info(ai_quota)');
       final columnNames = columns.map((c) => c['name'] as String).toSet();
 
-      expect(columnNames, containsAll(['id', 'user_id', 'daily_quota', 'daily_usage', 'quota_date', 'last_reset_at']));
+      expect(columnNames, containsAll(['id', 'user_id', 'daily_usage', 'quota_date', 'last_reset_at']));
     });
 
     test('settings table has ai_daily_quota column', () async {
@@ -103,7 +102,6 @@ void main() {
       final original = AIQuota(
         id: 1,
         userId: 5,
-        dailyQuota: 20,
         dailyUsage: 3,
         quotaDate: now,
         lastResetAt: now,
@@ -114,7 +112,6 @@ void main() {
 
       expect(restored.id, original.id);
       expect(restored.userId, original.userId);
-      expect(restored.dailyQuota, original.dailyQuota);
       expect(restored.dailyUsage, original.dailyUsage);
       expect(restored.quotaDate, original.quotaDate);
       expect(restored.lastResetAt, original.lastResetAt);
@@ -122,7 +119,7 @@ void main() {
   });
 
   group('Daily enforcement', () {
-    test('new user gets the configured default quota', () async {
+    test('new user starts with zero usage under the global quota', () async {
       await authenticateAsAdmin();
       final userService = UserService();
 
@@ -137,7 +134,7 @@ void main() {
       final aiQuotaService = AIQuotaService();
       final quota = await aiQuotaService.getQuotaForUser(result.user!.id!);
 
-      expect(quota.dailyQuota, AppConstants.defaultDailyAIQuota);
+      expect(await aiQuotaService.getDefaultQuota(), AppConstants.defaultDailyAIQuota);
       expect(quota.dailyUsage, 0);
     });
 
@@ -152,8 +149,7 @@ void main() {
       );
 
       final aiQuotaService = AIQuotaService();
-      await aiQuotaService.updateUserQuota(
-        result.user!.id!,
+      await aiQuotaService.setDefaultQuota(
         value: 2,
         verified: true,
       );
@@ -178,8 +174,7 @@ void main() {
       );
 
       final aiQuotaService = AIQuotaService();
-      await aiQuotaService.updateUserQuota(
-        result.user!.id!,
+      await aiQuotaService.setDefaultQuota(
         value: 20,
         verified: true,
       );
@@ -210,7 +205,6 @@ void main() {
 
       final result = await aiQuotaService.setDefaultQuota(
         value: 30,
-        applyToExisting: false,
         verified: false,
       );
 
@@ -223,7 +217,6 @@ void main() {
 
       final result = await aiQuotaService.setDefaultQuota(
         value: 30,
-        applyToExisting: false,
         verified: true,
       );
 
@@ -240,14 +233,12 @@ void main() {
 
       final negative = await aiQuotaService.setDefaultQuota(
         value: -1,
-        applyToExisting: false,
         verified: true,
       );
       expect(negative.success, isFalse);
 
       final tooLarge = await aiQuotaService.setDefaultQuota(
         value: 10000,
-        applyToExisting: false,
         verified: true,
       );
       expect(tooLarge.success, isFalse);
@@ -261,7 +252,6 @@ void main() {
 
       await aiQuotaService.setDefaultQuota(
         value: 30,
-        applyToExisting: false,
         verified: true,
       );
 

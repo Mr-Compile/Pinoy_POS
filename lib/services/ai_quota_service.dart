@@ -20,8 +20,12 @@ class AIQuotaOperationResult {
   });
 }
 
-/// Manages per-user AI quotas, daily reset, default quota configuration,
+/// Manages the global daily AI quota, per-user usage tracking, daily reset,
 /// and SuperAdmin-guarded administrative actions.
+///
+/// The quota limit is global: `settings.ai_daily_quota` applies to every
+/// user. There is no per-user quota override — `ai_quota` rows only track
+/// each user's daily usage counter.
 ///
 /// This service is the single source of truth for quota enforcement. The
 /// historical [ai_usage] table is kept for query history/auditing but is no
@@ -47,19 +51,16 @@ class AIQuotaService {
     return user.id!;
   }
 
-  /// Ensures the user has a quota row, creating one with the current default
-  /// if it is missing.
+  /// Ensures the user has a usage row, creating an empty counter if it is
+  /// missing.
   Future<AIQuota> ensureQuotaForUser(int userId) async {
     final existing = await _aiQuotaRepository.getByUserId(userId);
     if (existing != null) return existing;
 
-    final settings = await _settingsRepository.getSettings();
-    final dailyQuota = settings?.aiDailyQuota ?? AppConstants.defaultDailyAIQuota;
     final now = DateTime.now();
 
     final quota = AIQuota(
       userId: userId,
-      dailyQuota: dailyQuota,
       dailyUsage: 0,
       quotaDate: now,
       lastResetAt: now,
@@ -69,7 +70,7 @@ class AIQuotaService {
     return quota.copyWith(id: id);
   }
 
-  /// Returns the quota for [userId], automatically creating it and/or
+  /// Returns the usage row for [userId], automatically creating it and/or
   /// resetting the daily counter when the date has changed.
   Future<AIQuota> getQuotaForUser(int userId) async {
     final quota = await ensureQuotaForUser(userId);
@@ -97,14 +98,13 @@ class AIQuotaService {
     return quota;
   }
 
-  /// Returns the quota for the current user, or a disabled quota if the
-  /// current user is null.
+  /// Returns the usage row for the current user, or an empty counter if no
+  /// user is signed in.
   Future<AIQuota> _currentUserQuota() async {
     final user = _sessionManager.currentUser;
     if (user == null || user.id == null) {
       return AIQuota(
         userId: 0,
-        dailyQuota: 0,
         dailyUsage: 0,
         quotaDate: DateTime.now(),
       );
@@ -112,14 +112,14 @@ class AIQuotaService {
     return getQuotaForUser(user.id!);
   }
 
-  /// Returns true when the current user is under their daily AI quota.
+  /// Returns true when the current user is under the global daily AI quota.
   Future<bool> canUseAI() async {
     if (!_sessionManager.hasPermission('use_ai_advisor')) {
       return false;
     }
 
     final quota = await _currentUserQuota();
-    return quota.dailyUsage < quota.dailyQuota;
+    return quota.dailyUsage < await getDefaultQuota();
   }
 
   /// Records a successful AI query against the current user's daily quota.
@@ -130,7 +130,7 @@ class AIQuotaService {
     final userId = _currentUserId();
     final quota = await getQuotaForUser(userId);
 
-    if (quota.dailyUsage >= quota.dailyQuota) {
+    if (quota.dailyUsage >= await getDefaultQuota()) {
       return;
     }
 
@@ -146,7 +146,8 @@ class AIQuotaService {
   /// Returns the number of remaining AI queries for the current user.
   Future<int> getRemainingQueries() async {
     final quota = await _currentUserQuota();
-    return (quota.dailyQuota - quota.dailyUsage).clamp(0, quota.dailyQuota);
+    final limit = await getDefaultQuota();
+    return (limit - quota.dailyUsage).clamp(0, limit);
   }
 
   /// Returns the current default daily AI quota.
@@ -185,14 +186,12 @@ class AIQuotaService {
     return null;
   }
 
-  /// Updates the default daily quota for the application.
+  /// Updates the global daily quota for the application.
   ///
   /// [verified] must be the result of a successful SuperAdmin password check.
-  /// If [applyToExisting] is true, all active users' [dailyQuota] are updated
-  /// to the new value.
+  /// The new value applies to every user immediately — the limit is global.
   Future<AIQuotaOperationResult> setDefaultQuota({
     required int value,
-    required bool applyToExisting,
     required bool verified,
   }) async {
     final verificationError = _requireVerification(verified);
@@ -227,55 +226,14 @@ class AIQuotaService {
       );
     }
 
-    if (applyToExisting) {
-      final activeQuotas = await _aiQuotaRepository.getForActiveUsers();
-      for (final quota in activeQuotas) {
-        await _aiQuotaRepository.updateDailyQuota(quota.userId, value);
-      }
-    }
-
     await _logActivity(
       'AI_QUOTA_DEFAULT_CHANGED',
-      details:
-          'Default daily quota changed from $oldDefault to $value (applyToExisting: $applyToExisting)',
+      details: 'Default daily quota changed from $oldDefault to $value',
     );
 
     return AIQuotaOperationResult(
       success: true,
       message: 'Default quota updated to $value',
-    );
-  }
-
-  /// Updates the daily quota for an individual user.
-  Future<AIQuotaOperationResult> updateUserQuota(
-    int userId, {
-    required int value,
-    required bool verified,
-  }) async {
-    final verificationError = _requireVerification(verified);
-    if (verificationError != null) return verificationError;
-
-    final valueError = _validateQuotaValue(value);
-    if (valueError != null) return valueError;
-
-    if (!_sessionManager.hasPermission('manage_ai_quota')) {
-      throw AuthorizationException('manage_ai_quota');
-    }
-
-    final quota = await getQuotaForUser(userId);
-    final oldValue = quota.dailyQuota;
-
-    await _aiQuotaRepository.updateDailyQuota(userId, value);
-
-    await _logActivity(
-      'AI_QUOTA_USER_CHANGED',
-      entityId: userId,
-      details: 'User quota changed from $oldValue to $value',
-    );
-
-    return AIQuotaOperationResult(
-      success: true,
-      message: 'User quota updated to $value',
     );
   }
 

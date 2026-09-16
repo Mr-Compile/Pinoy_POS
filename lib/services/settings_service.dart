@@ -17,6 +17,10 @@ class SettingsService {
   final GroqService _groqService = GroqService();
   final SecureStorageService _secureStorage = SecureStorageService();
   static const String _groqApiKeySecureKey = 'groq_api_key';
+
+  /// Fallback model used whenever no model is stored and whenever the
+  /// recommended-model logic cannot pick one from the live model list.
+  static const String defaultGroqModel = 'openai/gpt-oss-120b';
   Settings? _currentSettings;
   Settings? _storeInfo;
 
@@ -417,12 +421,12 @@ class SettingsService {
     return key != null && key.isNotEmpty;
   }
 
-  /// Returns the configured Groq model, defaulting to llama-3.3-70b-versatile.
+  /// Returns the configured Groq model, defaulting to [defaultGroqModel].
   Future<String> getGroqModel() async {
     final settings = await getSettings();
     final model = settings.groqModel;
     if (model == null || model.trim().isEmpty) {
-      return 'llama-3.3-70b-versatile';
+      return defaultGroqModel;
     }
     return model.trim();
   }
@@ -536,17 +540,17 @@ class SettingsService {
   /// Does not hardcode a model that may be deprecated. Picks from the
   /// actually available models returned by the Groq Models API.
   String getRecommendedModel(List<GroqModel> models) {
-    if (models.isEmpty) return 'llama-3.3-70b-versatile';
+    if (models.isEmpty) return defaultGroqModel;
 
     // Preferred models in priority order (by capability for business analysis).
     // These are evaluated against the ACTUAL available list — if a model
     // has been deprecated, it won't be in the list and we skip it.
     const preferred = [
-      'llama-3.3-70b-versatile',
       'openai/gpt-oss-120b',
+      'openai/gpt-oss-20b',
+      'llama-3.3-70b-versatile',
       'meta-llama/llama-4-scout-17b-16e-instruct',
       'qwen/qwen3-32b',
-      'openai/gpt-oss-20b',
       'llama-3.1-8b-instant',
     ];
 
@@ -558,6 +562,6 @@ class SettingsService {
 
     // Fallback: first active model.
     final firstActive = models.where((m) => m.active).firstOrNull;
-    return firstActive?.id ?? 'llama-3.3-70b-versatile';
+    return firstActive?.id ?? defaultGroqModel;
   }
 }

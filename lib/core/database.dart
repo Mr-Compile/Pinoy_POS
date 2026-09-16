@@ -523,6 +523,24 @@ class DatabaseHelper {
       }
     }
 
+    // Migration from v27 → v28: drop the vestigial per-user override
+    // columns. The session inactivity timeout and the AI daily quota are
+    // global settings now — `users.inactivity_timeout_minutes` and
+    // `ai_quota.daily_quota` are no longer read or written.
+    if (oldVersion < 28) {
+      await _migrateV28(db);
+    }
+
+    // Migration from v28 → v29: drop dead columns that are never read or
+    // never populated — users.color_preference, settings.theme (the real
+    // theme lives in SharedPreferences), attachments.is_active (lifecycle
+    // is tracked by deleted_at), export_history.thumbnail_path (thumbnails
+    // were never generated), and notifications.read_at (written but never
+    // read — is_read alone carries the state).
+    if (oldVersion < 29) {
+      await _migrateV29(db);
+    }
+
     // Create any tables that were introduced after the backup's original
     // version but do not have an explicit migration block above (e.g.
     // `announcements`, `ai_usage`).  All CREATE statements in _createTables
@@ -643,7 +661,6 @@ class DatabaseHelper {
         mime_type TEXT NOT NULL,
         file_name TEXT NOT NULL,
         attachment_type TEXT,
-        is_active INTEGER NOT NULL DEFAULT 1,
         deleted_at TEXT,
         created_at TEXT NOT NULL
       )
@@ -700,6 +717,375 @@ class DatabaseHelper {
     }
   }
 
+  /// Migration from v27 → v28: drop the per-user override columns that are
+  /// now dead — `ai_quota.daily_quota` (the quota limit is the global
+  /// `settings.ai_daily_quota`) and `users.inactivity_timeout_minutes`
+  /// (the session timeout is the global `settings.inactivity_timeout_minutes`).
+  Future<void> _migrateV28(Database db) async {
+    try {
+      await db.execute('ALTER TABLE ai_quota DROP COLUMN daily_quota');
+    } catch (_) {
+      // Older SQLite builds do not support DROP COLUMN; rebuild the table.
+      await _rebuildAiQuotaWithoutDailyQuota(db);
+    }
+
+    try {
+      await db.execute(
+        'ALTER TABLE users DROP COLUMN inactivity_timeout_minutes',
+      );
+    } catch (_) {
+      // Older SQLite builds do not support DROP COLUMN; rebuild the table.
+      await _rebuildUsersWithoutInactivityTimeout(db);
+    }
+  }
+
+  /// Recreates ai_quota without the daily_quota column for SQLite builds
+  /// that lack ALTER TABLE ... DROP COLUMN (pre-3.35).
+  Future<void> _rebuildAiQuotaWithoutDailyQuota(Database db) async {
+    await db.execute('PRAGMA foreign_keys = OFF');
+    await db.execute('''
+      CREATE TABLE ai_quota_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL UNIQUE,
+        daily_usage INTEGER NOT NULL DEFAULT 0,
+        quota_date TEXT NOT NULL,
+        last_reset_at TEXT,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    ''');
+    await db.execute('''
+      INSERT INTO ai_quota_new (id, user_id, daily_usage, quota_date, last_reset_at)
+      SELECT id, user_id, daily_usage, quota_date, last_reset_at FROM ai_quota
+    ''');
+    await db.execute('DROP TABLE ai_quota');
+    await db.execute('ALTER TABLE ai_quota_new RENAME TO ai_quota');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_ai_quota_user ON ai_quota(user_id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_ai_quota_date ON ai_quota(quota_date)',
+    );
+    await db.execute('PRAGMA foreign_keys = ON');
+  }
+
+  /// Exposes the v28 migration so tests can exercise it against an
+  /// old-schema database.
+  @visibleForTesting
+  Future<void> runV28MigrationForTest(Database db) => _migrateV28(db);
+
+  /// Exposes the v28 table-rebuild fallback so tests can validate its SQL
+  /// even on SQLite builds where DROP COLUMN already succeeds.
+  @visibleForTesting
+  Future<void> runV28RebuildFallbackForTest(Database db) async {
+    await _rebuildAiQuotaWithoutDailyQuota(db);
+    await _rebuildUsersWithoutInactivityTimeout(db);
+  }
+
+  /// Migration from v28 → v29: drop dead columns. See the _onUpgrade
+  /// comment for why each column is unused.
+  Future<void> _migrateV29(Database db) async {
+    try {
+      await db.execute('ALTER TABLE users DROP COLUMN color_preference');
+    } catch (_) {
+      // Older SQLite builds do not support DROP COLUMN; rebuild the table.
+      await _rebuildUsersV29(db);
+    }
+
+    try {
+      await db.execute('ALTER TABLE settings DROP COLUMN theme');
+    } catch (_) {
+      await _rebuildSettingsV29(db);
+    }
+
+    try {
+      await db.execute('ALTER TABLE attachments DROP COLUMN is_active');
+    } catch (_) {
+      await _rebuildAttachmentsV29(db);
+    }
+
+    try {
+      await db.execute('ALTER TABLE export_history DROP COLUMN thumbnail_path');
+    } catch (_) {
+      await _rebuildExportHistoryV29(db);
+    }
+
+    try {
+      await db.execute('ALTER TABLE notifications DROP COLUMN read_at');
+    } catch (_) {
+      await _rebuildNotificationsV29(db);
+    }
+  }
+
+  /// Recreates users without the color_preference column for SQLite builds
+  /// that lack ALTER TABLE ... DROP COLUMN (pre-3.35).
+  Future<void> _rebuildUsersV29(Database db) async {
+    await db.execute('PRAGMA foreign_keys = OFF');
+    await db.execute('''
+      CREATE TABLE users_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
+        pin TEXT,
+        pin_length INTEGER,
+        role TEXT NOT NULL,
+        full_name TEXT NOT NULL,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        profile_image_path TEXT,
+        last_login TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT,
+        deleted_at TEXT,
+        must_change_password INTEGER NOT NULL DEFAULT 0,
+        has_changed_username INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+    await db.execute('''
+      INSERT INTO users_new (id, username, password_hash, pin, pin_length, role,
+        full_name, is_active, profile_image_path, last_login, created_at,
+        updated_at, deleted_at, must_change_password, has_changed_username)
+      SELECT id, username, password_hash, pin, pin_length, role, full_name,
+        is_active, profile_image_path, last_login, created_at, updated_at,
+        deleted_at, must_change_password, has_changed_username
+      FROM users
+    ''');
+    await db.execute('DROP TABLE users');
+    await db.execute('ALTER TABLE users_new RENAME TO users');
+    await db.execute(
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username_active '
+      'ON users(username) WHERE deleted_at IS NULL',
+    );
+    await db.execute('PRAGMA foreign_keys = ON');
+  }
+
+  /// Recreates settings without the theme column for SQLite builds that
+  /// lack ALTER TABLE ... DROP COLUMN (pre-3.35).
+  Future<void> _rebuildSettingsV29(Database db) async {
+    await db.execute('PRAGMA foreign_keys = OFF');
+    await db.execute('''
+      CREATE TABLE settings_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        store_name TEXT NOT NULL,
+        store_address TEXT,
+        store_phone TEXT,
+        currency TEXT NOT NULL DEFAULT 'PHP',
+        receipt_footer TEXT,
+        groq_api_key TEXT,
+        groq_model TEXT,
+        gcash_enabled INTEGER NOT NULL DEFAULT 1,
+        gcash_reference_required INTEGER NOT NULL DEFAULT 1,
+        gcash_customer_name_requirement TEXT NOT NULL DEFAULT 'optional',
+        gcash_payment_proof_requirement TEXT NOT NULL DEFAULT 'optional',
+        gcash_verification_mode TEXT NOT NULL DEFAULT 'immediate',
+        gcash_reference_min_length INTEGER NOT NULL DEFAULT ${AppConstants.minGcashReferenceLength},
+        gcash_qr_image_path TEXT,
+        gcash_qr_image_type TEXT,
+        gcash_qr_preview_path TEXT,
+        ai_daily_quota INTEGER NOT NULL DEFAULT ${AppConstants.defaultDailyAIQuota},
+        inactivity_timeout_minutes INTEGER NOT NULL DEFAULT 15,
+        session_warning_seconds INTEGER NOT NULL DEFAULT 30,
+        auto_backup_enabled INTEGER NOT NULL DEFAULT 0,
+        auto_backup_frequency TEXT NOT NULL DEFAULT '7_days',
+        auto_backup_time TEXT NOT NULL DEFAULT '02:00',
+        auto_backup_last_run TEXT,
+        auto_backup_scheduled_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute('''
+      INSERT INTO settings_new (id, store_name, store_address, store_phone,
+        currency, receipt_footer, groq_api_key, groq_model, gcash_enabled,
+        gcash_reference_required, gcash_customer_name_requirement,
+        gcash_payment_proof_requirement, gcash_verification_mode,
+        gcash_reference_min_length, gcash_qr_image_path, gcash_qr_image_type,
+        gcash_qr_preview_path, ai_daily_quota, inactivity_timeout_minutes,
+        session_warning_seconds, auto_backup_enabled, auto_backup_frequency,
+        auto_backup_time, auto_backup_last_run, auto_backup_scheduled_at,
+        created_at, updated_at)
+      SELECT id, store_name, store_address, store_phone, currency,
+        receipt_footer, groq_api_key, groq_model, gcash_enabled,
+        gcash_reference_required, gcash_customer_name_requirement,
+        gcash_payment_proof_requirement, gcash_verification_mode,
+        gcash_reference_min_length, gcash_qr_image_path, gcash_qr_image_type,
+        gcash_qr_preview_path, ai_daily_quota, inactivity_timeout_minutes,
+        session_warning_seconds, auto_backup_enabled, auto_backup_frequency,
+        auto_backup_time, auto_backup_last_run, auto_backup_scheduled_at,
+        created_at, updated_at
+      FROM settings
+    ''');
+    await db.execute('DROP TABLE settings');
+    await db.execute('ALTER TABLE settings_new RENAME TO settings');
+    await db.execute('PRAGMA foreign_keys = ON');
+  }
+
+  /// Recreates attachments without the is_active column for SQLite builds
+  /// that lack ALTER TABLE ... DROP COLUMN (pre-3.35).
+  Future<void> _rebuildAttachmentsV29(Database db) async {
+    await db.execute('PRAGMA foreign_keys = OFF');
+    await db.execute('''
+      CREATE TABLE attachments_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        entity_type TEXT NOT NULL,
+        entity_id INTEGER NOT NULL,
+        file_path TEXT NOT NULL,
+        mime_type TEXT NOT NULL,
+        file_name TEXT NOT NULL,
+        attachment_type TEXT,
+        deleted_at TEXT,
+        created_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute('''
+      INSERT INTO attachments_new (id, entity_type, entity_id, file_path,
+        mime_type, file_name, attachment_type, deleted_at, created_at)
+      SELECT id, entity_type, entity_id, file_path, mime_type, file_name,
+        attachment_type, deleted_at, created_at
+      FROM attachments
+    ''');
+    await db.execute('DROP TABLE attachments');
+    await db.execute('ALTER TABLE attachments_new RENAME TO attachments');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_attachments_entity '
+      'ON attachments(entity_type, entity_id, deleted_at)',
+    );
+    await db.execute('PRAGMA foreign_keys = ON');
+  }
+
+  /// Recreates export_history without the thumbnail_path column for SQLite
+  /// builds that lack ALTER TABLE ... DROP COLUMN (pre-3.35).
+  Future<void> _rebuildExportHistoryV29(Database db) async {
+    await db.execute('PRAGMA foreign_keys = OFF');
+    await db.execute('''
+      CREATE TABLE export_history_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        report_type TEXT NOT NULL,
+        file_format TEXT NOT NULL,
+        file_path TEXT NOT NULL,
+        date_range_start TEXT,
+        date_range_end TEXT,
+        created_by INTEGER,
+        created_at TEXT NOT NULL,
+        status TEXT,
+        submitted_at TEXT,
+        viewed_at TEXT,
+        file_size INTEGER,
+        report_number TEXT,
+        deleted_at TEXT,
+        FOREIGN KEY (created_by) REFERENCES users(id)
+      )
+    ''');
+    await db.execute('''
+      INSERT INTO export_history_new (id, report_type, file_format, file_path,
+        date_range_start, date_range_end, created_by, created_at, status,
+        submitted_at, viewed_at, file_size, report_number, deleted_at)
+      SELECT id, report_type, file_format, file_path, date_range_start,
+        date_range_end, created_by, created_at, status, submitted_at,
+        viewed_at, file_size, report_number, deleted_at
+      FROM export_history
+    ''');
+    await db.execute('DROP TABLE export_history');
+    await db.execute('ALTER TABLE export_history_new RENAME TO export_history');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_export_history_date '
+      'ON export_history(created_at)',
+    );
+    await db.execute('PRAGMA foreign_keys = ON');
+  }
+
+  /// Recreates notifications without the read_at column for SQLite builds
+  /// that lack ALTER TABLE ... DROP COLUMN (pre-3.35).
+  Future<void> _rebuildNotificationsV29(Database db) async {
+    await db.execute('PRAGMA foreign_keys = OFF');
+    await db.execute('''
+      CREATE TABLE notifications_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        message TEXT NOT NULL,
+        type TEXT,
+        user_id INTEGER,
+        is_read INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      )
+    ''');
+    await db.execute('''
+      INSERT INTO notifications_new (id, title, message, type, user_id,
+        is_read, created_at)
+      SELECT id, title, message, type, user_id, is_read, created_at
+      FROM notifications
+    ''');
+    await db.execute('DROP TABLE notifications');
+    await db.execute('ALTER TABLE notifications_new RENAME TO notifications');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_notifications_user '
+      'ON notifications(user_id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_notifications_read '
+      'ON notifications(is_read)',
+    );
+    await db.execute('PRAGMA foreign_keys = ON');
+  }
+
+  /// Exposes the v29 migration so tests can exercise it against an
+  /// old-schema database.
+  @visibleForTesting
+  Future<void> runV29MigrationForTest(Database db) => _migrateV29(db);
+
+  /// Exposes the v29 table-rebuild fallbacks so tests can validate their
+  /// SQL even on SQLite builds where DROP COLUMN already succeeds.
+  @visibleForTesting
+  Future<void> runV29RebuildFallbackForTest(Database db) async {
+    await _rebuildUsersV29(db);
+    await _rebuildSettingsV29(db);
+    await _rebuildAttachmentsV29(db);
+    await _rebuildExportHistoryV29(db);
+    await _rebuildNotificationsV29(db);
+  }
+
+  /// Recreates users without the inactivity_timeout_minutes column for
+  /// SQLite builds that lack ALTER TABLE ... DROP COLUMN (pre-3.35).
+  Future<void> _rebuildUsersWithoutInactivityTimeout(Database db) async {
+    await db.execute('PRAGMA foreign_keys = OFF');
+    await db.execute('''
+      CREATE TABLE users_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
+        pin TEXT,
+        pin_length INTEGER,
+        role TEXT NOT NULL,
+        full_name TEXT NOT NULL,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        color_preference TEXT,
+        profile_image_path TEXT,
+        last_login TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT,
+        deleted_at TEXT,
+        must_change_password INTEGER NOT NULL DEFAULT 0,
+        has_changed_username INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+    await db.execute('''
+      INSERT INTO users_new (id, username, password_hash, pin, pin_length, role,
+        full_name, is_active, color_preference, profile_image_path, last_login,
+        created_at, updated_at, deleted_at, must_change_password,
+        has_changed_username)
+      SELECT id, username, password_hash, pin, pin_length, role, full_name,
+        is_active, color_preference, profile_image_path, last_login, created_at,
+        updated_at, deleted_at, must_change_password, has_changed_username
+      FROM users
+    ''');
+    await db.execute('DROP TABLE users');
+    await db.execute('ALTER TABLE users_new RENAME TO users');
+    await db.execute(
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username_active '
+      'ON users(username) WHERE deleted_at IS NULL',
+    );
+    await db.execute('PRAGMA foreign_keys = ON');
+  }
+
   Future<void> _createTables(Database db) async {
     // Users table
     // NOTE: every CREATE statement uses IF NOT EXISTS so that _onCreate is
@@ -719,15 +1105,13 @@ class DatabaseHelper {
         role TEXT NOT NULL,
         full_name TEXT NOT NULL,
         is_active INTEGER NOT NULL DEFAULT 1,
-        color_preference TEXT,
         profile_image_path TEXT,
         last_login TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT,
         deleted_at TEXT,
         must_change_password INTEGER NOT NULL DEFAULT 0,
-        has_changed_username INTEGER NOT NULL DEFAULT 0,
-        inactivity_timeout_minutes INTEGER
+        has_changed_username INTEGER NOT NULL DEFAULT 0
       )
     ''');
 
@@ -827,7 +1211,6 @@ class DatabaseHelper {
         user_id INTEGER,
         is_read INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL,
-        read_at TEXT,
         FOREIGN KEY (user_id) REFERENCES users(id)
       )
     ''');
@@ -856,7 +1239,6 @@ class DatabaseHelper {
         store_phone TEXT,
         currency TEXT NOT NULL DEFAULT 'PHP',
         receipt_footer TEXT,
-        theme TEXT,
         groq_api_key TEXT,
         groq_model TEXT,
         gcash_enabled INTEGER NOT NULL DEFAULT 1,
@@ -909,12 +1291,12 @@ class DatabaseHelper {
     ''');
 
 
-    // AI quota table
+    // AI quota table — per-user usage counter only; the quota limit is the
+    // global settings.ai_daily_quota value.
     await db.execute('''
       CREATE TABLE IF NOT EXISTS ai_quota (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL UNIQUE,
-        daily_quota INTEGER NOT NULL,
         daily_usage INTEGER NOT NULL DEFAULT 0,
         quota_date TEXT NOT NULL,
         last_reset_at TEXT,
@@ -974,7 +1356,6 @@ class DatabaseHelper {
         submitted_at TEXT,
         viewed_at TEXT,
         file_size INTEGER,
-        thumbnail_path TEXT,
         report_number TEXT,
         deleted_at TEXT,
         FOREIGN KEY (created_by) REFERENCES users(id)

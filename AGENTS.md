@@ -1634,6 +1634,16 @@ disarm refusal, clear, signed activity log); `license_notice_test.dart`
   keeps a re-uploaded QR decoding fresh.
   Mockup: `mockups/gcash_qr_autofill.html` (upload → scanning dialog →
   detect/zoom → payment screen).
+- `PaymentQrService._decodeResultsWithZxing` now runs a second pass when
+  direct ZXing finds nothing: `img.contrast(150)` + 2× cubic upscale,
+  with result points divided by 2 back into original coordinates so the
+  crop stays correct. Real downloaded GCash QR cards (low-contrast JPEG,
+  ~250px QR, center logo) only decode via this pass. The enhanced copy
+  is built from `img.Image.from(image)` because `img.contrast` (and
+  `grayscale`/`normalize`) mutate in place — mutating the source would
+  corrupt the preview crop. `com.p2pqrpay` maps to `GCash` in
+  `PaymentQrParser._networkName`. Regression coverage uses a real
+  fixture at `test/fixtures/gcash_merchant_qr_lowcontrast.jpg`.
 - `AppConstants.minGcashReferenceLength` (`13`) is now the default and
   floor for `gcash_reference_min_length` — a real GCash reference is 13
   digits. `Settings` constructor + `fromMap` default to it, the settings

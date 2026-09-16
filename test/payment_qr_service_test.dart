@@ -272,6 +272,45 @@ void main() {
       expect(decoded.status, PaymentQrDecodeStatus.notDetected);
     });
 
+    test(
+        'detects and decodes a real low-contrast GCash merchant QR '
+        'via the enhanced preprocessing pass', () async {
+      // Regression fixture: a real downloaded GCash QR card (606×726 JPEG,
+      // ~250px QR with a center logo) that direct ZXing detection misses.
+      // Detection only succeeds after contrast + 2× cubic upscale.
+      final fixture = File(
+        p.join('test', 'fixtures', 'gcash_merchant_qr_lowcontrast.jpg'),
+      );
+      expect(await fixture.exists(), isTrue);
+
+      final dir = Directory(p.join(appDir.path, 'gcash_qr'));
+      await dir.create(recursive: true);
+      final copied =
+          await fixture.copy(p.join(dir.path, 'merchant_qr.jpg'));
+
+      final preview = await service.generatePreview(
+        p.join('gcash_qr', 'merchant_qr.jpg'),
+      );
+
+      expect(preview.wasDetected, isTrue);
+      expect(preview.previewPath, isNotNull);
+      final previewFile = File(p.join(appDir.path, preview.previewPath!));
+      expect(await previewFile.exists(), isTrue);
+      // The source image must remain intact (preprocessing clones it).
+      expect(await copied.length(), greaterThan(0));
+
+      final decoded = await service.decodePaymentQr(
+        p.join('gcash_qr', 'merchant_qr.jpg'),
+      );
+
+      expect(decoded.status, PaymentQrDecodeStatus.recognized);
+      expect(decoded.merchantName, 'MI****L T.');
+      expect(decoded.paymentNetwork, 'GCash');
+      expect(decoded.merchantCity, 'Yangco Poblaci');
+      // The payload carries no unmasked mobile — never fabricate one.
+      expect(decoded.mobileNumber, isNull);
+    });
+
     test('replaces an old preview when a new original is uploaded', () async {
       final oldSource = _generateQrImage(
         size: 400,

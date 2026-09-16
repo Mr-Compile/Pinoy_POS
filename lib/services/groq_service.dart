@@ -119,7 +119,7 @@ class GroqService {
   /// Sends a chat completion request to Groq.
   ///
   /// [apiKey] is the Groq API key (never stored here, never logged).
-  /// [model] is the Groq model id (e.g. "llama-3.3-70b-versatile").
+  /// [model] is the Groq model id (e.g. "openai/gpt-oss-120b").
   /// [systemPrompt] sets the assistant context.
   /// [messages] is the conversation history (role + content pairs).
   ///

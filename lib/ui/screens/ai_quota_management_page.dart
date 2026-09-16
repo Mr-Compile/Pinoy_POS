@@ -14,7 +14,7 @@ import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_input_fields.dart';
 import 'package:pinoy_pos/ui/widgets/responsive_create_action.dart';
 
-/// Admin page for managing per-user AI quotas and the default daily quota.
+/// Admin page for managing the global daily AI quota and per-user usage.
 ///
 /// The SuperAdmin password is verified once when the page is opened. All
 /// privileged actions inside the page reuse that verification and do not ask
@@ -87,116 +87,15 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
   }
 
   Future<void> _changeDefaultQuota() async {
-    final result =
-        await showDialog<ModalResult<({int value, bool applyToExisting})>>(
-      context: context,
-      useRootNavigator: true,
-      builder: (context) =>
-          AppDialogForm<ModalResult<({int value, bool applyToExisting})>>(
-        type: AppDialogType.edit,
-        title: 'Change Default AI Quota',
-        childBuilder: (context, state) {
-          final controller =
-              state.textController('quota', text: _defaultQuota.toString());
-          final applyToExisting =
-              state.value<bool>('applyToExisting', false);
-
-          return Form(
-            key: state.formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                AppTextFormField(
-                  controller: controller,
-                  keyboardType: TextInputType.number,
-                  label: 'New default daily quota',
-                  hint: 'e.g. 100',
-                  prefixIcon: Icons.auto_awesome,
-                  helperText: 'Applies to new users unless overridden',
-                ),
-                const SizedBox(height: Spacing.sm),
-                CheckboxListTile(
-                  title: const Text('Apply to all existing users'),
-                  value: applyToExisting,
-                  onChanged: (value) {
-                    state.setValue<bool>('applyToExisting', value ?? false);
-                  },
-                  controlAffinity: ListTileControlAffinity.leading,
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ],
-            ),
-          );
-        },
-        actionsBuilder: (context, state) => [
-          AppDialogAction(
-            label: 'Cancel',
-            onPressed: (context) => state.pop(
-              const ModalResult<({int value, bool applyToExisting})>
-                  .cancelled(),
-            ),
-          ),
-          AppDialogAction(
-            label: 'Save',
-            isPrimary: true,
-            onPressed: (context) {
-              final value =
-                  int.tryParse(state.textController('quota').text.trim());
-              if (value == null) return;
-
-              state.pop(
-                ModalResult<({int value, bool applyToExisting})>.saved(
-                  (
-                    value: value,
-                    applyToExisting:
-                        state.value<bool>('applyToExisting') ?? false,
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-
-    if (!mounted) return;
-
-    if (result case final saved? when saved.isSaved) {
-      final (:value, :applyToExisting) = saved.value!;
-      final serviceResult = await _aiQuotaService.setDefaultQuota(
-        value: value,
-        applyToExisting: applyToExisting,
-        verified: _isVerified,
-      );
-
-      if (!mounted) return;
-
-      if (serviceResult.success) {
-        await _loadData();
-        if (mounted) {
-          _showSnackBar('Default quota updated to $value');
-        }
-      } else {
-        _showErrorSnackBar(serviceResult.message);
-      }
-    }
-  }
-
-  Future<void> _editUserQuota(User user) async {
-    final quota = _quotas[user.id!];
-
     final result = await showDialog<ModalResult<int>>(
       context: context,
       useRootNavigator: true,
       builder: (context) => AppDialogForm<ModalResult<int>>(
         type: AppDialogType.edit,
-        title: 'Edit Quota for ${user.fullName}',
+        title: 'Change Daily AI Quota',
         childBuilder: (context, state) {
-          final controller = state.textController(
-            'quota',
-            text: (quota?.dailyQuota ?? _defaultQuota).toString(),
-          );
+          final controller =
+              state.textController('quota', text: _defaultQuota.toString());
 
           return Form(
             key: state.formKey,
@@ -206,6 +105,7 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
               label: 'Daily quota',
               hint: 'e.g. 100',
               prefixIcon: Icons.auto_awesome,
+              helperText: 'Applies to all users',
             ),
           );
         },
@@ -232,12 +132,10 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
     );
 
     if (!mounted) return;
-    if (user.id == null) return;
 
     if (result case final saved? when saved.isSaved) {
       final value = saved.value!;
-      final serviceResult = await _aiQuotaService.updateUserQuota(
-        user.id!,
+      final serviceResult = await _aiQuotaService.setDefaultQuota(
         value: value,
         verified: _isVerified,
       );
@@ -247,7 +145,7 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
       if (serviceResult.success) {
         await _loadData();
         if (mounted) {
-          _showSnackBar('Quota for ${user.fullName} updated to $value');
+          _showSnackBar('Daily quota updated to $value');
         }
       } else {
         _showErrorSnackBar(serviceResult.message);
@@ -331,7 +229,8 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
     final totalUsers = _users.length;
     final totalRemaining = _quotas.values.fold<int>(
       0,
-      (sum, q) => sum + (q.dailyQuota - q.dailyUsage).clamp(0, q.dailyQuota),
+      (sum, q) =>
+          sum + (_defaultQuota - q.dailyUsage).clamp(0, _defaultQuota),
     );
 
     // Page-level primary action: FAB on compact portrait, toolbar button
@@ -362,7 +261,7 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
                             children: [
                               Expanded(
                                 child: _StatCard(
-                                  label: 'Default Quota',
+                                  label: 'Daily Quota',
                                   value: _defaultQuota.toString(),
                                   icon: Icons.settings_outlined,
                                 ),
@@ -391,7 +290,7 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
                               FilledButton.icon(
                                 onPressed: _changeDefaultQuota,
                                 icon: const Icon(Icons.edit),
-                                label: const Text('Change Default Quota'),
+                                label: const Text('Change Daily Quota'),
                               ),
                               const Spacer(),
                               ?resetAction.contentAction(context),
@@ -399,7 +298,7 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Per-user quotas',
+                            'Usage today',
                             style: theme.textTheme.titleMedium?.copyWith(
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -415,8 +314,8 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
                         final user = _users[index];
                         final quota = _quotas[user.id!];
                         final used = quota?.dailyUsage ?? 0;
-                        final limit = quota?.dailyQuota ?? _defaultQuota;
-                        final remaining = (limit - used).clamp(0, limit);
+                        final remaining =
+                            (_defaultQuota - used).clamp(0, _defaultQuota);
 
                         return ListTile(
                           leading: CircleAvatar(
@@ -426,22 +325,12 @@ class _AIQuotaManagementPageState extends State<AIQuotaManagementPage> {
                           ),
                           title: Text(user.fullName),
                           subtitle: Text(
-                            '${user.role.name} · $remaining / $limit remaining',
+                            '${user.role.name} · $remaining / $_defaultQuota remaining',
                           ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.edit_outlined),
-                                tooltip: 'Edit quota',
-                                onPressed: () => _editUserQuota(user),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.restart_alt),
-                                tooltip: "Reset today's usage",
-                                onPressed: () => _resetUserUsage(user),
-                              ),
-                            ],
+                          trailing: IconButton(
+                            icon: const Icon(Icons.restart_alt),
+                            tooltip: "Reset today's usage",
+                            onPressed: () => _resetUserUsage(user),
                           ),
                         );
                       },

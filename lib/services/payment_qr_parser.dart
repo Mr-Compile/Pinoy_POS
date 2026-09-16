@@ -159,6 +159,7 @@ class PaymentQrParser {
     final lower = cleaned.toLowerCase();
     if (lower.contains('ppmi') || lower.contains('qrph')) return 'QR Ph';
     if (lower.contains('gcash')) return 'GCash';
+    if (lower.contains('p2pqrpay')) return 'GCash';
     if (lower.contains('instapay')) return 'InstaPay';
     if (lower.contains('paymaya') || lower.contains('maya')) return 'Maya';
     return cleaned;

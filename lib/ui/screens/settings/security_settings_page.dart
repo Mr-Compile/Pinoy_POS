@@ -300,8 +300,8 @@ class SecuritySettingsPage extends ConsumerWidget {
                 Text(
                   'How long the app waits for input before locking. '
                   'Unlimited never locks on idle — the 8-hour maximum session '
-                  'length still applies. This is the store default; a per-user '
-                  'override can be set in User Management.',
+                  'length still applies. This setting is global and applies '
+                  'to all users.',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 12),
