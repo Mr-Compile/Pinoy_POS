@@ -1580,3 +1580,76 @@ term tracking, unlock codes — format, per-grant enumeration, stacking,
 disarm refusal, clear, signed activity log); `license_notice_test.dart`
 9/9 pass (all three tiers, hidden states, dialog wiring); full suite
 588/588 pass.
+
+## Store Contact PH Mobile Format
+
+### What Changed
+
+- `lib/core/phone_utils.dart` (new) — `PhoneUtils.normalizePhMobile`
+  (digits-only, `+63`/`63` → `0`), `formatPhMobile` (`09XX XXX XXXX`
+  grouping), `isValidPhMobile` (11 digits starting `09`),
+  `phMobileHint` (`0926 585 2171`), and `PhMobileInputFormatter` for
+  live grouping while typing.
+- `lib/ui/screens/settings/store_information_settings_page.dart` — the
+  Store Contact edit dialog now uses the PH placeholder
+  `0926 585 2171`, `TextInputType.phone`, the live formatter, and a
+  `Form` + validator that rejects non-empty input that is not an
+  11-digit `09` number. Saved values are stored pre-formatted so the
+  `0926 585 2171` form is what the settings list, receipt, GCash
+  screen, and reports display. `_showTextEditDialog` gained
+  `helperText`/`keyboardType`/`inputFormatters`/`validator` params.
+- `lib/ui/screens/payment_settings_page.dart` — the "GCash Mobile
+  Number" field writes the same `store_phone` column, so it uses the
+  same placeholder, formatter, and `_submit` validation (invalid input
+  aborts the save with an error dialog).
+- Store Information saves now call `_invalidateSettingsProviders()`
+  (`settingsProvider` + `paymentSettingsProvider`) after every
+  `updateSettings`. Both providers are non-autoDispose `FutureProvider`s
+  and the Payment Settings "Merchant Identity" section (Store Name +
+  GCash Mobile Number) reads `store_name`/`store_phone` through them —
+  without the invalidation, edits made on the Store Information page
+  never reached Merchant Identity until re-login. The reverse direction
+  already worked because Payment Settings invalidates both providers on
+  save and `SettingsService.updateSettings` refreshes its own cache.
+- `AppConstants.defaultReceiptFooter` (`'Thank you for your purchase!'`)
+  is now the `Settings.receiptFooter` constructor default and the
+  `fromMap` NULL fallback, so the footer is "already there" instead of
+  placeholder-only: fresh installs persist it on the first settings
+  insert, and legacy NULL rows resolve to it (persisted on the next
+  settings save). A stored `''` stays `''`, so clearing the footer is
+  still possible. The `receipt_screen.dart` fallback and the edit-dialog
+  hint now use the same constant instead of divergent literals.
+
+- QR decode is display-only by design: `paymentQrDecodeProvider` +
+  `PaymentQrParser` show the payload's merchant name/mobile on the GCash
+  payment screen, but `updateGcashQrImage` never writes them into
+  `storeName`/`storePhone` — the QR's account name is the GCash holder
+  name, not the store name. On upload, `_uploadGcashQr` shows a
+  non-dismissible `_QrProcessingDialog` (`AppDialogType.loading`) that
+  cycles friendly status lines while the image is stored, decoded, and
+  cropped; the decode is awaited before the dialog closes so the success
+  message can name the detected merchant. A `_DetectedQrCard` under the
+  QR preview shows the decoded Merchant/Mobile/Network marked "shown at
+  checkout, not saved". `ref.invalidate(paymentQrDecodeProvider(...))`
+  keeps a re-uploaded QR decoding fresh.
+  Mockup: `mockups/gcash_qr_autofill.html` (upload → scanning dialog →
+  detect/zoom → payment screen).
+- `AppConstants.minGcashReferenceLength` (`13`) is now the default and
+  floor for `gcash_reference_min_length` — a real GCash reference is 13
+  digits. `Settings` constructor + `fromMap` default to it, the settings
+  table DDL defaults to it, the Payment Settings editor clamps to
+  `13..50`, and DB v27 raises any stored value below the floor (custom
+  values >= 13 are preserved). Both validators
+  (`sales_service.dart`, `gcash_payment_screen.dart`) read the settings
+  value, so enforcement moved automatically.
+
+### Verification
+
+```powershell
+flutter analyze
+flutter test test/phone_utils_test.dart test/payment_settings_page_test.dart test/settings_model_test.dart test/gcash_payment_service_test.dart test/payment_pos_validation_test.dart
+```
+
+Result: `flutter analyze` clean; phone utils 13/13, payment settings
+2/2, settings model 9/9, GCash sales flow 11/11, POS payment validation
+7/7 — all pass.

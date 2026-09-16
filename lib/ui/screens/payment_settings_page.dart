@@ -1,13 +1,19 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
 import 'package:pinoy_pos/core/breakpoints.dart';
+import 'package:pinoy_pos/core/constants.dart';
+import 'package:pinoy_pos/core/phone_utils.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
+import 'package:pinoy_pos/data/models/decoded_payment_qr.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
 import 'package:pinoy_pos/providers/payment_settings_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_payment_qr_preview.dart';
@@ -90,29 +96,65 @@ class PaymentSettingsPage extends ConsumerWidget {
   }
 
   Future<void> _uploadGcashQr(BuildContext context, WidgetRef ref) async {
+    // Blocking, friendly progress dialog while the image is stored, the QR
+    // is located for the auto-zoomed preview, and the payload is decoded.
+    unawaited(showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      useRootNavigator: true,
+      builder: (_) => const _QrProcessingDialog(),
+    ));
+
+    void closeProcessing() {
+      if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
+    }
+
     try {
       final result = await ref.read(settingsServiceProvider).updateGcashQrImage();
       if (!context.mounted) return;
 
-      if (result.isSuccess) {
-        ref.invalidate(settingsProvider);
-        ref.invalidate(paymentSettingsProvider);
-        await ref.read(settingsProvider.future);
-        if (context.mounted) {
-          await AppDialogService.success(
-            context,
-            title: 'QR Image Saved',
-            message: 'The GCash QR image has been uploaded.',
-          );
-        }
-      } else {
+      if (!result.isSuccess) {
+        closeProcessing();
+        // Cancelling the image picker is not an error.
+        if (result.error == 'No image selected') return;
         AppDialogService.error(
           context,
           title: 'Upload Failed',
           message: result.error ?? 'Could not upload the GCash QR image.',
         );
+        return;
       }
+
+      ref.invalidate(settingsProvider);
+      ref.invalidate(paymentSettingsProvider);
+      ref.invalidate(paymentQrDecodeProvider(result.filePath));
+
+      // Decode before closing the dialog so the success message can report
+      // the detected merchant and the "Detected from QR" card is populated
+      // as soon as the page repaints.
+      DecodedPaymentQr? decoded;
+      try {
+        decoded =
+            await ref.read(paymentQrDecodeProvider(result.filePath).future);
+      } catch (_) {
+        decoded = null;
+      }
+
+      closeProcessing();
+      await ref.read(settingsProvider.future);
+      if (!context.mounted) return;
+
+      final detectedMerchant = decoded?.merchantName;
+      await AppDialogService.success(
+        context,
+        title: 'QR Image Saved',
+        message: detectedMerchant != null
+            ? 'Payment QR recognized for $detectedMerchant. The detected '
+                'merchant details are shown on the payment screen.'
+            : 'The GCash QR image has been uploaded and zoomed to the code.',
+      );
     } catch (e) {
+      closeProcessing();
       if (context.mounted) {
         AppDialogService.error(
           context,
@@ -333,9 +375,10 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
           controller: _storePhoneController,
           label: 'GCash Mobile Number',
           prefixIcon: Icons.phone_outlined,
-          hint: '09XX XXX XXXX',
+          hint: PhoneUtils.phMobileHint,
           helperText: 'The mobile number linked to the GCash account.',
           keyboardType: TextInputType.phone,
+          inputFormatters: [PhMobileInputFormatter()],
           enabled: !widget.isLoading,
         ),
       ],
@@ -392,6 +435,10 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
                   ),
             ),
           ],
+          if (hasImage) ...[
+            const SizedBox(height: 12),
+            _DetectedQrCard(qrPath: qrPath),
+          ],
           const SizedBox(height: 12),
           LayoutBuilder(
             builder: (context, constraints) {
@@ -441,9 +488,20 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
   }
 
   void _submit() {
+    final phone = _storePhoneController.text.trim();
+    if (phone.isNotEmpty && !PhoneUtils.isValidPhMobile(phone)) {
+      AppDialogService.error(
+        context,
+        title: 'Invalid Mobile Number',
+        message: 'Enter an 11-digit PH mobile number '
+            '(e.g. ${PhoneUtils.phMobileHint}).',
+      );
+      return;
+    }
+
     final updated = widget.settings.copyWith(
       storeName: _storeNameController.text.trim(),
-      storePhone: _storePhoneController.text.trim(),
+      storePhone: PhoneUtils.formatPhMobile(phone),
       gcashEnabled: _gcashEnabled,
       gcashReferenceRequired: _gcashReferenceRequired,
       gcashCustomerNameRequirement: _customerNameRequirement,
@@ -542,13 +600,14 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
                     width: 80,
                     child: AppTextFormField(
                       initialValue: _referenceMinLength.toString(),
-                      hint: '1-50',
+                      hint: '${AppConstants.minGcashReferenceLength}-50',
                       keyboardType: TextInputType.number,
                       enabled: !widget.isLoading,
                       onChanged: (value) {
-                        final parsed = int.tryParse(value) ?? 1;
-                        setState(
-                            () => _referenceMinLength = parsed.clamp(1, 50));
+                        final parsed = int.tryParse(value) ??
+                            AppConstants.minGcashReferenceLength;
+                        setState(() => _referenceMinLength = parsed.clamp(
+                            AppConstants.minGcashReferenceLength, 50));
                       },
                       isDense: true,
                     ),
@@ -586,6 +645,193 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
             label: 'Save Payment Settings',
             fullWidth: true,
           ),
+        ],
+      ),
+    );
+  }
+}
+
+
+/// Blocking progress dialog shown while an uploaded GCash QR image is being
+/// scanned, decoded, and cropped into the zoomed preview. It cycles through
+/// friendly status lines so the owner knows the app is working.
+class _QrProcessingDialog extends StatefulWidget {
+  const _QrProcessingDialog();
+
+  @override
+  State<_QrProcessingDialog> createState() => _QrProcessingDialogState();
+}
+
+class _QrProcessingDialogState extends State<_QrProcessingDialog> {
+  static const List<String> _steps = [
+    'Locating the QR code in your image…',
+    'Reading the merchant details…',
+    'Zooming in on the QR code…',
+  ];
+
+  int _step = 0;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(milliseconds: 1300), (_) {
+      if (!mounted) return;
+      setState(() => _step = (_step + 1) % _steps.length);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AppDialog(
+      type: AppDialogType.loading,
+      title: 'Scanning QR Image',
+      message: '${_steps[_step]}\nThis only takes a moment — please wait.',
+      dismissible: false,
+    );
+  }
+}
+
+/// Shows the merchant details decoded from the uploaded payment QR inside
+/// the Merchant QR Code section. Display-only: decoded values are shown on
+/// the GCash payment screen but are never written into Merchant Identity.
+class _DetectedQrCard extends ConsumerWidget {
+  final String qrPath;
+
+  const _DetectedQrCard({required this.qrPath});
+
+  Widget _detailRow(BuildContext context, String label, String value) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: AppTypography.bodySmall(context).copyWith(
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: AppTypography.bodySmall(context).copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _note(BuildContext context, IconData icon, String text) {
+    final cs = Theme.of(context).colorScheme;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 15, color: cs.onSurfaceVariant),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: AppTypography.bodySmall(context).copyWith(
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
+    final decodeAsync = ref.watch(paymentQrDecodeProvider(qrPath));
+
+    if (decodeAsync.isLoading) {
+      return Row(
+        children: [
+          SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: cs.primary,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Reading merchant details…',
+              style: AppTypography.bodySmall(context).copyWith(
+                color: cs.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    final decoded = decodeAsync.value;
+    final fromQr =
+        decoded?.detectionSource == PaymentQrDetectionSource.qrPayload;
+    if (!fromQr || decoded == null || !decoded.hasMerchantInfo) {
+      return _note(
+        context,
+        Icons.info_outline,
+        'No merchant details were found in this QR. The image is still '
+            'shown for manual scanning.',
+      );
+    }
+
+    final showAccount =
+        decoded.accountIdentifier != null && decoded.mobileNumber == null;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: cs.primaryContainer.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: cs.primary.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.check_circle_outline, size: 15, color: cs.primary),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Payment QR recognized — shown at checkout, not saved',
+                  style: AppTypography.labelSmall(context).copyWith(
+                    color: cs.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (decoded.merchantName != null)
+            _detailRow(context, 'Merchant', decoded.merchantName!),
+          if (decoded.mobileNumber != null)
+            _detailRow(context, 'Mobile', decoded.mobileNumber!),
+          if (showAccount)
+            _detailRow(context, 'Account', decoded.accountIdentifier!),
+          if (decoded.paymentNetwork != null)
+            _detailRow(context, 'Network', decoded.paymentNetwork!),
         ],
       ),
     );

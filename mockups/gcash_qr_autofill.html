@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinoy POS — GCash QR Detect & Zoom (payment_settings_page.dart / gcash_payment_screen.dart)</title>
+<link rel="stylesheet" href="mockup.css">
+<style>
+  .steps { max-width: 1100px; margin: 0 auto 24px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; color: var(--text-2); font-size: 13px; }
+  .step-pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border); background: var(--surface-elev); font-weight: 700; font-size: 12.5px; }
+  .step-pill .n { width: 20px; height: 20px; border-radius: 50%; background: var(--primary); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; }
+  .step-arrow { color: var(--text-3); }
+  .qr-wrap { background: #fff; border-radius: 14px; margin: 10px auto; display: flex; align-items: center; justify-content: center; }
+  .qr-wrap svg { fill: #172033; }
+  .qr-full { width: 100%; border-radius: 10px; background: #fff; padding: 14px; color: #172033; text-align: center; }
+  .detected-card { background: var(--surface-elev); border: 1px solid rgba(22,163,74,.4); border-radius: 12px; padding: 12px; }
+  .detected-head { display: flex; align-items: center; gap: 8px; color: var(--success); font-size: 12px; font-weight: 700; margin-bottom: 8px; }
+  .detail-line { display: flex; justify-content: space-between; align-items: center; font-size: 13px; padding: 6px 0; }
+  .detail-line .k { color: var(--text-3); }
+  .detail-line .v { font-weight: 700; color: var(--text); }
+  .auto-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 700; color: var(--primary); background: rgba(75,130,233,.14); border-radius: 10px; padding: 2px 8px; margin-left: 8px; vertical-align: middle; }
+  .chip-ok { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: var(--success); background: rgba(22,163,74,.16); border-radius: 12px; padding: 4px 10px; }
+  .zoom-note { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-2); background: var(--surface-elev); border-radius: 10px; padding: 10px 12px; }
+  .summary-line { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--divider); font-size: 13px; }
+  .summary-line.total { border-bottom: 0; font-size: 18px; font-weight: 800; }
+  .order-item { display: flex; justify-content: space-between; font-size: 13px; color: var(--text); padding: 6px 0; }
+  .order-item + .order-item { border-top: 1px solid var(--divider); }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M12 21l3.5-4.5c-.97-.74-2.18-1.16-3.5-1.16s-2.53.42-3.5 1.16L12 21zM12 3C7.31 3 3.07 4.69 0 7.55l1.93 2.43C4.48 7.9 8.01 6.4 12 6.4s7.52 1.5 10.07 3.58L24 7.55C20.93 4.69 16.69 3 12 3z"/></symbol>
+  <symbol id="i-batt" viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></symbol>
+  <symbol id="i-store" viewBox="0 0 24 24"><path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zM14 13h2v-2h-2v2zm0 4h2v-2h-2v2z"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></symbol>
+  <symbol id="i-qr" viewBox="0 0 24 24"><path d="M3 11h8V3H3v8zm2-6h4v4H5V5zM3 21h8v-8H3v8zm2-6h4v4H5v-4zM13 3v8h8V3h-8zm6 6h-4V5h4v4zM13 13h2v2h-2zM15 15h2v2h-2zM13 17h2v2h-2zM17 13h2v2h-2zM19 15h2v2h-2zM17 17h2v2h-2zM15 19h2v2h-2zM19 19h2v2h-2zM13 21h8v-8h-2v6h-6v2z"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></symbol>
+  <symbol id="i-magic" viewBox="0 0 24 24"><path d="M7.5 5.6 10 7 8.6 9.5 7 8.1 4.5 9.5 5.9 7 4.5 4.4 7 5.9 7.5 5.6zM19.5 9.6 17 8l1.4-2.5L20 6.9l2.5-1.4L21.1 8l1.4 2.6L20 9.1l-.5 2.5zM22 2l-2.5 1.4L18 2l1.5 2.5L18 7l2.5-1.4L22 7l-1.5-2.5L22 2zM14.37 7.29c-.39-.39-1.02-.39-1.41 0L1.29 18.96c-.39.39-.39 1.02 0 1.41l1.41 1.41c.39.39 1.02.39 1.41 0L15.78 10.1c.39-.39.39-1.02 0-1.41l-1.41-1.4zM7.5 18.5l-1-1 7.13-7.13 1 1L7.5 18.5z"/></symbol>
+  <symbol id="i-scan" viewBox="0 0 24 24"><path d="M9.5 6.5v3h-3v-3h3zM11 5H5v6h6V5zm-1.5 9.5v3h-3v-3h3zM11 13H5v6h6v-6zm6.5-6.5v3h-3v-3h3zM19 5h-6v6h6V5zm-6 8h1.5v1.5H13V13zm1.5 1.5H16V16h-1.5v-1.5zM16 13h1.5v1.5H16V13zm-3 3h1.5v1.5H13V16zm1.5 1.5H16V19h-1.5v-1.5zM16 16h1.5v1.5H16V16zm1.5-1.5H19V16h-1.5v-1.5zM16 19h1.5v1.5H16V19zm1.5-1.5H19V19h-1.5v-1.5zM19 13h1.5v1.5H19V13zm0 3h1.5v1.5H19V16z"/></symbol>
+  <!-- Stylized QR: three finder squares + scattered modules -->
+  <symbol id="qr-code" viewBox="0 0 29 29">
+    <path d="M0 0h29v29H0z" fill="#fff"/>
+    <g fill="#172033">
+      <path d="M2 2h7v7H2zM4 4h3v3H4z" fill-rule="evenodd"/><path d="M3 3h5v5H3zM4 4h3v3H4z" fill-rule="evenodd"/>
+      <path d="M20 2h7v7h-7zM21 3h5v5h-5zM22 4h3v3h-3z" fill-rule="evenodd"/>
+      <path d="M2 20h7v7H2zM3 21h5v5H3zM4 22h3v3H4z" fill-rule="evenodd"/>
+      <path d="M11 2h2v2h-2zM15 2h2v2h-2zM11 6h2v2h-2zM13 4h2v2h-2zM17 4h2v2h-2zM15 8h2v2h-2z"/>
+      <path d="M2 11h2v2H2zM6 11h2v2H6zM10 11h2v2h-2zM14 11h2v2h-2zM18 11h2v2h-2zM22 11h2v2h-2zM26 11h2v2h-2z"/>
+      <path d="M4 13h2v2H4zM8 13h2v2H8zM12 13h2v2h-2zM16 13h2v2h-2zM20 13h2v2h-2zM24 13h2v2h-2z"/>
+      <path d="M2 15h2v2H2zM6 15h2v2H6zM11 15h2v2h-2zM15 15h2v2h-2zM19 15h2v2h-2zM23 15h2v2h-2zM27 15h2v2h-2z"/>
+      <path d="M4 17h2v2H4zM9 17h2v2H9zM13 17h2v2h-2zM17 17h2v2h-2zM21 17h2v2h-2zM25 17h2v2h-2z"/>
+      <path d="M11 19h2v2h-2zM15 19h2v2h-2zM19 19h2v2h-2zM24 19h2v2h-2z"/>
+      <path d="M11 21h2v2h-2zM13 23h2v2h-2zM11 25h2v2h-2zM15 23h2v2h-2zM17 21h2v2h-2zM19 25h2v2h-2zM21 21h2v2h-2zM23 23h2v2h-2zM25 21h2v2h-2zM27 23h2v2h-2zM21 25h2v2h-2zM25 25h2v2h-2zM23 27h2v2h-2zM27 27h2v2h-2zM13 27h2v2h-2zM17 27h2v2h-2z"/>
+      <path d="M20 20h7v7h-7z" fill="none"/>
+    </g>
+  </symbol>
+</svg>
+
+<div class="page-head">
+  <div>
+    <h1>GCash QR Detect &amp; Zoom — payment_settings_page.dart / gcash_payment_screen.dart</h1>
+    <p>Owner downloads the business GCash QR (name + number embedded) and uploads it once. The app crops/zooms the QR and decodes the EMVCo payload — the detected merchant name and number are shown on the payment screen only; Merchant Identity fields stay manual.</p>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <span class="step-pill"><span class="n">1</span> Upload QR</span>
+    <span class="step-pill"><span class="n">2</span> Scanning (please wait)</span>
+    <span class="step-pill"><span class="n">3</span> Detect + zoom preview</span>
+    <span class="step-pill"><span class="n">4</span> Shown at payment</span>
+    <button class="theme-toggle" onclick="toggleTheme()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>
+      <span id="themeLabel">Light mode</span>
+    </button>
+  </div>
+</div>
+
+<div class="frames">
+
+  <!-- STEP 1 — upload -->
+  <div class="frame-wrap">
+    <div class="frame-label">Step 1 · Payment Settings — before upload</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="appbar">
+        <div class="back"><svg><use href="#i-back"/></svg></div>
+        <div class="title"><h2>Payment Settings</h2></div>
+      </div>
+      <div class="screen">
+        <div class="screen-body">
+          <div class="card pad">
+            <div class="section-head" style="font-size:15px;margin-bottom:14px;">Merchant Identity</div>
+            <div class="field has-icon">
+              <label>Store Name</label>
+              <div class="field-ic c-blue"><svg><use href="#i-store"/></svg></div>
+              <input class="input" placeholder="Your store name">
+              <div class="helper">Shown to customers on the GCash payment screen.</div>
+            </div>
+            <div class="field has-icon" style="margin-top:12px;">
+              <label>GCash Mobile Number</label>
+              <div class="field-ic c-blue"><svg><use href="#i-phone"/></svg></div>
+              <input class="input" placeholder="0926 585 2171">
+              <div class="helper">The mobile number linked to the GCash account.</div>
+            </div>
+          </div>
+          <div class="card pad">
+            <div class="section-head" style="font-size:15px;margin-bottom:10px;">Merchant QR Code</div>
+            <div style="border:1.5px dashed var(--border);border-radius:12px;padding:22px;text-align:center;color:var(--text-3);font-size:12.5px;">
+              <svg style="width:34px;height:34px;fill:var(--text-3);margin-bottom:8px;"><use href="#i-qr"/></svg>
+              <div>No GCash QR image uploaded</div>
+              <div style="font-size:11.5px;margin-top:4px;">Download the QR from the GCash app — it already embeds the account name and number.</div>
+            </div>
+            <button class="btn btn-primary" style="width:100%;margin-top:14px;" onclick="showToast('Opening image picker…','info')"><svg><use href="#i-upload"/></svg> Upload QR Image</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes">Merchant Identity starts empty. The downloaded GCash QR PNG already carries the EMVCo payload (merchant name tag 59 + account/mobile).</div>
+  </div>
+
+  <!-- STEP 2 — scanning / detecting loading dialog -->
+  <div class="frame-wrap">
+    <div class="frame-label">Step 2 · While processing — "Scanning QR Image"</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="appbar">
+        <div class="back"><svg><use href="#i-back"/></svg></div>
+        <div class="title"><h2>Payment Settings</h2></div>
+      </div>
+      <div class="screen">
+        <div class="screen-body">
+          <div class="card pad">
+            <div class="section-head" style="font-size:15px;margin-bottom:14px;">Merchant Identity</div>
+            <div class="field has-icon">
+              <label>Store Name</label>
+              <div class="field-ic c-blue"><svg><use href="#i-store"/></svg></div>
+              <input class="input" placeholder="Your store name">
+            </div>
+            <div class="field has-icon" style="margin-top:12px;">
+              <label>GCash Mobile Number</label>
+              <div class="field-ic c-blue"><svg><use href="#i-phone"/></svg></div>
+              <input class="input" placeholder="0926 585 2171">
+            </div>
+          </div>
+          <div class="card pad">
+            <div class="section-head" style="font-size:15px;margin-bottom:10px;">Merchant QR Code</div>
+            <div style="border:1.5px dashed var(--border);border-radius:12px;padding:22px;text-align:center;color:var(--text-3);font-size:12.5px;">
+              <svg style="width:34px;height:34px;fill:var(--text-3);margin-bottom:8px;"><use href="#i-qr"/></svg>
+              <div>No GCash QR image uploaded</div>
+            </div>
+            <button class="btn btn-primary" style="width:100%;margin-top:14px;"><svg><use href="#i-upload"/></svg> Upload QR Image</button>
+          </div>
+        </div>
+      </div>
+      <!-- Non-dismissible processing dialog (AppDialogType.loading) -->
+      <div class="dialog-overlay open" style="position:absolute;inset:0;top:30px;background:rgba(0,0,0,.55);z-index:50;display:flex;align-items:center;justify-content:center;padding:16px;">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:22px;width:100%;max-width:300px;box-shadow:0 24px 64px rgba(0,0,0,.45);padding:24px 20px;text-align:center;">
+          <div class="spinner" style="margin:0 auto 14px;"></div>
+          <div style="font-size:17px;font-weight:800;color:var(--text);margin-bottom:8px;">Scanning QR Image</div>
+          <div style="font-size:13px;color:var(--text-2);line-height:1.55;">
+            Locating the QR code in your image…<br>
+            <span style="color:var(--text-3);font-size:12px;">This only takes a moment — please wait.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes">A blocking dialog cycles friendly status lines while the app works: "Locating the QR code in your image…" → "Reading the merchant details…" → "Zooming in on the QR code…". It cannot be dismissed; it closes by itself when processing finishes.</div>
+  </div>
+
+  <!-- STEP 3 — detected + zoomed preview, identity stays manual -->
+  <div class="frame-wrap">
+    <div class="frame-label">Step 3 · After upload — zoomed preview, detected</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="appbar">
+        <div class="back"><svg><use href="#i-back"/></svg></div>
+        <div class="title"><h2>Payment Settings</h2></div>
+      </div>
+      <div class="screen">
+        <div class="screen-body">
+          <div class="card pad">
+            <div class="section-head" style="font-size:15px;margin-bottom:14px;">Merchant Identity</div>
+            <div class="field has-icon">
+              <label>Store Name</label>
+              <div class="field-ic c-blue"><svg><use href="#i-store"/></svg></div>
+              <input class="input" placeholder="Your store name">
+              <div class="helper">Shown to customers on the GCash payment screen. Manual — never overwritten by the QR.</div>
+            </div>
+            <div class="field has-icon" style="margin-top:12px;">
+              <label>GCash Mobile Number</label>
+              <div class="field-ic c-blue"><svg><use href="#i-phone"/></svg></div>
+              <input class="input" placeholder="0926 585 2171">
+              <div class="helper">The mobile number linked to the GCash account.</div>
+            </div>
+          </div>
+          <div class="card pad">
+            <div class="section-head" style="font-size:15px;margin-bottom:10px;">Merchant QR Code</div>
+            <div class="zoom-note" style="margin-bottom:10px;">
+              <svg style="width:16px;height:16px;fill:var(--info);flex-shrink:0;"><use href="#i-scan"/></svg>
+              <span>QR found — the preview is auto-cropped to the code so it fills the scan area.</span>
+            </div>
+            <div class="qr-wrap" style="width:180px;height:180px;"><svg style="width:160px;height:160px;"><use href="#qr-code"/></svg></div>
+            <div class="detected-card" style="margin-top:12px;">
+              <div class="detected-head"><svg style="width:14px;height:14px;fill:var(--success)"><use href="#i-check"/></svg> Payment QR recognized — shown at checkout, not saved</div>
+              <div class="detail-line"><span class="k">Merchant</span><span class="v">MARIA'S SARI-SARI STORE</span></div>
+              <div class="detail-line"><span class="k">Mobile</span><span class="v">0926 585 2171</span></div>
+              <div class="detail-line"><span class="k">Network</span><span class="v">GCash / QR Ph</span></div>
+            </div>
+            <div class="btn-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;">
+              <button class="btn btn-outlined" onclick="showToast('Re-upload','info')"><svg><use href="#i-upload"/></svg> Change QR Image</button>
+              <button class="btn btn-outlined" style="color:var(--error);border-color:var(--error);" onclick="showToast('Remove QR','error')">Remove</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes">On upload the QR is decoded and a cropped preview is generated, but nothing is written into Merchant Identity — the QR's account name is the GCash holder name, not the store name.</div>
+  </div>
+
+  <!-- STEP 4 — payment screen -->
+  <div class="frame-wrap">
+    <div class="frame-label">Step 4 · GCash Payment — what the customer scans</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="icons"><svg><use href="#i-wifi"/></svg><svg><use href="#i-batt"/></svg></span></div>
+      <div class="appbar">
+        <div class="back"><svg><use href="#i-back"/></svg></div>
+        <div class="title"><h2>GCash Payment</h2><div class="sub">Scan QR to pay</div></div>
+      </div>
+      <div class="screen">
+        <div class="screen-body">
+          <div class="card" style="background:var(--primary);border-color:var(--primary);color:#fff;text-align:center;">
+            <div style="font-size:12.5px;opacity:.85;">Total Due</div>
+            <div style="font-size:30px;font-weight:800;">₱255.00</div>
+          </div>
+          <div class="card" style="text-align:center;">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <span style="display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:700;">
+                <svg style="width:16px;height:16px;fill:var(--primary)"><use href="#i-qr"/></svg> Scan to Pay
+              </span>
+              <span class="chip-ok"><svg style="width:12px;height:12px;fill:var(--success)"><use href="#i-check"/></svg> Merchant details detected</span>
+            </div>
+            <div class="qr-wrap" style="width:190px;height:190px;"><svg style="width:170px;height:170px;"><use href="#qr-code"/></svg></div>
+            <div style="font-size:11.5px;color:var(--text-3);">Open GCash and scan this QR code to complete the payment.</div>
+          </div>
+          <div class="card pad" style="padding:14px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+              <span style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;">
+                <svg style="width:15px;height:15px;fill:var(--primary)"><use href="#i-store"/></svg> Payment Details
+              </span>
+              <span style="font-size:11px;font-weight:700;color:var(--primary);">Detected from QR</span>
+            </div>
+            <div class="detail-line"><span class="k">Merchant</span><span class="v">MARIA'S SARI-SARI STORE</span></div>
+            <div class="detail-line"><span class="k">Mobile</span><span class="v">0926 585 2171</span></div>
+            <div class="detail-line"><span class="k">Network</span><span class="v">GCash</span></div>
+          </div>
+          <div class="card pad">
+            <div class="section-head" style="font-size:12.5px;">Customer / Payment Info</div>
+            <div class="field"><input class="input" placeholder="Customer name" value="Juan Cruz"></div>
+            <div class="field" style="margin-top:10px;"><input class="input" placeholder="GCash Reference Number" value="4029173856201"></div>
+          </div>
+          <button class="btn btn-primary" onclick="showToast('Review payment','success')">Review Payment</button>
+        </div>
+      </div>
+    </div>
+    <div class="frame-notes">Cashier and customer see who the QR pays: the zoomed code plus the decoded merchant name and GCash number, displayed from the payload — Merchant Identity fields are only a fallback when the QR encodes nothing.</div>
+  </div>
+
+</div>
+
+<script src="mockup.js"></script>
+</body>
+</html>

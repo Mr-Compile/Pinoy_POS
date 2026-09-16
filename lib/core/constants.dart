@@ -4,7 +4,7 @@ class AppConstants {
 
   // Database
   static const String databaseName = 'pinoy_pos.db';
-  static const int databaseVersion = 26;
+  static const int databaseVersion = 27;
 
   // App Info
   static const String appName = 'Pinoy POS';
@@ -24,6 +24,15 @@ class AppConstants {
   static const int maxPasswordLength = 128;
   static const int pinLength = 4;
   static const String defaultTemporaryPassword = '@Password123';
+
+  // Store
+  static const String defaultReceiptFooter = 'Thank you for your purchase!';
+
+  // GCash
+  /// Minimum length accepted for a GCash reference number. Also the
+  /// default stored in settings and the floor of the Payment Settings
+  /// editor — a real GCash reference is 13 digits.
+  static const int minGcashReferenceLength = 13;
 
   // Stock
   static const int defaultLowStockThreshold = 10;

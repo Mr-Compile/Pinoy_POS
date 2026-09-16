@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pinoy_pos/core/constants.dart';
 import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/modal_result.dart';
+import 'package:pinoy_pos/core/phone_utils.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
+import 'package:pinoy_pos/providers/payment_settings_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
@@ -61,6 +65,15 @@ class _StoreInformationSettingsPageState
         });
       }
     }
+  }
+
+  /// Store name/contact/currency also feed the Payment Settings merchant
+  /// identity and receipt surfaces, which watch [settingsProvider] and
+  /// [paymentSettingsProvider]. Both are non-autoDispose, so saving here
+  /// must invalidate them or those pages keep showing stale values.
+  void _invalidateSettingsProviders() {
+    ref.invalidate(settingsProvider);
+    ref.invalidate(paymentSettingsProvider);
   }
 
   @override
@@ -208,9 +221,13 @@ class _StoreInformationSettingsPageState
     required String title,
     required String label,
     String? hint,
+    String? helperText,
     required String initialValue,
     int maxLines = 1,
     IconData? prefixIcon,
+    TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
+    String? Function(String?)? validator,
   }) {
     return showDialog<ModalResult<String>>(
       context: context,
@@ -221,12 +238,19 @@ class _StoreInformationSettingsPageState
         childBuilder: (context, state) {
           final controller = state.textController('value', text: initialValue);
 
-          return AppTextFormField(
-            controller: controller,
-            label: label,
-            hint: hint,
-            prefixIcon: prefixIcon,
-            maxLines: maxLines,
+          return Form(
+            key: state.formKey,
+            child: AppTextFormField(
+              controller: controller,
+              label: label,
+              hint: hint,
+              helperText: helperText,
+              prefixIcon: prefixIcon,
+              maxLines: maxLines,
+              keyboardType: keyboardType,
+              inputFormatters: inputFormatters,
+              validator: validator,
+            ),
           );
         },
         actionsBuilder: (context, state) => [
@@ -238,11 +262,17 @@ class _StoreInformationSettingsPageState
           AppDialogAction(
             label: 'Save',
             isPrimary: true,
-            onPressed: (context) => state.pop(
-              ModalResult<String>.saved(
-                state.textController('value').text.trim(),
-              ),
-            ),
+            onPressed: (context) {
+              if (validator != null &&
+                  !(state.formKey.currentState?.validate() ?? false)) {
+                return;
+              }
+              state.pop(
+                ModalResult<String>.saved(
+                  state.textController('value').text.trim(),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -264,6 +294,7 @@ class _StoreInformationSettingsPageState
         await settingsService.updateSettings(
           settings.copyWith(storeName: result.value!),
         );
+        _invalidateSettingsProviders();
         await _loadSettings();
         if (mounted) {
           await AppDialogService.success(
@@ -313,10 +344,12 @@ class _StoreInformationSettingsPageState
       _ => null,
     };
 
+    final isPhone = fieldKey == 'store_phone';
+
     final hint = switch (fieldKey) {
       'store_address' => 'Store address',
-      'store_phone' => '09XX XXX XXXX',
-      'receipt_footer' => 'Thank you for your purchase!',
+      'store_phone' => PhoneUtils.phMobileHint,
+      'receipt_footer' => AppConstants.defaultReceiptFooter,
       _ => null,
     };
 
@@ -324,19 +357,35 @@ class _StoreInformationSettingsPageState
       title: label,
       label: label,
       hint: hint,
+      helperText: isPhone ? '11-digit PH mobile number.' : null,
       initialValue: currentValue,
       maxLines: fieldKey == 'receipt_footer' ? 2 : 1,
       prefixIcon: prefixIcon,
+      keyboardType: isPhone ? TextInputType.phone : null,
+      inputFormatters: isPhone ? [PhMobileInputFormatter()] : null,
+      validator: isPhone
+          ? (value) =>
+              value == null ||
+                      value.trim().isEmpty ||
+                      PhoneUtils.isValidPhMobile(value)
+                  ? null
+                  : 'Enter an 11-digit PH mobile number '
+                      '(e.g. ${PhoneUtils.phMobileHint}).'
+          : null,
     );
 
     if (result?.isSaved == true && mounted) {
+      final value = isPhone
+          ? PhoneUtils.formatPhMobile(result!.value!)
+          : result!.value!;
       final updated = settings.copyWith(
-        storeAddress: fieldKey == 'store_address' ? result!.value! : null,
-        storePhone: fieldKey == 'store_phone' ? result!.value! : null,
-        receiptFooter: fieldKey == 'receipt_footer' ? result!.value! : null,
+        storeAddress: fieldKey == 'store_address' ? value : null,
+        storePhone: isPhone ? value : null,
+        receiptFooter: fieldKey == 'receipt_footer' ? value : null,
       );
       try {
         await settingsService.updateSettings(updated);
+        _invalidateSettingsProviders();
         await _loadSettings();
         if (mounted) {
           await AppDialogService.success(
@@ -403,6 +452,7 @@ class _StoreInformationSettingsPageState
         await settingsService.updateSettings(
           settings.copyWith(currency: result),
         );
+        _invalidateSettingsProviders();
         await _loadSettings();
         if (mounted) {
           await AppDialogService.success(

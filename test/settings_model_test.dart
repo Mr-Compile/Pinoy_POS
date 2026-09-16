@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pinoy_pos/core/constants.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
 
 /// Regression tests for [Settings.fromMap] resilience.
@@ -51,6 +52,42 @@ void main() {
 
       expect(settings.createdAt, DateTime.fromMillisecondsSinceEpoch(0));
       expect(settings.updatedAt, DateTime.fromMillisecondsSinceEpoch(0));
+    });
+  });
+
+  group('Settings receipt footer default', () {
+    test('constructor defaults to AppConstants.defaultReceiptFooter', () {
+      final settings = Settings(
+        storeName: 'Test Store',
+        createdAt: DateTime(2026, 1, 1),
+        updatedAt: DateTime(2026, 1, 1),
+      );
+      expect(settings.receiptFooter, AppConstants.defaultReceiptFooter);
+    });
+
+    test('fromMap falls back to the default when the column is missing', () {
+      expect(
+        Settings.fromMap(baseRow()).receiptFooter,
+        AppConstants.defaultReceiptFooter,
+      );
+    });
+
+    test('fromMap falls back to the default when the column is null', () {
+      final row = baseRow()..['receipt_footer'] = null;
+      expect(
+        Settings.fromMap(row).receiptFooter,
+        AppConstants.defaultReceiptFooter,
+      );
+    });
+
+    test('fromMap keeps a stored custom footer', () {
+      final row = baseRow()..['receipt_footer'] = 'Custom footer';
+      expect(Settings.fromMap(row).receiptFooter, 'Custom footer');
+    });
+
+    test('fromMap keeps an explicitly cleared empty footer', () {
+      final row = baseRow()..['receipt_footer'] = '';
+      expect(Settings.fromMap(row).receiptFooter, '');
     });
   });
 }

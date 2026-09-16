@@ -89,7 +89,7 @@ void main() {
       gcashCustomerNameRequirement: 'optional',
       gcashPaymentProofRequirement: 'optional',
       gcashVerificationMode: 'owner',
-      gcashReferenceMinLength: 6,
+      gcashReferenceMinLength: 13,
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
@@ -112,7 +112,7 @@ void main() {
       gcashCustomerNameRequirement: 'optional',
       gcashPaymentProofRequirement: 'optional',
       gcashVerificationMode: 'immediate',
-      gcashReferenceMinLength: 6,
+      gcashReferenceMinLength: 13,
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );

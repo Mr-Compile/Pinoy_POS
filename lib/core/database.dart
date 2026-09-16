@@ -505,6 +505,24 @@ class DatabaseHelper {
       }
     }
 
+    // Migration from v26 → v27: raise the GCash reference minimum length
+    // floor to 13 — a real GCash reference is 13 digits. Stored values at
+    // or above the floor (custom lengths the owner deliberately set) are
+    // preserved.
+    if (oldVersion < 27) {
+      try {
+        await db.execute(
+          'UPDATE settings SET gcash_reference_min_length = '
+          '${AppConstants.minGcashReferenceLength} '
+          'WHERE gcash_reference_min_length < '
+          '${AppConstants.minGcashReferenceLength}',
+        );
+      } catch (_) {
+        // Column may not exist on a damaged database; the model default
+        // still applies at read time.
+      }
+    }
+
     // Create any tables that were introduced after the backup's original
     // version but do not have an explicit migration block above (e.g.
     // `announcements`, `ai_usage`).  All CREATE statements in _createTables
@@ -846,7 +864,7 @@ class DatabaseHelper {
         gcash_customer_name_requirement TEXT NOT NULL DEFAULT 'optional',
         gcash_payment_proof_requirement TEXT NOT NULL DEFAULT 'optional',
         gcash_verification_mode TEXT NOT NULL DEFAULT 'immediate',
-        gcash_reference_min_length INTEGER NOT NULL DEFAULT 6,
+        gcash_reference_min_length INTEGER NOT NULL DEFAULT ${AppConstants.minGcashReferenceLength},
         gcash_qr_image_path TEXT,
         gcash_qr_image_type TEXT,
         gcash_qr_preview_path TEXT,

@@ -38,7 +38,7 @@ class Settings {
     this.storeAddress = '',
     this.storePhone = '',
     this.currency = 'PHP',
-    this.receiptFooter,
+    this.receiptFooter = AppConstants.defaultReceiptFooter,
     this.theme,
     this.groqApiKey,
     this.groqModel,
@@ -47,7 +47,7 @@ class Settings {
     this.gcashCustomerNameRequirement = 'optional',
     this.gcashPaymentProofRequirement = 'optional',
     this.gcashVerificationMode = 'immediate',
-    this.gcashReferenceMinLength = 6,
+    this.gcashReferenceMinLength = AppConstants.minGcashReferenceLength,
     this.gcashQrImagePath,
     this.gcashQrImageType,
     this.gcashQrPreviewPath,
@@ -136,7 +136,8 @@ class Settings {
       storeAddress: stringOrNull('store_address') ?? '',
       storePhone: stringOrNull('store_phone') ?? '',
       currency: stringOrNull('currency') ?? 'PHP',
-      receiptFooter: stringOrNull('receipt_footer'),
+      receiptFooter:
+          stringOrNull('receipt_footer') ?? AppConstants.defaultReceiptFooter,
       theme: stringOrNull('theme'),
       groqApiKey: null, // Stored in flutter_secure_storage, never in memory from the DB
       groqModel: stringOrNull('groq_model'),
@@ -148,7 +149,8 @@ class Settings {
           stringOrNull('gcash_payment_proof_requirement') ?? 'optional',
       gcashVerificationMode:
           stringOrNull('gcash_verification_mode') ?? 'immediate',
-      gcashReferenceMinLength: intOrNull('gcash_reference_min_length') ?? 6,
+      gcashReferenceMinLength: intOrNull('gcash_reference_min_length') ??
+          AppConstants.minGcashReferenceLength,
       gcashQrImagePath: stringOrNull('gcash_qr_image_path'),
       gcashQrImageType: stringOrNull('gcash_qr_image_type'),
       gcashQrPreviewPath: stringOrNull('gcash_qr_preview_path'),

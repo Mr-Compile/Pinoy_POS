@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/constants.dart';
 import 'package:pinoy_pos/core/currency_utils.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/data/models/receipt_view_data.dart';
@@ -387,7 +388,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
           _buildMetaSection(receipt, dateFormat),
           const SizedBox(height: Spacing.lg),
           Text(
-            receipt.receiptFooter ?? 'Thank you, please come again!',
+            receipt.receiptFooter ?? AppConstants.defaultReceiptFooter,
             style: AppTypography.bodySmall(
               context,
             ).copyWith(color: cs.onSurfaceVariant),
