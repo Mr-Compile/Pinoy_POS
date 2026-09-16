@@ -11,6 +11,7 @@ import 'package:pinoy_pos/services/license_service.dart';
 import 'package:pinoy_pos/services/session_settings_service.dart';
 import 'package:pinoy_pos/services/session_timeout_service.dart';
 import 'package:pinoy_pos/ui/dialogs/session_expiring_dialog.dart';
+import 'package:pinoy_pos/ui/screens/activation_screen.dart';
 import 'package:pinoy_pos/ui/screens/license_locked_screen.dart';
 
 /// Root-level widget that watches user input and app lifecycle to enforce
@@ -101,18 +102,23 @@ class _SessionGuardState extends ConsumerState<SessionGuard>
   }
 
   void _handleLicenseChanged(LicenseStatus? previous, LicenseStatus next) {
-    if (!next.isLocked) {
+    final gated = next.isLocked || next.requiresActivation;
+    if (!gated) {
       _licenseLockEnforced = false;
       return;
     }
-    if (previous?.isLocked ?? false) return;
-    _enforceLicenseLock();
+    final wasGated =
+        (previous?.isLocked ?? false) || (previous?.requiresActivation ?? false);
+    if (wasGated) return;
+    _enforceLicenseLock(next);
   }
 
   /// Logs out any active session and replaces the whole navigation stack
-  /// with [LicenseLockedScreen]. Runs even when nobody is logged in so the
-  /// lock also covers the login screen itself.
-  void _enforceLicenseLock() {
+  /// with the gate screen — [ActivationScreen] while the install is
+  /// unactivated, [LicenseLockedScreen] for an expired/tampered license.
+  /// Runs even when nobody is logged in so the gate also covers the login
+  /// screen itself.
+  void _enforceLicenseLock(LicenseStatus status) {
     if (_licenseLockEnforced) return;
     _licenseLockEnforced = true;
 
@@ -123,7 +129,9 @@ class _SessionGuardState extends ConsumerState<SessionGuard>
         }
       } finally {
         widget.navigatorKey.currentState?.pushAndRemoveUntil(
-          LicenseLockedScreen.route(),
+          status.requiresActivation
+              ? ActivationScreen.route()
+              : LicenseLockedScreen.route(),
           (_) => false,
         );
       }

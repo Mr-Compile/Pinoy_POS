@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:pinoy_pos/core/security.dart';
 import 'package:pinoy_pos/services/secure_storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -58,7 +59,16 @@ enum LicenseLockState {
   evaluating,
 
   /// The feature has never been configured on this device.
+  ///
+  /// No longer produced by [LicenseService.evaluate] — a device with no
+  /// license state is [activationRequired] instead. Kept so persisted
+  /// semantics and older call sites remain meaningful.
   notConfigured,
+
+  /// No usable license state exists — fresh install, wiped storage, or a
+  /// bookkeeping blob that has never been activated. The app is gated
+  /// behind the developer's master activation code.
+  activationRequired,
 
   /// Configured but not armed — no enforcement.
   inactive,
@@ -111,6 +121,9 @@ enum LicenseEventType {
   passwordChanged,
   warning,
   expired,
+
+  /// The master activation code was redeemed on this device.
+  activated,
 }
 
 /// One entry in the signed license activity log.
@@ -122,6 +135,22 @@ class LicenseEvent {
 
   /// Short human-readable context, e.g. `'90-day term'` or `'+30 days'`.
   final String detail;
+}
+
+/// Result of redeeming the master activation code on a gated device.
+class ActivationResult {
+  const ActivationResult._({required this.success, this.retryAfter});
+
+  factory ActivationResult.ok() => const ActivationResult._(success: true);
+
+  factory ActivationResult.invalid() =>
+      const ActivationResult._(success: false);
+
+  factory ActivationResult.lockedOut(Duration retryAfter) =>
+      ActivationResult._(success: false, retryAfter: retryAfter);
+
+  final bool success;
+  final Duration? retryAfter;
 }
 
 /// Result of redeeming an unlock code on the lock screen.
@@ -213,6 +242,11 @@ class LicenseStatus {
 
   bool get isEvaluating => state == LicenseLockState.evaluating;
 
+  /// The device has never been activated — fresh install or wiped storage.
+  /// Routed to the activation screen, not the license lock screen.
+  bool get requiresActivation =>
+      state == LicenseLockState.activationRequired;
+
   bool get isLocked =>
       state == LicenseLockState.expired || state == LicenseLockState.tampered;
 
@@ -276,6 +310,7 @@ class LicenseStatus {
 class _LicenseConfig {
   _LicenseConfig({
     this.armed = false,
+    this.activated = false,
     this.expiresAtMs,
     this.armedAtMs = 0,
     this.message = '',
@@ -290,6 +325,22 @@ class _LicenseConfig {
        events = events ?? <LicenseEvent>[];
 
   bool armed;
+
+  /// Tri-state activation flag.
+  ///
+  /// - `null` → blob predates the activation feature (key absent in the
+  ///   stored payload, or an explicit null round-tripped from it) — the
+  ///   install is grandfathered and never gated.
+  /// - `false` → a config minted on this build that no developer code has
+  ///   redeemed yet — the device sits on the activation screen.
+  /// - `true` → activation code redeemed.
+  ///
+  /// Fresh configs default to `false` so that any blob created before
+  /// activation — including the rate-limit bookkeeping written by a failed
+  /// activation attempt — keeps the gate closed. Without this, setting a
+  /// developer password or saving a config on a wiped device would mint a
+  /// keyless blob that reads as "legacy" and opens the gate for free.
+  bool? activated;
   int? expiresAtMs;
   int armedAtMs;
   String message;
@@ -312,6 +363,7 @@ class _LicenseConfig {
   /// signature is stable across writes.
   Map<String, Object?> toPayload() => {
     'armed': armed,
+    'activated': activated,
     'expiresAtMs': expiresAtMs,
     'armedAtMs': armedAtMs,
     'message': message,
@@ -336,6 +388,9 @@ class _LicenseConfig {
     try {
       return _LicenseConfig(
         armed: map['armed'] == true,
+        // Absent key (pre-activation blobs) and explicit null both read
+        // back as null → grandfathered. Only a literal `false` gates.
+        activated: map['activated'] as bool?,
         expiresAtMs: (map['expiresAtMs'] as num?)?.toInt(),
         armedAtMs: (map['armedAtMs'] as num?)?.toInt() ?? 0,
         message: (map['message'] as String?) ?? '',
@@ -401,8 +456,16 @@ class _LoadedLicense {
 /// - Codes are single-use per device. The redeemed `'<days>:<index>'` keys
 ///   live inside the signed blob and are mirrored (also signed) into the
 ///   marker store, so deleting the secure blob alone does not reset them.
-///   The mirror is best-effort: wiping ALL app storage still returns the
-///   device to a fresh install — an accepted limit of any offline scheme.
+///   The mirror is best-effort: wiping ALL app storage clears it — but the
+///   wiped device lands on [LicenseLockState.activationRequired] and needs
+///   the master activation code before it runs again.
+/// - Activation is a separate gate ahead of the license term: any install
+///   whose signed blob is absent (fresh install / wipe) or was minted by
+///   this build without a code redemption (`activated == false`) is gated.
+///   Blobs written before the feature shipped carry no `activated` key and
+///   are grandfathered. The master code is deterministic HMAC, reusable,
+///   and displayed in the developer panel — which itself stays
+///   [DevGateMode.blocked] until the device is activated.
 /// - The developer password hash lives inside the signed blob, so it cannot
 ///   be swapped without invalidating the signature.
 /// - Password and unlock-code attempts share a persisted, signed
@@ -424,6 +487,12 @@ class LicenseService {
   // stronger posture, ship release builds with --obfuscate.
   static const String _stateSecret = 'pp-lic-state-4f2a9c7e1d6b83';
   static const String _unlockSecret = 'pp-lic-unlock-8b3d5f20a9e4c7';
+
+  /// Separate namespace for the master activation code so it can be
+  /// rotated without invalidating anything else — `activated` is just a
+  /// flag in the signed blob, a new secret only changes which code
+  /// redeems.
+  static const String _activationSecret = 'pp-lic-activate-7c41f9e2a6d85b30';
 
   static const int _maxFailedAttempts = 5;
   static const Duration _lockoutDuration = Duration(minutes: 5);
@@ -493,10 +562,12 @@ class LicenseService {
     if (!loaded.exists) {
       // Blob missing but the configured marker survives → someone deleted
       // the secure blob. Fail closed.
+      // Nothing at all → fresh install or wiped storage → the device must
+      // be activated with the developer's master code before it runs.
       return LicenseStatus(
         state: marker
             ? LicenseLockState.tampered
-            : LicenseLockState.notConfigured,
+            : LicenseLockState.activationRequired,
         effectiveNow: wallNow,
       );
     }
@@ -529,6 +600,11 @@ class LicenseService {
   }
 
   LicenseLockState _resolveState(_LicenseConfig cfg, DateTime effectiveNow) {
+    // Literal false = a blob this build minted that no activation code has
+    // redeemed. Null (legacy blob) and true both pass through.
+    if (cfg.activated == false) {
+      return LicenseLockState.activationRequired;
+    }
     if (!cfg.armed || cfg.expiresAtMs == null) {
       return LicenseLockState.inactive;
     }
@@ -563,17 +639,21 @@ class LicenseService {
   /// [DevGateMode.setup] is safe when the blob is signature-valid but has no
   /// password: only this code (holding the secret) can produce a valid
   /// signature, so a client cannot reach setup by tampering.
+  ///
+  /// While the device is unactivated the panel is always [DevGateMode
+  /// .blocked]: first-time setup on a fresh/wiped install would otherwise be
+  /// open to anyone, and the panel itself displays the master activation
+  /// code. The developer enters the code first, then creates the password.
   Future<DevGateMode> developerGateMode() async {
-    final marker = await _readMarker();
     final loaded = await _load();
 
     if (loaded.exists && loaded.signatureValid && loaded.config != null) {
+      if (loaded.config!.activated == false) return DevGateMode.blocked;
       return loaded.config!.devPasswordHash.isEmpty
           ? DevGateMode.setup
           : DevGateMode.verify;
     }
-    if (loaded.exists) return DevGateMode.blocked;
-    return marker ? DevGateMode.blocked : DevGateMode.setup;
+    return DevGateMode.blocked;
   }
 
   /// Sets the developer password. Only allowed in [DevGateMode.setup].
@@ -687,16 +767,66 @@ class LicenseService {
     } catch (_) {}
   }
 
+  // ── Activation ───────────────────────────────────────────────────────
+
+  /// The master activation code. Deterministic — no generation step, no
+  /// server, and the developer panel can render it on demand. Reusable by
+  /// design: the same code activates every install, before and after a
+  /// wipe. If it ever leaks, rotate [_activationSecret] in an update.
+  String activationCode() =>
+      _renderCode(_activationSecret, 'PINOY-POS:ACTIVATE');
+
+  /// Redeems the master activation code on a gated device.
+  ///
+  /// Unlike unlock codes this also works on a device with no license state
+  /// at all — that is exactly the state it exists to resolve. A failed
+  /// attempt still writes the signed blob (with `activated: false`) so the
+  /// shared rate-limit counter persists; the blob alone does not open the
+  /// gate.
+  Future<ActivationResult> redeemActivationCode(String input) async {
+    final loaded = await _load();
+    // A tampered or absent blob resolves to a fresh config — nothing is
+    // salvaged from untrusted payloads, same posture as unlock redemption.
+    final cfg = (loaded.exists && loaded.signatureValid)
+        ? loaded.config!
+        : _LicenseConfig();
+
+    final lockout = _lockoutRemaining(cfg);
+    if (lockout != null) {
+      return ActivationResult.lockedOut(lockout);
+    }
+
+    if (_normalizeCode(input) != _normalizeCode(activationCode())) {
+      await _registerFailure(cfg);
+      return ActivationResult.invalid();
+    }
+
+    if (cfg.activated != true) {
+      _recordEvent(cfg, LicenseEventType.activated);
+    }
+    cfg
+      ..activated = true
+      ..failedAttempts = 0
+      ..lockoutUntilMs = 0;
+    await _persist(cfg);
+    return ActivationResult.ok();
+  }
+
   // ── Unlock codes ─────────────────────────────────────────────────────
 
   /// The human-dictatable unlock code for grant [days], slot [index]
   /// (0-based, must be below `unlockGrants[days]`). Deterministic — no
   /// generation step or server needed.
-  String unlockCode(int days, int index) {
+  String unlockCode(int days, int index) =>
+      _renderCode(_unlockSecret, 'PINOY-POS:EXTEND:$days:$index');
+
+  /// Shared deterministic code renderer — HMAC-SHA256 over [payload] keyed
+  /// by [secret], rendered as 8 Crockford-base32 characters `XXXX-XXXX`.
+  static String _renderCode(String secret, String payload) {
     final digest = Hmac(
       sha256,
-      utf8.encode(_unlockSecret),
-    ).convert(utf8.encode('PINOY-POS:EXTEND:$days:$index')).bytes;
+      utf8.encode(secret),
+    ).convert(utf8.encode(payload)).bytes;
     var value = 0;
     for (var i = 0; i < 5; i++) {
       value = (value << 8) | digest[i];
@@ -757,9 +887,12 @@ class LicenseService {
           final nowMs = _effectiveNowMs(cfg);
           // Stack: redeemed before the deadline, the grant extends from
           // the deadline; redeemed after, it extends from now.
+          // A genuine developer code is proof the developer was present —
+          // it also satisfies the activation gate.
           final baseMs = max(nowMs, cfg.expiresAtMs ?? 0);
           cfg
             ..armed = true
+            ..activated = true
             ..expiresAtMs = baseMs + Duration(days: grant.key).inMilliseconds
             ..armedAtMs = nowMs
             ..failedAttempts = 0
@@ -878,6 +1011,13 @@ class LicenseService {
     sha256,
     utf8.encode(_stateSecret),
   ).convert(utf8.encode(jsonEncode(payload))).toString();
+
+  /// Test hook: signs a payload exactly as [_persist] does, so tests can
+  /// fabricate blobs this build would never write — e.g. a legacy blob
+  /// with no `activated` key, to prove grandfathering.
+  @visibleForTesting
+  static String signPayloadForTest(Map<String, Object?> payload) =>
+      _sign(payload);
 
   /// Effective "now" in milliseconds — the wall clock clamped to the
   /// monotonic watermark so lockouts cannot be dodged by rewinding time.

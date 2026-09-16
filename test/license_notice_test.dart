@@ -33,6 +33,12 @@ void main() {
     );
   });
 
+  /// Satisfies the activation gate — devices start unactivated, and an
+  /// unactivated device never shows the countdown strip.
+  Future<void> activate() async {
+    await service.redeemActivationCode(service.activationCode());
+  }
+
   Future<void> pumpNotice(WidgetTester tester) async {
     await tester.pumpWidget(
       ProviderScope(
@@ -50,6 +56,7 @@ void main() {
         armed: true,
         expiresAt: now.add(const Duration(days: 30)),
       );
+      await activate();
       await pumpNotice(tester);
 
       expect(find.text('Trial · 30 days left'), findsOneWidget);
@@ -62,6 +69,7 @@ void main() {
         armed: true,
         expiresAt: now.add(const Duration(days: 90)),
       );
+      await activate();
       await pumpNotice(tester);
 
       expect(find.text('License · 90 days left'), findsOneWidget);
@@ -76,6 +84,7 @@ void main() {
         armed: true,
         expiresAt: now.add(const Duration(days: 30)),
       );
+      await activate();
       // 5 days remain — inside the proportional warning window (7.5d).
       now = now.add(const Duration(days: 25));
       await pumpNotice(tester);
@@ -95,6 +104,7 @@ void main() {
         expiresAt: now.add(const Duration(days: 30)),
         contactInfo: 'Dev 0917',
       );
+      await activate();
       // 20 hours remain — inside warning window AND critical window.
       now = now.add(const Duration(days: 29, hours: 4));
       await pumpNotice(tester);
@@ -115,6 +125,7 @@ void main() {
         armed: true,
         expiresAt: now.add(const Duration(days: 4)),
       );
+      await activate();
       now = now.add(const Duration(hours: 60)); // 36h remain
       await pumpNotice(tester);
 
@@ -160,6 +171,7 @@ void main() {
       armed: true,
       expiresAt: now.add(const Duration(days: 90)),
     );
+    await activate();
     await pumpNotice(tester);
 
     await tester.tap(find.text('Enter code'));

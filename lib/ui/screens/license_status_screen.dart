@@ -50,6 +50,13 @@ class LicenseStatusScreen extends ConsumerWidget {
               'No developer license has been set on this device. '
               'The app runs without restrictions.',
         ),
+        LicenseLockState.activationRequired => const EmptyState(
+          icon: Icons.verified_user_outlined,
+          title: 'Activation required',
+          message:
+              'This installation has not been activated. The app is '
+              'gated until the developer activation code is entered.',
+        ),
         _ => _buildBody(context, ref, status),
       },
     );

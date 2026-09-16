@@ -292,6 +292,8 @@ String _licenseSubtitle(LicenseStatus status) {
       return 'Configured — enforcement off';
     case LicenseLockState.notConfigured:
       return 'No license configured';
+    case LicenseLockState.activationRequired:
+      return 'Activation required';
     case LicenseLockState.evaluating:
       return 'Checking license…';
   }

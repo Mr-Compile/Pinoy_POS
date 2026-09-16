@@ -88,6 +88,8 @@ class _DeveloperLicenseScreenState
                         const SizedBox(height: Spacing.lg),
                         _buildConfigCard(status),
                         const SizedBox(height: Spacing.lg),
+                        _buildActivationCard(),
+                        const SizedBox(height: Spacing.lg),
                         _buildUnlockCodesCard(status),
                         const SizedBox(height: Spacing.lg),
                         _buildActivityCard(status),
@@ -137,6 +139,11 @@ class _DeveloperLicenseScreenState
           'Configured — not armed',
           AppSemanticColors.resolve(AppSemanticColors.neutral, brightness),
           Icons.pause_circle_outline,
+        ),
+      LicenseLockState.activationRequired => (
+          'Awaiting activation — app is gated',
+          AppSemanticColors.resolve(AppSemanticColors.warning, brightness),
+          Icons.verified_user_outlined,
         ),
       _ => (
           'Not configured',
@@ -330,6 +337,55 @@ class _DeveloperLicenseScreenState
     });
   }
 
+  // ── Activation ─────────────────────────────────────────────────────
+
+  /// The master activation code, rendered on demand. Required by every
+  /// fresh install and every wiped device before the app runs — this panel
+  /// stays locked until the device is activated, so the code is only ever
+  /// visible to someone who already holds it (or the developer password).
+  Widget _buildActivationCard() {
+    final cs = Theme.of(context).colorScheme;
+    final service = ref.read(licenseServiceProvider);
+    final code = service.activationCode();
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Activation code',
+            style: AppTypography.titleSmallBold(context),
+          ),
+          const SizedBox(height: Spacing.xs),
+          Text(
+            'Required once per install — every fresh install and every '
+            'wiped device asks for it before the app runs. The same code '
+            'works everywhere; keep it to yourself.',
+            style: AppTypography.bodySmall(context)
+                .copyWith(color: cs.onSurfaceVariant),
+          ),
+          const SizedBox(height: Spacing.sm),
+          ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.verified_user_outlined),
+            title: Text(
+              code,
+              style: AppTypography.bodyMediumSemibold(context)
+                  .copyWith(letterSpacing: 2),
+            ),
+            trailing: IconButton(
+              icon: const Icon(Icons.copy_outlined, size: 18),
+              tooltip: 'Copy code',
+              onPressed: () => _copyCode(code),
+            ),
+            onTap: () => _copyCode(code),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ── Unlock codes ─────────────────────────────────────────────────────
 
   Widget _buildUnlockCodesCard(LicenseStatus status) {
@@ -520,6 +576,10 @@ class _DeveloperLicenseScreenState
           'License expired — app locked',
           AppSemanticColors.error,
         ),
+      LicenseEventType.activated => (
+          'Device activated',
+          AppSemanticColors.info,
+        ),
     };
     final dot = AppSemanticColors.resolve(color, brightness);
 
@@ -585,7 +645,8 @@ class _DeveloperLicenseScreenState
             ),
             subtitle: const Text(
               'Removes the license entirely — no deadline, codes or '
-              'developer password. The app runs without restrictions.',
+              'developer password. The device returns to the activation '
+              'screen and needs the activation code again.',
             ),
             onTap: _clearConfiguration,
           ),

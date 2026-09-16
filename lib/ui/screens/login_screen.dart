@@ -10,6 +10,7 @@ import 'package:pinoy_pos/providers/license_provider.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
 import 'package:pinoy_pos/services/license_service.dart';
 import 'package:pinoy_pos/ui/dialogs/license_unlock_dialog.dart';
+import 'package:pinoy_pos/ui/screens/activation_screen.dart';
 import 'package:pinoy_pos/ui/screens/license_locked_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
@@ -80,8 +81,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _login() async {
     FocusScope.of(context).unfocus();
 
-    // A locked license blocks login entirely — route to the lock screen.
-    if (ref.read(licenseStatusProvider).isLocked) {
+    // A gated license blocks login entirely — route to the gate screen.
+    final license = ref.read(licenseStatusProvider);
+    if (license.requiresActivation) {
+      await Navigator.of(
+        context,
+      ).pushAndRemoveUntil(ActivationScreen.route(), (_) => false);
+      return;
+    }
+    if (license.isLocked) {
       await Navigator.of(
         context,
       ).pushAndRemoveUntil(LicenseLockedScreen.route(), (_) => false);

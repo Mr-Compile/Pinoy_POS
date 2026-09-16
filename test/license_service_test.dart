@@ -29,6 +29,16 @@ void main() {
     clock: () => now,
   );
 
+  /// Satisfies the activation gate so tests can exercise post-activation
+  /// license states. Devices under test start unactivated — anything that
+  /// asserts an active/inactive/expired state must call this first.
+  Future<void> activate() async {
+    final result = await service.redeemActivationCode(
+      service.activationCode(),
+    );
+    assert(result.success);
+  }
+
   setUp(() {
     stateStore = MemoryLicenseStore();
     markerStore = MemoryLicenseStore();
@@ -39,9 +49,10 @@ void main() {
   String? rawBlob() => stateStore.data['pinoy_pos.license_state.v1'];
 
   group('evaluate', () {
-    test('returns notConfigured on a fresh device', () async {
+    test('requires activation on a fresh device', () async {
       final status = await service.evaluate();
-      expect(status.state, LicenseLockState.notConfigured);
+      expect(status.state, LicenseLockState.activationRequired);
+      expect(status.requiresActivation, isTrue);
       expect(status.isLocked, isFalse);
     });
 
@@ -52,6 +63,7 @@ void main() {
         message: 'Pay up',
         contactInfo: 'Dev 0917',
       );
+      await activate();
 
       final status = await service.evaluate();
       expect(status.state, LicenseLockState.active);
@@ -66,6 +78,7 @@ void main() {
         armed: true,
         expiresAt: now.subtract(const Duration(minutes: 1)),
       );
+      await activate();
 
       final status = await service.evaluate();
       expect(status.state, LicenseLockState.expired);
@@ -79,6 +92,7 @@ void main() {
           armed: true,
           expiresAt: now.add(const Duration(hours: 1)),
         );
+        await activate();
         now = now.add(const Duration(hours: 2));
 
         final status = await service.evaluate();
@@ -92,6 +106,7 @@ void main() {
         armed: false,
         expiresAt: now.subtract(const Duration(days: 1)),
       );
+      await activate();
 
       final status = await service.evaluate();
       expect(status.state, LicenseLockState.inactive);
@@ -105,6 +120,7 @@ void main() {
         armed: true,
         expiresAt: now.add(const Duration(days: 30)),
       );
+      await activate();
       // 30-day term → the warning appears only in the last ~7.5 days.
       expect((await service.evaluate()).isExpiringSoon, isFalse);
 
@@ -117,6 +133,7 @@ void main() {
         armed: true,
         expiresAt: now.add(const Duration(days: 30)),
       );
+      await activate();
       final status = await service.evaluate();
       expect(status.warningThreshold, const Duration(days: 7, hours: 12));
       expect(status.isExpiringSoon, isFalse);
@@ -127,6 +144,7 @@ void main() {
         armed: true,
         expiresAt: now.add(const Duration(days: 365)),
       );
+      await activate();
       final status = await service.evaluate();
       expect(status.warningThreshold, LicenseService.warningWindow);
       expect(status.isExpiringSoon, isFalse);
@@ -137,6 +155,7 @@ void main() {
         armed: true,
         expiresAt: now.add(const Duration(days: 2)),
       );
+      await activate();
       var status = await service.evaluate();
       expect(status.warningThreshold, const Duration(days: 1));
       expect(status.isExpiringSoon, isFalse); // 2 days remain
@@ -162,6 +181,7 @@ void main() {
         armed: true,
         expiresAt: now.add(const Duration(days: 45)),
       );
+      await activate();
       expect((await service.evaluate()).isExpiringSoon, isFalse);
     });
 
@@ -170,6 +190,7 @@ void main() {
         armed: true,
         expiresAt: now.subtract(const Duration(hours: 1)),
       );
+      await activate();
       expect((await service.evaluate()).isExpiringSoon, isFalse);
 
       await service.saveConfig(
@@ -186,6 +207,7 @@ void main() {
         armed: true,
         expiresAt: now.add(const Duration(days: 30)),
       );
+      await activate();
       final status = await service.evaluate();
       expect(status.armedAt, now);
       expect(status.totalTerm, const Duration(days: 30));
@@ -195,6 +217,7 @@ void main() {
     test('re-saving the same deadline keeps the original term start', () async {
       final expiry = now.add(const Duration(days: 30));
       await service.saveConfig(armed: true, expiresAt: expiry);
+      await activate();
       final armedAt = (await service.evaluate()).armedAt;
 
       now = now.add(const Duration(days: 1));
@@ -212,6 +235,7 @@ void main() {
         armed: true,
         expiresAt: now.add(const Duration(days: 30)),
       );
+      await activate();
 
       now = now.add(const Duration(days: 10));
       final status = await service.saveConfig(
@@ -228,6 +252,7 @@ void main() {
         armed: true,
         expiresAt: now.add(const Duration(days: 30)),
       );
+      await activate();
       final status = await service.saveConfig(armed: false);
       expect(status.armedAt, isNull);
       expect(status.totalTerm, isNull);
@@ -238,6 +263,7 @@ void main() {
         armed: true,
         expiresAt: now.add(const Duration(days: 30)),
       );
+      await activate();
       now = now.add(const Duration(days: 28)); // 2 days left — warning on
       expect((await service.evaluate()).isExpiringSoon, isTrue);
 
@@ -256,6 +282,7 @@ void main() {
         armed: true,
         expiresAt: now.add(const Duration(days: 30)),
       );
+      await activate();
       expect((await service.evaluate()).showCountdown, isTrue);
 
       now = now.add(const Duration(days: 28)); // inside the window
@@ -271,6 +298,7 @@ void main() {
         armed: true,
         expiresAt: now.add(const Duration(hours: 1)),
       );
+      await activate();
 
       // Time passes: watermark advances past the deadline.
       now = now.add(const Duration(hours: 2));
@@ -292,6 +320,7 @@ void main() {
           armed: true,
           expiresAt: now.add(const Duration(days: 30)),
         );
+        await activate();
 
         // Advance real time to just before expiry — watermark follows.
         now = now.add(const Duration(days: 29));
@@ -353,7 +382,8 @@ void main() {
   });
 
   group('developer password', () {
-    test('fresh device offers setup, then verifies', () async {
+    test('activated device offers setup, then verifies', () async {
+      await activate();
       expect(await service.developerGateMode(), DevGateMode.setup);
 
       expect(await service.initializeDeveloperPassword('devpass123'), isTrue);
@@ -364,17 +394,20 @@ void main() {
     });
 
     test('initialize is refused once a password exists', () async {
+      await activate();
       await service.initializeDeveloperPassword('devpass123');
       expect(await service.initializeDeveloperPassword('other'), isFalse);
     });
 
     test('wrong password reports incorrect', () async {
+      await activate();
       await service.initializeDeveloperPassword('devpass123');
       final res = await service.verifyDeveloperPassword('nope');
       expect(res.result, DevAuthResult.incorrect);
     });
 
     test('five wrong attempts trigger a lockout window', () async {
+      await activate();
       await service.initializeDeveloperPassword('devpass123');
       for (var i = 0; i < 5; i++) {
         await service.verifyDeveloperPassword('wrong$i');
@@ -385,6 +418,7 @@ void main() {
     });
 
     test('lockout clears after the window passes', () async {
+      await activate();
       await service.initializeDeveloperPassword('devpass123');
       for (var i = 0; i < 5; i++) {
         await service.verifyDeveloperPassword('wrong$i');
@@ -395,6 +429,7 @@ void main() {
     });
 
     test('changing the password requires the current one', () async {
+      await activate();
       await service.initializeDeveloperPassword('devpass123');
 
       final bad = await service.changeDeveloperPassword('wrong', 'newpass1');
@@ -496,6 +531,7 @@ void main() {
         armed: true,
         expiresAt: now.subtract(const Duration(hours: 1)),
       );
+      await activate();
       expect((await service.evaluate()).isLocked, isTrue);
 
       final code = service.unlockCode(90, 0);
@@ -544,6 +580,7 @@ void main() {
         armed: true,
         expiresAt: now.add(const Duration(days: 30)),
       );
+      await activate();
       await service.saveConfig(armed: false, expiresAt: null);
 
       final result = await service.redeemUnlockCode(service.unlockCode(90, 0));
@@ -562,6 +599,7 @@ void main() {
         armed: true,
         expiresAt: now.subtract(const Duration(hours: 1)),
       );
+      await activate();
       final result = await service.redeemUnlockCode('AAAA-BBBB');
       expect(result.success, isFalse);
       expect((await service.evaluate()).isLocked, isTrue);
@@ -605,7 +643,7 @@ void main() {
   });
 
   group('clearConfiguration', () {
-    test('returns the device to a fresh, unlocked state', () async {
+    test('returns the device to the activation gate', () async {
       await service.saveConfig(
         armed: true,
         expiresAt: now.subtract(const Duration(days: 1)),
@@ -613,9 +651,9 @@ void main() {
       await service.clearConfiguration();
 
       final status = await service.evaluate();
-      expect(status.state, LicenseLockState.notConfigured);
+      expect(status.state, LicenseLockState.activationRequired);
       expect(status.isLocked, isFalse);
-      expect(await service.developerGateMode(), DevGateMode.setup);
+      expect(await service.developerGateMode(), DevGateMode.blocked);
     });
 
     test('clears the redeemed-code record like a fresh install', () async {
@@ -692,6 +730,7 @@ void main() {
     });
 
     test('password set and change are recorded', () async {
+      await activate();
       expect(await service.initializeDeveloperPassword('Str0ng!Pass'), isTrue);
       expect(
         (await service.changeDeveloperPassword(
@@ -707,6 +746,7 @@ void main() {
       expect(types, [
         LicenseEventType.passwordChanged,
         LicenseEventType.passwordSet,
+        LicenseEventType.activated,
       ]);
     });
 
@@ -777,6 +817,136 @@ void main() {
       await service.clearConfiguration();
 
       expect((await service.evaluate()).events, isEmpty);
+    });
+  });
+
+  group('activation', () {
+    test('master code is stable, formatted, and distinct from grants', () {
+      final code = service.activationCode();
+      expect(code, matches(RegExp(r'^[0-9A-Z]{4}-[0-9A-Z]{4}$')));
+      expect(service.activationCode(), code);
+      expect(code, isNot(service.unlockCode(30, 0)));
+    });
+
+    test('the master code activates a fresh install', () async {
+      final result = await service.redeemActivationCode(
+        service.activationCode(),
+      );
+      expect(result.success, isTrue);
+
+      final status = await service.evaluate();
+      expect(status.state, LicenseLockState.inactive);
+      expect(status.requiresActivation, isFalse);
+      expect(status.events.single.type, LicenseEventType.activated);
+    });
+
+    test('the code tolerates lowercase input and the dash', () async {
+      final result = await service.redeemActivationCode(
+        service.activationCode().toLowerCase(),
+      );
+      expect(result.success, isTrue);
+    });
+
+    test(
+      'a wrong code keeps the gate closed and persists the failure',
+      () async {
+        final result = await service.redeemActivationCode('AAAA-BBBB');
+        expect(result.success, isFalse);
+
+        // The bookkeeping blob exists — but activated:false keeps the
+        // device gated.
+        expect(rawBlob(), isNotNull);
+        expect(
+          (await service.evaluate()).state,
+          LicenseLockState.activationRequired,
+        );
+      },
+    );
+
+    test('five wrong attempts lock out further tries', () async {
+      for (var i = 0; i < 5; i++) {
+        await service.redeemActivationCode('BAD0-COD$i');
+      }
+      final res = await service.redeemActivationCode(
+        service.activationCode(),
+      );
+      expect(res.success, isFalse);
+      expect(res.retryAfter, isNotNull);
+    });
+
+    test('activation preserves an already-armed license', () async {
+      await service.saveConfig(
+        armed: true,
+        expiresAt: now.add(const Duration(days: 30)),
+      );
+      expect(
+        (await service.evaluate()).state,
+        LicenseLockState.activationRequired,
+      );
+
+      await activate();
+      expect((await service.evaluate()).state, LicenseLockState.active);
+    });
+
+    test('a wiped device returns to the gate', () async {
+      await activate();
+      await service.clearConfiguration();
+      expect(
+        (await service.evaluate()).state,
+        LicenseLockState.activationRequired,
+      );
+    });
+
+    test('a legacy blob without the activated key is grandfathered', () async {
+      await service.saveConfig(armed: false);
+
+      // Strip the key and re-sign — exactly what a pre-feature build
+      // stored on devices already in the field.
+      final decoded = jsonDecode(rawBlob()!) as Map<String, Object?>;
+      final data = (decoded['data'] as Map).cast<String, Object?>()
+        ..remove('activated');
+      decoded['sig'] = LicenseService.signPayloadForTest(data);
+      stateStore.data['pinoy_pos.license_state.v1'] = jsonEncode(decoded);
+
+      final status = await service.evaluate();
+      expect(status.state, LicenseLockState.inactive);
+      expect(status.requiresActivation, isFalse);
+    });
+
+    test('setting a developer password cannot sidestep activation', () async {
+      // The panel is blocked while gated — no password setup, no access.
+      expect(await service.developerGateMode(), DevGateMode.blocked);
+      expect(
+        await service.initializeDeveloperPassword('devpass123'),
+        isFalse,
+      );
+      expect(
+        (await service.evaluate()).state,
+        LicenseLockState.activationRequired,
+      );
+    });
+
+    test('saving a config cannot sidestep activation', () async {
+      await service.saveConfig(
+        armed: true,
+        expiresAt: now.add(const Duration(days: 30)),
+      );
+      expect(
+        (await service.evaluate()).state,
+        LicenseLockState.activationRequired,
+      );
+    });
+
+    test('an unlock code redemption also activates the device', () async {
+      await service.saveConfig(armed: true, expiresAt: now);
+      expect(
+        (await service.evaluate()).state,
+        LicenseLockState.activationRequired,
+      );
+
+      final result = await service.redeemUnlockCode(service.unlockCode(30, 0));
+      expect(result.success, isTrue);
+      expect((await service.evaluate()).state, LicenseLockState.active);
     });
   });
 }

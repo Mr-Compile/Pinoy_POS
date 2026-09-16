@@ -1704,3 +1704,84 @@ flutter test test/auth_service_session_test.dart test/auth_session_flow_test.dar
 Result: `flutter analyze` clean; 28/28 tests pass including two new
 rebind cases in `auth_service_session_test.dart` (rowid collision ->
 same username kept, and absent account -> logged out).
+
+## Fresh-Install Activation Gate
+
+### Rule
+
+Every installation must be activated with a developer-held master code
+before the app can be used. A fresh install or a full app-data wipe lands
+on `ActivationScreen` and cannot reach login. Activation unlocks the
+**installation only** — it does not grant or extend a license term.
+
+### How it works (`lib/services/license_service.dart`)
+
+- New `LicenseLockState.activationRequired`. Evaluation order: no blob +
+  no marker -> `activationRequired`; marker without blob -> `tampered`;
+  bad signature -> `tampered`; `activated == false` -> `activationRequired`;
+  otherwise the existing `inactive`/`active`/`expired` resolution.
+- `_LicenseConfig.activated` is tri-state: absent/`null` means a legacy
+  pre-activation blob and is treated as activated (existing installs are
+  grandfathered); fresh `_LicenseConfig()` instances default to `false`,
+  so bookkeeping writes (failed attempts, dev-password setup) keep the
+  gate closed instead of looking "configured".
+- Master code = `HMAC(_activationSecret, 'PINOY-POS:ACTIVATE')` formatted
+  `XXXX-XXXX`, redeemable via `redeemActivationCode(input)` with the same
+  normalization + 5-failure/5-minute rate limit as unlock codes. Success
+  writes `activated=true`, records a `LicenseEventType.activated` event,
+  and persists blob + marker.
+- A successful unlock/extend-code redemption also sets `activated=true`
+  (a valid developer code proves authorization); on a never-configured
+  device those codes still return invalid because there is no marker.
+- `developerAccessState` returns a blocked result while unactivated, so
+  the 7-tap hidden entry cannot be used to set a password and open the
+  panel to read the master code. `DeveloperLicenseScreen` displays the
+  derived activation code only after activation.
+
+### Routing / UI
+
+- `lib/ui/screens/activation_screen.dart` — full-screen gate modeled on
+  `LicenseLockedScreen`: branding, "Activation Required", contact line,
+  code field, primary Activate, tertiary Developer access. Listens to
+  `licenseProvider` and self-heals to `LoginScreen` via
+  `pushAndRemoveUntil` once the device is activated.
+- `SplashScreen` routes to activation before auth when
+  `requiresActivation` is true; `SessionGuard` enforces it on its
+  1-minute timer and on app resume (gate can appear mid-session if a
+  wipe/reset occurs); `LoginScreen` redirects to the gate on submit.
+- `SettingsScreen` and `LicenseStatusScreen` show an
+  activation-required status distinct from "no license configured";
+  `LicenseNotice` stays hidden for the new state.
+
+### Test notes
+
+- `test/license_service_test.dart` — existing tests now call
+  `activateForTest()` (redeems the derived master code) before asserting
+  license behavior; the `activation` group covers fresh-state gating,
+  code normalization, rate limiting, legacy-blob grandfathering (via
+  `saveConfigForTest(omitActivated: true)`), wipe -> re-gate, and
+  unlock-code-redemption activation.
+- `test/auth_session_flow_test.dart` — the harness overrides
+  `licenseServiceProvider` with an in-memory store activated in `setUp`;
+  two tests cover cold-start gating and master-code -> login routing.
+- Widget tests: after entering the code, use `pumpAndSettle` (not fixed
+  pumps) — the outgoing `ActivationScreen` element lingers in the tree
+  while its route finishes disposal; asserting `findsNothing` too early
+  flakes.
+
+### Verification
+
+```powershell
+flutter analyze
+flutter test test/license_service_test.dart test/license_notice_test.dart test/auth_session_flow_test.dart
+```
+
+Result: `flutter analyze` clean; full suite 628/628 pass.
+
+### Known limits
+
+- This is a deterrent, not DRM: a patched/decompiled APK can skip the
+  check. Release builds should keep `--obfuscate`.
+- One leaked master code activates every device; rotating
+  `_activationSecret` invalidates the code without touching existing
+  activated installs (activation state is a flag inside the signed blob).

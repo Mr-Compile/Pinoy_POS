@@ -4,6 +4,7 @@ import 'package:pinoy_pos/core/auth_navigation.dart';
 import 'package:pinoy_pos/core/constants.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/license_provider.dart';
+import 'package:pinoy_pos/ui/screens/activation_screen.dart';
 import 'package:pinoy_pos/ui/screens/license_locked_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_logo.dart';
 
@@ -56,7 +57,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         if (current.isLoading || currentLicense.isEvaluating) return;
 
         _hasNavigated = true;
-        if (currentLicense.isLocked) {
+        if (currentLicense.requiresActivation) {
+          Navigator.of(context).pushAndRemoveUntil(
+            ActivationScreen.route(),
+            (_) => false,
+          );
+        } else if (currentLicense.isLocked) {
           Navigator.of(context).pushAndRemoveUntil(
             LicenseLockedScreen.route(),
             (_) => false,

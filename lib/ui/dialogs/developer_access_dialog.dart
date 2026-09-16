@@ -27,8 +27,8 @@ Future<bool> showDeveloperAccessDialog(
       context,
       title: 'Access Unavailable',
       message:
-          'The license state could not be verified. Use an unlock code to '
-          'restore access.',
+          'The license state could not be verified. Use an activation or '
+          'unlock code to restore access.',
     );
     return false;
   }

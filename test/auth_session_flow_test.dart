@@ -9,8 +9,11 @@ import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/core/session_status.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
+import 'package:pinoy_pos/providers/license_provider.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
+import 'package:pinoy_pos/services/license_service.dart';
 import 'package:pinoy_pos/ui/app_shell.dart';
+import 'package:pinoy_pos/ui/screens/activation_screen.dart';
 import 'package:pinoy_pos/ui/screens/login_screen.dart';
 import 'package:pinoy_pos/ui/screens/splash_screen.dart';
 import 'package:pinoy_pos/ui/widgets/session_guard.dart';
@@ -64,6 +67,21 @@ class _FakeAuthService extends AuthService {
   }
 }
 
+/// In-memory [LicenseStore] so the real [LicenseService] runs in tests
+/// without touching flutter_secure_storage or platform channels.
+class _MemoryLicenseStore implements LicenseStore {
+  final data = <String, String>{};
+
+  @override
+  Future<String?> read(String key) async => data[key];
+
+  @override
+  Future<void> write(String key, String value) async => data[key] = value;
+
+  @override
+  Future<void> delete(String key) async => data.remove(key);
+}
+
 void main() {
   User makeUser(int id, String username, UserRole role) => User(
         id: id,
@@ -75,6 +93,7 @@ void main() {
       );
 
   late _FakeAuthService authService;
+  late LicenseService licenseService;
   late Map<String, (User, String)> credentials;
 
   setUpAll(() {
@@ -88,7 +107,7 @@ void main() {
     databaseFactory = databaseFactoryFfi;
   });
 
-  setUp(() {
+  setUp(() async {
     SharedPreferences.setMockInitialValues({});
     SessionManager.resetForTest();
     credentials = {
@@ -97,10 +116,21 @@ void main() {
       'staff': (makeUser(3, 'staff', UserRole.staff), 'staff123'),
     };
     authService = _FakeAuthService(credentials);
+    // These tests exercise post-activation flows — the device starts
+    // activated so routing reaches the auth screens. The gate itself is
+    // covered by the activation tests at the bottom.
+    licenseService = LicenseService(
+      stateStore: _MemoryLicenseStore(),
+      markerStore: _MemoryLicenseStore(),
+    );
+    await licenseService.redeemActivationCode(licenseService.activationCode());
   });
 
-  ProviderContainer buildContainer() => ProviderContainer(overrides: [
+  ProviderContainer buildContainer([LicenseService? license]) =>
+      ProviderContainer(overrides: [
         authServiceProvider.overrideWithValue(authService),
+        licenseServiceProvider
+            .overrideWithValue(license ?? licenseService),
       ]);
 
   Widget buildApp(GlobalKey<NavigatorState> navKey, ProviderContainer c) {
@@ -301,5 +331,50 @@ void main() {
 
     expect(find.byType(LoginScreen), findsOneWidget);
     expect(find.byType(AppShell), findsNothing);
+  });
+
+  testWidgets(
+      'cold start on an unactivated device lands on the activation screen',
+      (tester) async {
+    final fresh = LicenseService(
+      stateStore: _MemoryLicenseStore(),
+      markerStore: _MemoryLicenseStore(),
+    );
+    final navKey = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(buildApp(navKey, buildContainer(fresh)));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ActivationScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+    // (Splash and SessionGuard can both push the gate — assert the screen,
+    // not the stack depth.)
+  });
+
+  testWidgets('the master activation code reaches the login screen',
+      (tester) async {
+    final fresh = LicenseService(
+      stateStore: _MemoryLicenseStore(),
+      markerStore: _MemoryLicenseStore(),
+    );
+    final navKey = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(buildApp(navKey, buildContainer(fresh)));
+    await tester.pumpAndSettle();
+    expect(find.byType(ActivationScreen), findsOneWidget);
+
+    await tester.enterText(
+      find.byType(TextFormField),
+      fresh.activationCode(),
+    );
+    await tester.tap(find.text('Activate'));
+    // The self-heal runs from a post-frame callback once the provider
+    // reports the device activated. Settle flushes the redemption, the
+    // refresh, the navigation transition and the outgoing route's
+    // disposal — the code field is unmounted with its route, so its
+    // cursor cannot keep the frame schedule alive.
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(find.byType(ActivationScreen), findsNothing);
+    expect(navKey.currentState!.canPop(), isFalse);
   });
 }
