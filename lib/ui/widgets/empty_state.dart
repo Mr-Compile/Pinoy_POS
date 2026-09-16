@@ -76,7 +76,16 @@ class EmptyState extends StatelessWidget {
 
         return SingleChildScrollView(
           child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            constraints: BoxConstraints(
+              minHeight: constraints.maxHeight,
+              // Fill the available width so the content column stays
+              // horizontally centered under loose-width parents (Scaffold
+              // body, shrink-wrapping Columns). Without this the scroll
+              // view shrink-wraps to the text's intrinsic width and the
+              // whole block sticks to the left edge.
+              minWidth:
+                  constraints.hasBoundedWidth ? constraints.maxWidth : 0.0,
+            ),
             child: content,
           ),
         );

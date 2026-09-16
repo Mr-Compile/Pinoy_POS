@@ -8,9 +8,9 @@ import 'package:pinoy_pos/ui/screens/developer_license_screen.dart';
 /// gate after [tapCount] taps inside [window].
 ///
 /// Mounted wherever the app logo renders — the login card, the
-/// navigation rail and the drawer — so the license panel stays reachable
-/// whether or not a session exists. No visual affordance; that's the
-/// point.
+/// navigation rail, the drawer and the compact app header — so the
+/// license panel stays reachable whether or not a session exists.
+/// No visual affordance; that's the point.
 class DeveloperAccessGate extends ConsumerStatefulWidget {
   const DeveloperAccessGate({required this.child, super.key});
 

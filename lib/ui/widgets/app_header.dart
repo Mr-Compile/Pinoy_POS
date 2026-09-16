@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:pinoy_pos/core/app_theme.dart';
+import 'package:pinoy_pos/core/breakpoints.dart';
+import 'package:pinoy_pos/core/spacing.dart';
+import 'package:pinoy_pos/ui/widgets/app_logo.dart';
+import 'package:pinoy_pos/ui/widgets/developer_access_gate.dart';
 import 'package:pinoy_pos/ui/widgets/notification_bell.dart';
 import 'package:pinoy_pos/ui/widgets/profile_menu.dart';
 import 'package:pinoy_pos/ui/widgets/theme_toggle.dart';
@@ -74,24 +78,40 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
     final headerForeground =
         Theme.of(context).appBarTheme.foregroundColor ?? AppColorTokens.onPrimaryBlue;
 
+    final Widget titleWidget = subtitle == null
+        ? Text(title)
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(title),
+              Text(
+                subtitle!,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: headerForeground.withValues(alpha: 0.85),
+                    ),
+              ),
+            ],
+          );
+
+    // The compact shell has no navigation rail to carry the brand mark,
+    // so it moves into the header on root screens — the same role the
+    // rail `leading` logo plays on medium/expanded layouts.
+    final showCompactLogo = !showBackButton &&
+        layoutClassFor(MediaQuery.sizeOf(context).width).isCompact;
+
     return AppBar(
       // Let AppBarTheme.titleTextStyle carry the size, weight, and color
       // so the title uses the same foreground as the header icons.
-      title: subtitle == null
-          ? Text(title)
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+      title: showCompactLogo
+          ? Row(
               children: [
-                Text(title),
-                Text(
-                  subtitle!,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: headerForeground.withValues(alpha: 0.85),
-                      ),
-                ),
+                const DeveloperAccessGate(child: AppIcon(size: 28)),
+                const SizedBox(width: Spacing.md),
+                Flexible(child: titleWidget),
               ],
-            ),
+            )
+          : titleWidget,
       leading: showBackButton
           ? IconButton(
               icon: Icon(Icons.arrow_back_rounded, color: headerForeground),

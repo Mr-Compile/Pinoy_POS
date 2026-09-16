@@ -70,7 +70,13 @@ class ErrorState extends StatelessWidget {
 
         return SingleChildScrollView(
           child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            constraints: BoxConstraints(
+              minHeight: constraints.maxHeight,
+              // Match EmptyState: fill available width so content stays
+              // centered instead of shrink-wrapping to the left edge.
+              minWidth:
+                  constraints.hasBoundedWidth ? constraints.maxWidth : 0.0,
+            ),
             child: content,
           ),
         );

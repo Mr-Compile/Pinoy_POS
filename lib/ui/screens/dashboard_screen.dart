@@ -490,7 +490,7 @@ class _OwnerDashboard extends ConsumerWidget {
     if (breakdown.isEmpty) {
       return const DashCard(
         title: 'Payment Methods',
-        children: [Text('No payment data this period.')],
+        children: [Center(child: Text('No payment data this period.'))],
       );
     }
 
@@ -505,7 +505,7 @@ class _OwnerDashboard extends ConsumerWidget {
     if (products.isEmpty) {
       return const DashCard(
         title: 'Top Products',
-        children: [Text('No products sold this period.')],
+        children: [Center(child: Text('No products sold this period.'))],
       );
     }
 
@@ -523,7 +523,7 @@ class _OwnerDashboard extends ConsumerWidget {
     if (summaries.isEmpty) {
       return const DashCard(
         title: 'Staff Performance',
-        children: [Text('No staff sales this period.')],
+        children: [Center(child: Text('No staff sales this period.'))],
       );
     }
 
@@ -617,7 +617,7 @@ class _OwnerDashboard extends ConsumerWidget {
         ),
       ),
       children: sales.isEmpty
-          ? const [Text('No sales recorded yet.')]
+          ? const [Center(child: Text('No sales recorded yet.'))]
           : _saleRows(context, sales),
     );
   }
@@ -663,7 +663,7 @@ class _OwnerDashboard extends ConsumerWidget {
     return DashCard(
       title: 'Recent Activity',
       children: activities.isEmpty
-          ? const [Text('No activity yet.')]
+          ? const [Center(child: Text('No activity yet.'))]
           : _activityRows(context, activities),
     );
   }
@@ -859,7 +859,7 @@ class _AdminDashboard extends ConsumerWidget {
       title: 'Users by Role',
       children: [
         if (total == 0)
-          const Text('No users yet.')
+          const Center(child: Text('No users yet.'))
         else
           DonutChart(
             size: 110,
@@ -1025,7 +1025,7 @@ class _AdminDashboard extends ConsumerWidget {
     return DashCard(
       title: 'Recent System Activity',
       children: activities.isEmpty
-          ? const [Text('No activity yet.')]
+          ? const [Center(child: Text('No activity yet.'))]
           : _activityRows(context, activities),
     );
   }
@@ -1162,7 +1162,7 @@ class _StaffDashboard extends ConsumerWidget {
     if (analytics.trend.isEmpty || _trendIsAllZero(analytics.trend)) {
       return const DashCard(
         title: 'My Sales Trend',
-        children: [Text('No sales recorded this period.')],
+        children: [Center(child: Text('No sales recorded this period.'))],
       );
     }
     final points = analytics.trend
@@ -1196,7 +1196,7 @@ class _StaffDashboard extends ConsumerWidget {
     if (products.isEmpty) {
       return const DashCard(
         title: 'My Top Products',
-        children: [Text('No products sold this period.')],
+        children: [Center(child: Text('No products sold this period.'))],
       );
     }
 
@@ -1214,7 +1214,7 @@ class _StaffDashboard extends ConsumerWidget {
     if (breakdown.isEmpty) {
       return const DashCard(
         title: 'Payment Breakdown',
-        children: [Text('No payment data this period.')],
+        children: [Center(child: Text('No payment data this period.'))],
       );
     }
 
@@ -1230,7 +1230,7 @@ class _StaffDashboard extends ConsumerWidget {
     if (status.total == 0) {
       return const DashCard(
         title: 'Inventory Status',
-        children: [Text('No products yet.')],
+        children: [Center(child: Text('No products yet.'))],
       );
     }
 
@@ -1337,7 +1337,7 @@ class _StaffDashboard extends ConsumerWidget {
     return DashCard(
       title: 'My Recent Activity',
       children: activities.isEmpty
-          ? const [Text('No activity yet.')]
+          ? const [Center(child: Text('No activity yet.'))]
           : _activityRows(context, activities),
     );
   }
