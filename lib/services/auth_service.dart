@@ -174,6 +174,54 @@ class AuthService {
     }
   }
 
+  /// Rebinds the persisted session after a database restore.
+  ///
+  /// A restore swaps the SQLite file, so the persisted session user id —
+  /// a rowid — may now point at a different user row. The session is
+  /// rebound by username, which is stable across backup/restore. When the
+  /// account exists and is active, the persisted session is re-pointed at
+  /// the restored row id. PIN-verified state is preserved only when the
+  /// restored PIN hash matches the pre-restore one; otherwise the user
+  /// must re-verify their PIN on the next [restoreSession].
+  ///
+  /// Returns the rebound user, or null when the account no longer exists
+  /// in the restored data — the session is logged out in that case.
+  Future<User?> rebindSessionAfterRestore() async {
+    final previous = _sessionManager.currentUser;
+    if (previous == null) return null;
+
+    final restored = await _userRepository.getByUsername(previous.username);
+    if (restored == null || !restored.isActive || restored.isDeleted) {
+      await logout();
+      return null;
+    }
+
+    _sessionManager.setCurrentUser(restored);
+
+    final now = DateTime.now();
+    final existing = _currentMetadata ?? await _loadSessionMetadata();
+    final metadata = (existing ??
+            SessionMetadata(
+              userId: restored.id!,
+              sessionExpiresAt:
+                  now.add(SessionSettingsService.maxSessionLifetime),
+              lastActivityAt: now,
+              pinVerified: !restored.hasPin,
+            ))
+        .copyWith(
+      userId: restored.id,
+      lastActivityAt: now,
+      pinVerified: !restored.hasPin ||
+          (restored.pin == previous.pin && existing?.pinVerified == true),
+    );
+
+    _currentMetadata = metadata;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_sessionKey, restored.id!);
+    await _persistSessionMetadata(metadata);
+    return restored;
+  }
+
   /// Starts a new persisted session for [user] with a fresh 8-hour expiry.
   Future<void> _createSession(User user) async {
     final now = DateTime.now();

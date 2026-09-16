@@ -301,6 +301,9 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
     bool canVerify,
     bool canViewEvidence,
   ) {
+    final headerForeground = Theme.of(context).appBarTheme.foregroundColor ??
+        AppColorTokens.onPrimaryBlue;
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -314,14 +317,16 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
           children: [
             Text(
               'Sale #${receipt.receiptNumber}',
-              style: AppTypography.titleMediumBold(context),
+              style: AppTypography.titleMediumBold(context).copyWith(
+                color: headerForeground,
+              ),
               overflow: TextOverflow.ellipsis,
               maxLines: 1,
             ),
             Text(
               _formatHeaderDate(receipt.date),
               style: AppTypography.bodySmall(context).copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                color: headerForeground.withValues(alpha: 0.85),
               ),
               overflow: TextOverflow.ellipsis,
               maxLines: 1,

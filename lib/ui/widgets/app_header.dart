@@ -106,7 +106,9 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
       title: showCompactLogo
           ? Row(
               children: [
-                const DeveloperAccessGate(child: AppIcon(size: 28)),
+                // The header surface is brand blue in both themes, so the
+                // icon must use the white asset regardless of brightness.
+                const DeveloperAccessGate(child: AppIcon(size: 28, forceDark: true)),
                 const SizedBox(width: Spacing.md),
                 Flexible(child: titleWidget),
               ],

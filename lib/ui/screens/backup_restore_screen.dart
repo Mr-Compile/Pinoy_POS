@@ -219,46 +219,66 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
     return null;
   }
 
+  /// Returns a usable backup destination, prompting the user to pick one
+  /// when none is configured or the saved one is no longer accessible.
+  ///
+  /// Returns null when the user declines or no valid location was chosen.
+  /// Shared by the manual export flow and the automated-backup gate so a
+  /// schedule can never be armed without a working destination.
+  Future<BackupLocation?> _requireBackupLocation() async {
+    final backupService = ref.read(backupServiceProvider);
+
+    var location = _backupLocation;
+    if (location == null || location.isNone) {
+      // Re-read the persisted location: the initial load may still be in
+      // flight, or a location may have been set from another flow.
+      location = await backupService.getSavedBackupLocation();
+      if (!mounted) return null;
+      if (location != null && !location.isNone) {
+        setState(() => _backupLocation = location);
+      }
+    }
+
+    if (location != null && !location.isNone) {
+      bool valid;
+      try {
+        valid = await backupService.isLocationValid(location);
+      } catch (e, st) {
+        _log('Backup location validation failed', e, st);
+        valid = false;
+      }
+      if (!mounted) return null;
+      if (valid) return location;
+
+      await backupService.clearBackupLocation();
+      if (!mounted) return null;
+      setState(() => _backupLocation = null);
+      final choose =
+          await AppDialogService.backupLocationUnavailable(context);
+      if (!choose || !mounted) return null;
+      final picked = await _chooseBackupLocation();
+      if (!mounted || picked == null || picked.isNone) return null;
+      return picked;
+    }
+
+    final choose = await AppDialogService.backupLocationRequired(context);
+    if (!choose || !mounted) return null;
+    final picked = await _chooseBackupLocation();
+    if (!mounted || picked == null || picked.isNone) return null;
+    return picked;
+  }
+
   // ── Export Backup ────────────────────────────────────────────────────
 
   Future<void> _exportBackup() async {
     if (_isExporting) return;
 
     final backupService = ref.read(backupServiceProvider);
-    final isWeb = kIsWeb;
 
-    // On non-web platforms, a saved location is required for the default
-    // "Save to saved location" flow. On web we do not need one.
-    if (!isWeb && (_backupLocation == null || _backupLocation!.isNone)) {
-      final choose = await AppDialogService.backupLocationRequired(context);
-      if (!choose || !mounted) return;
-      final location = await _chooseBackupLocation();
-      if (!mounted) return;
-      if (location == null || location.isNone) return;
-    }
-
-    // Validate the saved location is still accessible.
-    if (_backupLocation != null && !(_backupLocation?.isNone ?? true)) {
-      bool valid;
-      try {
-        valid = await backupService.isLocationValid(_backupLocation!);
-      } catch (e, st) {
-        _log('Backup location validation failed', e, st);
-        valid = false;
-      }
-
-      if (!valid) {
-        if (!mounted) return;
-        await backupService.clearBackupLocation();
-        if (!mounted) return;
-        setState(() => _backupLocation = null);
-        final choose = await AppDialogService.backupLocationUnavailable(context);
-        if (!choose || !mounted) return;
-        final location = await _chooseBackupLocation();
-        if (!mounted) return;
-        if (location == null || location.isNone) return;
-      }
-    }
+    // On web the browser download handles the destination; everywhere
+    // else a usable saved location is required before exporting.
+    if (!kIsWeb && await _requireBackupLocation() == null) return;
+    if (!mounted) return;
 
     await _runExportWithOptions(backupService);
   }
@@ -358,9 +378,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
 
       switch (result.result) {
         case BackupImportResult.success:
-          _invalidateAllProviders();
-          await AppDialogService.backupRestoreSuccess(context);
-          await _loadBackups();
+          await _handleRestoreSuccess();
         case BackupImportResult.canceled:
           break;
         case BackupImportResult.invalidFile:
@@ -407,9 +425,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
 
       switch (result.result) {
         case BackupImportResult.success:
-          _invalidateAllProviders();
-          await AppDialogService.backupRestoreSuccess(context);
-          await _loadBackups();
+          await _handleRestoreSuccess();
         case BackupImportResult.invalidFile:
           await AppDialogService.invalidBackupFile(context);
         case BackupImportResult.incompatible:
@@ -428,6 +444,34 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
       if (mounted) {
         setState(() => _isImporting = false);
       }
+    }
+  }
+
+  /// Handles a completed restore. The database file was swapped, so the
+  /// persisted session id (a rowid) may now point at a different account.
+  /// The session is rebound to the same username in the restored data
+  /// before providers are invalidated; when the account no longer exists
+  /// there, the session is cleared and the user is asked to sign in again.
+  Future<void> _handleRestoreSuccess() async {
+    final rebound =
+        await ref.read(authServiceProvider).rebindSessionAfterRestore();
+    if (!mounted) return;
+
+    if (rebound != null) {
+      await AppDialogService.backupRestoreSuccess(context);
+    } else {
+      await AppDialogService.info(
+        context,
+        title: 'Database Restored',
+        message: 'The backup was restored, but your account does not '
+            'exist in the restored data. Please sign in again.',
+      );
+    }
+    if (!mounted) return;
+
+    _invalidateAllProviders();
+    if (rebound != null) {
+      await _loadBackups();
     }
   }
 
@@ -550,7 +594,49 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
     }
   }
 
+  /// Enabling requires a working backup destination; without one the
+  /// schedule would save but every run would be skipped silently.
+  Future<void> _onAutoBackupEnabledChanged(bool value) async {
+    if (!value) {
+      setState(() {
+        _autoBackupSettings = _autoBackupSettings.copyWith(
+          enabled: false,
+          scheduledAt: DateTime.now(),
+        );
+      });
+      return;
+    }
+
+    if (_isSelectingLocation) return;
+    final location = await _requireBackupLocation();
+    if (!mounted || location == null) return;
+
+    setState(() {
+      _autoBackupSettings = _autoBackupSettings.copyWith(
+        enabled: true,
+        scheduledAt: DateTime.now(),
+      );
+    });
+  }
+
   Future<void> _saveAutoBackupSettings() async {
+    // A schedule that is enabled but has no usable destination can never
+    // run, so require (or repair) the location before persisting.
+    if (_autoBackupSettings.enabled) {
+      final location = await _requireBackupLocation();
+      if (!mounted) return;
+      if (location == null) {
+        await AppDialogService.warning(
+          context,
+          title: 'Schedule Not Saved',
+          message: 'Automatic backups need a backup location. Choose a '
+              'location or turn off "Enable automatic backups" and save '
+              'again.',
+        );
+        return;
+      }
+    }
+
     setState(() => _isSavingAutoBackup = true);
     try {
       final success = await ref
@@ -1062,14 +1148,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                 const Spacer(),
                 Switch(
                   value: _autoBackupSettings.enabled,
-                  onChanged: (value) {
-                    setState(() {
-                      _autoBackupSettings = _autoBackupSettings.copyWith(
-                        enabled: value,
-                        scheduledAt: DateTime.now(),
-                      );
-                    });
-                  },
+                  onChanged: _onAutoBackupEnabledChanged,
                 ),
               ],
             ),

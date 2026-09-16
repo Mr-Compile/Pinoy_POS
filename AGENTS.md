@@ -1065,7 +1065,7 @@ Results:
 
 - Schedule is Admin-controlled (`backup_restore`).
 - The scheduler does not add an OS background dependency; it only runs while the app is open.
-- Backup destination must be configured before automatic backups run; the scheduler skips silently (logs in debug) if missing or invalid.
+- Backup destination must be configured before automatic backups run. The UI enforces this at arm time: the enable switch (`_onAutoBackupEnabledChanged`) and "Save Schedule" (`_saveAutoBackupSettings`) both call `_requireBackupLocation()`, which re-reads the persisted location, validates it, and routes the user through the picker when missing or unusable. `_exportBackup` shares the same helper. The scheduler still skips (logs in debug) if the location goes missing or becomes invalid after the schedule was armed.
 - Monthly scheduling clamps the day to the last day of the next month.
 
 ### Verification
@@ -1663,3 +1663,44 @@ flutter test test/phone_utils_test.dart test/payment_settings_page_test.dart tes
 Result: `flutter analyze` clean; phone utils 13/13, payment settings
 2/2, settings model 9/9, GCash sales flow 11/11, POS payment validation
 7/7 — all pass.
+
+## Backup Restore Session Rebind Fix
+
+### Root Cause
+
+The persisted session keys on `users.id` — a SQLite rowid. Restoring a
+backup swaps the whole `.db` file, so after a restore that id can point
+at a different user row. `BackupRestoreScreen._invalidateAllProviders`
+invalidated `authStateProvider`, whose `_init` -> `restoreSession`
+resolved the stale id against the restored database and silently signed
+in whichever account owned that rowid (e.g. a Staff account) — no login
+screen, and the restore-success dialog rendered over an admin-only screen
+the new session had no permission for.
+
+### Changes Made
+
+- `lib/services/auth_service.dart` — new `rebindSessionAfterRestore()`:
+  re-resolves the session by `username` (stable across backup/restore),
+  re-points `user_session` prefs + session-token metadata at the
+  restored row id, and preserves `pinVerified` only when the restored
+  PIN hash matches the pre-restore one (a different PIN forces
+  re-verification on the next `restoreSession`). Missing, inactive, or
+  deleted accounts are logged out and `null` is returned.
+- `lib/ui/screens/backup_restore_screen.dart` — both restore success
+  branches (file import and history restore) now run
+  `_handleRestoreSuccess()`: rebind first, then show the success dialog
+  (or a 'sign in again' info dialog when the account is absent), then
+  invalidate providers. `authStateProvider._init` therefore re-resolves
+  the correct user — fully authenticated when the restored account has no
+  PIN, PIN-locked when it does, unauthenticated after a cleared session.
+
+### Verification
+
+```powershell
+flutter analyze
+flutter test test/auth_service_session_test.dart test/auth_session_flow_test.dart test/backup_service_test.dart test/backup_validation_test.dart test/backup_service_integration_test.dart test/pin_flow_test.dart
+```
+
+Result: `flutter analyze` clean; 28/28 tests pass including two new
+rebind cases in `auth_service_session_test.dart` (rowid collision ->
+same username kept, and absent account -> logged out).
