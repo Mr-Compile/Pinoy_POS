@@ -16,12 +16,13 @@ final paymentSettingsProvider = FutureProvider<PaymentSettings>((ref) async {
 });
 
 /// Decoded content of the merchant payment QR stored at the given relative
-/// image path. The result is cached per path so reopening the GCash payment
-/// screen does not decode the image again.
+/// image path.
+///
+/// The payload is persisted on the settings row at upload time (or lazily
+/// on first open for QRs uploaded before the cache existed), so repeat
+/// opens parse a stored string instead of image-decoding the QR again.
+/// The Riverpod family cache is only an in-memory layer on top.
 final paymentQrDecodeProvider =
     FutureProvider.family<DecodedPaymentQr, String?>((ref, imagePath) async {
-  if (imagePath == null || imagePath.isEmpty) {
-    return const DecodedPaymentQr.notDetected();
-  }
-  return ref.watch(paymentQrServiceProvider).decodePaymentQr(imagePath);
+  return ref.watch(settingsServiceProvider).getDecodedPaymentQr(imagePath);
 });

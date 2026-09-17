@@ -1,11 +1,13 @@
 import 'package:pinoy_pos/core/authorization_exception.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/auto_backup_settings.dart';
+import 'package:pinoy_pos/data/models/decoded_payment_qr.dart';
 import 'package:pinoy_pos/data/models/payment_settings.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
 import 'package:pinoy_pos/data/repositories/settings_repository.dart';
 import 'package:pinoy_pos/services/groq_service.dart';
 import 'package:pinoy_pos/services/image_service.dart';
+import 'package:pinoy_pos/services/payment_qr_parser.dart';
 import 'package:pinoy_pos/services/payment_qr_service.dart';
 import 'package:pinoy_pos/services/secure_storage_service.dart';
 import 'package:pinoy_pos/services/trash_service.dart';
@@ -43,6 +45,10 @@ class SettingsService {
             gcashQrImagePath: path,
             gcashQrImageType: type,
             gcashQrPreviewPath: previewResult.previewPath,
+            // The payload cache was cleared when the QR was removed; reset
+            // it so the next open decodes the restored image once and
+            // re-caches instead of trusting a stale payload.
+            gcashQrPayload: null,
           ),
         );
         await refreshStoreInfo();
@@ -265,13 +271,19 @@ class SettingsService {
       await PaymentQrService().deletePreview(oldPreview);
     }
 
-    final previewResult = await PaymentQrService().generatePreview(result.filePath);
+    final qrService = PaymentQrService();
+    final previewResult = await qrService.generatePreview(result.filePath);
+    // Decode once at upload time and persist the payload alongside the
+    // image path so payment screens can parse it instantly instead of
+    // image-decoding the QR on every open.
+    final decoded = await qrService.decodePaymentQr(result.filePath);
 
     await updateSettings(
       current.copyWith(
         gcashQrImagePath: result.filePath,
         gcashQrImageType: result.mediaType,
         gcashQrPreviewPath: previewResult.previewPath,
+        gcashQrPayload: decoded.rawPayload ?? '',
       ),
     );
     return result;
@@ -304,8 +316,50 @@ class SettingsService {
         gcashQrImagePath: null,
         gcashQrImageType: null,
         gcashQrPreviewPath: null,
+        gcashQrPayload: null,
       ),
     );
+  }
+
+  /// Returns the decoded details of the GCash payment QR stored at
+  /// [imagePath], using the payload cached on the settings row so the
+  /// image is only ever decoded once per upload instead of on every
+  /// Payment Settings / checkout open.
+  ///
+  /// The payload is a computed cache of the QR's own content — not a
+  /// user-editable setting — so it is read and written through the
+  /// repository directly. This keeps it permission-free for cashiers,
+  /// who need the decoded details at checkout but cannot call
+  /// [getSettings].
+  Future<DecodedPaymentQr> getDecodedPaymentQr(String? imagePath) async {
+    if (imagePath == null || imagePath.isEmpty) {
+      return const DecodedPaymentQr.notDetected();
+    }
+
+    final settings = await _settingsRepository.getSettings();
+    final isCurrentQr =
+        settings != null && settings.gcashQrImagePath == imagePath;
+    final cachedPayload = isCurrentQr ? settings.gcashQrPayload : null;
+
+    // Fast path: re-parsing the stored payload string is instant — no
+    // image decode on repeat opens.
+    if (cachedPayload != null) {
+      return PaymentQrParser.parse(cachedPayload);
+    }
+
+    final decoded = await PaymentQrService().decodePaymentQr(imagePath);
+    if (isCurrentQr) {
+      // Cache the outcome ('' when no payload was found) so the decode
+      // does not run again until the QR is replaced or cleared.
+      final updated = settings.copyWith(
+        gcashQrPayload: decoded.rawPayload ?? '',
+        updatedAt: DateTime.now(),
+      );
+      await _settingsRepository.update(updated);
+      if (_currentSettings != null) _currentSettings = updated;
+      if (_storeInfo != null) _storeInfo = updated;
+    }
+    return decoded;
   }
 
   /// Returns the store information (name, address, contact, currency) to use

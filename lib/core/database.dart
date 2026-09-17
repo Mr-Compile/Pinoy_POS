@@ -553,6 +553,13 @@ class DatabaseHelper {
       await _migrateV30(db);
     }
 
+    // Migration from v30 → v31: add the decoded payment-QR payload cache
+    // column so payment screens stop re-decoding the stored QR image on
+    // every open.
+    if (oldVersion < 31) {
+      await _migrateV31(db);
+    }
+
     // Create any tables that were introduced after the backup's original
     // version but do not have an explicit migration block above (e.g.
     // `announcements`, `ai_usage`).  All CREATE statements in _createTables
@@ -1081,6 +1088,24 @@ class DatabaseHelper {
 
   Future<void> runV30MigrationForTest(Database db) => _migrateV30(db);
 
+  /// Migration from v30 → v31: `settings.gcash_qr_payload` caches the raw
+  /// decoded QR payload so the merchant QR is only ever image-decoded once
+  /// per upload instead of on every payment-settings / checkout open.
+  Future<void> _migrateV31(Database db) async {
+    try {
+      await db.execute(
+        'ALTER TABLE settings ADD COLUMN gcash_qr_payload TEXT',
+      );
+    } catch (_) {
+      // Column may already exist.
+    }
+  }
+
+  /// Exposes the v31 migration so tests can exercise it against an
+  /// old-schema database.
+  @visibleForTesting
+  Future<void> runV31MigrationForTest(Database db) => _migrateV31(db);
+
   /// Exposes the v29 table-rebuild fallbacks so tests can validate their
   /// SQL even on SQLite builds where DROP COLUMN already succeeds.
   @visibleForTesting
@@ -1304,6 +1329,7 @@ class DatabaseHelper {
         gcash_qr_image_path TEXT,
         gcash_qr_image_type TEXT,
         gcash_qr_preview_path TEXT,
+        gcash_qr_payload TEXT,
         gcash_merchant_name TEXT,
         gcash_merchant_phone TEXT,
         ai_daily_quota INTEGER NOT NULL DEFAULT ${AppConstants.defaultDailyAIQuota},

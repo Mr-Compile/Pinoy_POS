@@ -21,6 +21,13 @@ class Settings {
   final String? gcashQrImageType;
   final String? gcashQrPreviewPath;
 
+  /// Cached raw payload decoded from [gcashQrImagePath]. Null means the
+  /// stored QR image has not been decoded yet; an empty string means it
+  /// was decoded and no QR payload was found. Storing it lets payment
+  /// screens parse the payload instantly instead of re-decoding the
+  /// image on every open.
+  final String? gcashQrPayload;
+
   /// Payment-side merchant name, configured in Payment Settings.
   /// Deliberately independent of [storeName] (Store Information): the
   /// QR image already identifies the payee in most cases, and this is
@@ -60,6 +67,7 @@ class Settings {
     this.gcashQrImagePath,
     this.gcashQrImageType,
     this.gcashQrPreviewPath,
+    this.gcashQrPayload,
     this.gcashMerchantName = '',
     this.gcashMerchantPhone = '',
     this.aiDailyQuota = AppConstants.defaultDailyAIQuota,
@@ -93,6 +101,7 @@ class Settings {
       'gcash_qr_image_path': gcashQrImagePath,
       'gcash_qr_image_type': gcashQrImageType,
       'gcash_qr_preview_path': gcashQrPreviewPath,
+      'gcash_qr_payload': gcashQrPayload,
       'gcash_merchant_name': gcashMerchantName,
       'gcash_merchant_phone': gcashMerchantPhone,
       'ai_daily_quota': aiDailyQuota,
@@ -165,6 +174,7 @@ class Settings {
       gcashQrImagePath: stringOrNull('gcash_qr_image_path'),
       gcashQrImageType: stringOrNull('gcash_qr_image_type'),
       gcashQrPreviewPath: stringOrNull('gcash_qr_preview_path'),
+      gcashQrPayload: stringOrNull('gcash_qr_payload'),
       gcashMerchantName: stringOrNull('gcash_merchant_name') ?? '',
       gcashMerchantPhone: stringOrNull('gcash_merchant_phone') ?? '',
       aiDailyQuota:
@@ -203,6 +213,7 @@ class Settings {
     Object? gcashQrImagePath = _sentinel,
     Object? gcashQrImageType = _sentinel,
     Object? gcashQrPreviewPath = _sentinel,
+    Object? gcashQrPayload = _sentinel,
     String? gcashMerchantName,
     String? gcashMerchantPhone,
     int? aiDailyQuota,
@@ -244,6 +255,9 @@ class Settings {
       gcashQrPreviewPath: gcashQrPreviewPath == _sentinel
           ? this.gcashQrPreviewPath
           : gcashQrPreviewPath as String?,
+      gcashQrPayload: gcashQrPayload == _sentinel
+          ? this.gcashQrPayload
+          : gcashQrPayload as String?,
       gcashMerchantName: gcashMerchantName ?? this.gcashMerchantName,
       gcashMerchantPhone: gcashMerchantPhone ?? this.gcashMerchantPhone,
       aiDailyQuota: aiDailyQuota ?? this.aiDailyQuota,
