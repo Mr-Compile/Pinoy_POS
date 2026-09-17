@@ -7,6 +7,7 @@ import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/providers/ai_advisor_provider.dart';
 import 'package:pinoy_pos/ui/widgets/ai_assistant_message.dart';
+import 'package:pinoy_pos/ui/widgets/ai_voice_input_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_icon_circle.dart';
@@ -22,6 +23,8 @@ class AIAdvisorScreen extends ConsumerStatefulWidget {
 class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
   final TextEditingController _inputController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final GlobalKey<AIVoiceInputButtonState> _voiceKey = GlobalKey();
+  bool _voiceListening = false;
   bool _configChecked = false;
 
   @override
@@ -64,6 +67,7 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
     final text = _inputController.text.trim();
     if (text.isEmpty) return;
 
+    await _voiceKey.currentState?.stopListening();
     _inputController.clear();
     await ref.read(aiAdvisorChatProvider.notifier).sendQuery(text);
     _scrollToBottom();
@@ -588,9 +592,11 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
                 textInputAction: TextInputAction.send,
                 onSubmitted: canSend ? (_) => _sendQuery() : null,
                 decoration: InputDecoration(
-                  hintText: canSend
-                      ? 'Ask about your business...'
-                      : 'AI unavailable',
+                  hintText: _voiceListening
+                      ? 'Listening…'
+                      : (canSend
+                          ? 'Ask about your business...'
+                          : 'AI unavailable'),
                   hintStyle: TextStyle(
                       color: cs.onSurfaceVariant.withValues(alpha: 0.6)),
                   filled: true,
@@ -601,6 +607,13 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
               ),
             ),
             const SizedBox(width: Spacing.xs),
+            AIVoiceInputButton(
+              key: _voiceKey,
+              controller: _inputController,
+              enabled: canSend,
+              onListeningChanged: (listening) =>
+                  setState(() => _voiceListening = listening),
+            ),
             IconButton.filled(
               icon: chatState.isSending
                   ? SizedBox(

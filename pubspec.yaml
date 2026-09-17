@@ -79,6 +79,7 @@ dependencies:
   http: ^1.2.2
   url_launcher: ^6.3.2
   fl_chart: ^1.2.0
+  speech_to_text: ^7.5.0
 
 dev_dependencies:
   flutter_test:

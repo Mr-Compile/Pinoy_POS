@@ -49,6 +49,10 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Speech recognition is used for voice input in the AI assistant chat.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Microphone access is used for voice input in the AI assistant chat.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
