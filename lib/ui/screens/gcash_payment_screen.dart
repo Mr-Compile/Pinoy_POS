@@ -15,6 +15,7 @@ import 'package:pinoy_pos/providers/catalog_provider.dart';
 import 'package:pinoy_pos/providers/payment_settings_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/services/image_service.dart';
+import 'package:pinoy_pos/services/payment_qr_parser.dart';
 import 'package:pinoy_pos/ui/screens/payment_settings_page.dart';
 import 'package:pinoy_pos/ui/screens/payment_success_screen.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
@@ -471,9 +472,18 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
     final displayPath = previewPath?.isNotEmpty == true ? previewPath : qrPath;
     final hasImage = displayPath != null && displayPath.isNotEmpty;
     final canConfigure = SessionManager().canEditBusinessSettings();
-    final decodeAsync = qrPath != null && qrPath.isNotEmpty
-        ? ref.watch(paymentQrDecodeProvider(qrPath))
-        : null;
+    // The decoded payload is cached on the settings row — parse it inline
+    // so reopening this screen never re-decodes the image. Only a QR that
+    // has never been decoded (uploaded before the cache existed) falls
+    // back to the provider, which decodes once and persists the result.
+    final qrPayload = settings.gcashQrPayload;
+    final decodeAsync =
+        qrPayload == null && qrPath != null && qrPath.isNotEmpty
+            ? ref.watch(paymentQrDecodeProvider(qrPath))
+            : null;
+    final decodedQr = qrPayload != null
+        ? PaymentQrParser.parse(qrPayload)
+        : decodeAsync?.valueOrNull;
 
     return AppCard(
       child: Padding(
@@ -502,7 +512,12 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
                     style: AppTypography.titleSmallBold(context),
                   ),
                 ),
-                if (hasImage) _buildQrStatusChip(cs, decodeAsync),
+                if (hasImage)
+                  _buildQrStatusChip(
+                    cs,
+                    decodedQr,
+                    decodeAsync?.isLoading == true,
+                  ),
               ],
             ),
             const SizedBox(height: Spacing.md),
@@ -580,11 +595,12 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
   /// read correctly in both light and dark mode.
   Widget _buildQrStatusChip(
     ColorScheme cs,
-    AsyncValue<DecodedPaymentQr>? decodeAsync,
+    DecodedPaymentQr? decoded,
+    bool isDecoding,
   ) {
     final brightness = Theme.of(context).brightness;
 
-    if (decodeAsync == null || decodeAsync.isLoading) {
+    if (isDecoding || decoded == null) {
       return _statusChip(
         cs,
         icon: null,
@@ -595,9 +611,8 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
       );
     }
 
-    final decoded = decodeAsync.value;
-    final status = decoded?.status ?? PaymentQrDecodeStatus.unreadable;
-    final hasDetails = decoded?.hasAnyDetails ?? false;
+    final status = decoded.status;
+    final hasDetails = decoded.hasAnyDetails;
 
     return switch (status) {
       PaymentQrDecodeStatus.recognized when hasDetails => _statusChip(
@@ -744,12 +759,20 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
     final qrPath = settings.gcashQrImagePath;
     if (qrPath == null || qrPath.isEmpty) return const SizedBox.shrink();
 
-    final decodeAsync = ref.watch(paymentQrDecodeProvider(qrPath));
-    // While decoding, the "Reading QR…" chip on the QR card already
-    // communicates progress; keep the rest of the layout stable.
-    if (decodeAsync.isLoading) return const SizedBox.shrink();
-
-    final decoded = decodeAsync.value;
+    // Prefer the payload cached on the settings row — parsing it is
+    // instant. A QR that has never been decoded falls back to the
+    // provider's one-time decode (see _buildQrCard).
+    final qrPayload = settings.gcashQrPayload;
+    DecodedPaymentQr? decoded;
+    if (qrPayload != null) {
+      decoded = PaymentQrParser.parse(qrPayload);
+    } else {
+      final decodeAsync = ref.watch(paymentQrDecodeProvider(qrPath));
+      // While decoding, the "Reading QR…" chip on the QR card already
+      // communicates progress; keep the rest of the layout stable.
+      if (decodeAsync.isLoading) return const SizedBox.shrink();
+      decoded = decodeAsync.value;
+    }
     final fromQr =
         decoded?.detectionSource == PaymentQrDetectionSource.qrPayload;
 

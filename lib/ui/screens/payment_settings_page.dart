@@ -11,6 +11,7 @@ import 'package:pinoy_pos/data/models/decoded_payment_qr.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
 import 'package:pinoy_pos/providers/payment_settings_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
+import 'package:pinoy_pos/services/payment_qr_parser.dart';
 import 'package:pinoy_pos/ui/widgets/app_button.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
@@ -451,7 +452,10 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
           ],
           if (hasImage) ...[
             const SizedBox(height: 12),
-            _DetectedQrCard(qrPath: qrPath),
+            _DetectedQrCard(
+              qrPath: qrPath,
+              qrPayload: widget.settings.gcashQrPayload,
+            ),
           ],
           const SizedBox(height: 12),
           LayoutBuilder(
@@ -717,8 +721,9 @@ class _QrProcessingDialogState extends State<_QrProcessingDialog> {
 /// the GCash payment screen but are never written into Merchant Identity.
 class _DetectedQrCard extends ConsumerWidget {
   final String qrPath;
+  final String? qrPayload;
 
-  const _DetectedQrCard({required this.qrPath});
+  const _DetectedQrCard({required this.qrPath, this.qrPayload});
 
   Widget _detailRow(BuildContext context, String label, String value) {
     final cs = Theme.of(context).colorScheme;
@@ -770,9 +775,22 @@ class _DetectedQrCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
-    final decodeAsync = ref.watch(paymentQrDecodeProvider(qrPath));
 
-    if (decodeAsync.isLoading) {
+    // The payload cached on the settings row parses instantly — no image
+    // decode on reopen. Only a QR that has never been decoded (uploaded
+    // before the cache existed) goes through the provider, which decodes
+    // once and persists the result.
+    DecodedPaymentQr? decoded;
+    var decoding = false;
+    if (qrPayload != null) {
+      decoded = PaymentQrParser.parse(qrPayload);
+    } else {
+      final decodeAsync = ref.watch(paymentQrDecodeProvider(qrPath));
+      decoding = decodeAsync.isLoading;
+      decoded = decodeAsync.valueOrNull;
+    }
+
+    if (decoding) {
       return Row(
         children: [
           SizedBox(
@@ -795,8 +813,6 @@ class _DetectedQrCard extends ConsumerWidget {
         ],
       );
     }
-
-    final decoded = decodeAsync.value;
     final fromQr =
         decoded?.detectionSource == PaymentQrDetectionSource.qrPayload;
     if (!fromQr || decoded == null || !decoded.hasMerchantInfo) {

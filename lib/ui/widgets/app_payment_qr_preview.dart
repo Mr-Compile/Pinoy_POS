@@ -10,8 +10,10 @@ import 'package:pinoy_pos/ui/widgets/app_image.dart';
 /// form, with a clear "tap to enlarge" cue. When no QR is configured it shows
 /// a compact empty state.
 ///
-/// The image is always rendered with [BoxFit.contain] and no cache width so
-/// the original QR pixels are preserved.
+/// The image is always rendered with [BoxFit.contain]. Decoding is capped
+/// at 1024 px — well above what a QR needs to stay crisp and scannable at
+/// preview size — so opening a screen does not decode a multi-megabyte
+/// original. The fullscreen viewer loads the full-resolution image.
 class AppPaymentQrPreview extends StatelessWidget {
   /// Relative path to the configured QR image, or null/empty if none.
   final String? imagePath;
@@ -69,7 +71,7 @@ class AppPaymentQrPreview extends StatelessWidget {
           imagePath: imagePath,
           placeholderIcon: Icons.qr_code,
           fit: BoxFit.contain,
-          cacheWidth: null,
+          cacheWidth: 1024,
           semanticLabel: 'Payment QR code',
         ),
       ),

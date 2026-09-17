@@ -13,6 +13,13 @@ class PaymentSettings {
   final String? gcashQrImageType;
   final String? gcashQrPreviewPath;
 
+  /// Payload decoded from [gcashQrImagePath], cached on the settings row
+  /// at upload time. Parsing this string is instant, so checkout screens
+  /// never have to decode the QR image again. Null means the stored QR
+  /// has never been decoded; an empty string means it was decoded and no
+  /// payload was found.
+  final String? gcashQrPayload;
+
   /// Merchant name shown on the GCash payment screen when the uploaded
   /// QR image does not itself encode merchant details. This is the
   /// payment-side identity configured in Payment Settings — it is NOT
@@ -34,6 +41,7 @@ class PaymentSettings {
     this.gcashQrImagePath,
     this.gcashQrImageType,
     this.gcashQrPreviewPath,
+    this.gcashQrPayload,
     this.gcashMerchantName = '',
     this.gcashMerchantPhone = '',
   });
@@ -49,6 +57,7 @@ class PaymentSettings {
       gcashQrImagePath: settings.gcashQrImagePath,
       gcashQrImageType: settings.gcashQrImageType,
       gcashQrPreviewPath: settings.gcashQrPreviewPath,
+      gcashQrPayload: settings.gcashQrPayload,
       gcashMerchantName: settings.gcashMerchantName,
       gcashMerchantPhone: settings.gcashMerchantPhone,
     );
