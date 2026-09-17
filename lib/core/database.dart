@@ -541,6 +541,18 @@ class DatabaseHelper {
       await _migrateV29(db);
     }
 
+    // Migration from v29 → v30: add payment-specific merchant identity
+    // columns to settings (gcash_merchant_name / gcash_merchant_phone).
+    // These were previously aliased onto store_name / store_phone, which
+    // coupled Payment Settings to Store Information. The existing values
+    // are seeded from the store columns so users keep their current
+    // payment identity; the two identities are independent from here on.
+    // The `ai_chat_messages` table itself is created by the _createTables
+    // call at the end of this method.
+    if (oldVersion < 30) {
+      await _migrateV30(db);
+    }
+
     // Create any tables that were introduced after the backup's original
     // version but do not have an explicit migration block above (e.g.
     // `announcements`, `ai_usage`).  All CREATE statements in _createTables
@@ -1032,6 +1044,43 @@ class DatabaseHelper {
   @visibleForTesting
   Future<void> runV29MigrationForTest(Database db) => _migrateV29(db);
 
+  /// Migration from v29 → v30: add the payment-side merchant identity
+  /// columns (settings.gcash_merchant_name / gcash_merchant_phone) and seed
+  /// them from the store columns so existing installs keep their current
+  /// payment identity. The `ai_chat_messages` table is created separately
+  /// by the _createTables call at the end of _onUpgrade.
+  Future<void> _migrateV30(Database db) async {
+    for (final column in [
+      'gcash_merchant_name TEXT',
+      'gcash_merchant_phone TEXT',
+    ]) {
+      try {
+        await db.execute('ALTER TABLE settings ADD COLUMN $column');
+      } catch (_) {
+        // Column may already exist.
+      }
+    }
+    try {
+      await db.execute('''
+        UPDATE settings
+        SET gcash_merchant_name = store_name,
+            gcash_merchant_phone = store_phone
+        WHERE (gcash_merchant_name IS NULL OR gcash_merchant_name = '')
+          AND store_name IS NOT NULL
+      ''');
+      await db.execute('''
+        UPDATE settings
+        SET gcash_merchant_phone = store_phone
+        WHERE (gcash_merchant_phone IS NULL OR gcash_merchant_phone = '')
+          AND store_phone IS NOT NULL
+      ''');
+    } catch (_) {
+      // Seeding is best-effort; empty merchant fields are valid.
+    }
+  }
+
+  Future<void> runV30MigrationForTest(Database db) => _migrateV30(db);
+
   /// Exposes the v29 table-rebuild fallbacks so tests can validate their
   /// SQL even on SQLite builds where DROP COLUMN already succeeds.
   @visibleForTesting
@@ -1231,6 +1280,11 @@ class DatabaseHelper {
     ''');
 
     // Settings table
+    // gcash_merchant_name / gcash_merchant_phone are the payment-side
+    // merchant identity configured in Payment Settings — deliberately
+    // separate from store_name / store_phone (Store Information). The
+    // decoded QR payload remains authoritative at checkout; these are a
+    // fallback for QRs that do not encode merchant details.
     await db.execute('''
       CREATE TABLE IF NOT EXISTS settings (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1250,6 +1304,8 @@ class DatabaseHelper {
         gcash_qr_image_path TEXT,
         gcash_qr_image_type TEXT,
         gcash_qr_preview_path TEXT,
+        gcash_merchant_name TEXT,
+        gcash_merchant_phone TEXT,
         ai_daily_quota INTEGER NOT NULL DEFAULT ${AppConstants.defaultDailyAIQuota},
         inactivity_timeout_minutes INTEGER NOT NULL DEFAULT 15,
         session_warning_seconds INTEGER NOT NULL DEFAULT 30,
@@ -1300,6 +1356,25 @@ class DatabaseHelper {
         daily_usage INTEGER NOT NULL DEFAULT 0,
         quota_date TEXT NOT NULL,
         last_reset_at TEXT,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    ''');
+
+    // AI chat history — the persisted advisor conversation. Unlike
+    // `ai_usage` (a quota/audit log of query→response pairs), this table
+    // stores every message so the chat survives app restarts. Rows are
+    // scoped per user and only deleted when the user explicitly starts a
+    // new conversation (or the user account itself is deleted).
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS ai_chat_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        is_user INTEGER NOT NULL,
+        text TEXT NOT NULL,
+        is_error INTEGER NOT NULL DEFAULT 0,
+        response_json TEXT,
+        follow_ups_json TEXT,
+        created_at TEXT NOT NULL,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       )
     ''');
@@ -1414,6 +1489,10 @@ class DatabaseHelper {
     await db.execute('CREATE INDEX IF NOT EXISTS idx_ai_usage_date ON ai_usage(created_at)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_ai_quota_user ON ai_quota(user_id)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_ai_quota_date ON ai_quota(quota_date)');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_ai_chat_messages_user '
+      'ON ai_chat_messages(user_id, id)',
+    );
   }
 
   Future<void> close() async {
@@ -1493,6 +1572,7 @@ class DatabaseHelper {
       await txn.execute('DROP TABLE IF EXISTS activity_logs');
       await txn.execute('DROP TABLE IF EXISTS ai_usage');
       await txn.execute('DROP TABLE IF EXISTS ai_quota');
+      await txn.execute('DROP TABLE IF EXISTS ai_chat_messages');
       await txn.execute('DROP TABLE IF EXISTS trash');
       await txn.execute('DROP TABLE IF EXISTS backup_history');
       await txn.execute('DROP TABLE IF EXISTS export_history');

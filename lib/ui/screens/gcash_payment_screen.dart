@@ -733,12 +733,13 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
   }
 
   /// Payment details decoded from the QR payload (merchant name, mobile,
-  /// network, encoded amount), with the configured store identity as a
-  /// fallback when the QR does not encode merchant data.
+  /// network, encoded amount), with the payment-side merchant identity
+  /// from Payment Settings as a fallback when the QR does not encode
+  /// merchant data.
   ///
   /// Only fields that actually exist are rendered — nothing is fabricated.
   /// QR-decoded values are marked "Detected from QR" so the cashier can tell
-  /// them apart from configured store data and manually entered input.
+  /// them apart from the configured fallback and manually entered input.
   Widget _buildQrDetailsCard(PaymentSettings settings, ColorScheme cs) {
     final qrPath = settings.gcashQrImagePath;
     if (qrPath == null || qrPath.isEmpty) return const SizedBox.shrink();
@@ -761,12 +762,18 @@ class _GcashPaymentScreenState extends ConsumerState<GcashPaymentScreen> {
     final qrCurrency = fromQr ? decoded!.currencyCode : null;
     final qrReference = fromQr ? decoded!.qrReference : null;
 
-    // Configured store identity is real data, not fabricated QR data — it
-    // fills in only when the payload provides nothing for that field.
+    // The configured GCash merchant identity is real data, not fabricated
+    // QR data — it fills in only when the payload provides nothing for
+    // that field. Store Information is intentionally NOT used here: the
+    // two identities are configured separately.
     final merchant = merchantName ??
-        (settings.storeName.isNotEmpty ? settings.storeName : null);
-    final phone =
-        mobile ?? (settings.storePhone.isNotEmpty ? settings.storePhone : null);
+        (settings.gcashMerchantName.isNotEmpty
+            ? settings.gcashMerchantName
+            : null);
+    final phone = mobile ??
+        (settings.gcashMerchantPhone.isNotEmpty
+            ? settings.gcashMerchantPhone
+            : null);
     final showAccount = account != null && mobile == null;
 
     final amountMismatch = qrAmount != null &&

@@ -214,6 +214,7 @@ class AIAdvisorService {
       effectiveIntent,
       role: role,
       userId: userId,
+      query: userQuery,
     );
 
     // 9. Build the role-specific system prompt with facts as context,

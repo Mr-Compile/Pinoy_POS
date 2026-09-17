@@ -42,17 +42,21 @@ class AICapabilityPolicy {
       case UserRole.owner:
         return 'You have access to business-wide analytics: total sales, '
             'product performance, inventory status, low-stock analysis, '
-            'category performance, sales trends, and business recommendations.';
+            'category performance, sales trends, recent transactions, '
+            'specific product and sale/receipt lookups, cash vs GCash '
+            'payment breakdowns, and business recommendations.';
       case UserRole.admin:
         return 'You have access to system administration analytics: user '
-            'account summaries, activity logs, backup history, export '
-            'history, and system status. You do NOT have access to business '
-            'sales, products, or inventory analytics.';
+            'account summaries and individual user lookups, activity logs, '
+            'backup history, export history, and system status. You do '
+            'NOT have access to business sales, products, or inventory '
+            'analytics.';
       case UserRole.staff:
-        return 'You have access to your own sales data, low-stock alerts, '
-            'product and category information, and your own activity. You '
-            'do NOT have access to other users\' sales, total business '
-            'sales, or system administration data.';
+        return 'You have access to your own sales data, your own sale '
+            'receipts, low-stock alerts, product price/stock lookups, '
+            'category information, your own cash vs GCash breakdown, and '
+            'your own activity. You do NOT have access to other users\' '
+            'sales, total business sales, or system administration data.';
     }
   }
 
@@ -74,6 +78,10 @@ class AICapabilityPolicy {
     BusinessIntent.inventoryStatus,
     BusinessIntent.businessSummary,
     BusinessIntent.trendAnalysis,
+    BusinessIntent.recentSales,
+    BusinessIntent.productLookup,
+    BusinessIntent.saleLookup,
+    BusinessIntent.paymentBreakdown,
     BusinessIntent.general,
   };
 
@@ -87,6 +95,7 @@ class AICapabilityPolicy {
     BusinessIntent.exportSummary,
     BusinessIntent.systemStatusSummary,
     BusinessIntent.adminSummary,
+    BusinessIntent.userLookup,
     BusinessIntent.general,
   };
 
@@ -101,6 +110,9 @@ class AICapabilityPolicy {
     BusinessIntent.categoryInformation,
     BusinessIntent.myActivitySummary,
     BusinessIntent.myWorkSummary,
+    BusinessIntent.productLookup,
+    BusinessIntent.saleLookup,
+    BusinessIntent.paymentBreakdown,
     BusinessIntent.general,
   };
 }

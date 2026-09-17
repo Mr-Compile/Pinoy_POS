@@ -7,7 +7,6 @@ import 'package:pinoy_pos/core/modal_result.dart';
 import 'package:pinoy_pos/core/phone_utils.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/models/settings.dart';
-import 'package:pinoy_pos/providers/payment_settings_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/ui/widgets/app_card.dart';
 import 'package:pinoy_pos/ui/widgets/app_dialog.dart';
@@ -67,13 +66,13 @@ class _StoreInformationSettingsPageState
     }
   }
 
-  /// Store name/contact/currency also feed the Payment Settings merchant
-  /// identity and receipt surfaces, which watch [settingsProvider] and
-  /// [paymentSettingsProvider]. Both are non-autoDispose, so saving here
-  /// must invalidate them or those pages keep showing stale values.
+  /// Receipt surfaces read store identity through [settingsProvider],
+  /// which is non-autoDispose, so saving here must invalidate it or those
+  /// surfaces keep showing stale values. Payment Settings deliberately
+  /// does not need invalidating — its GCash merchant identity is stored
+  /// in separate `gcash_merchant_*` fields that this page never edits.
   void _invalidateSettingsProviders() {
     ref.invalidate(settingsProvider);
-    ref.invalidate(paymentSettingsProvider);
   }
 
   @override

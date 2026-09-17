@@ -13,11 +13,16 @@ class PaymentSettings {
   final String? gcashQrImageType;
   final String? gcashQrPreviewPath;
 
-  /// Merchant name shown on the GCash payment screen.
-  final String storeName;
+  /// Merchant name shown on the GCash payment screen when the uploaded
+  /// QR image does not itself encode merchant details. This is the
+  /// payment-side identity configured in Payment Settings — it is NOT
+  /// the Store Information business name.
+  final String gcashMerchantName;
 
-  /// Merchant contact number shown on the GCash payment screen.
-  final String storePhone;
+  /// Merchant contact number shown on the GCash payment screen as a
+  /// fallback when the QR payload carries no mobile number. Independent
+  /// of the Store Information phone.
+  final String gcashMerchantPhone;
 
   const PaymentSettings({
     required this.gcashEnabled,
@@ -29,8 +34,8 @@ class PaymentSettings {
     this.gcashQrImagePath,
     this.gcashQrImageType,
     this.gcashQrPreviewPath,
-    this.storeName = 'Pinoy POS',
-    this.storePhone = '',
+    this.gcashMerchantName = '',
+    this.gcashMerchantPhone = '',
   });
 
   factory PaymentSettings.fromSettings(Settings settings) {
@@ -44,8 +49,8 @@ class PaymentSettings {
       gcashQrImagePath: settings.gcashQrImagePath,
       gcashQrImageType: settings.gcashQrImageType,
       gcashQrPreviewPath: settings.gcashQrPreviewPath,
-      storeName: settings.storeName.isNotEmpty ? settings.storeName : 'Pinoy POS',
-      storePhone: settings.storePhone,
+      gcashMerchantName: settings.gcashMerchantName,
+      gcashMerchantPhone: settings.gcashMerchantPhone,
     );
   }
 

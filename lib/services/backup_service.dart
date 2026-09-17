@@ -114,6 +114,7 @@ class BackupService {
     'announcements',
     'ai_usage',
     'ai_quota',
+    'ai_chat_messages',
     'trash',
     'backup_history',
     'export_history',

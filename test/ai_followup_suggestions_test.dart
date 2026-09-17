@@ -10,6 +10,7 @@ import 'package:pinoy_pos/providers/ai_advisor_provider.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/service_providers.dart';
 import 'package:pinoy_pos/services/ai_advisor_service.dart';
+import 'package:pinoy_pos/services/ai_chat_history_service.dart';
 import 'package:pinoy_pos/services/ai_skill_service.dart';
 import 'package:pinoy_pos/services/ai_usage_service.dart';
 import 'package:pinoy_pos/services/auth_service.dart';
@@ -263,11 +264,32 @@ ProviderContainer _createContainer() {
       ),
       aiUsageServiceProvider.overrideWith((ref) => _FakeAIUsageService()),
       settingsServiceProvider.overrideWith((ref) => _FakeSettingsService()),
+      aiChatHistoryServiceProvider
+          .overrideWith((ref) => _InMemoryChatHistoryService()),
     ],
   );
 }
 
 // ── Fakes ───────────────────────────────────────────────────────────
+
+/// In-memory chat history so provider tests never touch sqflite (the
+/// FFI factory is not initialized in these unit tests).
+class _InMemoryChatHistoryService extends AIChatHistoryService {
+  final List<AIChatMessage> messages = [];
+
+  @override
+  Future<List<AIChatMessage>> loadConversation() async => List.of(messages);
+
+  @override
+  Future<void> appendMessage(AIChatMessage message) async {
+    messages.add(message);
+  }
+
+  @override
+  Future<void> clearConversation() async {
+    messages.clear();
+  }
+}
 
 class _FakeGroqService extends GroqService {
   @override
@@ -325,6 +347,7 @@ class _FakeBIService extends BusinessIntelligenceService {
     DetectedIntent detected, {
     UserRole? role,
     int? userId,
+    String? query,
   }) async {
     return BusinessFacts(
       context: '---\nStore: Test Store\n---',

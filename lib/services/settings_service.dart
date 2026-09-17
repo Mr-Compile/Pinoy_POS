@@ -217,7 +217,9 @@ class SettingsService {
         a.gcashReferenceMinLength != b.gcashReferenceMinLength ||
         a.gcashQrImagePath != b.gcashQrImagePath ||
         a.gcashQrImageType != b.gcashQrImageType ||
-        a.gcashQrPreviewPath != b.gcashQrPreviewPath;
+        a.gcashQrPreviewPath != b.gcashQrPreviewPath ||
+        a.gcashMerchantName != b.gcashMerchantName ||
+        a.gcashMerchantPhone != b.gcashMerchantPhone;
   }
 
   /// Returns true if any business-identity field (store name, address,

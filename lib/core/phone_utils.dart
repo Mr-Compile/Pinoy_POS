@@ -5,8 +5,10 @@ import 'package:flutter/services.dart';
 class PhoneUtils {
   PhoneUtils._();
 
-  /// Placeholder/example shown in mobile number inputs.
-  static const String phMobileHint = '0926 585 2171';
+  /// Placeholder/example shown in mobile number inputs. Deliberately a
+  /// masked placeholder — never a real-looking number, so a user never
+  /// mistakes the hint for their own number.
+  static const String phMobileHint = '09XX XXX XXXX';
 
   /// Strips every non-digit character and converts a `+63`/`63` country-code
   /// prefix to the local `0` trunk prefix. The result is digits only and is

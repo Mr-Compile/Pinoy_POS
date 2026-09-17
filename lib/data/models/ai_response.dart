@@ -46,6 +46,59 @@ class AIResponse {
     return copyWith(actions: actions.where(isAllowed).toList());
   }
 
+  /// Serializes this response so a chat message can be persisted and
+  /// restored with its instructions, actions, and suggestions intact.
+  Map<String, dynamic> toJson() {
+    return {
+      'message': message,
+      'instructions': [for (final i in instructions) i.toJson()],
+      'actions': [for (final a in actions) a.toJson()],
+      'suggestions': suggestions,
+    };
+  }
+
+  /// Rebuilds an [AIResponse] from [AIResponse.toJson]. Unrecognized or
+  /// malformed entries are skipped so a row written by a different app
+  /// version can never break conversation restore.
+  factory AIResponse.fromJson(Map<String, dynamic> json) {
+    final instructions = <AIInstruction>[];
+    final rawInstructions = json['instructions'];
+    if (rawInstructions is List) {
+      for (final e in rawInstructions) {
+        if (e is Map) {
+          final parsed = AIInstruction.tryParse(e.cast<String, dynamic>());
+          if (parsed != null) instructions.add(parsed);
+        }
+      }
+    }
+
+    final actions = <AIAction>[];
+    final rawActions = json['actions'];
+    if (rawActions is List) {
+      for (final e in rawActions) {
+        if (e is Map) {
+          final parsed = AIAction.tryParse(e.cast<String, dynamic>());
+          if (parsed != null) actions.add(parsed);
+        }
+      }
+    }
+
+    final suggestions = <String>[];
+    final rawSuggestions = json['suggestions'];
+    if (rawSuggestions is List) {
+      for (final s in rawSuggestions) {
+        if (s != null) suggestions.add(s.toString());
+      }
+    }
+
+    return AIResponse(
+      message: json['message'] as String? ?? '',
+      instructions: instructions,
+      actions: actions,
+      suggestions: suggestions,
+    );
+  }
+
   @override
   String toString() {
     return 'AIResponse(message: $message, instructions: ${instructions.length}, '
@@ -62,6 +115,24 @@ class AIInstruction {
     required this.text,
     this.action,
   });
+
+  Map<String, dynamic> toJson() => {
+        'text': text,
+        if (action != null) 'action': action!.toJson(),
+      };
+
+  /// Parses a JSON map into an [AIInstruction]. Returns null when the map
+  /// does not contain a usable `text` value.
+  static AIInstruction? tryParse(Map<String, dynamic> json) {
+    final text = json['text'];
+    if (text is! String || text.isEmpty) return null;
+    final rawAction = json['action'];
+    AIAction? action;
+    if (rawAction is Map) {
+      action = AIAction.tryParse(rawAction.cast<String, dynamic>());
+    }
+    return AIInstruction(text: text, action: action);
+  }
 
   @override
   String toString() => 'AIInstruction(text: $text, action: $action)';
@@ -86,6 +157,44 @@ class AIAction {
   /// True when this action requires a contextual parameter such as
   /// a sale or product ID.
   bool get hasParameters => parameters.isNotEmpty;
+
+  Map<String, dynamic> toJson() => {
+        'type': type.name,
+        'destination': destination,
+        'label': label,
+        'parameters': parameters,
+      };
+
+  /// Parses a JSON map into an [AIAction]. Returns null when the type is
+  /// unknown or required fields are missing — the caller should drop the
+  /// action rather than render something un-executable.
+  static AIAction? tryParse(Map<String, dynamic> json) {
+    final typeName = json['type'];
+    final destination = json['destination'];
+    final label = json['label'];
+    if (typeName is! String || destination is! String || label is! String) {
+      return null;
+    }
+
+    AIActionType? type;
+    for (final t in AIActionType.values) {
+      if (t.name == typeName) {
+        type = t;
+        break;
+      }
+    }
+    if (type == null) return null;
+
+    final rawParams = json['parameters'];
+    return AIAction(
+      type: type,
+      destination: destination,
+      label: label,
+      parameters: rawParams is Map
+          ? rawParams.cast<String, dynamic>()
+          : const {},
+    );
+  }
 
   @override
   String toString() {

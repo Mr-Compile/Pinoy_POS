@@ -13,6 +13,7 @@ import 'package:pinoy_pos/services/report_service.dart';
 import 'package:pinoy_pos/services/auto_backup_service.dart';
 import 'package:pinoy_pos/services/backup_service.dart';
 import 'package:pinoy_pos/services/ai_usage_service.dart';
+import 'package:pinoy_pos/services/ai_chat_history_service.dart';
 import 'package:pinoy_pos/services/ai_advisor_service.dart';
 import 'package:pinoy_pos/services/cart_service.dart';
 import 'package:pinoy_pos/services/business_intelligence_service.dart';
@@ -82,6 +83,10 @@ final autoBackupServiceProvider = Provider<AutoBackupService>((ref) {
 
 final aiUsageServiceProvider = Provider<AIUsageService>((ref) {
   return AIUsageService();
+});
+
+final aiChatHistoryServiceProvider = Provider<AIChatHistoryService>((ref) {
+  return AIChatHistoryService();
 });
 
 final aiAdvisorServiceProvider = Provider<AIAdvisorService>((ref) {

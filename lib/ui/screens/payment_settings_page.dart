@@ -216,8 +216,8 @@ class _PaymentSettingsForm extends StatefulWidget {
 }
 
 class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
-  final _storeNameController = TextEditingController();
-  final _storePhoneController = TextEditingController();
+  final _merchantNameController = TextEditingController();
+  final _merchantPhoneController = TextEditingController();
 
   late bool _gcashEnabled;
   late bool _gcashReferenceRequired;
@@ -245,14 +245,14 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
 
   @override
   void dispose() {
-    _storeNameController.dispose();
-    _storePhoneController.dispose();
+    _merchantNameController.dispose();
+    _merchantPhoneController.dispose();
     super.dispose();
   }
 
   void _syncFromSettings() {
-    _storeNameController.text = widget.settings.storeName;
-    _storePhoneController.text = widget.settings.storePhone;
+    _merchantNameController.text = widget.settings.gcashMerchantName;
+    _merchantPhoneController.text = widget.settings.gcashMerchantPhone;
 
     _gcashEnabled = widget.settings.gcashEnabled;
     _gcashReferenceRequired = widget.settings.gcashReferenceRequired;
@@ -353,6 +353,7 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
   }
 
   Widget _buildMerchantIdentitySection() {
+    final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -360,23 +361,36 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
           'Merchant Identity',
           style: AppTypography.titleMediumBold(context).copyWith(fontSize: 17),
         ),
+        const SizedBox(height: 8),
+        Text(
+          'Fallback payee details for the GCash payment screen. When the '
+          'uploaded QR already identifies the payee, the details detected '
+          'from the QR are shown instead. Your Store Information name and '
+          'contact number are managed separately.',
+          style: Theme.of(context)
+              .textTheme
+              .bodySmall
+              ?.copyWith(color: cs.onSurfaceVariant),
+        ),
         const SizedBox(height: 16),
         AppTextFormField(
-          controller: _storeNameController,
-          label: 'Store Name',
-          prefixIcon: Icons.store_outlined,
-          hint: 'Your store name',
-          helperText: 'Shown to customers on the GCash payment screen.',
+          controller: _merchantNameController,
+          label: 'Merchant Name',
+          prefixIcon: Icons.storefront_outlined,
+          hint: 'Payee name',
+          helperText: 'Shown at checkout only when the QR does not '
+              'identify the payee.',
           textCapitalization: TextCapitalization.words,
           enabled: !widget.isLoading,
         ),
         const SizedBox(height: 16),
         AppTextFormField(
-          controller: _storePhoneController,
+          controller: _merchantPhoneController,
           label: 'GCash Mobile Number',
           prefixIcon: Icons.phone_outlined,
           hint: PhoneUtils.phMobileHint,
-          helperText: 'The mobile number linked to the GCash account.',
+          helperText: 'The mobile number linked to the GCash account. '
+              'Shown only when the QR carries no mobile number.',
           keyboardType: TextInputType.phone,
           inputFormatters: [PhMobileInputFormatter()],
           enabled: !widget.isLoading,
@@ -488,7 +502,7 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
   }
 
   void _submit() {
-    final phone = _storePhoneController.text.trim();
+    final phone = _merchantPhoneController.text.trim();
     if (phone.isNotEmpty && !PhoneUtils.isValidPhMobile(phone)) {
       AppDialogService.error(
         context,
@@ -500,8 +514,8 @@ class _PaymentSettingsFormState extends State<_PaymentSettingsForm> {
     }
 
     final updated = widget.settings.copyWith(
-      storeName: _storeNameController.text.trim(),
-      storePhone: PhoneUtils.formatPhMobile(phone),
+      gcashMerchantName: _merchantNameController.text.trim(),
+      gcashMerchantPhone: PhoneUtils.formatPhMobile(phone),
       gcashEnabled: _gcashEnabled,
       gcashReferenceRequired: _gcashReferenceRequired,
       gcashCustomerNameRequirement: _customerNameRequirement,

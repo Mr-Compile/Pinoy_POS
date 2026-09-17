@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinoy_pos/core/ai_config_status.dart';
 import 'package:pinoy_pos/core/constants.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
+import 'package:pinoy_pos/data/models/ai_chat_message.dart';
 import 'package:pinoy_pos/data/models/ai_response.dart';
 import 'package:pinoy_pos/providers/auth_provider.dart';
 import 'package:pinoy_pos/providers/navigation_provider.dart';
@@ -11,42 +12,10 @@ import 'package:pinoy_pos/services/ai_advisor_service.dart';
 import 'package:pinoy_pos/services/ai_navigation_service.dart';
 import 'package:pinoy_pos/services/ai_product_action_service.dart';
 
-/// A single message in the AI Advisor conversation.
-///
-/// Messages can either be plain text ([text]) for conversational AI
-/// responses, or a structured [AIResponse] that the app renders with
-/// instructions, navigation actions, and follow-up suggestions.
-class AIChatMessage {
-  final String text;
-  final AIResponse? response;
-  final bool isUser;
-  final DateTime timestamp;
-  final bool isError;
-
-  /// Adaptive follow-up questions attached to an assistant message.
-  ///
-  /// Rendered as suggestion chips below the assistant bubble. Structured
-  /// [AIResponse] suggestions take precedence when present.
-  final List<String> followUps;
-
-  AIChatMessage({
-    required this.text,
-    this.response,
-    required this.isUser,
-    required this.timestamp,
-    this.isError = false,
-    this.followUps = const [],
-  });
-
-  /// The suggestion chips to show below this message, if any.
-  List<String> get effectiveSuggestions =>
-      response != null && response!.suggestions.isNotEmpty
-          ? response!.suggestions
-          : followUps;
-
-  /// True when this message should be rendered as a structured card.
-  bool get isStructured => response != null;
-}
+// AIChatMessage now lives in the data layer so it can be persisted.
+// Re-exported here because several widgets historically imported it
+// from this provider file.
+export 'package:pinoy_pos/data/models/ai_chat_message.dart';
 
 /// State for the AI Advisor chat experience.
 class AIAdvisorChatState {
@@ -98,18 +67,36 @@ class AIAdvisorChatNotifier extends StateNotifier<AIAdvisorChatState> {
 
   AIAdvisorChatNotifier(this._ref) : super(AIAdvisorChatState());
 
+  /// The user whose conversation is currently held in [state.messages],
+  /// and whether the persisted history has already been restored for
+  /// that user. Guarded so a user switch can never show the previous
+  /// user's conversation.
+  int? _historyUserId;
+  bool _historyLoaded = false;
+
   Future<void> checkConfig() async {
     final authNotifier = _ref.read(authStateProvider.notifier);
 
     if (!authNotifier.hasPermission('use_ai_advisor') &&
         !authNotifier.hasPermission('manage_ai_config')) {
-      state = state.copyWith(configStatus: AIConfigStatus.unavailable);
+      _historyUserId = null;
+      _historyLoaded = false;
+      state = state.copyWith(
+        configStatus: AIConfigStatus.unavailable,
+        messages: const [],
+      );
       return;
     }
 
     state = state.copyWith(configStatus: AIConfigStatus.checking);
 
     try {
+      // Restore the persisted conversation before anything else so the
+      // panel opens with the previous chat visible — history is kept
+      // until the user explicitly starts a new conversation.
+      await _syncConversationHistory();
+      if (!mounted) return;
+
       final settingsService = _ref.read(settingsServiceProvider);
       final aiUsageService = _ref.read(aiUsageServiceProvider);
 
@@ -117,6 +104,7 @@ class AIAdvisorChatNotifier extends StateNotifier<AIAdvisorChatState> {
       final remaining = await aiUsageService.getRemainingQueries();
       final dailyQuota = await aiUsageService.getDailyQuota();
       final model = await settingsService.getGroqModel();
+      if (!mounted) return;
 
       if (!isConfigured) {
         state = state.copyWith(
@@ -136,8 +124,43 @@ class AIAdvisorChatNotifier extends StateNotifier<AIAdvisorChatState> {
       }
     } catch (e, st) {
       _log('checkConfig failed', e, st);
+      if (!mounted) return;
       state = state.copyWith(configStatus: AIConfigStatus.unavailable);
     }
+  }
+
+  /// Loads the stored conversation for the current authenticated user.
+  ///
+  /// No-ops once the history for this user has been synced; a different
+  /// authenticated user id triggers a reload so conversations are
+  /// always isolated per account.
+  Future<void> _syncConversationHistory() async {
+    final userId = SessionManager().currentUser?.id;
+    if (userId == null) return;
+    if (_historyLoaded && _historyUserId == userId) return;
+
+    try {
+      final history =
+          await _ref.read(aiChatHistoryServiceProvider).loadConversation();
+      if (!mounted) return;
+      _historyUserId = userId;
+      _historyLoaded = true;
+      state = state.copyWith(messages: history);
+    } catch (e, st) {
+      _log('loadConversation failed', e, st);
+    }
+  }
+
+  /// Persists a message that was just appended to the conversation.
+  /// Fire-and-forget: a persistence failure must never block the chat.
+  void _persistMessage(AIChatMessage message) {
+    if (!_historyLoaded) return;
+    _ref
+        .read(aiChatHistoryServiceProvider)
+        .appendMessage(message)
+        .catchError((Object e, StackTrace st) {
+      _log('persistMessage failed', e, st);
+    });
   }
 
   Future<void> _loadSuggestions() async {
@@ -167,6 +190,13 @@ class AIAdvisorChatNotifier extends StateNotifier<AIAdvisorChatState> {
       return;
     }
 
+    // Make sure the stored conversation is loaded before appending —
+    // locally-resolved answers (product actions, navigation) must be
+    // persisted too, and they cannot be written safely until the
+    // existing history is in memory.
+    await _syncConversationHistory();
+    if (!mounted) return;
+
     // Product-creation commands resolve locally — no API call, no quota.
     // This runs before navigation so "add product" phrasing is not routed
     // to the Products destination.
@@ -175,6 +205,7 @@ class AIAdvisorChatNotifier extends StateNotifier<AIAdvisorChatState> {
       hasPermission: authNotifier.hasPermission,
     );
     if (productResponse != null) {
+      if (!mounted) return;
       _addUserMessage(q);
       _addBotMessage(
         text: productResponse.message,
@@ -198,6 +229,7 @@ class AIAdvisorChatNotifier extends StateNotifier<AIAdvisorChatState> {
     );
 
     if (navigationResponse != null) {
+      if (!mounted) return;
       _addUserMessage(q);
       _addBotMessage(
         text: navigationResponse.message,
@@ -211,6 +243,7 @@ class AIAdvisorChatNotifier extends StateNotifier<AIAdvisorChatState> {
 
     if (state.configStatus != AIConfigStatus.active) {
       await checkConfig();
+      if (!mounted) return;
       if (state.configStatus != AIConfigStatus.active) {
         _addBotMessage(
           text: state.configStatus.label,
@@ -256,19 +289,18 @@ class AIAdvisorChatNotifier extends StateNotifier<AIAdvisorChatState> {
       if (result.success) {
         final action = result.action;
         final content = result.content ?? 'No response from the advisor.';
+        final message = AIChatMessage(
+          text: content,
+          isUser: false,
+          timestamp: DateTime.now(),
+          response: action == null
+              ? null
+              : AIResponse(message: content, actions: [action]),
+          followUps: action == null ? _buildFollowUps(q) : const [],
+        );
+        _persistMessage(message);
         state = state.copyWith(
-          messages: [
-            ...state.messages,
-            AIChatMessage(
-              text: content,
-              isUser: false,
-              timestamp: DateTime.now(),
-              response: action == null
-                  ? null
-                  : AIResponse(message: content, actions: [action]),
-              followUps: action == null ? _buildFollowUps(q) : const [],
-            ),
-          ],
+          messages: [...state.messages, message],
           isSending: false,
           remainingQueries:
               (state.remainingQueries - 1).clamp(0, AppConstants.maxDailyAIQuota),
@@ -283,17 +315,16 @@ class AIAdvisorChatNotifier extends StateNotifier<AIAdvisorChatState> {
           newStatus = AIConfigStatus.unavailable;
         }
 
+        final message = AIChatMessage(
+          text: result.errorMessage ??
+              'The advisor could not complete the analysis.',
+          isUser: false,
+          timestamp: DateTime.now(),
+          isError: true,
+        );
+        _persistMessage(message);
         state = state.copyWith(
-          messages: [
-            ...state.messages,
-            AIChatMessage(
-              text: result.errorMessage ??
-                  'The advisor could not complete the analysis.',
-              isUser: false,
-              timestamp: DateTime.now(),
-              isError: true,
-            ),
-          ],
+          messages: [...state.messages, message],
           isSending: false,
           configStatus: newStatus,
         );
@@ -311,16 +342,13 @@ class AIAdvisorChatNotifier extends StateNotifier<AIAdvisorChatState> {
   }
 
   void _addUserMessage(String text) {
-    state = state.copyWith(
-      messages: [
-        ...state.messages,
-        AIChatMessage(
-          text: text,
-          isUser: true,
-          timestamp: DateTime.now(),
-        ),
-      ],
+    final message = AIChatMessage(
+      text: text,
+      isUser: true,
+      timestamp: DateTime.now(),
     );
+    _persistMessage(message);
+    state = state.copyWith(messages: [...state.messages, message]);
   }
 
   /// Builds adaptive follow-up suggestions for the user query [query].
@@ -348,18 +376,17 @@ class AIAdvisorChatNotifier extends StateNotifier<AIAdvisorChatState> {
     bool isError = false,
     List<String> followUps = const [],
   }) {
+    final message = AIChatMessage(
+      text: text,
+      response: response,
+      isUser: false,
+      timestamp: DateTime.now(),
+      isError: isError,
+      followUps: followUps,
+    );
+    _persistMessage(message);
     state = state.copyWith(
-      messages: [
-        ...state.messages,
-        AIChatMessage(
-          text: text,
-          response: response,
-          isUser: false,
-          timestamp: DateTime.now(),
-          isError: isError,
-          followUps: followUps,
-        ),
-      ],
+      messages: [...state.messages, message],
       isSending: false,
     );
   }
@@ -377,8 +404,19 @@ class AIAdvisorChatNotifier extends StateNotifier<AIAdvisorChatState> {
     state = state.copyWith(isPanelOpen: false);
   }
 
-  void clearConversation() {
+  /// Starts a new conversation: clears the in-memory messages AND the
+  /// persisted history for the current user. This is the only way a
+  /// conversation is removed — app restarts, panel close, and route
+  /// changes all preserve it.
+  Future<void> startNewConversation() async {
+    try {
+      await _ref.read(aiChatHistoryServiceProvider).clearConversation();
+    } catch (e, st) {
+      _log('clearConversation failed', e, st);
+    }
+    if (!mounted) return;
     state = state.copyWith(messages: []);
+    _loadSuggestions();
   }
 
   void _log(String message, Object error, StackTrace stackTrace) {

@@ -20,6 +20,17 @@ class Settings {
   final String? gcashQrImagePath;
   final String? gcashQrImageType;
   final String? gcashQrPreviewPath;
+
+  /// Payment-side merchant name, configured in Payment Settings.
+  /// Deliberately independent of [storeName] (Store Information): the
+  /// QR image already identifies the payee in most cases, and this is
+  /// only the fallback label shown at checkout when it does not.
+  final String gcashMerchantName;
+
+  /// Payment-side merchant contact number, configured in Payment
+  /// Settings. Independent of [storePhone].
+  final String gcashMerchantPhone;
+
   final int aiDailyQuota;
   final int inactivityTimeoutMinutes;
   final int sessionWarningSeconds;
@@ -49,6 +60,8 @@ class Settings {
     this.gcashQrImagePath,
     this.gcashQrImageType,
     this.gcashQrPreviewPath,
+    this.gcashMerchantName = '',
+    this.gcashMerchantPhone = '',
     this.aiDailyQuota = AppConstants.defaultDailyAIQuota,
     this.inactivityTimeoutMinutes = 15,
     this.sessionWarningSeconds = 30,
@@ -80,6 +93,8 @@ class Settings {
       'gcash_qr_image_path': gcashQrImagePath,
       'gcash_qr_image_type': gcashQrImageType,
       'gcash_qr_preview_path': gcashQrPreviewPath,
+      'gcash_merchant_name': gcashMerchantName,
+      'gcash_merchant_phone': gcashMerchantPhone,
       'ai_daily_quota': aiDailyQuota,
       'inactivity_timeout_minutes': inactivityTimeoutMinutes,
       'session_warning_seconds': sessionWarningSeconds,
@@ -150,6 +165,8 @@ class Settings {
       gcashQrImagePath: stringOrNull('gcash_qr_image_path'),
       gcashQrImageType: stringOrNull('gcash_qr_image_type'),
       gcashQrPreviewPath: stringOrNull('gcash_qr_preview_path'),
+      gcashMerchantName: stringOrNull('gcash_merchant_name') ?? '',
+      gcashMerchantPhone: stringOrNull('gcash_merchant_phone') ?? '',
       aiDailyQuota:
           intOrNull('ai_daily_quota') ?? AppConstants.defaultDailyAIQuota,
       inactivityTimeoutMinutes: intOrNull('inactivity_timeout_minutes') ?? 15,
@@ -186,6 +203,8 @@ class Settings {
     Object? gcashQrImagePath = _sentinel,
     Object? gcashQrImageType = _sentinel,
     Object? gcashQrPreviewPath = _sentinel,
+    String? gcashMerchantName,
+    String? gcashMerchantPhone,
     int? aiDailyQuota,
     Object? inactivityTimeoutMinutes = _sentinel,
     int? sessionWarningSeconds,
@@ -225,6 +244,8 @@ class Settings {
       gcashQrPreviewPath: gcashQrPreviewPath == _sentinel
           ? this.gcashQrPreviewPath
           : gcashQrPreviewPath as String?,
+      gcashMerchantName: gcashMerchantName ?? this.gcashMerchantName,
+      gcashMerchantPhone: gcashMerchantPhone ?? this.gcashMerchantPhone,
       aiDailyQuota: aiDailyQuota ?? this.aiDailyQuota,
       inactivityTimeoutMinutes: inactivityTimeoutMinutes == _sentinel
           ? this.inactivityTimeoutMinutes

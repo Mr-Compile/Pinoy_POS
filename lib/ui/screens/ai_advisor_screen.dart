@@ -7,6 +7,7 @@ import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/core/spacing.dart';
 import 'package:pinoy_pos/providers/ai_advisor_provider.dart';
 import 'package:pinoy_pos/ui/widgets/ai_assistant_message.dart';
+import 'package:pinoy_pos/ui/widgets/app_dialog_service.dart';
 import 'package:pinoy_pos/ui/widgets/app_header.dart';
 import 'package:pinoy_pos/ui/widgets/app_icon_circle.dart';
 
@@ -89,6 +90,15 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
         showBackButton: true,
         actions: [
           _buildStatusChip(context, chatState),
+          // New conversation — the only way stored history is cleared.
+          IconButton(
+            icon: const Icon(Icons.add_comment_outlined),
+            iconSize: 22,
+            tooltip: 'New conversation',
+            onPressed: chatState.messages.isEmpty
+                ? null
+                : () => _confirmNewConversation(context),
+          ),
         ],
       ),
       body: Column(
@@ -107,6 +117,22 @@ class _AIAdvisorScreenState extends ConsumerState<AIAdvisorScreen> {
         ],
       ),
     );
+  }
+
+  /// Confirms and starts a new conversation. The conversation is kept
+  /// across restarts and is only removed when the user confirms here.
+  Future<void> _confirmNewConversation(BuildContext context) async {
+    final confirmed = await AppDialogService.confirmation(
+      context,
+      title: 'Start a new conversation?',
+      message:
+          'This clears your current conversation with the AI Advisor. This cannot be undone.',
+      confirmLabel: 'New Conversation',
+      destructive: true,
+    );
+    if (confirmed == true && mounted) {
+      await ref.read(aiAdvisorChatProvider.notifier).startNewConversation();
+    }
   }
 
   // -- Status Chip ---------------------------------------------------------

@@ -5,7 +5,9 @@ import 'package:pinoy_pos/core/date_utils.dart';
 import 'package:pinoy_pos/core/session_manager.dart';
 import 'package:pinoy_pos/data/repositories/sale_item_repository.dart';
 import 'package:pinoy_pos/data/models/daily_sales_point.dart';
+import 'package:pinoy_pos/data/models/product.dart';
 import 'package:pinoy_pos/data/models/reporting_period.dart';
+import 'package:pinoy_pos/data/models/sale.dart';
 import 'package:pinoy_pos/data/models/user.dart';
 import 'package:pinoy_pos/data/repositories/activity_log_repository.dart';
 import 'package:pinoy_pos/data/repositories/backup_history_repository.dart';
@@ -39,6 +41,7 @@ enum BusinessIntent {
   inventoryStatus,
   businessSummary,
   trendAnalysis,
+  recentSales,
   // ── Admin / system-administrative intents ──
   activeUserSummary,
   userStatusSummary,
@@ -48,6 +51,7 @@ enum BusinessIntent {
   exportSummary,
   systemStatusSummary,
   adminSummary,
+  userLookup,
   // ── Staff / own-data intents (filtered by currentUserId) ──
   myTodaySales,
   myDateRangeSales,
@@ -57,6 +61,11 @@ enum BusinessIntent {
   categoryInformation,
   myActivitySummary,
   myWorkSummary,
+  // ── Entity lookups (Owner + Staff; Staff results are scoped to the
+  // user's own records) ──
+  productLookup,
+  saleLookup,
+  paymentBreakdown,
   // ── Shared ──
   general,
 }
@@ -196,6 +205,54 @@ class BusinessIntelligenceService {
     }
 
     // ── Owner / business-wide intent detection ──
+
+    // Specific sale/receipt lookup — "receipt 20260908-0001",
+    // "what was sale #42", "what was my latest transaction". Checked
+    // before the payment-split and generic sales blocks because it
+    // carries an explicit reference that must not be absorbed by either.
+    if (_containsSaleReference(q)) {
+      return DetectedIntent(
+        intent: BusinessIntent.saleLookup,
+        startDate: startDate,
+        endDate: endDate,
+        periodDescription: periodDesc,
+      );
+    }
+
+    // Payment-method split ("GCash vs cash sales today", "how much did we
+    // make in GCash?"). Checked before the generic sales block so phrases
+    // like 'gcash sales today' are not swallowed by todaySales.
+    if (_mentionsPaymentMethodSplit(q)) {
+      return DetectedIntent(
+        intent: BusinessIntent.paymentBreakdown,
+        startDate: startDate,
+        endDate: endDate,
+        periodDescription: periodDesc,
+      );
+    }
+
+    // Recent transactions list.
+    if (_matches(q, ['recent sales', 'latest sales', 'recent transactions',
+        'latest transactions', 'show recent sales', 'show latest sales'])) {
+      return DetectedIntent(
+        intent: BusinessIntent.recentSales,
+        startDate: startDate,
+        endDate: endDate,
+        periodDescription: periodDesc,
+      );
+    }
+
+    // Specific product lookup — "price of coke", "magkano ang coke",
+    // "stock of lucky me". Generic terms ("products", "stock") are
+    // filtered inside _extractProductCandidate.
+    if (extractProductCandidate(q) != null) {
+      return DetectedIntent(
+        intent: BusinessIntent.productLookup,
+        startDate: startDate,
+        endDate: endDate,
+        periodDescription: periodDesc,
+      );
+    }
 
     // Sales queries
     if (_matches(q, ['how were my sales', 'how are my sales', 'sales today',
@@ -394,9 +451,10 @@ class BusinessIntelligenceService {
     DetectedIntent detected, {
     UserRole? role,
     int? userId,
+    String? query,
   }) async {
     final facts =
-        await _dispatchFacts(detected, role: role, userId: userId);
+        await _dispatchFacts(detected, role: role, userId: userId, query: query);
     if (!_auditIntents.contains(detected.intent)) return facts;
     try {
       final audit = await _buildAuditSignals(role: role, userId: userId);
@@ -433,6 +491,7 @@ class BusinessIntelligenceService {
     DetectedIntent detected, {
     UserRole? role,
     int? userId,
+    String? query,
   }) async {
     try {
       switch (detected.intent) {
@@ -469,6 +528,26 @@ class BusinessIntelligenceService {
           return await _gatherBusinessSummary(detected);
         case BusinessIntent.trendAnalysis:
           return await _gatherTrendAnalysis(detected);
+        case BusinessIntent.recentSales:
+          return await _gatherRecentSales(detected);
+        // ── Entity lookups (role-scoped inside each gather) ──
+        case BusinessIntent.productLookup:
+          return await _gatherProductLookup(detected, query: query);
+        case BusinessIntent.saleLookup:
+          return await _gatherSaleLookup(
+            detected,
+            role: role,
+            userId: userId,
+            query: query,
+          );
+        case BusinessIntent.paymentBreakdown:
+          return await _gatherPaymentBreakdown(
+            detected,
+            role: role,
+            userId: userId,
+          );
+        case BusinessIntent.userLookup:
+          return await _gatherUserLookup(detected, query: query);
         // ── Admin / system-administrative ──
         case BusinessIntent.activeUserSummary:
           return await _gatherActiveUserSummary(detected);
@@ -505,7 +584,12 @@ class BusinessIntelligenceService {
           return await _gatherMyWorkSummary(detected, userId);
         // ── Shared ──
         case BusinessIntent.general:
-          return await _gatherGeneralContext(detected, role: role);
+          return await _gatherGeneralContext(
+            detected,
+            role: role,
+            userId: userId,
+            query: query,
+          );
       }
     } catch (e, st) {
       _log('gatherFacts failed for intent ${detected.intent}: $e\n$st');
@@ -1204,10 +1288,800 @@ class BusinessIntelligenceService {
     );
   }
 
+  /// Business-wide recent transactions (Owner). Each line carries the
+  /// receipt number, time, total, payment method, and the cashier's name
+  /// so the AI can answer "who handled that sale" style follow-ups.
+  Future<BusinessFacts> _gatherRecentSales(DetectedIntent d) async {
+    final sales = await _saleRepository.getAllActive(limit: 10);
+    final active = sales.where((s) => !s.isDeleted).toList();
+
+    // Resolve cashier names (one lookup per distinct user id).
+    final names = <int, String>{};
+    for (final s in active) {
+      if (!names.containsKey(s.userId)) {
+        final u = await _userRepository.getById(s.userId);
+        names[s.userId] = u?.fullName ?? 'User ${s.userId}';
+      }
+    }
+
+    final buf = StringBuffer();
+    buf.writeln('--- RECENT SALES (business-wide) ---');
+    if (active.isEmpty) {
+      buf.writeln('No sales have been recorded yet.');
+    } else {
+      for (final s in active) {
+        buf.writeln('  - ${s.receiptNumber ?? 'Sale #${s.id}'} · '
+            '${_formatDateTime(s.createdAt)} · '
+            'PHP ${_formatMoney(s.totalAmount)} · '
+            '${s.paymentMethod} · ${s.paymentStatus} · '
+            'by ${names[s.userId]}'
+            '${s.customerName != null && s.customerName!.isNotEmpty ? ' · customer: ${s.customerName}' : ''}');
+      }
+      buf.writeln('');
+      buf.writeln('Showing the ${active.length} most recent sales.');
+    }
+    buf.writeln('--- END DATA ---');
+
+    return BusinessFacts(
+      context: buf.toString(),
+      intent: d.intent,
+      hasData: active.isNotEmpty,
+    );
+  }
+
+  // ── Entity lookups ──────────────────────────────────────────────────
+  //
+  // These intents resolve a specific entity named in the query (product,
+  // sale/receipt, user account) against the database and return real
+  // field values. Results are role-scoped: Staff sale lookups only see
+  // their own sales; Admin user lookups only run for the admin role.
+
+  /// Phrases that introduce a product name, e.g. "price of coke",
+  /// "magkano ang coke", "stock of lucky me".
+  static const _productLookupPrefixes = [
+    'price of',
+    'price for',
+    'how much is',
+    'how much does',
+    'how much for',
+    'how much',
+    'cost of',
+    'cost for',
+    'stock of',
+    'stocks of',
+    'stock level of',
+    'stock for',
+    'inventory of',
+    'how many',
+    'do we have',
+    'do we still have',
+    'do you have',
+    'do you still have',
+    'still have',
+    'any more',
+    'check',
+    'find',
+    'search for',
+    'look up',
+    'lookup',
+    'magkano ang',
+    'magkano ba ang',
+    'magkano po ang',
+    'magkano',
+    'presyo ng',
+    'presyo nang',
+    'presyo',
+    'ilan pa ang',
+    'ilan pa',
+    'ilan na',
+    'ilan',
+  ];
+
+  /// Words that mean the question is about a whole domain rather than a
+  /// named entity ("how many products do we have" → productInformation,
+  /// not a lookup for "products").
+  static const _genericLookupTerms = {
+    'product',
+    'products',
+    'item',
+    'items',
+    'stock',
+    'stocks',
+    'inventory',
+    'category',
+    'categories',
+    'sale',
+    'sales',
+    'transaction',
+    'transactions',
+    'order',
+    'orders',
+    'user',
+    'users',
+    'account',
+    'accounts',
+    'count',
+    'list',
+    'summary',
+    'status',
+    'settings',
+    'management',
+    'everything',
+    'anything',
+    'it',
+    'this',
+    'that',
+    'them',
+    'money',
+    'cash',
+    'gcash',
+    'all',
+  };
+
+  /// Trailing filler words stripped from a lookup candidate, e.g.
+  /// "how many coke do we have" → "coke".
+  static final _lookupFillerSuffix = RegExp(
+    r'\s+(cost|left|available|in stock|in store|in the store|in the shop|'
+    r'in shop|stock|please|po|ba|nga|today|now|na|pa|do we have|'
+    r'do you have|on hand|remaining|selling|for sale|meron pa)\.?$',
+    caseSensitive: false,
+  );
+
+  /// Extracts the entity name the user is asking about, or null when the
+  /// query does not use a lookup phrase or the candidate is a generic
+  /// domain word.
+  /// Words that mark a question or verb phrase rather than a product
+  /// name. A candidate containing any of these is the tail of a sentence
+  /// like "how much did i sell today" — not something the user is asking
+  /// the catalog about.
+  static const _nonProductWords = {
+    'did',
+    'do',
+    'does',
+    'is',
+    'are',
+    'was',
+    'were',
+    'am',
+    'i',
+    'you',
+    'they',
+    'it',
+    'he',
+    'she',
+    'sell',
+    'sold',
+    'make',
+    'made',
+    'earn',
+    'earned',
+    'get',
+    'got',
+    'take',
+    'took',
+    'have',
+    'has',
+    'had',
+    'will',
+    'would',
+    'should',
+    'could',
+    'much',
+    'many',
+    'cost',
+    'left',
+    'there',
+    'this',
+    'that',
+    'who',
+    'what',
+    'when',
+    'where',
+    'why',
+    'how',
+    'total',
+    'profit',
+    'revenue',
+    'income',
+  };
+
+  static String? extractProductCandidate(String query) {
+    final q = query.toLowerCase().trim();
+    for (final prefix in _productLookupPrefixes) {
+      // Prefix must be followed by a space so 'is' can't match 'island'.
+      if (!q.startsWith('$prefix ')) continue;
+      var rest = q.substring(prefix.length).trim();
+      rest = rest.replaceAll(RegExp(r'[?.!]+$'), '').trim();
+      // Strip trailing filler repeatedly ("coke in stock please" → "coke").
+      while (true) {
+        final stripped = rest.replaceAll(_lookupFillerSuffix, '').trim();
+        if (stripped == rest) break;
+        rest = stripped;
+      }
+      // Strip leading articles/fillers ("the", "ang").
+      rest = rest
+          .replaceAll(RegExp(r'^(the|a|an|ang|yung|si|sa)\s+'), '')
+          .trim();
+      if (rest.isEmpty) return null;
+      if (_genericLookupTerms.contains(rest)) return null;
+      // Reject verb/pronoun phrases — "how much did i sell" is a sales
+      // question, not a lookup for a product called "did i sell".
+      final words = rest.split(RegExp(r'\s+'));
+      if (words.any(_nonProductWords.contains)) return null;
+      return rest;
+    }
+    return null;
+  }
+
+  /// Phrases that introduce a user account name for the Admin lookup.
+  static const _userLookupPrefixes = [
+    'who is',
+    "who's",
+    'whos',
+    'tell me about',
+    'show user',
+    'show account',
+    'find user',
+    'find account',
+    'find',
+    'search for',
+    'look up',
+    'lookup',
+    'about user',
+    'about the user',
+    'about',
+    'user account',
+    'account of',
+    'account for',
+    'account',
+    'user',
+    'is',
+  ];
+
+  /// Words that indicate a status question — stripped from the candidate
+  /// ("is maria active" → "maria").
+  static final _userFillerSuffix = RegExp(
+    r'\s+(active|inactive|disabled|enabled|online|deleted|still here|'
+    r'still employed|working today|a user|a staff|a staff member|'
+    r'an admin|the owner|staff|admin|owner|member)\.?$',
+    caseSensitive: false,
+  );
+
+  static const _genericUserTerms = {
+    'user',
+    'users',
+    'account',
+    'accounts',
+    'staff',
+    'admin',
+    'admins',
+    'owner',
+    'owners',
+    'everyone',
+    'team',
+    'members',
+    'count',
+    'list',
+    'summary',
+    'status',
+    'management',
+    'settings',
+    'me',
+    'i',
+    'all',
+    'system',
+    'the system',
+  };
+
+  static String? _extractUserCandidate(String query) {
+    final q = query.toLowerCase().trim();
+    for (final prefix in _userLookupPrefixes) {
+      // Prefix must be followed by a space so 'user' can't match
+      // 'username' or 'is' can't match 'issue'.
+      if (!q.startsWith('$prefix ')) continue;
+      var rest = q.substring(prefix.length).trim();
+      rest = rest.replaceAll(RegExp(r'[?.!]+$'), '').trim();
+      while (true) {
+        final stripped = rest.replaceAll(_userFillerSuffix, '').trim();
+        if (stripped == rest) break;
+        rest = stripped;
+      }
+      rest = rest
+          .replaceAll(RegExp(r'^(the|a|an|ang|yung|si|sa)\s+'), '')
+          .trim();
+      if (rest.isEmpty) return null;
+      if (_genericUserTerms.contains(rest)) return null;
+      return rest;
+    }
+    return null;
+  }
+
+  /// A full receipt number (`YYYYMMDD-NNNN`) mentioned anywhere in the
+  /// query, or a sale/transaction/order keyword followed by digits.
+  static final _saleReferencePattern = RegExp(
+    r'(?:receipt|sale|transaction|order)\b\s*(?:#|number|num|no\.?|id)?'
+    r'\s*[:\s-]*\d',
+    caseSensitive: false,
+  );
+
+  /// Captures the numeric id after a sale/transaction/order keyword —
+  /// "sale #42" → 42, "receipt: 7" → 7.
+  static final _saleIdCapturePattern = RegExp(
+    r'(?:receipt|sale|transaction|order)\b\s*(?:#|number|num|no\.?|id)?'
+    r'\s*[:\s-]*(\d+)',
+    caseSensitive: false,
+  );
+  static final _receiptNumberPattern = RegExp(r'\b\d{8}-\d{3,}\b');
+
+  static const _latestSalePhrases = [
+    'latest sale',
+    'last sale',
+    'most recent sale',
+    'latest transaction',
+    'last transaction',
+    'most recent transaction',
+    'latest order',
+    'last order',
+  ];
+
+  bool _containsSaleReference(String q) {
+    return _saleReferencePattern.hasMatch(q) ||
+        _receiptNumberPattern.hasMatch(q) ||
+        _matches(q, _latestSalePhrases);
+  }
+
+  /// True when the query asks about a payment-method split (GCash vs
+  /// cash): the method keyword plus an amount/sales cue.
+  bool _mentionsPaymentMethodSplit(String q) {
+    final mentionsMethod =
+        q.contains('gcash') || RegExp(r'\bcash\b').hasMatch(q);
+    if (!mentionsMethod) return false;
+    return _matches(q, [
+      'sales',
+      'sale',
+      'payment',
+      'payments',
+      'breakdown',
+      'vs',
+      'versus',
+      'total',
+      'much',
+      'many',
+      'paid',
+      'share',
+      'split',
+      'made',
+      'collected',
+      'received',
+      'took in',
+      'earnings',
+    ]);
+  }
+
+  /// Resolves the products named in [q]: an explicit lookup candidate
+  /// first, then a whole-word mention scan across active product names.
+  List<Product> _resolveProductMentions(List<Product> products, String q) {
+    final matches = <Product>[];
+    final candidate = extractProductCandidate(q);
+    if (candidate != null) {
+      matches.addAll(
+        products.where((p) => p.name.toLowerCase().trim() == candidate),
+      );
+      if (matches.isEmpty) {
+        matches.addAll(products.where((p) {
+          final name = p.name.toLowerCase().trim();
+          return name.contains(candidate) || candidate.contains(name);
+        }));
+      }
+    }
+    if (matches.isEmpty) {
+      for (final p in products) {
+        final name = p.name.toLowerCase().trim();
+        if (name.length < 3) continue;
+        if (RegExp('\\b${RegExp.escape(name)}\\b').hasMatch(q)) {
+          matches.add(p);
+        }
+      }
+    }
+    // Prefer the shortest (closest) names first when many match.
+    matches.sort((a, b) => a.name.length.compareTo(b.name.length));
+    return matches.take(6).toList();
+  }
+
+  /// Looks up the product(s) named in the query: real price, stock,
+  /// category, and recent sales velocity. Never fabricates a match —
+  /// when nothing resolves, the facts say so and list a sample of the
+  /// catalog so the AI can redirect the user.
+  Future<BusinessFacts> _gatherProductLookup(
+    DetectedIntent d, {
+    String? query,
+  }) async {
+    final q = (query ?? '').toLowerCase();
+    final products = await _productRepository.getActiveProducts();
+    final matches = _resolveProductMentions(products, q);
+
+    final buf = StringBuffer();
+    if (matches.isEmpty) {
+      final candidate = extractProductCandidate(q);
+      buf.writeln('--- PRODUCT LOOKUP ---');
+      buf.writeln(
+        'No active product matched ${candidate != null ? '"$candidate"' : 'the query'}.',
+      );
+      buf.writeln('Total active products: ${products.length}');
+      if (products.isNotEmpty) {
+        buf.writeln('Available products (sample):');
+        for (final p in products.take(12)) {
+          buf.writeln('  - ${p.name} (PHP ${_formatMoney(p.price)})');
+        }
+        if (products.length > 12) {
+          buf.writeln('  ... and ${products.length - 12} more.');
+        }
+      }
+      buf.writeln('--- END DATA ---');
+      return BusinessFacts(
+        context: buf.toString(),
+        intent: d.intent,
+        hasData: false,
+      );
+    }
+
+    final categories = await _categoryRepository.getActiveCategories();
+    final catNames = {for (final c in categories) c.id!: c.name};
+    final velocity = await _saleItemRepository.getTopProducts(
+      limit: 200,
+      since: DateTime.now().subtract(const Duration(days: 30)),
+    );
+    final sold30 = {
+      for (final t in velocity)
+        t['product_id'] as int: t['total_quantity'] as int,
+    };
+
+    buf.writeln('--- PRODUCT LOOKUP RESULTS ---');
+    for (final p in matches) {
+      buf.writeln('  - ${p.name}: PHP ${_formatMoney(p.price)}; '
+          'stock: ${p.stock} units (min: ${p.minStock}); '
+          'category: ${catNames[p.categoryId] ?? 'Uncategorized'}; '
+          'sold last 30 days: ${sold30[p.id] ?? 0} units'
+          '${p.isLowStock ? '; LOW STOCK' : ''}');
+    }
+    buf.writeln('--- END DATA ---');
+
+    return BusinessFacts(
+      context: buf.toString(),
+      intent: d.intent,
+      hasData: true,
+    );
+  }
+
+  /// Looks up a specific sale by receipt number, internal id, or
+  /// "latest/last sale". Staff are scoped to their own sales — the
+  /// `user_id` filter is applied inside the repository query.
+  Future<BusinessFacts> _gatherSaleLookup(
+    DetectedIntent d, {
+    UserRole? role,
+    int? userId,
+    String? query,
+  }) async {
+    final q = (query ?? '').toLowerCase();
+    final scopedUserId = role == UserRole.staff ? userId : null;
+    if (role == UserRole.staff && userId == null) return _noUserData(d);
+
+    Sale? sale;
+    final receiptNo = _receiptNumberPattern.firstMatch(q)?.group(0);
+    if (receiptNo != null) {
+      final results = await _saleRepository.getFilteredSales(
+        search: receiptNo,
+        userId: scopedUserId,
+        limit: 20,
+      );
+      for (final s in results) {
+        if (!s.isDeleted && s.receiptNumber == receiptNo) {
+          sale = s;
+          break;
+        }
+      }
+    }
+
+    // Fall back to a numeric sale id only when the query did NOT carry a
+    // full receipt number — otherwise '20260908' would be misread as id.
+    if (sale == null && receiptNo == null) {
+      final idMatch = _saleIdCapturePattern.firstMatch(q);
+      final id =
+          idMatch == null ? null : int.tryParse(idMatch.group(1)!);
+      if (id != null) {
+        final found = await _saleRepository.getById(id);
+        if (found != null &&
+            !found.isDeleted &&
+            (scopedUserId == null || found.userId == scopedUserId)) {
+          sale = found;
+        }
+      }
+    }
+
+    if (sale == null && _matches(q, _latestSalePhrases)) {
+      final recent = scopedUserId != null
+          ? await _saleRepository.getByUserId(scopedUserId, limit: 1)
+          : await _saleRepository.getAllActive(limit: 1);
+      for (final s in recent) {
+        if (!s.isDeleted) {
+          sale = s;
+          break;
+        }
+      }
+    }
+
+    if (sale == null) {
+      return BusinessFacts(
+        context: '--- SALE LOOKUP ---\n'
+            'No matching sale was found for this query.'
+            '${role == UserRole.staff ? ' (You can only look up your own sales.)' : ''}\n'
+            '--- END DATA ---',
+        intent: d.intent,
+        hasData: false,
+      );
+    }
+
+    final items = await _saleItemRepository.getBySaleId(sale.id!);
+    String? recordedBy;
+    if (role != UserRole.staff) {
+      final u = await _userRepository.getById(sale.userId);
+      recordedBy = u?.fullName;
+    }
+
+    final buf = StringBuffer();
+    buf.writeln('--- SALE LOOKUP RESULT ---');
+    buf.writeln('Receipt number: ${sale.receiptNumber ?? '(none assigned)'}');
+    buf.writeln('Sale ID: ${sale.id}');
+    buf.writeln('Date: ${_formatDateTime(sale.createdAt)}');
+    buf.writeln('Total: PHP ${_formatMoney(sale.totalAmount)}');
+    buf.writeln('Payment method: ${sale.paymentMethod}');
+    buf.writeln('Payment status: ${sale.paymentStatus}');
+    if (sale.paymentMethod == 'Cash') {
+      buf.writeln('Cash received: PHP ${_formatMoney(sale.cashReceived)}');
+      buf.writeln('Change: PHP ${_formatMoney(sale.change)}');
+    }
+    if (sale.referenceNumber != null && sale.referenceNumber!.isNotEmpty) {
+      buf.writeln('GCash reference: ${sale.referenceNumber}');
+    }
+    if (sale.customerName != null && sale.customerName!.isNotEmpty) {
+      buf.writeln('Customer: ${sale.customerName}');
+    }
+    if (recordedBy != null) {
+      buf.writeln('Recorded by: $recordedBy');
+    }
+    if (sale.isPending) {
+      buf.writeln('NOTE: This sale is pending GCash verification.');
+    }
+    if (sale.isCancelled) {
+      buf.writeln('NOTE: This sale was ${sale.paymentStatus}.');
+    }
+    buf.writeln('');
+    if (items.isEmpty) {
+      buf.writeln('Items: none recorded.');
+    } else {
+      buf.writeln('Items (${items.length}):');
+      for (final item in items) {
+        buf.writeln('  - ${item.productName ?? 'Product #${item.productId}'}: '
+            '${item.quantity} × PHP ${_formatMoney(item.unitPrice)} = '
+            'PHP ${_formatMoney(item.totalPrice)}');
+      }
+    }
+    buf.writeln('--- END DATA ---');
+
+    return BusinessFacts(
+      context: buf.toString(),
+      intent: d.intent,
+      hasData: true,
+    );
+  }
+
+  /// Cash vs GCash (and any other method) totals for the requested
+  /// period. Staff results are scoped to their own sales.
+  Future<BusinessFacts> _gatherPaymentBreakdown(
+    DetectedIntent d, {
+    UserRole? role,
+    int? userId,
+  }) async {
+    final scopedUserId = role == UserRole.staff ? userId : null;
+    if (role == UserRole.staff && userId == null) return _noUserData(d);
+
+    final now = DateTime.now();
+    final today = startOfDay(now);
+    final start = d.startDate ?? today;
+    final end = d.endDate ?? today.add(const Duration(days: 1));
+
+    final breakdown = await _saleRepository.getPaymentBreakdown(
+      start,
+      end,
+      userId: scopedUserId,
+    );
+    final grandTotal =
+        breakdown.fold<double>(0, (sum, p) => sum + p.total);
+    final totalCount = breakdown.fold<int>(0, (sum, p) => sum + p.count);
+
+    final buf = StringBuffer();
+    buf.writeln('--- PAYMENT METHOD BREAKDOWN '
+        '(${d.periodDescription ?? 'period'}'
+        '${scopedUserId != null ? ', your sales only' : ''}) ---');
+    buf.writeln(
+        'Period: ${_formatDate(start)} to ${_formatDate(end.subtract(const Duration(days: 1)))}');
+    if (breakdown.isEmpty || grandTotal <= 0) {
+      buf.writeln('No confirmed sales in this period.');
+    } else {
+      for (final p in breakdown) {
+        buf.writeln('  - ${p.method}: PHP ${_formatMoney(p.total)} '
+            '(${p.count} transactions, '
+            '${p.percentageOf(grandTotal).toStringAsFixed(1)}% of total)');
+      }
+      buf.writeln('  Total: PHP ${_formatMoney(grandTotal)} '
+          '($totalCount transactions)');
+    }
+    buf.writeln('--- END DATA ---');
+
+    return BusinessFacts(
+      context: buf.toString(),
+      intent: d.intent,
+      hasData: breakdown.isNotEmpty,
+    );
+  }
+
+  /// Looks up a specific user account by name or username (Admin only).
+  /// Never exposes credentials — only account state fields.
+  Future<BusinessFacts> _gatherUserLookup(
+    DetectedIntent d, {
+    String? query,
+  }) async {
+    final q = (query ?? '').toLowerCase();
+    final candidate = _extractUserCandidate(q);
+    final users = await _userRepository.getAllActive();
+
+    final matches = <User>[];
+    if (candidate != null && candidate.isNotEmpty) {
+      final c = candidate.toLowerCase();
+      matches.addAll(users.where(
+        (u) =>
+            u.username.toLowerCase() == c || u.fullName.toLowerCase() == c,
+      ));
+      if (matches.isEmpty) {
+        matches.addAll(users.where((u) {
+          final full = u.fullName.toLowerCase();
+          final uname = u.username.toLowerCase();
+          return full.contains(c) || uname.contains(c);
+        }));
+      }
+    }
+    if (matches.isEmpty) {
+      // Mention scan: the query may name a user without a lookup prefix.
+      for (final u in users) {
+        final full = u.fullName.toLowerCase().trim();
+        final uname = u.username.toLowerCase().trim();
+        if (full.length >= 3 &&
+            RegExp('\\b${RegExp.escape(full)}\\b').hasMatch(q)) {
+          matches.add(u);
+        } else if (uname.length >= 3 &&
+            RegExp('\\b${RegExp.escape(uname)}\\b').hasMatch(q)) {
+          matches.add(u);
+        }
+      }
+    }
+
+    final buf = StringBuffer();
+    if (matches.isEmpty) {
+      buf.writeln('--- USER LOOKUP ---');
+      buf.writeln(
+        'No user account matched ${candidate != null ? '"$candidate"' : 'the query'}.',
+      );
+      buf.writeln('Total user accounts (not deleted): ${users.length}');
+      if (users.isNotEmpty) {
+        buf.writeln('User accounts (sample):');
+        for (final u in users.take(10)) {
+          buf.writeln(
+              '  - ${u.fullName} (@${u.username}, ${u.role.displayName})');
+        }
+      }
+      buf.writeln('--- END DATA ---');
+      return BusinessFacts(
+        context: buf.toString(),
+        intent: d.intent,
+        hasData: false,
+      );
+    }
+
+    buf.writeln('--- USER LOOKUP RESULTS ---');
+    for (final u in matches.take(5)) {
+      buf.writeln('  - ${u.fullName} (@${u.username})');
+      buf.writeln('    Role: ${u.role.displayName}');
+      buf.writeln('    Status: ${u.isActive ? 'active' : 'inactive'}');
+      buf.writeln('    Last login: '
+          '${u.lastLogin != null ? _formatDateTime(u.lastLogin!) : 'never'}');
+      buf.writeln('    Account created: ${_formatDate(u.createdAt)}');
+      if (u.mustChangePassword) {
+        buf.writeln('    Password change required on next login: yes');
+      }
+    }
+    buf.writeln('--- END DATA ---');
+
+    return BusinessFacts(
+      context: buf.toString(),
+      intent: d.intent,
+      hasData: true,
+    );
+  }
+
+  /// When a general-intent query names a product, return the real product
+  /// facts instead of the thin generic context. Returns null when no
+  /// product matches.
+  Future<BusinessFacts?> _tryProductLookupFacts(
+    DetectedIntent d,
+    String q,
+  ) async {
+    final products = await _productRepository.getActiveProducts();
+    if (_resolveProductMentions(products, q).isEmpty) return null;
+    return _gatherProductLookup(d, query: q);
+  }
+
+  /// When a general-intent query references a specific sale/receipt,
+  /// return the real sale facts. Returns null when the query carries no
+  /// sale reference at all (a "not found" lookup result IS returned).
+  Future<BusinessFacts?> _trySaleLookupFacts(
+    DetectedIntent d,
+    String q, {
+    UserRole? role,
+    int? userId,
+  }) async {
+    if (!_containsSaleReference(q)) return null;
+    return _gatherSaleLookup(d, role: role, userId: userId, query: q);
+  }
+
+  /// Admin counterpart for user-account mentions in a general query.
+  Future<BusinessFacts?> _tryUserLookupFacts(
+    DetectedIntent d,
+    String q,
+  ) async {
+    final users = await _userRepository.getAllActive();
+    var found = false;
+    for (final u in users) {
+      final full = u.fullName.toLowerCase().trim();
+      final uname = u.username.toLowerCase().trim();
+      if (full.length >= 3 &&
+          RegExp('\\b${RegExp.escape(full)}\\b').hasMatch(q)) {
+        found = true;
+        break;
+      }
+      if (uname.length >= 3 &&
+          RegExp('\\b${RegExp.escape(uname)}\\b').hasMatch(q)) {
+        found = true;
+        break;
+      }
+    }
+    if (!found) return null;
+    return _gatherUserLookup(d, query: q);
+  }
+
   Future<BusinessFacts> _gatherGeneralContext(
     DetectedIntent d, {
     UserRole? role,
+    int? userId,
+    String? query,
   }) async {
+    // When an unmatched query names a specific entity the role can see,
+    // answer it with real data rather than thin generic context. This is
+    // what makes phrasing like "coke price" or "anong laman ng
+    // 20260908-0001" reach the database even without a detected intent.
+    final q = (query ?? '').toLowerCase();
+    if (q.isNotEmpty) {
+      if (role == UserRole.admin) {
+        final userFacts = await _tryUserLookupFacts(d, q);
+        if (userFacts != null) return userFacts;
+      } else {
+        final productFacts = await _tryProductLookupFacts(d, q);
+        if (productFacts != null) return productFacts;
+        final saleFacts =
+            await _trySaleLookupFacts(d, q, role: role, userId: userId);
+        if (saleFacts != null) return saleFacts;
+      }
+    }
+
     final buf = StringBuffer();
 
     // Add store and user context to every AI context so the assistant can
@@ -1613,6 +2487,26 @@ class BusinessIntelligenceService {
       'Which products are low in stock?',
       'What should I restock soon?',
     ],
+    BusinessIntent.recentSales: [
+      'How are my sales today?',
+      'What was my latest sale?',
+      'How much was paid via GCash today?',
+    ],
+    BusinessIntent.productLookup: [
+      'Which products are low in stock?',
+      'What products are selling the most?',
+      'What should I restock soon?',
+    ],
+    BusinessIntent.saleLookup: [
+      'Show recent sales.',
+      'How much was paid via GCash today?',
+      'How are my sales today?',
+    ],
+    BusinessIntent.paymentBreakdown: [
+      'How are my sales today?',
+      'Show recent sales.',
+      'What was my latest sale?',
+    ],
   };
 
   static const List<String> _ownerFallbackFollowUps = [
@@ -1663,6 +2557,11 @@ class BusinessIntelligenceService {
       'How many active users do we have?',
       'Show recent system activity.',
       'When was the latest backup?',
+    ],
+    BusinessIntent.userLookup: [
+      'How many active users do we have?',
+      'Show recent system activity.',
+      'Give me a system summary.',
     ],
   };
 
@@ -1715,6 +2614,21 @@ class BusinessIntelligenceService {
       'What products are low in stock?',
     ],
     BusinessIntent.myWorkSummary: [
+      'How much did I sell today?',
+      'Show my recent sales.',
+      'What products are low in stock?',
+    ],
+    BusinessIntent.productLookup: [
+      'What products are low in stock?',
+      'Show my recent sales.',
+      'How much did I sell today?',
+    ],
+    BusinessIntent.saleLookup: [
+      'Show my recent sales.',
+      'How much did I sell today?',
+      'Give me a summary of my work today.',
+    ],
+    BusinessIntent.paymentBreakdown: [
       'How much did I sell today?',
       'Show my recent sales.',
       'What products are low in stock?',
@@ -1827,6 +2741,18 @@ class BusinessIntelligenceService {
       );
     }
 
+    // Specific user account lookup — "who is maria", "is john active".
+    // Runs after the aggregate user blocks so 'how many users' etc. keep
+    // resolving to summaries.
+    if (_extractUserCandidate(q) != null) {
+      return DetectedIntent(
+        intent: BusinessIntent.userLookup,
+        startDate: startDate,
+        endDate: endDate,
+        periodDescription: periodDesc,
+      );
+    }
+
     return DetectedIntent(
       intent: BusinessIntent.general,
       startDate: startDate,
@@ -1843,6 +2769,38 @@ class BusinessIntelligenceService {
     DateTime? endDate,
     String? periodDesc,
   ) {
+    // Specific sale/receipt lookup — scoped to the staff member's own
+    // sales at the SQL level inside _gatherSaleLookup.
+    if (_containsSaleReference(q)) {
+      return DetectedIntent(
+        intent: BusinessIntent.saleLookup,
+        startDate: startDate,
+        endDate: endDate,
+        periodDescription: periodDesc,
+      );
+    }
+
+    // Payment-method split for own sales ("how much GCash did I take
+    // today"). Checked before the generic "my sales" block.
+    if (_mentionsPaymentMethodSplit(q)) {
+      return DetectedIntent(
+        intent: BusinessIntent.paymentBreakdown,
+        startDate: startDate,
+        endDate: endDate,
+        periodDescription: periodDesc,
+      );
+    }
+
+    // Specific product lookup — "price of coke", "stock of lucky me".
+    if (extractProductCandidate(q) != null) {
+      return DetectedIntent(
+        intent: BusinessIntent.productLookup,
+        startDate: startDate,
+        endDate: endDate,
+        periodDescription: periodDesc,
+      );
+    }
+
     // My sales (own sales only, filtered by currentUserId)
     if (_matches(q, ['my sales', 'how much did i sell', 'how much did i make',
         'i sell today', 'i make today', 'my transactions',
