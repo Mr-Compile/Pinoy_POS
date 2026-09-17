@@ -42,6 +42,7 @@ enum BusinessIntent {
   businessSummary,
   trendAnalysis,
   recentSales,
+  staffSales,
   // ── Admin / system-administrative intents ──
   activeUserSummary,
   userStatusSummary,
@@ -153,7 +154,10 @@ class BusinessIntelligenceService {
   /// [BusinessIntent.general] if no specific intent is detected (the AI
   /// can still answer generally but must not invent database facts).
   DetectedIntent detectIntent(String query, {UserRole? role}) {
-    final q = query.toLowerCase();
+    // Normalize first: punctuation stripped and misspelled tokens
+    // snapped to the intent vocabulary, so "saels", "staf sales",
+    // and "who's my employe" still reach the right intent.
+    final q = _normalizeQuery(query);
 
     // ── Date range detection (shared by all roles) ──
     DateTime? startDate;
@@ -248,6 +252,51 @@ class BusinessIntelligenceService {
     if (extractProductCandidate(q) != null) {
       return DetectedIntent(
         intent: BusinessIntent.productLookup,
+        startDate: startDate,
+        endDate: endDate,
+        periodDescription: periodDesc,
+      );
+    }
+
+    // Staff & user accounts — the owner can see every account plus
+    // per-staff sales performance. Placed before the generic sales
+    // block so 'staff sales today' resolves to staffSales instead of
+    // being absorbed by business-wide todaySales.
+    final asksAboutPerson = _matches(q, ['who is', "who's", 'whos']) ||
+        _staffAccountPattern.hasMatch(q);
+    if (asksAboutPerson) {
+      // Per-staff performance — "staff sales today", "which staff
+      // sold the most", "my best employee".
+      if (_matches(q, ['sale', 'sold', 'revenue', 'income', 'earning',
+          'performance', 'best', 'top', 'most', 'highest'])) {
+        return DetectedIntent(
+          intent: BusinessIntent.staffSales,
+          startDate: startDate,
+          endDate: endDate,
+          periodDescription: periodDesc,
+        );
+      }
+      // Named-account lookup — "who is maria".
+      if (_extractUserCandidate(q) != null) {
+        return DetectedIntent(
+          intent: BusinessIntent.userLookup,
+          startDate: startDate,
+          endDate: endDate,
+          periodDescription: periodDesc,
+        );
+      }
+      // Headcount — "how many staff", "how many users".
+      if (_matches(q, ['how many', 'count', 'number of', 'total '])) {
+        return DetectedIntent(
+          intent: BusinessIntent.activeUserSummary,
+          startDate: startDate,
+          endDate: endDate,
+          periodDescription: periodDesc,
+        );
+      }
+      // Full roster — "who are my staff", "list users", "my team".
+      return DetectedIntent(
+        intent: BusinessIntent.userStatusSummary,
         startDate: startDate,
         endDate: endDate,
         periodDescription: periodDesc,
@@ -411,6 +460,44 @@ class BusinessIntelligenceService {
       );
     }
 
+    // System administration data — the owner can see everything:
+    // audit activity, backups, exports, and system status.
+    if (_matches(q, ['backup'])) {
+      return DetectedIntent(
+        intent: BusinessIntent.backupSummary,
+        startDate: startDate,
+        endDate: endDate,
+        periodDescription: periodDesc,
+      );
+    }
+    if (_matches(q, ['export'])) {
+      return DetectedIntent(
+        intent: BusinessIntent.exportSummary,
+        startDate: startDate,
+        endDate: endDate,
+        periodDescription: periodDesc,
+      );
+    }
+    if (_matches(q, ['system status', 'system health', 'system overview',
+        'system summary', 'system configuration'])) {
+      return DetectedIntent(
+        intent: BusinessIntent.systemStatusSummary,
+        startDate: startDate,
+        endDate: endDate,
+        periodDescription: periodDesc,
+      );
+    }
+    if (_matches(q, ['activity', 'audit log', 'what happened'])) {
+      return DetectedIntent(
+        intent: _matches(q, ['recent', 'latest', 'show', 'log'])
+            ? BusinessIntent.recentActivity
+            : BusinessIntent.systemActivitySummary,
+        startDate: startDate,
+        endDate: endDate,
+        periodDescription: periodDesc,
+      );
+    }
+
     // Business summary / overview
     if (_matches(q, ['business summary', 'overview', 'give me a summary',
         'business performance', 'how is my business',
@@ -530,6 +617,8 @@ class BusinessIntelligenceService {
           return await _gatherTrendAnalysis(detected);
         case BusinessIntent.recentSales:
           return await _gatherRecentSales(detected);
+        case BusinessIntent.staffSales:
+          return await _gatherStaffSales(detected);
         // ── Entity lookups (role-scoped inside each gather) ──
         case BusinessIntent.productLookup:
           return await _gatherProductLookup(detected, query: query);
@@ -1329,6 +1418,47 @@ class BusinessIntelligenceService {
     );
   }
 
+  /// Per-staff sales performance for the period — "which staff sold
+  /// the most today", "employee sales this week". Business-wide by
+  /// design: the owner sees every user's contribution.
+  Future<BusinessFacts> _gatherStaffSales(DetectedIntent d) async {
+    final now = DateTime.now();
+    final start = d.startDate ?? startOfDay(now);
+    final end = d.endDate ?? start.add(const Duration(days: 1));
+    final staff = await _saleRepository.getStaffSalesSummary(start, end);
+    final ranked = staff.toList()
+      ..sort((a, b) => b.totalSales.compareTo(a.totalSales));
+
+    final buf = StringBuffer();
+    buf.writeln('--- STAFF SALES PERFORMANCE '
+        '(${d.periodDescription ?? 'today'}) ---');
+    buf.writeln('Period: ${_formatDate(start)} to ${_formatDate(end)}');
+    if (ranked.isEmpty) {
+      buf.writeln('No sales recorded by any staff in this period.');
+    } else {
+      var rank = 1;
+      for (final s in ranked.take(20)) {
+        buf.writeln('  $rank. ${s.fullName}'
+            '${s.role != null ? ' (${s.role!.displayName})' : ''} — '
+            'PHP ${_formatMoney(s.totalSales)} '
+            '(${s.transactionCount} transactions, '
+            'avg PHP ${_formatMoney(s.averageTransaction)})');
+        rank++;
+      }
+      final total =
+          ranked.fold<double>(0, (sum, s) => sum + s.totalSales);
+      buf.writeln('');
+      buf.writeln('Total staff sales: PHP ${_formatMoney(total)}');
+    }
+    buf.writeln('--- END DATA ---');
+
+    return BusinessFacts(
+      context: buf.toString(),
+      intent: d.intent,
+      hasData: ranked.isNotEmpty,
+    );
+  }
+
   // ── Entity lookups ──────────────────────────────────────────────────
   //
   // These intents resolve a specific entity named in the query (product,
@@ -1483,6 +1613,22 @@ class BusinessIntelligenceService {
     'profit',
     'revenue',
     'income',
+    // People words — "how many staff ko" is a staff question, never a
+    // lookup for a product called "staff ko".
+    'staff',
+    'employee',
+    'employees',
+    'member',
+    'members',
+    'team',
+    'user',
+    'users',
+    'account',
+    'accounts',
+    'ko',
+    'aking',
+    'natin',
+    'namin',
   };
 
   static String? extractProductCandidate(String query) {
@@ -1567,6 +1713,8 @@ class BusinessIntelligenceService {
     'management',
     'settings',
     'me',
+    'my',
+    'mine',
     'i',
     'all',
     'system',
@@ -1612,6 +1760,14 @@ class BusinessIntelligenceService {
     caseSensitive: false,
   );
   static final _receiptNumberPattern = RegExp(r'\b\d{8}-\d{3,}\b');
+
+  /// Words that identify a staff/user-account question for the owner —
+  /// "my staff", "employees", "team members", "users", "who works here".
+  static final _staffAccountPattern = RegExp(
+    r'\b(staff|employees?|team(\s*members?)?|users?|accounts?)\b|'
+    r'\bwho\s+works?\b',
+    caseSensitive: false,
+  );
 
   static const _latestSalePhrases = [
     'latest sale',
@@ -1676,9 +1832,8 @@ class BusinessIntelligenceService {
     }
     if (matches.isEmpty) {
       for (final p in products) {
-        final name = p.name.toLowerCase().trim();
-        if (name.length < 3) continue;
-        if (RegExp('\\b${RegExp.escape(name)}\\b').hasMatch(q)) {
+        if (p.name.trim().length < 3) continue;
+        if (_nameMentioned(p.name, q)) {
           matches.add(p);
         }
       }
@@ -1925,8 +2080,9 @@ class BusinessIntelligenceService {
     );
   }
 
-  /// Looks up a specific user account by name or username (Admin only).
-  /// Never exposes credentials — only account state fields.
+  /// Looks up a specific user account by name or username (Admin and
+  /// Owner — Staff cannot see other users' accounts). Never exposes
+  /// credentials — only account state fields.
   Future<BusinessFacts> _gatherUserLookup(
     DetectedIntent d, {
     String? query,
@@ -1951,15 +2107,11 @@ class BusinessIntelligenceService {
       }
     }
     if (matches.isEmpty) {
-      // Mention scan: the query may name a user without a lookup prefix.
+      // Mention scan: the query may name a user without a lookup
+      // prefix — or with a typo ("who is maira" still finds Maria).
       for (final u in users) {
-        final full = u.fullName.toLowerCase().trim();
-        final uname = u.username.toLowerCase().trim();
-        if (full.length >= 3 &&
-            RegExp('\\b${RegExp.escape(full)}\\b').hasMatch(q)) {
-          matches.add(u);
-        } else if (uname.length >= 3 &&
-            RegExp('\\b${RegExp.escape(uname)}\\b').hasMatch(q)) {
+        if (_nameMentioned(u.fullName, q) ||
+            _nameMentioned(u.username, q)) {
           matches.add(u);
         }
       }
@@ -2033,7 +2185,8 @@ class BusinessIntelligenceService {
     return _gatherSaleLookup(d, role: role, userId: userId, query: q);
   }
 
-  /// Admin counterpart for user-account mentions in a general query.
+  /// Counterpart for user-account mentions in a general query — runs
+  /// for the roles allowed to see user accounts (Admin and Owner).
   Future<BusinessFacts?> _tryUserLookupFacts(
     DetectedIntent d,
     String q,
@@ -2041,15 +2194,7 @@ class BusinessIntelligenceService {
     final users = await _userRepository.getAllActive();
     var found = false;
     for (final u in users) {
-      final full = u.fullName.toLowerCase().trim();
-      final uname = u.username.toLowerCase().trim();
-      if (full.length >= 3 &&
-          RegExp('\\b${RegExp.escape(full)}\\b').hasMatch(q)) {
-        found = true;
-        break;
-      }
-      if (uname.length >= 3 &&
-          RegExp('\\b${RegExp.escape(uname)}\\b').hasMatch(q)) {
+      if (_nameMentioned(u.fullName, q) || _nameMentioned(u.username, q)) {
         found = true;
         break;
       }
@@ -2079,6 +2224,12 @@ class BusinessIntelligenceService {
         final saleFacts =
             await _trySaleLookupFacts(d, q, role: role, userId: userId);
         if (saleFacts != null) return saleFacts;
+        // The owner may also name a staff member/user account —
+        // resolve it against the real users table.
+        if (role == UserRole.owner) {
+          final userFacts = await _tryUserLookupFacts(d, q);
+          if (userFacts != null) return userFacts;
+        }
       }
     }
 
@@ -2169,15 +2320,23 @@ class BusinessIntelligenceService {
       final products = await _productRepository.getActiveProducts();
       final lowStock = await _productRepository.getLowStockProducts();
 
+      final users = await _userRepository.getAllActive();
+
       buf.writeln('--- GENERAL BUSINESS CONTEXT ---');
       buf.writeln('Today\'s sales: PHP ${_formatMoney(todayTotal)} '
           '(${todayActive.length} transactions)');
       buf.writeln('Active products: ${products.length}');
       buf.writeln('Low stock items: ${lowStock.length}');
       buf.writeln('');
+      buf.writeln('Team accounts (${users.length}):');
+      for (final u in users.take(20)) {
+        buf.writeln('  - ${u.fullName} (${u.role.displayName})'
+            '${u.isActive ? '' : ' — inactive'}');
+      }
+      buf.writeln('');
       buf.writeln('NOTE: This is general context only. For specific '
-          'analysis, ask about sales, products, inventory, or request a '
-          'business summary.');
+          'analysis, ask about sales, products, inventory, staff, '
+          'users, activity, backups, or request a business summary.');
       buf.writeln('--- END CONTEXT ---');
     }
 
@@ -2249,6 +2408,12 @@ class BusinessIntelligenceService {
       final products = await _productRepository.getActiveProducts();
       if (products.isNotEmpty) {
         suggestions.add('Which products are performing best?');
+      }
+
+      // Surface staff visibility when the team has members.
+      final users = await _userRepository.getAllActive();
+      if (users.any((u) => u.role == UserRole.staff)) {
+        suggestions.add('Who are my staff?');
       }
 
       // Check for insufficient history.
@@ -2506,6 +2671,51 @@ class BusinessIntelligenceService {
       'How are my sales today?',
       'Show recent sales.',
       'What was my latest sale?',
+    ],
+    BusinessIntent.staffSales: [
+      'Who are my staff?',
+      'How are my sales today?',
+      'What products are selling the most?',
+    ],
+    BusinessIntent.userStatusSummary: [
+      'Which staff sold the most today?',
+      'How many users do I have?',
+      'Show recent sales.',
+    ],
+    BusinessIntent.activeUserSummary: [
+      'Who are my staff?',
+      'Which staff sold the most today?',
+      'Give me a business summary.',
+    ],
+    BusinessIntent.userLookup: [
+      'Who are my staff?',
+      'Which staff sold the most today?',
+      'Show recent sales.',
+    ],
+    BusinessIntent.systemActivitySummary: [
+      'Show recent activity.',
+      'Who are my staff?',
+      'Give me a business summary.',
+    ],
+    BusinessIntent.recentActivity: [
+      'Summarize today\'s activity.',
+      'Who are my staff?',
+      'How are my sales today?',
+    ],
+    BusinessIntent.backupSummary: [
+      'Show recent activity.',
+      'Give me a business summary.',
+      'How are my sales today?',
+    ],
+    BusinessIntent.exportSummary: [
+      'When was the latest backup?',
+      'Give me a business summary.',
+      'How are my sales today?',
+    ],
+    BusinessIntent.systemStatusSummary: [
+      'How many users do I have?',
+      'When was the latest backup?',
+      'Give me a business summary.',
     ],
   };
 
@@ -3700,8 +3910,193 @@ class BusinessIntelligenceService {
 
   // ── Helpers ──────────────────────────────────────────────────────────
 
+  /// Intent-relevant vocabulary used for typo correction. Any query
+  /// token within one edit (substitution, insertion, deletion, or
+  /// adjacent transposition) of a word here is snapped to it, so
+  /// "saels", "staf", and "gcahs" still detect correctly.
+  static const _intentVocabulary = {
+    'how', 'who', 'whos', 'what', 'when', 'where', 'which',
+    'show', 'list', 'count', 'many', 'much',
+    'sales', 'sale', 'sold', 'selling', 'seller',
+    'staff', 'employee', 'employees', 'team', 'members',
+    'user', 'users', 'account', 'accounts', 'admin', 'owner',
+    'product', 'products', 'category', 'categories',
+    'stock', 'stocks', 'inventory', 'restock',
+    'receipt', 'transaction', 'transactions', 'order',
+    'gcash', 'cash', 'payment', 'paid',
+    'price', 'cost',
+    'today', 'yesterday', 'tomorrow', 'week', 'month',
+    'daily', 'weekly', 'monthly',
+    'total', 'amount', 'income', 'revenue', 'earning', 'earnings',
+    'profit', 'activity', 'backup', 'export', 'system', 'status',
+    'active', 'inactive', 'recent', 'latest', 'best', 'worst',
+    'most', 'least', 'highest', 'lowest', 'summary', 'report',
+    'overview', 'performance', 'trend', 'customer', 'customers',
+  };
+
+  /// Explicit corrections for common misspellings, keyboard slips, and
+  /// Taglish phrasing — covers cases a one-edit fuzzy match cannot.
+  static const _queryCorrections = {
+    'usr': 'user', 'usrs': 'users', 'uers': 'users',
+    'staf': 'staff', 'stafs': 'staff', 'staffs': 'staff',
+    'employe': 'employee', 'employes': 'employees',
+    'emplyee': 'employee', 'employye': 'employee',
+    'prodct': 'product', 'prodcts': 'products', 'prodcut': 'product',
+    'prodcuts': 'products', 'porduct': 'product', 'porducts': 'products',
+    'stok': 'stock', 'stcok': 'stock', 'stck': 'stock', 'stoks': 'stock',
+    'invntory': 'inventory', 'inventroy': 'inventory',
+    'inventry': 'inventory', 'inventori': 'inventory',
+    'reciept': 'receipt', 'recipt': 'receipt', 'resept': 'receipt',
+    'transation': 'transaction', 'transction': 'transaction',
+    'transations': 'transactions', 'transacions': 'transactions',
+    'trnsaction': 'transaction', 'trnsactions': 'transactions',
+    'gcas': 'gcash', 'gcahs': 'gcash', 'gcashh': 'gcash',
+    'gcaash': 'gcash', 'gcashs': 'gcash',
+    'yestrday': 'yesterday', 'yesteday': 'yesterday',
+    'ystarday': 'yesterday', 'yterday': 'yesterday',
+    'tomorow': 'tomorrow', 'tommorrow': 'tomorrow', 'tomorrw': 'tomorrow',
+    'bakcup': 'backup', 'bakup': 'backup', 'backp': 'backup',
+    'bckup': 'backup', 'backups': 'backup',
+    'activty': 'activity', 'activiy': 'activity', 'actvity': 'activity',
+    'activites': 'activity', 'activitie': 'activity',
+    'catgory': 'category', 'categry': 'category', 'categoy': 'category',
+    'categores': 'categories', 'catgories': 'categories',
+    'custmer': 'customer', 'costumer': 'customer', 'cstomer': 'customer',
+    'custmers': 'customers', 'costumers': 'customers',
+    'prce': 'price', 'pice': 'price', 'prize': 'price', 'rpice': 'price',
+    'paymnt': 'payment', 'paymnet': 'payment', 'pyament': 'payment',
+    'paymet': 'payment',
+    'amout': 'amount', 'amont': 'amount', 'ammount': 'amount',
+    'totl': 'total', 'totla': 'total', 'ttal': 'total',
+    'mont': 'month', 'mnth': 'month', 'motnh': 'month',
+    'wek': 'week', 'weel': 'week', 'weekk': 'week',
+    'restok': 'restock', 'restck': 'restock', 'resock': 'restock',
+    'perfomance': 'performance', 'performace': 'performance',
+    'perfomrmance': 'performance',
+    'recnt': 'recent', 'recetn': 'recent', 'lates': 'latest',
+    'sumary': 'summary', 'summay': 'summary', 'sumamry': 'summary',
+    'hwo': 'how', 'woh': 'who', 'wht': 'what', 'whats': 'what',
+    'whtas': 'what', 'wich': 'which', 'whic': 'which', 'shw': 'show',
+    'sohw': 'show', 'lst': 'list', 'lsit': 'list', 'ilst': 'list',
+    'manny': 'many', 'mny': 'many', 'mcuh': 'much', 'mch': 'much',
+    'teh': 'the', 'adn': 'and', 'nad': 'and', 'fro': 'for', 'fo': 'for',
+    // Taglish phrasing users naturally type.
+    'magkno': 'how much', 'magkano': 'how much', 'mkano': 'how much',
+    'hm': 'how much', 'howmuch': 'how much',
+    'ilan': 'how many', 'ilang': 'how many', 'pilan': 'how many',
+    'presyo': 'price', 'presyu': 'price',
+    'kita': 'sales', 'benta': 'sales', 'tinda': 'products',
+    'sino': 'who', 'ano': 'what', 'anong': 'what',
+  };
+
+  /// Normalizes the raw query for intent detection: lowercase,
+  /// punctuation stripped (receipt numbers and `#` references kept),
+  /// whitespace collapsed, and misspelled tokens snapped to the
+  /// [_intentVocabulary]. Entity extraction still runs on the raw
+  /// query, so a correction can never corrupt a product or user name.
+  String _normalizeQuery(String query) {
+    var q = query.toLowerCase().trim();
+    q = q.replaceAll(RegExp('[!?.,;:\'"()]'), ' ');
+    q = q.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (q.isEmpty) return q;
+    return q.split(' ').map(_correctToken).join(' ');
+  }
+
+  String _correctToken(String token) {
+    final direct = _queryCorrections[token];
+    if (direct != null) return direct;
+    if (token.length < 4) return token;
+    if (_intentVocabulary.contains(token)) return token;
+    if (double.tryParse(token) != null) return token;
+    if (_receiptNumberPattern.hasMatch(token)) return token;
+    for (final word in _intentVocabulary) {
+      if (word.length < 4) continue;
+      if ((token.length - word.length).abs() > 1) continue;
+      if (_isOneEditAway(token, word)) return word;
+    }
+    return token;
+  }
+
+  /// True when [a] is one substitution, insertion, deletion, or
+  /// adjacent transposition away from [b] — e.g. "saels" → "sales",
+  /// "staf" → "staff", "gcahs" → "gcash".
+  static bool _isOneEditAway(String a, String b) {
+    var x = a;
+    var y = b;
+    if (x.length > y.length) {
+      final t = x;
+      x = y;
+      y = t;
+    }
+    final lx = x.length;
+    final ly = y.length;
+    if (ly - lx > 1) return false;
+    if (lx == ly) {
+      var first = -1;
+      var second = -1;
+      var diffs = 0;
+      for (var i = 0; i < lx; i++) {
+        if (x[i] != y[i]) {
+          diffs++;
+          if (first < 0) {
+            first = i;
+          } else {
+            second = i;
+          }
+        }
+      }
+      if (diffs == 1) return true;
+      return diffs == 2 &&
+          second == first + 1 &&
+          x[first] == y[second] &&
+          x[second] == y[first];
+    }
+    // x is one character shorter — allow a single insertion in y.
+    var i = 0;
+    var j = 0;
+    var skipped = false;
+    while (i < lx && j < ly) {
+      if (x[i] == y[j]) {
+        i++;
+        j++;
+      } else {
+        if (skipped) return false;
+        skipped = true;
+        j++;
+      }
+    }
+    return true;
+  }
+
+  /// True when [name] (a user's full name, username, or a product
+  /// name) is mentioned in [q] — an exact word-boundary match first,
+  /// then a one-edit fuzzy match per token so "maira" still finds
+  /// "Maria" and "cokke" still finds "Coke". Intent vocabulary words
+  /// are excluded from the fuzzy pass so keywords can't false-match
+  /// an entity.
+  bool _nameMentioned(String name, String q) {
+    final lowered = name.toLowerCase().trim();
+    if (lowered.length >= 3 &&
+        RegExp('\\b${RegExp.escape(lowered)}\\b').hasMatch(q)) {
+      return true;
+    }
+    final nameTokens =
+        lowered.split(RegExp(r'\s+')).where((t) => t.length >= 4);
+    if (nameTokens.isEmpty) return false;
+    final qTokens = q
+        .split(' ')
+        .map((t) => t.replaceAll(RegExp('[^a-z0-9]'), ''))
+        .where((t) => t.length >= 4 && !_intentVocabulary.contains(t));
+    for (final nt in nameTokens) {
+      if (qTokens.any((qt) => _isOneEditAway(qt, nt))) return true;
+    }
+    return false;
+  }
+
   bool _matches(String query, List<String> patterns) {
-    return patterns.any((p) => query.contains(p));
+    // The normalized query has no apostrophes, so strip them from the
+    // patterns too — "today's activity" still matches "todays ...".
+    return patterns.any((p) => query.contains(p.replaceAll("'", '')));
   }
 
   DateTime _startOfWeek() {

@@ -40,11 +40,13 @@ class AICapabilityPolicy {
   static String capabilityDescription(UserRole role) {
     switch (role) {
       case UserRole.owner:
-        return 'You have access to business-wide analytics: total sales, '
-            'product performance, inventory status, low-stock analysis, '
-            'category performance, sales trends, recent transactions, '
-            'specific product and sale/receipt lookups, cash vs GCash '
-            'payment breakdowns, and business recommendations.';
+        return 'You have full access to everything in the system: '
+            'total sales, product performance, inventory status, '
+            'low-stock analysis, category performance, sales trends, '
+            'recent transactions, specific product and sale/receipt '
+            'lookups, cash vs GCash payment breakdowns, staff accounts '
+            'and per-staff sales performance, user activity, backups, '
+            'exports, system status, and business recommendations.';
       case UserRole.admin:
         return 'You have access to system administration analytics: user '
             'account summaries and individual user lookups, activity logs, '
@@ -79,9 +81,21 @@ class AICapabilityPolicy {
     BusinessIntent.businessSummary,
     BusinessIntent.trendAnalysis,
     BusinessIntent.recentSales,
+    BusinessIntent.staffSales,
     BusinessIntent.productLookup,
     BusinessIntent.saleLookup,
     BusinessIntent.paymentBreakdown,
+    // The owner can see everything in the system — including the
+    // system-administration data domains below.
+    BusinessIntent.activeUserSummary,
+    BusinessIntent.userStatusSummary,
+    BusinessIntent.systemActivitySummary,
+    BusinessIntent.recentActivity,
+    BusinessIntent.backupSummary,
+    BusinessIntent.exportSummary,
+    BusinessIntent.systemStatusSummary,
+    BusinessIntent.adminSummary,
+    BusinessIntent.userLookup,
     BusinessIntent.general,
   };
 
